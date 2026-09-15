@@ -1,0 +1,55 @@
+extends Node
+
+signal save_completed(ok, message)
+
+const SAVE_PATH := "user://tech_empire_save.json"
+
+func save_game():
+	if not CompanyManager.created:
+		save_completed.emit(false, "Aucune partie à sauvegarder.")
+		return
+	var state := {
+		"version":2,
+		"time":TimeManager.get_state(),
+		"economy":Economy.get_state(),
+		"company":CompanyManager.get_state(),
+		"personnel":PersonnelManager.get_state(),
+		"research":ResearchManager.get_state(),
+		"patents":PatentManager.get_state(),
+		"products":ProductManager.get_state(),
+		"market":MarketManager.get_state(),
+		"media":MediaManager.get_state()
+	}
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		save_completed.emit(false, "Impossible d'ouvrir le fichier de sauvegarde.")
+		return
+	file.store_string(JSON.stringify(state))
+	file.close()
+	save_completed.emit(true, "Partie sauvegardée.")
+
+func load_game() -> bool:
+	if not FileAccess.file_exists(SAVE_PATH):
+		save_completed.emit(false, "Aucune sauvegarde trouvée.")
+		return false
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		save_completed.emit(false, "Impossible de lire la sauvegarde.")
+		return false
+	var parsed = JSON.parse_string(file.get_as_text())
+	file.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		save_completed.emit(false, "Sauvegarde invalide.")
+		return false
+	var state: Dictionary = parsed
+	CompanyManager.load_state(state.get("company", {}))
+	Economy.load_state(state.get("economy", {}))
+	PersonnelManager.load_state(state.get("personnel", {}))
+	ResearchManager.load_state(state.get("research", {}))
+	PatentManager.load_state(state.get("patents", {}))
+	ProductManager.load_state(state.get("products", {}))
+	MarketManager.load_state(state.get("market", {}))
+	MediaManager.load_state(state.get("media", {}))
+	TimeManager.load_state(state.get("time", {}))
+	save_completed.emit(true, "Partie chargée.")
+	return true
