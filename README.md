@@ -1,20 +1,29 @@
-# Tycoon Hardware
+# Tech Empire / Tycoon Hardware
 
-> Nom de travail. Le projet évolue vers une simulation complète d'entreprise technologique couvrant hardware, software, services, infrastructures, IA, télécoms, spatial et autres secteurs technologiques.
+> **Nom de travail.** Simulation de gestion d'entreprise technologique couvrant progressivement hardware, software, services, infrastructures, IA, télécoms, spatial et autres secteurs technologiques.
 
 ## Statut
 
-**Projet actif — dépôt en préparation.**
+**Projet actif — prototype V0.2.2 importé et validé sous Godot 4.7.2.**
 
-Le vrai projet Godot est encore sur le PC de développement et n'a pas encore été importé ici. Ce dépôt est donc préparé pour recevoir la source réelle sans reconstruire ni écraser ce qui existe déjà.
+La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
-État fonctionnel connu à confirmer après import :
+État actuellement validé :
 
-- Godot 4.x, 2D ;
+- Godot **4.7.2**, GDScript, 2D / interface de gestion ;
 - cible Windows / PC + Android ;
-- système de temps avec jours, mois, années et vitesses x1/x2/x3 ;
-- économie de base avec trésorerie, revenus et dépenses mensuelles ;
-- première UI de gestion.
+- temps avec pause et vitesses x1/x2/x3 ;
+- économie mensuelle et rapports de clôture ;
+- création d'entreprise et secteur de départ ;
+- personnel, expérience, équipes, départements et délégation ;
+- R&D en plusieurs phases avec rapports techniques ;
+- développement interne / hybride / externe ;
+- technologies et savoir-faire ;
+- produits, prix, capacité de production, ventes et parts de marché ;
+- segments clients, benchmarks et satisfaction ;
+- SAV, garanties, réputation, marketing et environnement ;
+- presse / médias, contrats B2B, brevets, licences et premières filiales ;
+- sauvegarde / chargement.
 
 ## Vision
 
@@ -36,9 +45,15 @@ La boucle centrale visée est :
 
 **observer le marché → décider → investir → rechercher → concevoir → produire → vendre → analyser → réinvestir / pivoter / acquérir.**
 
+## Philosophie de gestion
+
+Le jeu doit proposer **une seule simulation**, pas plusieurs jeux séparés selon la difficulté. La complexité ressentie dépendra surtout de la délégation : le joueur pourra gérer directement un département, le superviser ou confier davantage d'autonomie à un responsable.
+
+L'expérience individuelle, l'expérience d'équipe, les spécialisations et la qualité du management devront influencer les résultats sans transformer l'interface en tableur illisible.
+
 ## IA et immersion
 
-La simulation reste calculée par Godot. L'IA générative pourra être utilisée comme couche d'immersion pour :
+La simulation reste calculée par Godot. L'IA générative pourra être ajoutée comme couche d'immersion pour :
 
 - un assistant / conseiller du joueur ;
 - des rapports et réunions ;
@@ -48,59 +63,48 @@ La simulation reste calculée par Godot. L'IA générative pourra être utilisé
 
 Le jeu devra rester fonctionnel même sans LLM.
 
-## Première vertical slice
+## Validation automatique
 
-La vision est volontairement vaste, mais le développement restera progressif.
+Le workflow `.github/workflows/godot-ci.yml` utilise Godot 4.7.2 et vérifie :
 
-Premier objectif jouable :
+1. import et parsing du projet ;
+2. démarrage headless de la scène principale ;
+3. smoke test : création d'entreprise → lancement d'une R&D → traitement d'un mois → cohérence du rapport économique.
 
-**créer une entreprise → rechercher un CPU → concevoir → produire → fixer le prix → vendre → mesurer marge, réputation et part de marché → financer la génération suivante.**
-
-Cette boucle servira ensuite de base générique pour les autres secteurs technologiques.
+La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais elle évite de transmettre une version contenant une erreur GDScript évidente.
 
 ## Documentation
 
-- [`docs/VISION.md`](docs/VISION.md) — vision globale du jeu ;
-- [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes de game design ;
+- [`docs/VISION.md`](docs/VISION.md) — vision globale ;
+- [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes ;
 - [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
-- [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — procédure d'import du vrai projet Godot.
+- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — contenu du prototype actuel ;
+- [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — historique / procédure d'import du projet local.
 
-## Organisation prévue
+## Organisation actuelle
 
 ```text
-TycoonHardware/
+Tech-Empire/
 ├─ project.godot
-├─ assets/
-├─ scenes/
+├─ main.tscn
+├─ main.gd
 ├─ scripts/
-├─ data/
-├─ ui/
 ├─ tests/
 ├─ docs/
-└─ .github/
+└─ .github/workflows/
 ```
 
-Cette structure sera adaptée au projet réel après son import ; aucun fichier existant du PC ne doit être écrasé uniquement pour respecter ce schéma.
+La structure sera raffinée progressivement sans réorganisations inutiles qui casseraient le prototype.
 
-## Prochaine étape obligatoire
+## Workflow de développement
 
-Avant de coder de nouvelles fonctionnalités :
-
-1. récupérer le dossier Godot réel depuis le PC de développement ;
-2. faire une sauvegarde locale ;
-3. comparer son contenu au dépôt ;
-4. importer sans inclure `.godot/`, builds, secrets ou fichiers temporaires ;
-5. lancer le projet depuis un clone propre ;
-6. vérifier PC et Android ;
-7. seulement ensuite reprendre le gameplay.
-
-## Règles Git
-
-- `main` devra devenir la branche stable quand le dépôt sera normalisé ;
-- développement par branches courtes (`feature/...`, `fix/...`) ;
-- Pull Request pour les changements importants ;
-- aucun secret, build ou cache Godot versionné ;
+- dépôt GitHub = source de vérité ;
+- branche stable actuelle : `master` (normalisation vers `main` prévue plus tard) ;
+- branches courtes pour les évolutions importantes ;
+- Pull Requests quand utile ;
+- CI Godot obligatoire avant de considérer une modification comme techniquement validée ;
+- aucun secret, build, cache `.godot/` ou fichier `*.import` versionné ;
 - commits courts et explicites (`feat:`, `fix:`, `docs:`, `chore:`).
 
 ## Plateformes visées
