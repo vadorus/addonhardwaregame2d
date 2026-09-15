@@ -19,19 +19,25 @@ Objectif : prouver une boucle de jeu complète, pas seulement un écran de conce
 - [ ] Création de l'entreprise.
 - [ ] Trésorerie et coûts fixes.
 - [ ] Marché CPU de départ.
+- [ ] Première équipe technique.
 - [ ] R&D CPU.
 - [ ] Paramètres de conception : architecture, cœurs, fréquence, IPC, cache, TDP, gravure.
+- [ ] Phases concept / prototype / bêta / validation simplifiées.
+- [ ] Rapport du chef d'équipe avec forces, faiblesses et risques.
 - [ ] Validation du design.
 - [ ] Production / sous-traitance simple.
 - [ ] Coût unitaire et volume.
 - [ ] Prix de vente.
 - [ ] Demande et ventes mensuelles.
+- [ ] Premier benchmark public.
+- [ ] Avis clients simplifiés par segment.
 - [ ] Marge et trésorerie.
 - [ ] Réputation.
 - [ ] Parts de marché.
+- [ ] SAV simplifié avec budget/politique.
 - [ ] Génération suivante.
 
-**Critère de fin :** une partie permet de créer une société, lancer un premier CPU, le commercialiser et observer des conséquences financières et concurrentielles.
+**Critère de fin :** une partie permet de créer une société, développer un premier CPU avec son équipe, le commercialiser, recevoir des retours mesurables et observer des conséquences financières et concurrentielles.
 
 ## Phase 2 — Moteur industriel générique
 
@@ -41,20 +47,28 @@ Objectif : prouver une boucle de jeu complète, pas seulement un écran de conce
 - [ ] Services.
 - [ ] Infrastructures.
 - [ ] Fournisseurs.
+- [ ] Développer / acheter / licencier / co-développer.
 - [ ] Capacité de production.
 - [ ] Rendement de fabrication.
 - [ ] Qualité et taux de panne.
 - [ ] Stocks.
-- [ ] SAV / retours.
+- [ ] SAV / retours / garanties.
+- [ ] Pièces détachées et capacité de réparation.
 - [ ] Logistique.
 
 Objectif : permettre à plusieurs familles de produits d'utiliser le même moteur.
 
-## Phase 3 — Marché et concurrence
+## Phase 3 — Marché, clients, médias et concurrence
 
 - [ ] Segments de marché.
+- [ ] Critères d'évaluation par segment.
+- [ ] Attentes selon prix, marque et promesses marketing.
 - [ ] Élasticité prix / performance / marque.
 - [ ] Tendances technologiques.
+- [ ] Benchmarks multi-critères.
+- [ ] Presse hardware / software / économique.
+- [ ] Médias web, vidéo, livestream et influenceurs.
+- [ ] Avis clients et bouche-à-oreille.
 - [ ] Concurrents avec profils durables.
 - [ ] Budget et stratégie concurrents.
 - [ ] Parts de marché.
@@ -66,18 +80,38 @@ Objectif : permettre à plusieurs familles de produits d'utiliser le même moteu
 
 - [ ] Départements.
 - [ ] Employés et compétences.
-- [ ] Recrutement / salaires.
+- [ ] Chefs d'équipe et responsables de département.
+- [ ] Progression des équipes par expérience réelle.
+- [ ] Recrutement / salaires / turnover.
 - [ ] Bureaux et centres R&D.
 - [ ] Marques et filiales.
+- [ ] Société mère / groupe.
 - [ ] Financement / dette.
-- [ ] Marketing et distribution.
-- [ ] Contrats.
-- [ ] Brevets et licences.
+- [ ] Publicité et marketing multicanal.
+- [ ] Distribution.
+- [ ] Contrats B2B.
+- [ ] Brevets, licences, cross-licensing et secrets industriels.
 - [ ] Expansion internationale.
 - [ ] Acquisitions et participations.
+- [ ] Fusion / cession / spin-off de filiales.
 - [ ] Intégration verticale.
 
-## Phase 5 — Première diversification
+## Phase 5 — Délégation et profondeur configurable
+
+- [ ] Preset Accessible.
+- [ ] Preset Standard.
+- [ ] Preset Simulation.
+- [ ] Automatisation par département plutôt qu'un mode global rigide.
+- [ ] Politiques automatiques de SAV.
+- [ ] Politiques automatiques RH.
+- [ ] Politiques automatiques production/logistique.
+- [ ] Politiques automatiques marketing.
+- [ ] Alertes et exceptions qui remontent au joueur.
+- [ ] Possibilité de reprendre manuellement un département à tout moment.
+
+Objectif : offrir la même simulation de fond aux joueurs casual et experts, avec un niveau de microgestion choisi par le joueur.
+
+## Phase 6 — Première diversification
 
 Après stabilisation du moteur commun :
 
@@ -88,13 +122,15 @@ Après stabilisation du moteur commun :
 - [ ] Smartphones / tablettes.
 - [ ] TV / écrans.
 - [ ] Logiciels / système d'exploitation.
+- [ ] Synergies hardware / software.
+- [ ] Optimisation d'écosystème interne.
 
 L'ordre exact dépendra de la qualité de la vertical slice et des synergies disponibles.
 
-## Phase 6 — IA et monde vivant
+## Phase 7 — IA et monde vivant
 
 - [ ] Assistant du joueur basé sur les données réelles de la partie.
-- [ ] Conseillers spécialisés (finance, technologie, production, marketing...).
+- [ ] Conseillers spécialisés (finance, technologie, production, marketing, SAV...).
 - [ ] Personnalités concurrentes.
 - [ ] Réactions médias / analystes.
 - [ ] Négociations enrichies.
@@ -103,7 +139,7 @@ L'ordre exact dépendra de la qualité de la vertical slice et des synergies dis
 
 Voir `docs/AI_IMMERSION.md`.
 
-## Phase 7 — Nouveaux secteurs technologiques
+## Phase 8 — Nouveaux secteurs technologiques
 
 Extension progressive du moteur vers :
 
@@ -118,7 +154,7 @@ Extension progressive du moteur vers :
 - [ ] communications orbitales ;
 - [ ] autres technologies futures.
 
-## Phase 8 — Réalisme avancé
+## Phase 9 — Réalisme avancé
 
 - [ ] Chaînes d'approvisionnement multi-niveaux.
 - [ ] Géographie des marchés.
@@ -127,10 +163,32 @@ Extension progressive du moteur vers :
 - [ ] Crises et pénuries.
 - [ ] Rappels produit.
 - [ ] Dépendances stratégiques.
-- [ ] Fiscalité simplifiée ou avancée selon mode.
+- [ ] Fiscalité simplifiée ou avancée selon niveau de délégation.
 - [ ] Gouvernance / actionnaires si pertinent.
+- [ ] Environnement, énergie, ressources, recyclage et réparabilité.
 
-## Phase 9 — Mobile, PC et finition
+## Phase 10 — Multijoueur économique optionnel
+
+Ne démarrer cette phase qu'après validation du solo.
+
+- [ ] Monde économique partagé asynchrone.
+- [ ] Temps serveur indépendant de la vitesse locale du solo.
+- [ ] Entreprises de joueurs visibles dans benchmarks et marchés.
+- [ ] Contrats B2B entre joueurs.
+- [ ] Vente de composants.
+- [ ] Licences technologiques / brevets.
+- [ ] Partenariats et co-développement.
+- [ ] Joint-ventures.
+- [ ] Appels d'offres.
+- [ ] Prises de participation.
+- [ ] Vente de marques ou filiales.
+- [ ] Fusions et acquisitions volontaires.
+- [ ] Protections empêchant la perte forcée d'une partie hors mode compétitif explicitement accepté.
+- [ ] Gestion automatique de l'entreprise pendant l'absence du joueur selon ses politiques.
+
+Objectif : confronter les stratégies des joueurs sans transformer le jeu en MMO temps réel permanent ni rendre le solo dépendant d'un serveur.
+
+## Phase 11 — Mobile, PC et finition
 
 - [ ] UI responsive.
 - [ ] Contrôles tactiles.
