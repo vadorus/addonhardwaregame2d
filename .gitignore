@@ -1,8 +1,9 @@
-# Tycoon Hardware — Godot 4.x
+# Tech Empire — Godot 4.7.x
 
 # Godot generated data
 .godot/
 .import/
+*.import
 
 # Mono / C# generated files (si utilisés plus tard)
 .mono/
