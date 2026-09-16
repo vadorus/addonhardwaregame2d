@@ -61,3 +61,13 @@ Cette V0.2 est une fondation jouable : elle ne cherche pas encore à simuler tou
 - Futurs secteurs conservés dans les données, affichés comme « à venir » et désactivés dans l’interface.
 - Validation côté moteur empêchant le démarrage d’une partie, d’une filiale ou d’une R&D dans une branche inactive.
 - Smoke test étendu pour vérifier le verrou CPU.
+
+
+## Correctif V0.2.4 — premier passage interface
+
+- Nouvelle identité sombre et technologique avec couleurs fonctionnelles cohérentes.
+- Navigation principale dédiée : QG, Entreprise, Équipe, Laboratoire CPU, Produits, Marché et Presse.
+- QG reconstruit autour du projet prioritaire, de sa progression, du rapport du CTO et des événements récents.
+- Aperçu graphique du processeur dessiné directement par Godot, sans dépendance à un asset externe.
+- Indicateurs et radar marché alimentés par l’état réel de la partie.
+- Mise en page du QG adaptable aux écrans étroits.

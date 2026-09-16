@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.2.3 importé et validé sous Godot 4.7.2.**
+**Projet actif — prototype V0.2.4 importé et validé sous Godot 4.7.2.**
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
@@ -23,11 +23,14 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - segments clients, benchmarks et satisfaction ;
 - SAV, garanties, réputation, marketing et environnement ;
 - presse / médias, contrats B2B, brevets, licences et premières filiales ;
-- sauvegarde / chargement.
+- sauvegarde / chargement ;
+- nouvelle identité visuelle, navigation dédiée et QG centré sur le projet CPU prioritaire.
 
 ## Périmètre jouable actuel
 
 La vertical slice est volontairement limitée à la branche **CPU**. Les autres secteurs restent paramétrés dans les données afin de préparer les futures extensions, mais ils sont affichés comme « à venir », désactivés dans l’interface et refusés par le moteur de R&D. Ils ne doivent pas être développés avant que la boucle CPU soit profonde, équilibrée et amusante.
+
+L’interface V0.2.4 pose le premier socle de cette expérience : palette visuelle propre au jeu, navigation sans onglets techniques visibles, aperçu graphique du processeur, projet prioritaire, rapport du CTO, indicateurs lisibles et radar du marché alimentés par les vraies données de simulation.
 
 ## Vision
 
