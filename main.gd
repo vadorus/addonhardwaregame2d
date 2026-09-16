@@ -172,6 +172,9 @@ func _create_research_tab():
 	var scroll := _tab_scroll("R&D")
 	var box: VBoxContainer = scroll.get_child(0)
 	box.add_child(_section("Lancer un développement produit"))
+	var scope_note := _label("Vertical slice actuelle : processeurs (CPU). Les autres branches sont affichées mais verrouillées pour plus tard.", 13)
+	scope_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(scope_note)
 	var grid := GridContainer.new(); grid.columns=2; box.add_child(grid)
 	grid.add_child(_label("Nom du produit",14)); rd_name=LineEdit.new(); rd_name.placeholder_text="X-Core One"; grid.add_child(rd_name)
 	grid.add_child(_label("Secteur",14)); rd_sector=OptionButton.new(); _fill_sector_options(rd_sector); grid.add_child(rd_sector)
@@ -221,7 +224,7 @@ func _build_setup_layer():
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
 	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("Commencez petit, choisissez votre premier secteur, puis développez vos équipes, technologies, produits et divisions.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var desc:=_label("La vertical slice actuelle commence par la branche CPU. Développez vos équipes, vos technologies et plusieurs générations de processeurs avant l’ouverture des autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
 	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
 	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
@@ -258,7 +261,17 @@ func _fill_simple(option: OptionButton, items: Dictionary):
 	option.clear(); for key in items.keys(): option.add_item(str(items[key])); option.set_item_metadata(option.item_count-1,str(key))
 
 func _fill_sector_options(option: OptionButton):
-	option.clear(); for key in GameData.get_sector_keys(): option.add_item(str(GameData.SECTORS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
+	option.clear()
+	for key in GameData.get_sector_keys():
+		var sector_key := str(key)
+		var active := GameData.is_sector_active(sector_key)
+		var item_label := str(GameData.SECTORS[key].label)
+		if not active:
+			item_label += " — à venir"
+		option.add_item(item_label)
+		var item_index := option.item_count - 1
+		option.set_item_metadata(item_index, sector_key)
+		option.set_item_disabled(item_index, not active)
 
 func _fill_segment_options(option: OptionButton):
 	option.clear(); for key in GameData.get_segment_keys(): option.add_item(str(GameData.SEGMENTS[key].label)); option.set_item_metadata(option.item_count-1,str(key))

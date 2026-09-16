@@ -40,7 +40,7 @@ var alerts: Array = []
 
 func reset(name: String, sector: String, capital: int = 500_000):
 	company_name = name.strip_edges() if not name.strip_edges().is_empty() else "Nova Technologies"
-	starting_sector = sector
+	starting_sector = sector if GameData.is_sector_active(sector) else "CPU"
 	founded_year = 2025
 	created = true
 	reputation = {
@@ -110,6 +110,8 @@ func department_management_modifier(department: String) -> float:
 	return clampf(0.78 + leader_quality / 420.0, 0.65, 1.10)
 
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
+	if not GameData.is_sector_active(sector):
+		return false
 	if capital < 50000 or Economy.money < capital:
 		return false
 	Economy.add_expense(capital, "Capital filiale")
