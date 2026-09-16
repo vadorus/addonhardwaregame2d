@@ -1,5 +1,19 @@
 extends Control
 
+const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
+const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
+const APP_PANEL := Color(0.071, 0.106, 0.161, 1.0)
+const APP_PANEL_ALT := Color(0.094, 0.141, 0.212, 1.0)
+const APP_TEXT := Color(0.933, 0.965, 1.0, 1.0)
+const APP_MUTED := Color(0.565, 0.635, 0.718, 1.0)
+const APP_LINE := Color(0.149, 0.212, 0.290, 1.0)
+const APP_CYAN := Color(0.306, 0.843, 0.910, 1.0)
+const APP_CYAN_DARK := Color(0.071, 0.200, 0.239, 1.0)
+const APP_AMBER := Color(1.000, 0.741, 0.353, 1.0)
+const APP_AMBER_DARK := Color(0.224, 0.165, 0.086, 1.0)
+const APP_GREEN := Color(0.361, 0.878, 0.643, 1.0)
+const APP_RED := Color(1.000, 0.482, 0.482, 1.0)
+
 var company_label: Label
 var date_label: Label
 var money_label: Label
@@ -47,11 +61,36 @@ var subsidiary_name: LineEdit
 var subsidiary_sector: OptionButton
 var subsidiary_capital: SpinBox
 
+var nav_buttons: Array[Button] = []
+var dashboard_grid: GridContainer
+var dashboard_project_grid: GridContainer
+var dashboard_stats_grid: GridContainer
+var dashboard_lower_grid: GridContainer
+var dashboard_chip: Control
+var dashboard_project_meta_label: Label
+var dashboard_project_phase_label: Label
+var dashboard_project_progress: ProgressBar
+var dashboard_cto_label: Label
+var dashboard_market_outlook_label: Label
+var dashboard_cash_value: Label
+var dashboard_result_value: Label
+var dashboard_staff_value: Label
+var dashboard_brand_value: Label
+var dashboard_metric_a: Label
+var dashboard_metric_b: Label
+var dashboard_metric_c: Label
+var dashboard_action_button: Button
+var dashboard_cto_button: Button
+var dashboard_target_tab := 3
+
 func _ready():
+	theme = _create_app_theme()
 	_build_ui()
 	_connect_signals()
+	resized.connect(_update_responsive_layout)
 	_refresh_all()
 	setup_layer.visible = not CompanyManager.created
+	call_deferred("_update_responsive_layout")
 
 func _process(_delta):
 	if CompanyManager.created:
@@ -75,44 +114,109 @@ func _connect_signals():
 
 func _build_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var background := ColorRect.new()
+	background.color = APP_BG
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
+
 	var root_box := VBoxContainer.new()
 	root_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root_box.add_theme_constant_override("separation", 6)
+	root_box.offset_left = 10.0
+	root_box.offset_top = 10.0
+	root_box.offset_right = -10.0
+	root_box.offset_bottom = -10.0
+	root_box.add_theme_constant_override("separation", 8)
 	add_child(root_box)
 
-	var top := HBoxContainer.new()
-	top.custom_minimum_size.y = 54
-	top.add_theme_constant_override("separation", 12)
-	root_box.add_child(top)
-	company_label = _label("Tech Empire", 20)
-	company_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(company_label)
-	date_label = _label("Jour 1 • Mois 1 • 2025", 16)
-	top.add_child(date_label)
-	money_label = _label("500 000 €", 18)
-	top.add_child(money_label)
-	for data in [["⏸",0.0],["x1",1.0],["x2",2.0],["x3",3.0]]:
-		var b := Button.new()
-		b.text = str(data[0])
+	var header := _card(APP_SHELL, 13, 12)
+	root_box.add_child(header)
+	var top := HFlowContainer.new()
+	top.add_theme_constant_override("h_separation", 12)
+	top.add_theme_constant_override("v_separation", 8)
+	header.add_child(top)
+
+	var mark := PanelContainer.new()
+	mark.custom_minimum_size = Vector2(44, 44)
+	mark.add_theme_stylebox_override("panel", _stylebox(APP_CYAN, 11, 0, APP_CYAN, 0))
+	var mark_label := _label("TE", 17)
+	mark_label.add_theme_color_override("font_color", APP_BG)
+	mark_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mark_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mark.add_child(mark_label)
+	top.add_child(mark)
+
+	var brand_box := VBoxContainer.new()
+	brand_box.custom_minimum_size.x = 180
+	top.add_child(brand_box)
+	company_label = _label("Tech Empire", 18)
+	brand_box.add_child(company_label)
+	var era_label := _muted_label("Vertical slice • CPU", 12)
+	brand_box.add_child(era_label)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.custom_minimum_size.x = 20
+	top.add_child(spacer)
+
+	var date_box := VBoxContainer.new()
+	date_box.custom_minimum_size.x = 125
+	date_box.add_child(_eyebrow("CALENDRIER"))
+	date_label = _label("Jour 1 • Mois 1 • 2025", 14)
+	date_box.add_child(date_label)
+	top.add_child(date_box)
+
+	var money_box := VBoxContainer.new()
+	money_box.custom_minimum_size.x = 120
+	money_box.add_child(_eyebrow("TRÉSORERIE"))
+	money_label = _label("500 000 €", 16)
+	money_label.add_theme_color_override("font_color", APP_GREEN)
+	money_box.add_child(money_label)
+	top.add_child(money_box)
+
+	for data in [["Ⅱ",0.0],["x1",1.0],["x2",2.0],["x3",3.0]]:
+		var speed_button := Button.new()
+		speed_button.text = str(data[0])
+		speed_button.custom_minimum_size = Vector2(44, 42)
 		var speed := float(data[1])
-		b.pressed.connect(func(): TimeManager.time_scale = speed)
-		top.add_child(b)
+		speed_button.pressed.connect(func(): TimeManager.time_scale = speed)
+		top.add_child(speed_button)
+
 	var save_btn := Button.new()
 	save_btn.text = "Sauver"
+	save_btn.custom_minimum_size.y = 42
 	save_btn.pressed.connect(func(): SaveManager.save_game())
 	top.add_child(save_btn)
 	var load_btn := Button.new()
 	load_btn.text = "Charger"
+	load_btn.custom_minimum_size.y = 42
 	load_btn.pressed.connect(_load_game)
 	top.add_child(load_btn)
 
+	var nav_panel := _card(APP_SHELL, 12, 6)
+	root_box.add_child(nav_panel)
+	var nav_scroll := ScrollContainer.new()
+	nav_scroll.custom_minimum_size.y = 48
+	nav_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	nav_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	nav_panel.add_child(nav_scroll)
+	var nav_bar := HBoxContainer.new()
+	nav_bar.add_theme_constant_override("separation", 6)
+	nav_scroll.add_child(nav_bar)
+	_build_navigation(nav_bar)
+
 	status_label = _label("", 13)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.custom_minimum_size.y = 24
+	status_label.add_theme_color_override("font_color", APP_CYAN)
 	root_box.add_child(status_label)
 
 	tabs = TabContainer.new()
+	tabs.tabs_visible = false
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.tab_changed.connect(func(_index): _update_nav_state())
 	root_box.add_child(tabs)
 	_create_dashboard_tab()
 	_create_company_tab()
@@ -121,17 +225,160 @@ func _build_ui():
 	_create_products_tab()
 	_create_market_tab()
 	_create_media_tab()
+	_update_nav_state()
 	_build_setup_layer()
 	_build_month_layer()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
 	var box: VBoxContainer = scroll.get_child(0)
-	dashboard_label = _rich_label()
-	box.add_child(dashboard_label)
-	box.add_child(_section("Alertes de direction"))
+
+	var heading := HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 12)
+	box.add_child(heading)
+	var heading_copy := VBoxContainer.new()
+	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(heading_copy)
+	heading_copy.add_child(_eyebrow("CENTRE DE COMMANDEMENT"))
+	var title := _label("Votre entreprise, en un coup d'œil", 27)
+	heading_copy.add_child(title)
+	heading_copy.add_child(_muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+
+	dashboard_grid = GridContainer.new()
+	dashboard_grid.columns = 2
+	dashboard_grid.add_theme_constant_override("h_separation", 12)
+	dashboard_grid.add_theme_constant_override("v_separation", 12)
+	box.add_child(dashboard_grid)
+
+	var project_card := _card(APP_PANEL, 14, 16)
+	project_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_grid.add_child(project_card)
+	var project_box := VBoxContainer.new()
+	project_box.add_theme_constant_override("separation", 13)
+	project_card.add_child(project_box)
+	var project_head := HBoxContainer.new()
+	project_box.add_child(project_head)
+	var project_kicker := _eyebrow("PROJET PRIORITAIRE")
+	project_kicker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	project_head.add_child(project_kicker)
+	var phase_badge := PanelContainer.new()
+	phase_badge.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 99, 0, APP_AMBER_DARK, 6))
+	dashboard_project_phase_label = _label("EN ATTENTE", 11)
+	dashboard_project_phase_label.add_theme_color_override("font_color", APP_AMBER)
+	phase_badge.add_child(dashboard_project_phase_label)
+	project_head.add_child(phase_badge)
+
+	dashboard_project_grid = GridContainer.new()
+	dashboard_project_grid.columns = 2
+	dashboard_project_grid.add_theme_constant_override("h_separation", 16)
+	dashboard_project_grid.add_theme_constant_override("v_separation", 12)
+	project_box.add_child(dashboard_project_grid)
+	var chip_frame := PanelContainer.new()
+	chip_frame.custom_minimum_size = Vector2(175, 175)
+	chip_frame.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 13, 0, APP_PANEL_ALT, 0))
+	var chip_script: Script = load("res://ui/ChipPreview.gd")
+	dashboard_chip = chip_script.new() as Control
+	chip_frame.add_child(dashboard_chip)
+	dashboard_project_grid.add_child(chip_frame)
+
+	var project_info := VBoxContainer.new()
+	project_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	project_info.add_theme_constant_override("separation", 9)
+	dashboard_project_grid.add_child(project_info)
+	dashboard_label = _label("Votre première génération", 24)
+	dashboard_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	project_info.add_child(dashboard_label)
+	dashboard_project_meta_label = _muted_label("Définissez votre premier processeur.", 13)
+	dashboard_project_meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	project_info.add_child(dashboard_project_meta_label)
+	dashboard_project_progress = ProgressBar.new()
+	dashboard_project_progress.show_percentage = false
+	dashboard_project_progress.custom_minimum_size.y = 10
+	project_info.add_child(dashboard_project_progress)
+
+	var project_metrics := GridContainer.new()
+	project_metrics.columns = 3
+	project_metrics.add_theme_constant_override("h_separation", 7)
+	project_info.add_child(project_metrics)
+	dashboard_metric_a = _add_inline_metric(project_metrics, "Budget", "—")
+	dashboard_metric_b = _add_inline_metric(project_metrics, "Durée", "—")
+	dashboard_metric_c = _add_inline_metric(project_metrics, "Approche", "—")
+
+	dashboard_action_button = Button.new()
+	dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+	dashboard_action_button.custom_minimum_size.y = 44
+	dashboard_action_button.pressed.connect(_dashboard_primary_action)
+	project_box.add_child(dashboard_action_button)
+
+	var advisor_card := _card(APP_PANEL, 14, 16)
+	advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_grid.add_child(advisor_card)
+	var advisor_box := VBoxContainer.new()
+	advisor_box.add_theme_constant_override("separation", 13)
+	advisor_card.add_child(advisor_box)
+	var advisor_head := HBoxContainer.new()
+	advisor_box.add_child(advisor_head)
+	var avatar := PanelContainer.new()
+	avatar.custom_minimum_size = Vector2(46, 46)
+	avatar.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 12, 0, APP_AMBER_DARK, 0))
+	var avatar_label := _label("CD", 15)
+	avatar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	avatar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	avatar_label.add_theme_color_override("font_color", APP_AMBER)
+	avatar.add_child(avatar_label)
+	advisor_head.add_child(avatar)
+	var advisor_identity := VBoxContainer.new()
+	advisor_identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	advisor_head.add_child(advisor_identity)
+	advisor_identity.add_child(_label("Camille Durand", 16))
+	advisor_identity.add_child(_muted_label("CTO • Responsable R&D", 12))
+	dashboard_cto_label = _rich_label()
+	dashboard_cto_label.custom_minimum_size.y = 125
+	dashboard_cto_label.add_theme_font_size_override("font_size", 15)
+	advisor_box.add_child(dashboard_cto_label)
+	dashboard_cto_button = Button.new()
+	dashboard_cto_button.text = "Voir le rapport complet"
+	dashboard_cto_button.custom_minimum_size.y = 44
+	dashboard_cto_button.pressed.connect(func(): _show_tab(3))
+	advisor_box.add_child(dashboard_cto_button)
+
+	dashboard_stats_grid = GridContainer.new()
+	dashboard_stats_grid.columns = 4
+	dashboard_stats_grid.add_theme_constant_override("h_separation", 10)
+	dashboard_stats_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(dashboard_stats_grid)
+	dashboard_cash_value = _add_stat_card(dashboard_stats_grid, "TRÉSORERIE")
+	dashboard_result_value = _add_stat_card(dashboard_stats_grid, "DERNIER RÉSULTAT")
+	dashboard_staff_value = _add_stat_card(dashboard_stats_grid, "ÉQUIPE")
+	dashboard_brand_value = _add_stat_card(dashboard_stats_grid, "IMAGE DE MARQUE")
+
+	dashboard_lower_grid = GridContainer.new()
+	dashboard_lower_grid.columns = 2
+	dashboard_lower_grid.add_theme_constant_override("h_separation", 12)
+	dashboard_lower_grid.add_theme_constant_override("v_separation", 12)
+	box.add_child(dashboard_lower_grid)
+
+	var activity_card := _card(APP_PANEL, 14, 16)
+	activity_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_lower_grid.add_child(activity_card)
+	var activity_box := VBoxContainer.new()
+	activity_box.add_theme_constant_override("separation", 10)
+	activity_card.add_child(activity_box)
+	activity_box.add_child(_eyebrow("CE QUI VIENT DE SE PASSER"))
 	alerts_label = _rich_label()
-	box.add_child(alerts_label)
+	alerts_label.custom_minimum_size.y = 128
+	activity_box.add_child(alerts_label)
+
+	var market_card := _card(APP_PANEL, 14, 16)
+	market_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_lower_grid.add_child(market_card)
+	var market_box := VBoxContainer.new()
+	market_box.add_theme_constant_override("separation", 10)
+	market_card.add_child(market_box)
+	market_box.add_child(_eyebrow("RADAR DU MARCHÉ CPU"))
+	dashboard_market_outlook_label = _rich_label()
+	dashboard_market_outlook_label.custom_minimum_size.y = 128
+	market_box.add_child(dashboard_market_outlook_label)
 
 func _create_company_tab():
 	var scroll := _tab_scroll("Entreprise")
@@ -239,20 +486,183 @@ func _build_month_layer():
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
 func _tab_scroll(title: String) -> ScrollContainer:
-	var scroll:=ScrollContainer.new(); scroll.name=title; scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL; scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var box:=VBoxContainer.new(); box.size_flags_horizontal=Control.SIZE_EXPAND_FILL; box.add_theme_constant_override("separation",10); box.custom_minimum_size.x=900; scroll.add_child(box); tabs.add_child(scroll); return scroll
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 12)
+	scroll.add_child(box)
+	tabs.add_child(scroll)
+	return scroll
 
-func _label(text: String, size: int=14) -> Label:
-	var l:=Label.new(); l.text=text; l.add_theme_font_size_override("font_size",size); return l
+func _label(text: String, size: int = 14) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", APP_TEXT)
+	return label
+
+func _muted_label(text: String, size: int = 13) -> Label:
+	var label := _label(text, size)
+	label.add_theme_color_override("font_color", APP_MUTED)
+	return label
+
+func _eyebrow(text: String) -> Label:
+	var label := _label(text, 11)
+	label.add_theme_color_override("font_color", APP_CYAN)
+	return label
 
 func _section(text: String) -> Label:
-	var l:=_label(text,19); l.custom_minimum_size.y=32; return l
+	var label := _label(text, 19)
+	label.custom_minimum_size.y = 34
+	label.add_theme_color_override("font_color", APP_CYAN)
+	return label
 
 func _rich_label() -> Label:
-	var l:=_label("",14); l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; l.size_flags_horizontal=Control.SIZE_EXPAND_FILL; return l
+	var label := _label("", 14)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_color_override("font_color", APP_MUTED)
+	return label
 
-func _spin(minv: float,maxv: float,stepv: float,valuev: float) -> SpinBox:
-	var s:=SpinBox.new(); s.min_value=minv; s.max_value=maxv; s.step=stepv; s.value=valuev; s.allow_greater=true; return s
+func _spin(minv: float, maxv: float, stepv: float, valuev: float) -> SpinBox:
+	var spin := SpinBox.new()
+	spin.min_value = minv
+	spin.max_value = maxv
+	spin.step = stepv
+	spin.value = valuev
+	spin.allow_greater = true
+	spin.custom_minimum_size.y = 42
+	return spin
+
+func _stylebox(bg: Color, radius: int = 10, border: int = 0, border_color: Color = APP_LINE, padding: int = 10) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	style.border_width_left = border
+	style.border_width_top = border
+	style.border_width_right = border
+	style.border_width_bottom = border
+	style.border_color = border_color
+	style.content_margin_left = padding
+	style.content_margin_top = padding
+	style.content_margin_right = padding
+	style.content_margin_bottom = padding
+	return style
+
+func _card(color: Color = APP_PANEL, radius: int = 14, padding: int = 14) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _stylebox(color, radius, 1, APP_LINE, padding))
+	return panel
+
+func _create_app_theme() -> Theme:
+	var app_theme := Theme.new()
+	app_theme.default_font_size = 14
+	app_theme.set_color("font_color", "Label", APP_TEXT)
+	app_theme.set_color("font_color", "Button", APP_TEXT)
+	app_theme.set_color("font_hover_color", "Button", APP_TEXT)
+	app_theme.set_color("font_pressed_color", "Button", APP_BG)
+	app_theme.set_color("font_disabled_color", "Button", APP_MUTED)
+	app_theme.set_stylebox("normal", "Button", _stylebox(APP_PANEL_ALT, 9, 1, APP_LINE, 10))
+	app_theme.set_stylebox("hover", "Button", _stylebox(APP_CYAN_DARK, 9, 1, APP_CYAN, 10))
+	app_theme.set_stylebox("pressed", "Button", _stylebox(APP_CYAN, 9, 1, APP_CYAN, 10))
+	app_theme.set_stylebox("focus", "Button", _stylebox(APP_CYAN_DARK, 9, 1, APP_CYAN, 10))
+	app_theme.set_stylebox("disabled", "Button", _stylebox(APP_SHELL, 9, 1, APP_LINE, 10))
+	app_theme.set_stylebox("panel", "PanelContainer", _stylebox(APP_PANEL, 12, 1, APP_LINE, 12))
+	app_theme.set_stylebox("normal", "LineEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
+	app_theme.set_stylebox("focus", "LineEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_CYAN, 9))
+	app_theme.set_color("font_color", "LineEdit", APP_TEXT)
+	app_theme.set_color("font_placeholder_color", "LineEdit", APP_MUTED)
+	app_theme.set_stylebox("normal", "OptionButton", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
+	app_theme.set_stylebox("hover", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
+	app_theme.set_stylebox("pressed", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
+	app_theme.set_color("font_color", "OptionButton", APP_TEXT)
+	app_theme.set_stylebox("background", "ProgressBar", _stylebox(APP_PANEL_ALT, 99, 0, APP_PANEL_ALT, 0))
+	app_theme.set_stylebox("fill", "ProgressBar", _stylebox(APP_CYAN, 99, 0, APP_CYAN, 0))
+	app_theme.set_color("font_color", "ProgressBar", APP_TEXT)
+	app_theme.set_stylebox("panel", "TabContainer", _stylebox(Color(0, 0, 0, 0), 0, 0, APP_LINE, 0))
+	app_theme.set_constant("separation", "VBoxContainer", 7)
+	app_theme.set_constant("separation", "HBoxContainer", 8)
+	return app_theme
+
+func _build_navigation(parent: HBoxContainer):
+	var entries := [
+		["QG", 0],
+		["Entreprise", 1],
+		["Équipe", 2],
+		["Laboratoire CPU", 3],
+		["Produits", 4],
+		["Marché", 5],
+		["Presse", 6]
+	]
+	for entry in entries:
+		var button := Button.new()
+		button.text = str(entry[0])
+		button.custom_minimum_size = Vector2(112, 40)
+		var tab_index := int(entry[1])
+		button.pressed.connect(func(): _show_tab(tab_index))
+		parent.add_child(button)
+		nav_buttons.append(button)
+
+func _show_tab(index: int):
+	if tabs == null:
+		return
+	tabs.current_tab = clampi(index, 0, tabs.get_tab_count() - 1)
+	_update_nav_state()
+
+func _update_nav_state():
+	if tabs == null:
+		return
+	for i in range(nav_buttons.size()):
+		var button := nav_buttons[i]
+		var selected := i == tabs.current_tab
+		button.add_theme_color_override("font_color", APP_CYAN if selected else APP_MUTED)
+		button.add_theme_color_override("font_hover_color", APP_TEXT)
+		button.add_theme_stylebox_override("normal", _stylebox(APP_CYAN_DARK if selected else Color(0, 0, 0, 0), 9, 0, APP_LINE, 9))
+
+func _add_inline_metric(parent: GridContainer, title: String, value: String) -> Label:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 8, 0, APP_PANEL_ALT, 8))
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	panel.add_child(box)
+	box.add_child(_muted_label(title, 11))
+	var value_label := _label(value, 14)
+	box.add_child(value_label)
+	return value_label
+
+func _add_stat_card(parent: GridContainer, title: String) -> Label:
+	var panel := _card(APP_PANEL, 12, 12)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	panel.add_child(box)
+	box.add_child(_eyebrow(title))
+	var value_label := _label("—", 21)
+	box.add_child(value_label)
+	return value_label
+
+func _dashboard_primary_action():
+	_show_tab(dashboard_target_tab)
+
+func _update_responsive_layout():
+	var compact := size.x < 900.0
+	var narrow := size.x < 620.0
+	if dashboard_grid != null:
+		dashboard_grid.columns = 1 if compact else 2
+	if dashboard_stats_grid != null:
+		dashboard_stats_grid.columns = 2 if compact else 4
+	if dashboard_lower_grid != null:
+		dashboard_lower_grid.columns = 1 if compact else 2
+	if dashboard_project_grid != null:
+		dashboard_project_grid.columns = 1 if narrow else 2
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
@@ -333,16 +743,132 @@ func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
 
 func _refresh_dashboard():
-	if dashboard_label==null: return
+	if dashboard_label == null:
+		return
 	if not CompanyManager.created:
-		dashboard_label.text="Créez ou chargez une entreprise pour commencer."; return
-	var launched:=0; var active_projects:=0; var monthly_sales:=0
-	for p in ProductManager.products:
-		if str(p.status)=="LAUNCHED": launched+=1; monthly_sales+=int(p.last_month_sales)
-	for p in ResearchManager.projects:
-		if str(p.status)=="DEVELOPMENT": active_projects+=1
-	dashboard_label.text="%s\nSecteur de départ : %s\nTrésorerie : %s €\nEmployés : %d\nProjets R&D actifs : %d\nProduits commercialisés : %d\nVentes du dernier mois : %s unités\nImage de marque : %.1f/100" % [CompanyManager.company_name,GameData.SECTORS.get(CompanyManager.starting_sector,{}).get("label",CompanyManager.starting_sector),_money(Economy.money),PersonnelManager.staff.size(),active_projects,launched,_money(monthly_sales),CompanyManager.get_brand_score()]
-	alerts_label.text="\n".join(CompanyManager.alerts.slice(0,8)) if not CompanyManager.alerts.is_empty() else "Aucune alerte importante."
+		dashboard_label.text = "Votre première génération"
+		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
+		dashboard_project_phase_label.text = "EN ATTENTE"
+		dashboard_project_progress.value = 0.0
+		dashboard_metric_a.text = "—"
+		dashboard_metric_b.text = "—"
+		dashboard_metric_c.text = "—"
+		dashboard_cto_label.text = "Je suis prête à constituer l'équipe et à transformer votre première idée en processeur."
+		dashboard_cash_value.text = "500 000 €"
+		dashboard_result_value.text = "—"
+		dashboard_staff_value.text = "—"
+		dashboard_brand_value.text = "—"
+		alerts_label.text = "Aucun événement pour le moment."
+		dashboard_market_outlook_label.text = "Le marché CPU sera analysé après la création de l'entreprise."
+		dashboard_action_button.text = "Créer l'entreprise"
+		dashboard_target_tab = 0
+		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
+			dashboard_chip.call("set_progress", 0.0, false)
+		return
+
+	var active_project: Dictionary = {}
+	for project in ResearchManager.projects:
+		if str(project.get("status", "")) == "DEVELOPMENT":
+			active_project = project
+			break
+
+	var ready_product: Dictionary = {}
+	var launched_product: Dictionary = {}
+	for product in ProductManager.products:
+		if str(product.get("status", "")) == "READY" and ready_product.is_empty():
+			ready_product = product
+		elif str(product.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
+			launched_product = product
+
+	if not active_project.is_empty():
+		var phase_index: int = clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		var phase_progress: float = float(active_project.get("phase_progress", 0.0))
+		var overall_progress: float = (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		var approach_key := str(active_project.get("approach", "INTERNAL"))
+		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
+		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
+		dashboard_project_meta_label.text = "Processeur • %s • cible %s" % [approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
+		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+		dashboard_project_progress.value = overall_progress
+		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
+		dashboard_metric_b.text = "%d mois" % int(active_project.get("months_spent", 0))
+		dashboard_metric_c.text = str(active_project.get("focus_label", "Équilibré"))
+		if not active_project.get("reports", []).is_empty():
+			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
+		else:
+			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
+		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+		dashboard_target_tab = 3
+		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
+			dashboard_chip.call("set_progress", overall_progress, false)
+	elif not ready_product.is_empty():
+		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
+		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
+		dashboard_project_phase_label.text = "PRÊT AU LANCEMENT"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % _money(int(ready_product.get("unit_cost", 0)))
+		dashboard_metric_b.text = "Validation OK"
+		dashboard_metric_c.text = str(ready_product.get("target_segment", "MAINSTREAM")).capitalize()
+		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
+		dashboard_action_button.text = "Préparer le lancement"
+		dashboard_target_tab = 4
+		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
+			dashboard_chip.call("set_progress", 100.0, false)
+	elif not launched_product.is_empty():
+		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
+		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées" % [int(launched_product.get("months_on_market", 0)), _money(int(launched_product.get("units_sold_total", 0)))]
+		dashboard_project_phase_label.text = "SUR LE MARCHÉ"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % _money(int(launched_product.get("price", 0)))
+		dashboard_metric_b.text = "%s ventes" % _money(int(launched_product.get("last_month_sales", 0)))
+		dashboard_metric_c.text = "%.1f/100" % float(launched_product.get("customer_satisfaction", 50.0))
+		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
+		dashboard_action_button.text = "Analyser le marché"
+		dashboard_target_tab = 5
+		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
+			dashboard_chip.call("set_progress", 100.0, true)
+	else:
+		dashboard_label.text = "Votre première génération"
+		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."
+		dashboard_project_phase_label.text = "NOUVEAU PROJET"
+		dashboard_project_progress.value = 0.0
+		dashboard_metric_a.text = "À définir"
+		dashboard_metric_b.text = "À définir"
+		dashboard_metric_c.text = "Équilibré"
+		dashboard_cto_label.text = "« Commençons par une promesse simple : pour qui construisons-nous ce processeur, et pourquoi devrait-il exister ? »"
+		dashboard_action_button.text = "Concevoir le premier CPU"
+		dashboard_target_tab = 3
+		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
+			dashboard_chip.call("set_progress", 8.0, false)
+
+	dashboard_cash_value.text = "%s €" % _money(Economy.money)
+	if Economy.history.is_empty():
+		dashboard_result_value.text = "Mois en cours"
+	else:
+		var last_report: Dictionary = Economy.history[-1]
+		dashboard_result_value.text = "%s €" % _money(int(last_report.get("result", 0)))
+		dashboard_result_value.add_theme_color_override("font_color", APP_GREEN if int(last_report.get("result", 0)) >= 0 else APP_RED)
+	dashboard_staff_value.text = "%d personnes" % PersonnelManager.staff.size()
+	dashboard_brand_value.text = "%.0f / 100" % CompanyManager.get_brand_score()
+
+	var event_lines: Array[String] = []
+	for alert in CompanyManager.alerts.slice(0, 5):
+		event_lines.append("●  %s" % str(alert))
+	alerts_label.text = "\n\n".join(event_lines) if not event_lines.is_empty() else "●  Aucun événement important. Le monde réagira à vos prochaines décisions."
+
+	if not launched_product.is_empty():
+		var rows := MarketManager.benchmark_for(launched_product)
+		var rank := MarketManager.benchmark_rank(launched_product)
+		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0))]
+	else:
+		var competitors: Array = MarketManager.competitors.get("CPU", [])
+		if competitors.is_empty():
+			dashboard_market_outlook_label.text = "Les concurrents seront révélés au lancement de la simulation."
+		else:
+			var lines: Array[String] = ["Trois concurrents occupent déjà le terrain :"]
+			for competitor in competitors:
+				lines.append("• %s — prix repère %s €" % [str(competitor.get("company", "Concurrent")), _money(int(competitor.get("price", 0)))])
+			dashboard_market_outlook_label.text = "\n".join(lines)
 
 func _refresh_company():
 	if company_rep_label==null or not CompanyManager.created: return
