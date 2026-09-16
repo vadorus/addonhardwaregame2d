@@ -7,6 +7,10 @@ const METRICS := [
 
 const PHASES := ["Concept", "Architecture", "Prototype", "Alpha", "Beta", "Validation"]
 
+# La vertical slice actuelle est volontairement limitée aux processeurs.
+# Les autres secteurs restent paramétrés pour leurs futures branches.
+const ACTIVE_SECTORS := ["CPU"]
+
 const SECTORS := {
 	"CPU": {
 		"label": "Processeurs",
@@ -123,6 +127,12 @@ const APPROACHES := {
 	"HYBRID": {"label":"Hybride / partenariat", "speed":1.06, "knowledge":0.90, "quality":1.02, "cost":1.00, "internal_ratio":0.60},
 	"EXTERNAL": {"label":"Composants / technologie externe", "speed":1.26, "knowledge":0.48, "quality":0.98, "cost":0.82, "internal_ratio":0.22}
 }
+
+func get_active_sector_keys() -> Array:
+	return ACTIVE_SECTORS.duplicate()
+
+func is_sector_active(sector: String) -> bool:
+	return ACTIVE_SECTORS.has(sector)
 
 func get_sector_keys() -> Array:
 	return SECTORS.keys()

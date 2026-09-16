@@ -1,4 +1,4 @@
-# HardwareTycoon / Tech Empire — Prototype V0.2
+# HardwareTycoon / Tech Empire — Prototype V0.2.3
 
 Cette version transforme l'ancien prototype temps + économie en première boucle de simulation d'entreprise technologique.
 
@@ -27,9 +27,11 @@ Cette version transforme l'ancien prototype temps + économie en première boucl
 - filiales simples ;
 - sauvegarde / chargement.
 
-## Secteurs actuellement paramétrés
+## Branche actuellement active
 
-CPU, GPU, smartphones, TV/écrans, logiciels/OS, cloud/services et satellites/télécoms.
+La vertical slice jouable est limitée aux **processeurs (CPU)**.
+
+GPU, smartphones, TV/écrans, logiciels/OS, cloud/services et satellites/télécoms restent paramétrés uniquement comme fondations de futures branches. Ils apparaissent comme « à venir », ne peuvent pas être sélectionnés et sont également refusés par la logique de R&D.
 
 ## Important
 
@@ -51,3 +53,11 @@ Cette V0.2 est une fondation jouable : elle ne cherche pas encore à simuler tou
 
 - Compatibilité stricte Godot 4.7.2 : fonctions numériques typées (`clampf`, `maxf`, `maxi`, `mini`, `snappedf`).
 - Suppression des inférences `Variant` qui pouvaient être traitées comme erreurs par GDScript.
+
+
+## Correctif V0.2.3
+
+- Branche CPU définie comme unique secteur actif de la vertical slice.
+- Futurs secteurs conservés dans les données, affichés comme « à venir » et désactivés dans l’interface.
+- Validation côté moteur empêchant le démarrage d’une partie, d’une filiale ou d’une R&D dans une branche inactive.
+- Smoke test étendu pour vérifier le verrou CPU.

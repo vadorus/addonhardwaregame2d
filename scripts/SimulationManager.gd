@@ -3,10 +3,11 @@ extends Node
 signal month_processed(report)
 
 func reset_all(company_name: String, starting_sector: String):
+	var active_sector := starting_sector if GameData.is_sector_active(starting_sector) else "CPU"
 	TimeManager.reset()
-	CompanyManager.reset(company_name, starting_sector, 500_000)
-	PersonnelManager.reset(starting_sector)
-	ResearchManager.reset(starting_sector)
+	CompanyManager.reset(company_name, active_sector, 500_000)
+	PersonnelManager.reset(active_sector)
+	ResearchManager.reset(active_sector)
 	PatentManager.reset()
 	ProductManager.reset()
 	MarketManager.reset()

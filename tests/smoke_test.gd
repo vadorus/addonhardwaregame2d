@@ -2,7 +2,17 @@ extends Node
 
 func _ready() -> void:
   print("[CI] Tech Empire smoke test starting")
-  SimulationManager.reset_all("CI Test", "CPU")
+  SimulationManager.reset_all("CI Test", "GPU")
+  if CompanyManager.starting_sector != "CPU":
+    _fail("Inactive starting sector was not normalized to CPU")
+    return
+  if GameData.get_active_sector_keys() != ["CPU"]:
+    _fail("CPU must be the only active sector")
+    return
+  var forbidden: bool = ResearchManager.start_project("Forbidden GPU", "GPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000)
+  if forbidden:
+    _fail("Inactive GPU branch accepted a research project")
+    return
   if not CompanyManager.created:
     _fail("Company was not created")
     return
