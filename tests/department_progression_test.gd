@@ -30,7 +30,7 @@ func _ready() -> void:
 			_fail("%s did not reach stage 4" % str(sector_id))
 			return
 	var panel_script: Script = load("res://ui/DepartmentEvolutionPanel.gd")
-	var panel: Control = panel_script.new() as Control
+	var panel: Control = panel_script.new()
 	add_child(panel)
 	await get_tree().process_frame
 	panel.call("refresh")
