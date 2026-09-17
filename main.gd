@@ -87,6 +87,7 @@ var nav_buttons: Array[Button] = []
 var navigation_layer: Control
 var navigation_grid: GridContainer
 var nav_context_label: Label
+var settings_layer: Control
 var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
 var dashboard_office_scene: Control
@@ -248,6 +249,12 @@ func _build_ui():
 	menu_button.custom_minimum_size = Vector2(126, 44)
 	menu_button.pressed.connect(_toggle_navigation_menu)
 	nav_bar.add_child(menu_button)
+	var settings_button := Button.new()
+	settings_button.text = "⚙ Paramètres"
+	settings_button.tooltip_text = "Paramètres"
+	settings_button.custom_minimum_size = Vector2(82, 44)
+	settings_button.pressed.connect(_toggle_settings)
+	nav_bar.add_child(settings_button)
 
 	status_label = _label("", 13)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -270,6 +277,7 @@ func _build_ui():
 	_create_media_tab()
 	_create_evolution_tab()
 	_build_navigation_overlay()
+	_build_settings_overlay()
 	_update_nav_state()
 	_build_setup_layer()
 	_build_month_layer()
@@ -1099,6 +1107,12 @@ func _build_navigation_overlay():
 		navigation_grid.add_child(button)
 		nav_buttons.append(button)
 
+	var settings_button := Button.new()
+	settings_button.text = "Paramètres PC / Android"
+	settings_button.custom_minimum_size.y = 44
+	settings_button.pressed.connect(_toggle_settings)
+	box.add_child(settings_button)
+
 	var close_button := Button.new()
 	close_button.text = "Fermer"
 	close_button.custom_minimum_size.y = 44
@@ -1108,6 +1122,21 @@ func _build_navigation_overlay():
 func _toggle_navigation_menu():
 	if navigation_layer != null:
 		navigation_layer.visible = not navigation_layer.visible
+
+func _build_settings_overlay():
+	var panel_script: Script = load("res://ui/SettingsPanel.gd")
+	settings_layer = panel_script.new() as Control
+	settings_layer.visible = false
+	settings_layer.call("set_compact", size.x < 900.0)
+	settings_layer.connect("close_requested", _toggle_settings)
+	add_child(settings_layer)
+
+func _toggle_settings():
+	if settings_layer == null:
+		return
+	settings_layer.visible = not settings_layer.visible
+	if settings_layer.visible and navigation_layer != null:
+		navigation_layer.visible = false
 
 func _show_tab(index: int):
 	if tabs == null:
@@ -1193,6 +1222,8 @@ func _update_responsive_layout():
 		lab_stats_grid.columns = 1 if narrow else 3
 	if evolution_panel != null and evolution_panel.has_method("set_compact"):
 		evolution_panel.call("set_compact", compact)
+	if settings_layer != null and settings_layer.has_method("set_compact"):
+		settings_layer.call("set_compact", compact)
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
