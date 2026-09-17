@@ -34,6 +34,13 @@ ProductManager="*res://scripts/ProductManager.gd"
 SimulationManager="*res://scripts/SimulationManager.gd"
 TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
+BugReporter="*res://scripts/BugReporter.gd"
+
+[bug_reporting]
+
+; Left empty until the isolated VPS collector is deployed.
+; Reports remain only in user://bug_reports_queue.json while this is empty.
+endpoint=""
 
 [display]
 
