@@ -49,6 +49,9 @@ var rd_segment: OptionButton
 var rd_approach: OptionButton
 var rd_focus: OptionButton
 var rd_budget: SpinBox
+var cpu_generation_select: OptionButton
+var cpu_generation_summary_label: Label
+var active_cpu_generation_plan: Dictionary = {}
 var rd_cores: HSlider
 var rd_frequency: HSlider
 var rd_cache: HSlider
@@ -125,6 +128,7 @@ func _connect_signals():
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
 	ResearchManager.projects_changed.connect(_refresh_all)
+	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
 	ProductManager.products_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
@@ -491,6 +495,31 @@ func _create_research_tab():
 	rd_budget.value_changed.connect(func(_value): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Budget mensuel R&D", rd_budget)
 
+	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
+	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
+	generation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(generation_intro)
+	var request_generation := Button.new()
+	request_generation.text = "Préparer 3 plans de génération"
+	request_generation.custom_minimum_size.y = 44
+	request_generation.pressed.connect(_request_cpu_generation_plans)
+	configuration_box.add_child(request_generation)
+	cpu_generation_select = OptionButton.new()
+	cpu_generation_select.item_selected.connect(func(_index): _refresh_generation_plan_summary())
+	_add_labeled_control(configuration_box, "Plans proposés", cpu_generation_select)
+	var generation_panel := PanelContainer.new()
+	generation_panel.add_theme_stylebox_override("panel", _stylebox(APP_CYAN_DARK, 10, 1, APP_CYAN, 11))
+	cpu_generation_summary_label = _muted_label("Aucun plan préparé. Définissez le brief puis lancez la réunion d'architecture.", 12)
+	cpu_generation_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cpu_generation_summary_label.custom_minimum_size.y = 155
+	generation_panel.add_child(cpu_generation_summary_label)
+	configuration_box.add_child(generation_panel)
+	var apply_generation := Button.new()
+	apply_generation.text = "Appliquer le plan sélectionné"
+	apply_generation.custom_minimum_size.y = 44
+	apply_generation.pressed.connect(_apply_selected_generation_plan)
+	configuration_box.add_child(apply_generation)
+
 	configuration_box.add_child(_eyebrow("ARCHITECTURE CPU"))
 	var preset_row := HFlowContainer.new()
 	preset_row.add_theme_constant_override("h_separation", 7)
@@ -671,14 +700,90 @@ func _current_cpu_design() -> Dictionary:
 		"tdp_w": int(rd_tdp.value)
 	})
 
-func _apply_cpu_preset(key: String):
-	var design := CPU_DESIGN.preset(key)
+func _request_cpu_generation_plans():
+	if not CompanyManager.created:
+		status_label.text = "Créez d'abord votre entreprise."
+		return
+	active_cpu_generation_plan = {}
+	var proposals := ResearchManager.prepare_cpu_generation_proposals(
+		_meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), _current_cpu_design()
+	)
+	_refresh_generation_plan_options()
+	if proposals.size() == 3:
+		status_label.text = "Camille a préparé trois pistes pour la prochaine génération CPU."
+	else:
+		status_label.text = "L'équipe n'a pas pu préparer les plans."
+
+func _refresh_generation_plan_options():
+	if cpu_generation_select == null:
+		return
+	var previous_id := ""
+	if cpu_generation_select.item_count > 0:
+		previous_id = str(cpu_generation_select.get_item_metadata(cpu_generation_select.selected))
+	cpu_generation_select.clear()
+	for proposal in ResearchManager.get_cpu_generation_proposals():
+		var marker := "★ " if bool(proposal.get("recommended", false)) else ""
+		cpu_generation_select.add_item("%s%s — %s" % [marker, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture"))])
+		cpu_generation_select.set_item_metadata(cpu_generation_select.item_count - 1, str(proposal.get("id", "")))
+	if previous_id != "":
+		_select_meta(cpu_generation_select, previous_id)
+	elif cpu_generation_select.item_count > 0:
+		cpu_generation_select.select(0)
+	_refresh_generation_plan_summary()
+
+func _selected_cpu_generation_plan() -> Dictionary:
+	if cpu_generation_select == null or cpu_generation_select.item_count == 0:
+		return {}
+	return ResearchManager.get_cpu_generation_proposal(str(cpu_generation_select.get_item_metadata(cpu_generation_select.selected)))
+
+func _refresh_generation_plan_summary():
+	if cpu_generation_summary_label == null:
+		return
+	var proposal := _selected_cpu_generation_plan()
+	if proposal.is_empty():
+		cpu_generation_summary_label.text = "Aucun plan préparé. Définissez le brief puis lancez la réunion d'architecture."
+		cpu_generation_summary_label.add_theme_color_override("font_color", APP_MUTED)
+		return
+	var design: Dictionary = proposal.get("design", {})
+	var deltas: Dictionary = proposal.get("metric_deltas", {})
+	var strengths: Array = proposal.get("strengths", [])
+	var risks: Array = proposal.get("risks", [])
+	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
+		str(proposal.get("promise", "")),
+		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
+		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
+		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("target_fit", 0.0)),
+		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
+		" • ".join(strengths), " • ".join(risks), str(proposal.get("recommendation", ""))
+	]
+	cpu_generation_summary_label.add_theme_color_override("font_color", APP_GREEN if bool(proposal.get("recommended", false)) else APP_TEXT)
+
+func _signed_score(value: float) -> String:
+	return "+%.0f" % value if value >= 0.0 else "%.0f" % value
+
+func _apply_selected_generation_plan():
+	var proposal := _selected_cpu_generation_plan()
+	if proposal.is_empty():
+		status_label.text = "Préparez d'abord les plans de génération."
+		return
+	active_cpu_generation_plan = proposal.duplicate(true)
+	_set_cpu_design_controls(proposal.get("design", {}))
+	status_label.text = "Plan %s appliqué. Vous pouvez encore ajuster chaque paramètre." % str(proposal.get("title", "sélectionné"))
+
+func _set_cpu_design_controls(input: Dictionary):
+	var design := CPU_DESIGN.normalize(input)
 	rd_cores.value = int(design.cores)
 	rd_frequency.value = float(design.frequency_ghz)
 	rd_cache.value = int(design.cache_mb)
 	_select_meta(rd_node, str(design.node_nm))
 	rd_tdp.value = int(design.tdp_w)
 	_refresh_cpu_preview()
+
+func _apply_cpu_preset(key: String):
+	active_cpu_generation_plan = {}
+	_set_cpu_design_controls(CPU_DESIGN.preset(key))
 	status_label.text = "Préréglage %s appliqué. Vous pouvez encore tout ajuster." % key.to_lower()
 
 func _refresh_cpu_preview():
@@ -1228,6 +1333,7 @@ func _refresh_research():
 	if tech_label == null:
 		return
 	_refresh_cpu_preview()
+	_refresh_generation_plan_options()
 	var tech_lines: Array[String] = []
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
@@ -1249,6 +1355,9 @@ func _refresh_research():
 			str(GameData.APPROACHES[str(project.approach)].label),
 			str(project.get("focus_label", "Équilibré"))
 		])
+		var generation_plan: Dictionary = project.get("generation_plan", {})
+		if not generation_plan.is_empty():
+			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
 		if not project.reports.is_empty():
 			lines.append("  Camille : %s" % str(project.reports[0].text))
 	projects_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
@@ -1266,9 +1375,12 @@ func _start_project():
 		name = "Nova CPU %d" % (ResearchManager.projects.size() + 1)
 	var design := _current_cpu_design()
 	var evaluation := CPU_DESIGN.evaluate(design)
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design):
+	var generation_plan := active_cpu_generation_plan.duplicate(true)
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan):
 		rd_name.text = ""
-		status_label.text = "%s entre en développement — profil %s." % [name, str(evaluation.profile)]
+		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
+		status_label.text = "%s entre en développement — profil %s%s." % [name, str(evaluation.profile), plan_text]
+		active_cpu_generation_plan = {}
 	else:
 		status_label.text = "Impossible de lancer le projet : trésorerie ou capacité R&D insuffisante."
 	_refresh_all()

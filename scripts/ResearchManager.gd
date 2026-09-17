@@ -1,12 +1,16 @@
 extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 
 signal projects_changed
+signal generation_proposals_changed(proposals)
 signal phase_report_created(project, report)
 signal project_completed(project)
 
 var projects: Array = []
+var cpu_generation_proposals: Array = []
+var cpu_generation_context: Dictionary = {}
 var technologies: Dictionary = {}
 var _next_id := 1
 var rng := RandomNumberGenerator.new()
@@ -16,6 +20,8 @@ func _ready():
 
 func reset(starting_sector: String):
 	projects = []
+	cpu_generation_proposals = []
+	cpu_generation_context = {}
 	_next_id = 1
 	technologies = {}
 	for key in GameData.SECTORS.keys():
@@ -24,9 +30,52 @@ func reset(starting_sector: String):
 	technologies["manufacturing"] = 12.0
 	technologies["software"] = maxf(float(technologies.get("software", 0.0)), 8.0)
 	technologies["integration"] = 10.0
+	generation_proposals_changed.emit([])
 	projects_changed.emit()
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}) -> bool:
+func prepare_cpu_generation_proposals(segment: String, approach: String, focus: String, monthly_budget: int, base_design: Dictionary) -> Array:
+	if not DivisionManager.is_operational("CPU"):
+		return []
+	var division := DivisionManager.get_division("CPU")
+	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
+	var team_score := PersonnelManager.team_score("R&D", "cpu")
+	var management_modifier := CompanyManager.department_management_modifier("R&D")
+	var technology_score := float(technologies.get("cpu", 0.0))
+	var manufacturing_score := float(technologies.get("manufacturing", 0.0))
+	var integration_score := float(technologies.get("integration", 0.0))
+	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
+	var equipment_score := clampf(25.0 + manufacturing_score * 1.55 + integration_score * 0.85, 20.0, 100.0)
+	cpu_generation_context = {
+		"segment":segment,
+		"approach":approach,
+		"focus":focus,
+		"monthly_budget":monthly_budget,
+		"base_development_cost":float(GameData.SECTORS.CPU.base_dev_cost),
+		"approach_speed":float(approach_data.speed),
+		"approach_cost":float(approach_data.cost),
+		"team_score":team_score,
+		"management_modifier":management_modifier,
+		"technology_score":technology_score,
+		"equipment_score":equipment_score,
+		"division_maturity":float(division.get("maturity", 0.0)),
+		"division_strategy":str(division.get("strategy", "BALANCED")),
+		"generation_index":int(division.get("generation_count", 0)) + 1,
+		"treasury":Economy.money
+	}
+	cpu_generation_proposals = CPU_GENERATION_PLANNER.generate(base_design, cpu_generation_context)
+	generation_proposals_changed.emit(get_cpu_generation_proposals())
+	return get_cpu_generation_proposals()
+
+func get_cpu_generation_proposals() -> Array:
+	return cpu_generation_proposals.duplicate(true)
+
+func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
+	for proposal in cpu_generation_proposals:
+		if str(proposal.get("id", "")) == proposal_id:
+			return proposal.duplicate(true)
+	return {}
+
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}) -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	if Economy.money < maxi(monthly_budget, 10000):
@@ -57,6 +106,17 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if focus_metric != "":
 		desired[focus_metric] = clampf(maxf(float(desired.get(focus_metric, 55.0)), 65.0) + 8.0, 0.0, 96.0)
 
+	var stored_generation_plan: Dictionary = {}
+	if sector == "CPU" and not generation_plan.is_empty():
+		stored_generation_plan = CPU_GENERATION_PLANNER.normalize_saved_proposal(generation_plan)
+		stored_generation_plan["customized"] = (
+			CPU_DESIGN.normalize(stored_generation_plan.get("design", {})) != normalized_design
+			or str(stored_generation_plan.get("segment", segment)) != segment
+			or str(stored_generation_plan.get("approach", approach)) != approach
+			or str(stored_generation_plan.get("focus", focus)) != focus
+			or int(stored_generation_plan.get("monthly_budget", monthly_budget)) != monthly_budget
+		)
+
 	var project := {
 		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":segment,
 		"approach":approach,"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
@@ -64,10 +124,15 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
+		"generation_plan":stored_generation_plan,
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
 	_next_id += 1
 	projects.append(project)
+	if sector == "CPU":
+		cpu_generation_proposals = []
+		cpu_generation_context = {}
+		generation_proposals_changed.emit([])
 	CompanyManager.add_alert("Nouveau projet lancé : %s." % project_name)
 	projects_changed.emit()
 	return true
@@ -174,7 +239,7 @@ func active_departments() -> Array:
 	return []
 
 func get_state() -> Dictionary:
-	return {"projects":projects,"technologies":technologies,"next_id":_next_id,"rng_seed":rng.seed,"rng_state":rng.state}
+	return {"projects":projects,"cpu_generation_proposals":cpu_generation_proposals,"cpu_generation_context":cpu_generation_context,"technologies":technologies,"next_id":_next_id,"rng_seed":rng.seed,"rng_state":rng.state}
 
 func load_state(state: Dictionary):
 	projects = state.get("projects", []).duplicate(true)
@@ -185,8 +250,22 @@ func load_state(state: Dictionary):
 			project["cpu_design"] = design
 			project["design_estimate"] = estimate
 			project["complexity"] = float(project.get("complexity", estimate.complexity))
+			var generation_plan_value = project.get("generation_plan", {})
+			if typeof(generation_plan_value) == TYPE_DICTIONARY and not generation_plan_value.is_empty():
+				project["generation_plan"] = CPU_GENERATION_PLANNER.normalize_saved_proposal(generation_plan_value)
+			else:
+				project["generation_plan"] = {}
+	cpu_generation_proposals = []
+	var saved_proposals_value = state.get("cpu_generation_proposals", [])
+	if typeof(saved_proposals_value) == TYPE_ARRAY:
+		for saved_proposal_value in saved_proposals_value:
+			if typeof(saved_proposal_value) == TYPE_DICTIONARY:
+				cpu_generation_proposals.append(CPU_GENERATION_PLANNER.normalize_saved_proposal(saved_proposal_value))
+	var saved_context_value = state.get("cpu_generation_context", {})
+	cpu_generation_context = saved_context_value.duplicate(true) if typeof(saved_context_value) == TYPE_DICTIONARY else {}
 	technologies = state.get("technologies", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 8282))
 	rng.state = int(state.get("rng_state", rng.state))
+	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	projects_changed.emit()

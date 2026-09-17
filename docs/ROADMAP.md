@@ -7,7 +7,7 @@ Cette roadmap fixe l'ordre de construction du jeu. La vision finale est très la
 - [x] Documenter les décisions de conception dans une bible versionnée.
 - [x] Ajouter un socle générique de divisions avec CPU seul actif.
 - [x] Sauvegarder la maturité et le nombre de générations d’une division.
-- [ ] Proposer trois plans d’architecture pour une nouvelle génération CPU.
+- [x] Proposer trois plans d’architecture pour une nouvelle génération CPU.
 - [ ] Décliner une architecture en plusieurs modèles de gamme.
 - [ ] Ajouter procédé, packaging, rendement et fournisseur simplifiés.
 - [ ] Ajouter microcode, compatibilité, incidents et correctifs.

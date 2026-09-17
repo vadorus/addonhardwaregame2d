@@ -40,14 +40,46 @@ func _ready() -> void:
 		_fail("Efficient preset is not more efficient")
 		return
 
-	var cpu_design := CPU_DESIGN.preset("PERFORMANCE")
-	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design)
+	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
+	if proposals.size() != 3:
+		_fail("CPU generation council did not return three plans")
+		return
+	var safe_plan: Dictionary = proposals[0]
+	var bold_plan: Dictionary = proposals[2]
+	if float(bold_plan.get("evaluation", {}).get("performance", 0.0)) <= float(safe_plan.get("evaluation", {}).get("performance", 0.0)):
+		_fail("Bold generation plan must outperform safe plan")
+		return
+	if float(bold_plan.get("risk", 0.0)) <= float(safe_plan.get("risk", 0.0)):
+		_fail("Bold generation plan must carry more risk")
+		return
+	if float(safe_plan.get("confidence", 0.0)) <= float(bold_plan.get("confidence", 0.0)):
+		_fail("Safe generation estimates must be more trustworthy")
+		return
+	var recommended_count := 0
+	var selected_plan: Dictionary = proposals[1]
+	for proposal_value in proposals:
+		var proposal: Dictionary = proposal_value
+		if bool(proposal.get("recommended", false)):
+			recommended_count += 1
+			selected_plan = proposal
+	if recommended_count != 1:
+		_fail("Exactly one CPU generation plan must be recommended")
+		return
+
+	var cpu_design: Dictionary = selected_plan.get("design", {})
+	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design, selected_plan)
 	if not started:
 		_fail("Could not start R&D project")
 		return
 	var project: Dictionary = ResearchManager.projects[0]
-	if int(project.get("cpu_design", {}).get("cores", 0)) != 16:
-		_fail("CPU design was not stored on the R&D project")
+	if int(project.get("cpu_design", {}).get("cores", 0)) != int(cpu_design.get("cores", -1)):
+		_fail("Selected generation design was not stored on the R&D project")
+		return
+	if str(project.get("generation_plan", {}).get("id", "")) != str(selected_plan.get("id", "")):
+		_fail("Generation plan was not attached to the R&D project")
+		return
+	if not ResearchManager.get_cpu_generation_proposals().is_empty():
+		_fail("Generation proposals were not cleared after project launch")
 		return
 	if float(project.get("complexity", 0.0)) <= float(efficient.get("complexity", 0.0)):
 		_fail("Complex CPU design did not increase development complexity")
@@ -67,10 +99,23 @@ func _ready() -> void:
 	legacy_project.erase("cpu_design")
 	legacy_project.erase("design_estimate")
 	legacy_project.erase("complexity")
+	legacy_project.erase("generation_plan")
+	legacy_state.erase("cpu_generation_proposals")
+	legacy_state.erase("cpu_generation_context")
 	ResearchManager.load_state(legacy_state)
 	var migrated_project: Dictionary = ResearchManager.projects[0]
 	if not migrated_project.has("cpu_design") or migrated_project.get("design_estimate", {}).is_empty():
 		_fail("Legacy R&D save was not migrated to a CPU design")
+		return
+	if not migrated_project.get("generation_plan", {}).is_empty():
+		_fail("Legacy project received an invalid generation plan")
+		return
+
+	ResearchManager.prepare_cpu_generation_proposals("PRO", "HYBRID", "RELIABILITY", 50_000, CPU_DESIGN.preset("BALANCED"))
+	var research_round_trip := ResearchManager.get_state().duplicate(true)
+	ResearchManager.load_state(research_round_trip)
+	if ResearchManager.get_cpu_generation_proposals().size() != 3:
+		_fail("Generation proposals did not survive a save round-trip")
 		return
 
 	DivisionManager.record_completed_generation("CPU")

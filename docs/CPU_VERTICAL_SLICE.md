@@ -2,6 +2,10 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
+## État d’implémentation — V0.2.7
+
+Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer. Les propositions et le plan retenu sont sauvegardés avec migration des anciennes parties.
+
 ## 1. Ce que le joueur fabrique réellement
 
 Le joueur ne crée pas seulement un modèle isolé. Il finance une **génération d'architecture**, puis décline cette base en une famille de processeurs.
