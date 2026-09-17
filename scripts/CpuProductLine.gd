@@ -116,7 +116,7 @@ static func _project_metrics(project: Dictionary, architecture_estimate: Diction
 	return result
 
 static func _estimate_yield(architecture: Dictionary, estimate: Dictionary, metrics: Dictionary, division_maturity: float) -> float:
-	var node_penalty := {14:0.00, 10:0.02, 7:0.05, 5:0.10, 3:0.16}.get(int(architecture.node_nm), 0.06)
+	var node_penalty: float = float({14:0.00, 10:0.02, 7:0.05, 5:0.10, 3:0.16}.get(int(architecture.node_nm), 0.06))
 	var reliability := float(metrics.get("reliability", estimate.get("reliability", 60.0)))
 	var complexity := float(estimate.get("complexity", 50.0))
 	var yield_rate := 0.68 + (reliability - 60.0) * 0.003
@@ -155,7 +155,7 @@ static func _tier_metrics(project_metrics: Dictionary, design_estimate: Dictiona
 		result[metric] = project_value
 		if design_estimate.has(metric):
 			result[metric] = project_value * 0.52 + float(design_estimate.get(metric, project_value)) * 0.48
-	var deltas := {
+	var deltas: Dictionary = {
 		"ESSENTIAL":{"performance":-2.0,"efficiency":5.0,"reliability":4.0,"innovation":-2.0,"sustainability":4.0},
 		"SIGNATURE":{"performance":0.0,"efficiency":1.0,"reliability":1.0,"innovation":0.0,"sustainability":1.0},
 		"APEX":{"performance":4.0,"efficiency":-3.0,"reliability":-2.0,"innovation":2.0,"sustainability":-2.0}
