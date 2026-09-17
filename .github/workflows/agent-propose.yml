@@ -1,0 +1,125 @@
+name: Agent API - Préparer une proposition
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Tâche précise à réaliser dans la vertical slice CPU"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agents-api-proposal-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    name: Produire et tester un patch isolé
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout sans identifiants persistants
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Godot 4.7.2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: false
+
+      - name: Vérifier la configuration secrète
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_EXECUTOR_API_KEY: ${{ secrets.OPENAI_EXECUTOR_API_KEY }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "::error::Le secret OPENAI_API_KEY est absent."
+            exit 1
+          fi
+          if [[ -z "$OPENAI_EXECUTOR_API_KEY" ]]; then
+            echo "::error::Le secret OPENAI_EXECUTOR_API_KEY est absent."
+            exit 1
+          fi
+
+      - name: Vérifier la base avant intervention
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --import 2>&1 | tee /tmp/agent-baseline-import.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/agent-baseline-import.log; then exit 1; fi
+          godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/agent-baseline-smoke.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|ERROR: \[CI\]' /tmp/agent-baseline-smoke.log; then exit 1; fi
+
+      - name: Préparer le runtime de confiance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          runtime="$RUNNER_TEMP/tech-empire-agent-runtime"
+          mkdir -p "$runtime"
+          cp tools/agents/run_agent.mjs "$runtime/run_agent.mjs"
+          cp tools/agents/collect_patch.sh "$runtime/collect_patch.sh"
+          cd "$runtime"
+          npm init --yes >/dev/null
+          npm install --no-save openai@latest
+          godot_source="$(readlink -f "$(command -v godot)")"
+          install -m 0755 "$godot_source" "$runtime/godot"
+          docker build \
+            --tag tech-empire-agent:local \
+            --file "$GITHUB_WORKSPACE/tools/agents/Dockerfile" \
+            "$GITHUB_WORKSPACE/tools/agents"
+          echo "AGENT_RUNTIME=$runtime" >> "$GITHUB_ENV"
+          echo "GODOT_BIN=$runtime/godot" >> "$GITHUB_ENV"
+
+      - name: Lancer l'agent isolé
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_EXECUTOR_API_KEY: ${{ secrets.OPENAI_EXECUTOR_API_KEY }}
+          AGENT_TASK: ${{ inputs.task }}
+          AGENT_MODEL: ${{ vars.OPENAI_AGENT_MODEL || 'gpt-6-astra' }}
+          AGENT_EXECUTOR_IMAGE: tech-empire-agent:local
+        run: node "$AGENT_RUNTIME/run_agent.mjs"
+
+      - name: Collecter et contrôler le patch
+        if: always()
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: ${{ github.sha }}
+        run: bash "$AGENT_RUNTIME/collect_patch.sh"
+
+      - name: Publier la proposition pour revue humaine
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-proposal-${{ github.run_id }}
+          path: .agent-output/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Résumé
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## Proposition Agents API prête"
+            echo
+            echo "Run ID : \`${{ github.run_id }}\`"
+            echo
+            echo "Télécharger et relire l'artefact avant de lancer le workflow de création de PR."
+            echo "Aucun commit, push ou merge n'a été effectué par l'agent."
+          } >> "$GITHUB_STEP_SUMMARY"
