@@ -84,8 +84,13 @@ var subsidiary_sector: OptionButton
 var subsidiary_capital: SpinBox
 
 var nav_buttons: Array[Button] = []
+var navigation_layer: Control
+var navigation_grid: GridContainer
+var nav_context_label: Label
 var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
+var dashboard_office_scene: Control
+var dashboard_advisor_card: PanelContainer
 var dashboard_stats_grid: GridContainer
 var dashboard_lower_grid: GridContainer
 var dashboard_chip: Control
@@ -103,6 +108,11 @@ var dashboard_metric_b: Label
 var dashboard_metric_c: Label
 var dashboard_action_button: Button
 var dashboard_cto_button: Button
+var dashboard_next_step_label: Label
+var dashboard_stage_label: Label
+var dashboard_details_button: Button
+var dashboard_secondary_visible := true
+var dashboard_compact_mode := false
 var dashboard_target_tab := 3
 
 func _ready():
@@ -220,15 +230,23 @@ func _build_ui():
 
 	var nav_panel := _card(APP_SHELL, 12, 6)
 	root_box.add_child(nav_panel)
-	var nav_scroll := ScrollContainer.new()
-	nav_scroll.custom_minimum_size.y = 48
-	nav_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	nav_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	nav_panel.add_child(nav_scroll)
 	var nav_bar := HBoxContainer.new()
-	nav_bar.add_theme_constant_override("separation", 6)
-	nav_scroll.add_child(nav_bar)
-	_build_navigation(nav_bar)
+	nav_bar.add_theme_constant_override("separation", 8)
+	nav_panel.add_child(nav_bar)
+	nav_context_label = _label("QG", 14)
+	nav_context_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nav_context_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nav_bar.add_child(nav_context_label)
+	var qg_button := Button.new()
+	qg_button.text = "⌂ QG"
+	qg_button.custom_minimum_size = Vector2(90, 44)
+	qg_button.pressed.connect(func(): _show_tab(0))
+	nav_bar.add_child(qg_button)
+	var menu_button := Button.new()
+	menu_button.text = "☰ Actions"
+	menu_button.custom_minimum_size = Vector2(126, 44)
+	menu_button.pressed.connect(_toggle_navigation_menu)
+	nav_bar.add_child(menu_button)
 
 	status_label = _label("", 13)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -249,6 +267,7 @@ func _build_ui():
 	_create_products_tab()
 	_create_market_tab()
 	_create_media_tab()
+	_build_navigation_overlay()
 	_update_nav_state()
 	_build_setup_layer()
 	_build_month_layer()
@@ -266,7 +285,41 @@ func _create_dashboard_tab():
 	heading_copy.add_child(_eyebrow("CENTRE DE COMMANDEMENT"))
 	var title := _label("Votre entreprise, en un coup d'œil", 27)
 	heading_copy.add_child(title)
-	heading_copy.add_child(_muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+	heading_copy.add_child(_muted_label("Une priorité claire, un lieu vivant, et la prochaine décision.", 13))
+
+	var office_card := _card(APP_SHELL, 16, 10)
+	office_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(office_card)
+	var office_box := VBoxContainer.new()
+	office_box.add_theme_constant_override("separation", 8)
+	office_card.add_child(office_box)
+	var office_head := HBoxContainer.new()
+	office_box.add_child(office_head)
+	dashboard_stage_label = _label("GARAGE • DÉPART", 14)
+	dashboard_stage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_stage_label.add_theme_color_override("font_color", APP_AMBER)
+	office_head.add_child(dashboard_stage_label)
+	var office_actions := Button.new()
+	office_actions.text = "☰ Ouvrir les actions"
+	office_actions.custom_minimum_size.y = 42
+	office_actions.pressed.connect(_toggle_navigation_menu)
+	office_head.add_child(office_actions)
+	var office_script: Script = load("res://ui/OfficeScene.gd")
+	dashboard_office_scene = office_script.new() as Control
+	office_box.add_child(dashboard_office_scene)
+
+	var next_card := _card(APP_AMBER_DARK, 13, 12)
+	box.add_child(next_card)
+	var next_box := HBoxContainer.new()
+	next_box.add_theme_constant_override("separation", 10)
+	next_card.add_child(next_box)
+	var next_title := _eyebrow("PROCHAINE ÉTAPE")
+	next_title.custom_minimum_size.x = 120
+	next_box.add_child(next_title)
+	dashboard_next_step_label = _label("Créer votre premier CPU", 15)
+	dashboard_next_step_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_next_step_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	next_box.add_child(dashboard_next_step_label)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -334,12 +387,12 @@ func _create_dashboard_tab():
 	dashboard_action_button.pressed.connect(_dashboard_primary_action)
 	project_box.add_child(dashboard_action_button)
 
-	var advisor_card := _card(APP_PANEL, 14, 16)
-	advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dashboard_grid.add_child(advisor_card)
+	dashboard_advisor_card = _card(APP_PANEL, 14, 16)
+	dashboard_advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_grid.add_child(dashboard_advisor_card)
 	var advisor_box := VBoxContainer.new()
 	advisor_box.add_theme_constant_override("separation", 13)
-	advisor_card.add_child(advisor_box)
+	dashboard_advisor_card.add_child(advisor_box)
 	var advisor_head := HBoxContainer.new()
 	advisor_box.add_child(advisor_head)
 	var avatar := PanelContainer.new()
@@ -365,6 +418,12 @@ func _create_dashboard_tab():
 	dashboard_cto_button.custom_minimum_size.y = 44
 	dashboard_cto_button.pressed.connect(func(): _show_tab(3))
 	advisor_box.add_child(dashboard_cto_button)
+
+	dashboard_details_button = Button.new()
+	dashboard_details_button.text = "Afficher les détails"
+	dashboard_details_button.custom_minimum_size.y = 42
+	dashboard_details_button.pressed.connect(_toggle_dashboard_details)
+	box.add_child(dashboard_details_button)
 
 	dashboard_stats_grid = GridContainer.new()
 	dashboard_stats_grid.columns = 4
@@ -982,40 +1041,83 @@ func _create_app_theme() -> Theme:
 	app_theme.set_constant("separation", "HBoxContainer", 8)
 	return app_theme
 
-func _build_navigation(parent: HBoxContainer):
+func _build_navigation_overlay():
+	navigation_layer = ColorRect.new()
+	navigation_layer.color = Color(0.012, 0.020, 0.035, 0.88)
+	navigation_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	navigation_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	navigation_layer.visible = false
+	add_child(navigation_layer)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	navigation_layer.add_child(center)
+	var panel := _card(APP_SHELL, 18, 18)
+	panel.custom_minimum_size = Vector2(560, 470)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+	box.add_child(_eyebrow("CENTRE D'ACTIONS"))
+	box.add_child(_label("Que voulez-vous faire ?", 25))
+	var hint := _muted_label("Le QG reste léger. Ouvrez seulement l'espace utile à votre décision.", 13)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+
+	navigation_grid = GridContainer.new()
+	navigation_grid.columns = 2
+	navigation_grid.add_theme_constant_override("h_separation", 10)
+	navigation_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(navigation_grid)
 	var entries := [
-		["QG", 0],
-		["Entreprise", 1],
-		["Équipe", 2],
-		["Laboratoire CPU", 3],
-		["Produits", 4],
-		["Marché", 5],
-		["Presse", 6]
+		["⌂", "QG", "Priorités et progression", 0],
+		["◆", "Entreprise", "Budgets et organisation", 1],
+		["●", "Équipe", "Recrutement et responsables", 2],
+		["◈", "Laboratoire CPU", "Concevoir la prochaine génération", 3],
+		["▣", "Produits", "Prix, capacité et lancement", 4],
+		["↗", "Marché", "Ventes et concurrence", 5],
+		["▤", "Presse", "Actualités et réputation", 6]
 	]
 	for entry in entries:
 		var button := Button.new()
-		button.text = str(entry[0])
-		button.custom_minimum_size = Vector2(112, 40)
-		var tab_index := int(entry[1])
+		button.text = "%s  %s\n%s" % [str(entry[0]), str(entry[1]), str(entry[2])]
+		button.custom_minimum_size = Vector2(245, 72)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var tab_index := int(entry[3])
 		button.pressed.connect(func(): _show_tab(tab_index))
-		parent.add_child(button)
+		navigation_grid.add_child(button)
 		nav_buttons.append(button)
+
+	var close_button := Button.new()
+	close_button.text = "Fermer"
+	close_button.custom_minimum_size.y = 44
+	close_button.pressed.connect(_toggle_navigation_menu)
+	box.add_child(close_button)
+
+func _toggle_navigation_menu():
+	if navigation_layer != null:
+		navigation_layer.visible = not navigation_layer.visible
 
 func _show_tab(index: int):
 	if tabs == null:
 		return
 	tabs.current_tab = clampi(index, 0, tabs.get_tab_count() - 1)
+	if navigation_layer != null:
+		navigation_layer.visible = false
 	_update_nav_state()
 
 func _update_nav_state():
 	if tabs == null:
 		return
+	var section_names := ["QG", "Entreprise", "Équipe", "Laboratoire CPU", "Produits", "Marché", "Presse"]
+	if nav_context_label != null and tabs.current_tab < section_names.size():
+		nav_context_label.text = str(section_names[tabs.current_tab])
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var selected := i == tabs.current_tab
-		button.add_theme_color_override("font_color", APP_CYAN if selected else APP_MUTED)
+		button.add_theme_color_override("font_color", APP_CYAN if selected else APP_TEXT)
 		button.add_theme_color_override("font_hover_color", APP_TEXT)
-		button.add_theme_stylebox_override("normal", _stylebox(APP_CYAN_DARK if selected else Color(0, 0, 0, 0), 9, 0, APP_LINE, 9))
+		button.add_theme_stylebox_override("normal", _stylebox(APP_CYAN_DARK if selected else APP_PANEL_ALT, 11, 1, APP_CYAN if selected else APP_LINE, 12))
 
 func _add_inline_metric(parent: GridContainer, title: String, value: String) -> Label:
 	var panel := PanelContainer.new()
@@ -1043,9 +1145,29 @@ func _add_stat_card(parent: GridContainer, title: String) -> Label:
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)
 
+func _toggle_dashboard_details():
+	dashboard_secondary_visible = not dashboard_secondary_visible
+	_apply_dashboard_density()
+
+func _apply_dashboard_density():
+	if dashboard_details_button != null:
+		dashboard_details_button.text = "Masquer les détails" if dashboard_secondary_visible else "Afficher les détails"
+	if dashboard_stats_grid != null:
+		dashboard_stats_grid.visible = dashboard_secondary_visible
+	if dashboard_lower_grid != null:
+		dashboard_lower_grid.visible = dashboard_secondary_visible
+	if dashboard_advisor_card != null:
+		dashboard_advisor_card.visible = dashboard_secondary_visible or not dashboard_compact_mode
+
 func _update_responsive_layout():
 	var compact := size.x < 900.0
 	var narrow := size.x < 620.0
+	if compact != dashboard_compact_mode:
+		dashboard_compact_mode = compact
+		dashboard_secondary_visible = not compact
+		_apply_dashboard_density()
+	if navigation_grid != null:
+		navigation_grid.columns = 1 if compact else 2
 	if dashboard_grid != null:
 		dashboard_grid.columns = 1 if compact else 2
 	if dashboard_stats_grid != null:
@@ -1137,6 +1259,28 @@ func _refresh_top():
 func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
 
+func _company_visual_stage() -> int:
+	if not CompanyManager.created:
+		return 0
+	var launched := 0
+	for product in ProductManager.products:
+		if str(product.get("status", "")) == "LAUNCHED":
+			launched += 1
+	var brand := CompanyManager.get_brand_score()
+	var staff_count := PersonnelManager.staff.size()
+	if launched >= 10 or brand >= 85.0 or CompanyManager.subsidiaries.size() >= 2:
+		return 4
+	if launched >= 6 or brand >= 74.0 or staff_count >= 14:
+		return 3
+	if launched >= 3 or brand >= 63.0 or staff_count >= 8:
+		return 2
+	if launched >= 1 or staff_count >= 4:
+		return 1
+	return 0
+
+func _company_stage_name(stage: int) -> String:
+	return ["Garage fondateur", "Petit bureau", "Startup reconnue", "Groupe technologique", "Campus mondial"][clampi(stage, 0, 4)]
+
 func _refresh_dashboard():
 	if dashboard_label == null:
 		return
@@ -1157,6 +1301,12 @@ func _refresh_dashboard():
 		dashboard_market_outlook_label.text = "Le marché CPU sera analysé après la création de l'entreprise."
 		dashboard_action_button.text = "Créer l'entreprise"
 		dashboard_target_tab = 0
+		if dashboard_stage_label != null:
+			dashboard_stage_label.text = "GARAGE • AVANT LE LANCEMENT"
+		if dashboard_next_step_label != null:
+			dashboard_next_step_label.text = "Créez votre entreprise pour démarrer depuis le garage."
+		if dashboard_office_scene != null and dashboard_office_scene.has_method("set_stage"):
+			dashboard_office_scene.call("set_stage", 0, "Tech Empire")
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 0.0, false)
 		return
@@ -1174,6 +1324,12 @@ func _refresh_dashboard():
 			ready_product = product
 		elif str(product.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
 			launched_product = product
+
+	var visual_stage := _company_visual_stage()
+	if dashboard_stage_label != null:
+		dashboard_stage_label.text = "%s • PALIER %d" % [_company_stage_name(visual_stage).to_upper(), visual_stage]
+	if dashboard_office_scene != null and dashboard_office_scene.has_method("set_stage"):
+		dashboard_office_scene.call("set_stage", visual_stage, CompanyManager.company_name)
 
 	if not active_project.is_empty():
 		var phase_index: int = clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
@@ -1195,6 +1351,7 @@ func _refresh_dashboard():
 			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
 		dashboard_target_tab = 3
+		dashboard_next_step_label.text = "Laissez l'équipe avancer et surveillez le prochain arbitrage R&D."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
 	elif not ready_product.is_empty():
@@ -1208,6 +1365,7 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
 		dashboard_action_button.text = "Préparer le lancement"
 		dashboard_target_tab = 4
+		dashboard_next_step_label.text = "Fixez le prix et la capacité, puis lancez votre CPU sur le marché."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	elif not launched_product.is_empty():
@@ -1221,6 +1379,7 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
 		dashboard_action_button.text = "Analyser le marché"
 		dashboard_target_tab = 5
+		dashboard_next_step_label.text = "Analysez les ventes et préparez la génération suivante quand vous êtes prêt."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
 	else:
@@ -1234,6 +1393,7 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Commençons par une promesse simple : pour qui construisons-nous ce processeur, et pourquoi devrait-il exister ? »"
 		dashboard_action_button.text = "Concevoir le premier CPU"
 		dashboard_target_tab = 3
+		dashboard_next_step_label.text = "Ouvrez le laboratoire et définissez la cible de votre premier processeur."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
 
