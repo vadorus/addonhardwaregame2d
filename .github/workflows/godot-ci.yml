@@ -11,9 +11,12 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Godot 4.7.2
         uses: chickensoft-games/setup-godot@v2
@@ -24,6 +27,12 @@ jobs:
 
       - name: Godot version
         run: godot --version
+
+      - name: Validate Agents API pilot scripts
+        shell: bash
+        run: |
+          bash -n tools/agents/collect_patch.sh
+          node --check tools/agents/run_agent.mjs
 
       - name: Import and parse
         shell: bash
@@ -45,3 +54,4 @@ jobs:
           set -o pipefail
           godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|ERROR: \[CI\]' /tmp/smoke.log; then exit 1; fi
+

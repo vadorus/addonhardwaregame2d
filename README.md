@@ -124,6 +124,7 @@ La structure sera raffinée progressivement sans réorganisations inutiles qui c
 - CI Godot obligatoire avant de considérer une modification comme techniquement validée ;
 - aucun secret, build, cache `.godot/` ou fichier `*.import` versionné ;
 - commits courts et explicites (`feat:`, `fix:`, `docs:`, `chore:`).
+- pilote Agents API optionnel documenté dans [`docs/AGENTS_API_PILOT.md`](docs/AGENTS_API_PILOT.md) ; il prépare des patchs isolés et ne peut jamais fusionner automatiquement.
 
 ## Plateformes visées
 
@@ -134,3 +135,4 @@ La structure sera raffinée progressivement sans réorganisations inutiles qui c
 ## Licence
 
 Aucune licence publique définie pour le moment. Le dépôt reste privé pendant le développement.
+

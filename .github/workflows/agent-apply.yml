@@ -1,0 +1,195 @@
+name: Agent API - Créer la PR validée
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID du workflow de proposition relu"
+        required: true
+        type: string
+      pr_title:
+        description: "Titre de la Pull Request brouillon"
+        required: true
+        type: string
+      confirmation:
+        description: "Confirmer après lecture du rapport et du patch"
+        required: true
+        type: choice
+        options:
+          - ANNULER
+          - CREER LA PR
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: agents-api-apply-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Appliquer le patch et ouvrir une PR brouillon
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Vérifier la confirmation
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$CONFIRMATION" == "CREER LA PR" ]] || {
+            echo "::error::Création annulée : la confirmation explicite est absente."
+            exit 1
+          }
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || {
+            echo "::error::Le Run ID doit être numérique."
+            exit 1
+          }
+
+      - name: Checkout de master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Télécharger la proposition relue
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-proposal-${{ inputs.run_id }}
+          path: .agent-review
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Revalider, committer et pousser la branche
+        id: proposal
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -Eeuo pipefail
+
+          mapfile -t patch_candidates < <(find .agent-review -type f -name changes.patch -print)
+          [[ ${#patch_candidates[@]} -eq 1 ]] || {
+            echo "::error::L'artefact doit contenir exactement un fichier changes.patch."
+            exit 1
+          }
+          patch_file="${patch_candidates[0]}"
+          [[ -s "$patch_file" ]] || {
+            echo "::error::Le patch est vide."
+            exit 1
+          }
+
+          mapfile -t manifest_candidates < <(find .agent-review -type f -name manifest.txt -print)
+          [[ ${#manifest_candidates[@]} -eq 1 ]] || {
+            echo "::error::Le manifeste de proposition est absent ou ambigu."
+            exit 1
+          }
+          base_sha="$(sed -n 's/^base_sha=//p' "${manifest_candidates[0]}" | head -n 1)"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Le SHA du manifeste est invalide."
+            exit 1
+          }
+          git cat-file -e "$base_sha^{commit}"
+          git merge-base --is-ancestor "$base_sha" HEAD || {
+            echo "::error::La proposition ne descend pas de l'historique master courant."
+            exit 1
+          }
+
+          branch="agent/proposal-$SOURCE_RUN_ID"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::error::La branche $branch existe déjà."
+            exit 1
+          fi
+          git switch --create "$branch"
+          git apply --index --3way "$patch_file"
+
+          mapfile -d '' staged_files < <(git diff --cached --name-only -z)
+          [[ ${#staged_files[@]} -gt 0 ]] || {
+            echo "::error::Le patch n'a produit aucune modification."
+            exit 1
+          }
+
+          for file in "${staged_files[@]}"; do
+            [[ -n "$file" ]] || continue
+            case "$file" in
+              .github/*|tools/agents/*|AGENTS.md|.gitignore|.gitattributes|.gitmodules|.env|.env.*)
+                echo "::error::Chemin d'infrastructure interdit : $file"
+                exit 1
+                ;;
+            esac
+            case "$file" in
+              *.gd|*.tscn|*.tres|*.godot|*.md|*.json|*.cfg|*.svg|*.txt|*.uid) ;;
+              *)
+                echo "::error::Type de fichier interdit : $file"
+                exit 1
+                ;;
+            esac
+            mode="$(git ls-files --stage -- "$file" | awk 'NR == 1 { print $1 }')"
+            if [[ -n "$mode" && "$mode" != "100644" && "$mode" != "100755" ]]; then
+              echo "::error::Mode Git interdit ($mode) : $file"
+              exit 1
+            fi
+            if [[ -f "$file" ]] && (( $(stat --format='%s' -- "$file") > 1572864 )); then
+              echo "::error::Fichier supérieur à 1,5 Mio : $file"
+              exit 1
+            fi
+          done
+
+          git diff --cached --check
+          git config user.name "Tech Empire Agent Gate"
+          git config user.email "tech-empire-agent@users.noreply.github.com"
+          git commit -m "agent: proposition $SOURCE_RUN_ID"
+          git push origin "HEAD:refs/heads/$branch"
+
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Ouvrir la Pull Request brouillon
+        id: pull_request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+          PR_TITLE: ${{ inputs.pr_title }}
+          BRANCH: ${{ steps.proposal.outputs.branch }}
+          PROPOSAL_COMMIT: ${{ steps.proposal.outputs.commit }}
+        run: |
+          set -Eeuo pipefail
+          body_file="$RUNNER_TEMP/agent-pr-body.md"
+          {
+            echo "## Proposition produite par le pilote Agents API"
+            echo
+            echo "- Run source : \`$SOURCE_RUN_ID\`"
+            echo "- Commit proposé : \`$PROPOSAL_COMMIT\`"
+            echo "- Statut : **brouillon — revue humaine et CI obligatoires**"
+            echo
+            echo "L'agent n'avait aucun droit GitHub et n'a effectué ni commit ni push."
+            echo "Cette branche a été créée uniquement après le second déclenchement manuel."
+            echo "Ne pas fusionner tant que le diff, le rapport de l'artefact et la CI Godot n'ont pas été contrôlés."
+          } > "$body_file"
+
+          pr_url="$(gh pr create \
+            --draft \
+            --base master \
+            --head "$BRANCH" \
+            --title "$PR_TITLE" \
+            --body-file "$body_file")"
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "$pr_url"
+
+      - name: Résumé
+        shell: bash
+        run: |
+          {
+            echo "## Pull Request brouillon créée"
+            echo
+            echo "${{ steps.pull_request.outputs.url }}"
+            echo
+            echo "La fusion reste manuelle et dépend de la CI Godot."
+          } >> "$GITHUB_STEP_SUMMARY"
