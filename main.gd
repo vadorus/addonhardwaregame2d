@@ -113,6 +113,7 @@ var dashboard_stage_label: Label
 var dashboard_details_button: Button
 var dashboard_secondary_visible := true
 var dashboard_compact_mode := false
+var evolution_panel: Control
 var dashboard_target_tab := 3
 
 func _ready():
@@ -267,6 +268,7 @@ func _build_ui():
 	_create_products_tab()
 	_create_market_tab()
 	_create_media_tab()
+	_create_evolution_tab()
 	_build_navigation_overlay()
 	_update_nav_state()
 	_build_setup_layer()
@@ -912,6 +914,14 @@ func _create_media_tab():
 	var box: VBoxContainer = scroll.get_child(0)
 	media_label=_rich_label(); box.add_child(media_label)
 
+func _create_evolution_tab():
+	var scroll := _tab_scroll("Évolution des secteurs")
+	var box: VBoxContainer = scroll.get_child(0)
+	var panel_script: Script = load("res://ui/DepartmentEvolutionPanel.gd")
+	evolution_panel = panel_script.new() as Control
+	evolution_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(evolution_panel)
+
 func _build_setup_layer():
 	setup_layer = ColorRect.new()
 	setup_layer.color = Color(0.05,0.06,0.08,0.97)
@@ -1076,7 +1086,8 @@ func _build_navigation_overlay():
 		["◈", "Laboratoire CPU", "Concevoir la prochaine génération", 3],
 		["▣", "Produits", "Prix, capacité et lancement", 4],
 		["↗", "Marché", "Ventes et concurrence", 5],
-		["▤", "Presse", "Actualités et réputation", 6]
+		["▤", "Presse", "Actualités et réputation", 6],
+		["◆", "Évolution", "Voir grandir chaque secteur", 7]
 	]
 	for entry in entries:
 		var button := Button.new()
@@ -1109,7 +1120,7 @@ func _show_tab(index: int):
 func _update_nav_state():
 	if tabs == null:
 		return
-	var section_names := ["QG", "Entreprise", "Équipe", "Laboratoire CPU", "Produits", "Marché", "Presse"]
+	var section_names := ["QG", "Entreprise", "Équipe", "Laboratoire CPU", "Produits", "Marché", "Presse", "Évolution"]
 	if nav_context_label != null and tabs.current_tab < section_names.size():
 		nav_context_label.text = str(section_names[tabs.current_tab])
 	for i in range(nav_buttons.size()):
@@ -1180,6 +1191,8 @@ func _update_responsive_layout():
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
 		lab_stats_grid.columns = 1 if narrow else 3
+	if evolution_panel != null and evolution_panel.has_method("set_compact"):
+		evolution_panel.call("set_compact", compact)
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
@@ -1258,6 +1271,8 @@ func _refresh_top():
 
 func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	if evolution_panel != null and evolution_panel.has_method("refresh"):
+		evolution_panel.call("refresh")
 
 func _company_visual_stage() -> int:
 	if not CompanyManager.created:
