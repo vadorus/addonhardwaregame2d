@@ -3,7 +3,7 @@ extends Node
 signal save_completed(ok, message)
 
 const SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 
 func save_game():
 	if not CompanyManager.created:
