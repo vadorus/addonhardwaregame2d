@@ -3,16 +3,18 @@ extends Node
 signal save_completed(ok, message)
 
 const SAVE_PATH := "user://tech_empire_save.json"
+const SAVE_VERSION := 4
 
 func save_game():
 	if not CompanyManager.created:
 		save_completed.emit(false, "Aucune partie à sauvegarder.")
 		return
 	var state := {
-		"version":3,
+		"version":SAVE_VERSION,
 		"time":TimeManager.get_state(),
 		"economy":Economy.get_state(),
 		"company":CompanyManager.get_state(),
+		"divisions":DivisionManager.get_state(),
 		"personnel":PersonnelManager.get_state(),
 		"research":ResearchManager.get_state(),
 		"patents":PatentManager.get_state(),
@@ -43,6 +45,7 @@ func load_game() -> bool:
 		return false
 	var state: Dictionary = parsed
 	CompanyManager.load_state(state.get("company", {}))
+	DivisionManager.load_state(state.get("divisions", {}))
 	Economy.load_state(state.get("economy", {}))
 	PersonnelManager.load_state(state.get("personnel", {}))
 	ResearchManager.load_state(state.get("research", {}))

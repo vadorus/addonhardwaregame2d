@@ -11,6 +11,12 @@ func _ready() -> void:
 	if GameData.get_active_sector_keys() != ["CPU"]:
 		_fail("CPU must be the only active sector")
 		return
+	if DivisionManager.get_active_division_keys() != ["CPU"]:
+		_fail("CPU must be the only operational company division")
+		return
+	if DivisionManager.is_operational("GPU"):
+		_fail("Future divisions must remain locked")
+		return
 	var forbidden: bool = ResearchManager.start_project("Forbidden GPU", "GPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000)
 	if forbidden:
 		_fail("Inactive GPU branch accepted a research project")
@@ -65,6 +71,19 @@ func _ready() -> void:
 	var migrated_project: Dictionary = ResearchManager.projects[0]
 	if not migrated_project.has("cpu_design") or migrated_project.get("design_estimate", {}).is_empty():
 		_fail("Legacy R&D save was not migrated to a CPU design")
+		return
+
+	DivisionManager.record_completed_generation("CPU")
+	var division_state := DivisionManager.get_state()
+	DivisionManager.reset("CPU")
+	DivisionManager.load_state(division_state)
+	var restored_cpu := DivisionManager.get_division("CPU")
+	if int(restored_cpu.get("generation_count", 0)) != 1 or float(restored_cpu.get("maturity", 0.0)) <= 12.0:
+		_fail("Division progress did not survive a save round-trip")
+		return
+	DivisionManager.load_state({})
+	if DivisionManager.get_active_division_keys() != ["CPU"]:
+		_fail("Legacy V3 save was not migrated to the CPU division")
 		return
 
 	print("[CI] Smoke test passed")

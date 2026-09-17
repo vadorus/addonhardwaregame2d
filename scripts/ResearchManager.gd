@@ -27,7 +27,7 @@ func reset(starting_sector: String):
 	projects_changed.emit()
 
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}) -> bool:
-	if not GameData.is_sector_active(sector):
+	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	if Economy.money < maxi(monthly_budget, 10000):
 		return false
