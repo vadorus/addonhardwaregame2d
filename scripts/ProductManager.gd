@@ -1,5 +1,7 @@
 extends Node
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 signal products_changed
 signal product_launched(product)
 signal sales_report_created(report)
@@ -25,7 +27,14 @@ func _on_project_completed(project: Dictionary):
 	for metric in GameData.METRICS:
 		avg += float(metrics.get(metric, 50.0))
 	avg /= float(GameData.METRICS.size())
+	var cpu_design: Dictionary = project.get("cpu_design", {}).duplicate(true)
+	var design_estimate: Dictionary = project.get("design_estimate", {}).duplicate(true)
 	var unit_cost := int(float(sd.base_unit_cost) * (0.76 + avg / 220.0))
+	if str(project.sector) == "CPU":
+		cpu_design = CPU_DESIGN.normalize(cpu_design)
+		design_estimate = CPU_DESIGN.evaluate(cpu_design)
+		var design_cost := int(design_estimate.get("unit_cost", unit_cost))
+		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
 	if str(project.approach) == "INTERNAL":
 		unit_cost = int(unit_cost * 0.92)
 	elif str(project.approach) == "EXTERNAL":
@@ -35,6 +44,7 @@ func _on_project_completed(project: Dictionary):
 		"id":"PROD-%03d" % _next_id,"project_id":str(project.id),"name":str(project.name),
 		"company":CompanyManager.company_name,"sector":str(project.sector),"target_segment":str(project.segment),
 		"approach":str(project.approach),"internal_ratio":float(approach.internal_ratio),
+		"cpu_design":cpu_design,"design_estimate":design_estimate,
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sd.market_units)*0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
@@ -128,6 +138,12 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	products = state.get("products", []).duplicate(true)
+	for product in products:
+		if str(product.get("sector", "")) == "CPU":
+			var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
+			product["cpu_design"] = design
+			if not product.has("design_estimate") or product.get("design_estimate", {}).is_empty():
+				product["design_estimate"] = CPU_DESIGN.evaluate(design)
 	_next_id = int(state.get("next_id", 1))
 	_reviewed_products = state.get("reviewed_products", {}).duplicate(true)
 	products_changed.emit()
