@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.2.4 importé et validé sous Godot 4.7.2.**
+**Projet actif — prototype V0.2.5 importé et validé sous Godot 4.7.2.**
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
@@ -16,6 +16,7 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - économie mensuelle et rapports de clôture ;
 - création d'entreprise avec branche CPU active ;
 - personnel, expérience, équipes, départements et délégation ;
+- laboratoire CPU interactif : cœurs, fréquence, cache, gravure et enveloppe thermique ;
 - R&D en plusieurs phases avec rapports techniques ;
 - développement interne / hybride / externe ;
 - technologies et savoir-faire ;
@@ -24,13 +25,14 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - SAV, garanties, réputation, marketing et environnement ;
 - presse / médias, contrats B2B, brevets, licences et premières filiales ;
 - sauvegarde / chargement ;
-- nouvelle identité visuelle, navigation dédiée et QG centré sur le projet CPU prioritaire.
+- nouvelle identité visuelle, navigation dédiée et QG centré sur le projet CPU prioritaire ;
+- aperçu en direct des compromis performance, efficacité, fiabilité, coût, risque et durée.
 
 ## Périmètre jouable actuel
 
 La vertical slice est volontairement limitée à la branche **CPU**. Les autres secteurs restent paramétrés dans les données afin de préparer les futures extensions, mais ils sont affichés comme « à venir », désactivés dans l’interface et refusés par le moteur de R&D. Ils ne doivent pas être développés avant que la boucle CPU soit profonde, équilibrée et amusante.
 
-L’interface V0.2.4 pose le premier socle de cette expérience : palette visuelle propre au jeu, navigation sans onglets techniques visibles, aperçu graphique du processeur, projet prioritaire, rapport du CTO, indicateurs lisibles et radar du marché alimentés par les vraies données de simulation.
+L’interface V0.2.5 ajoute un véritable laboratoire CPU : le joueur règle les cœurs, la fréquence, le cache, la finesse de gravure et le TDP. Ces choix modifient réellement les caractéristiques finales, le coût unitaire, la complexité et la durée de R&D. Le QG réutilise ensuite le design choisi dans son aperçu graphique.
 
 ## Vision
 
@@ -76,7 +78,7 @@ Le workflow `.github/workflows/godot-ci.yml` utilise Godot 4.7.2 et vérifie :
 
 1. import et parsing du projet ;
 2. démarrage headless de la scène principale ;
-3. smoke test : verrou de la branche CPU → création d'entreprise → lancement d'une R&D → traitement d'un mois → cohérence du rapport économique.
+3. smoke test : verrou CPU → comparaison des profils techniques → lancement d’une architecture → traitement d’un mois → migration d’une ancienne sauvegarde.
 
 La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais elle évite de transmettre une version contenant une erreur GDScript évidente.
 

@@ -1,5 +1,7 @@
 extends Node
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 signal projects_changed
 signal phase_report_created(project, report)
 signal project_completed(project)
@@ -24,35 +26,48 @@ func reset(starting_sector: String):
 	technologies["integration"] = 10.0
 	projects_changed.emit()
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int) -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}) -> bool:
 	if not GameData.is_sector_active(sector):
 		return false
 	if Economy.money < maxi(monthly_budget, 10000):
 		return false
 	var active_count := 0
-	for p in projects:
-		if str(p.status) == "DEVELOPMENT":
+	for existing_project in projects:
+		if str(existing_project.status) == "DEVELOPMENT":
 			active_count += 1
 	if active_count >= 3:
 		return false
+
 	var desired := {}
 	for metric in GameData.METRICS:
 		desired[metric] = 55.0
-	var focus_metric := str(GameData.FOCUS_OPTIONS.get(focus, {}).get("metric", ""))
-	if focus_metric != "":
-		desired[focus_metric] = 78.0
 	var sector_data: Dictionary = GameData.SECTORS[sector]
 	desired[str(sector_data.primary_metric)] = maxf(float(desired[str(sector_data.primary_metric)]), 70.0)
 	desired[str(sector_data.secondary_metric)] = maxf(float(desired[str(sector_data.secondary_metric)]), 64.0)
-	var p := {
+
+	var normalized_design: Dictionary = {}
+	var design_estimate: Dictionary = {}
+	if sector == "CPU":
+		normalized_design = CPU_DESIGN.normalize(cpu_design)
+		design_estimate = CPU_DESIGN.evaluate(normalized_design)
+		for design_metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
+			desired[design_metric] = float(design_estimate.get(design_metric, desired.get(design_metric, 55.0)))
+
+	var focus_metric := str(GameData.FOCUS_OPTIONS.get(focus, {}).get("metric", ""))
+	if focus_metric != "":
+		desired[focus_metric] = clampf(maxf(float(desired.get(focus_metric, 55.0)), 65.0) + 8.0, 0.0, 96.0)
+
+	var project := {
 		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":segment,
 		"approach":approach,"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
-		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{}
+		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
+		"cpu_design":normalized_design,"design_estimate":design_estimate,
+		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
 	_next_id += 1
-	projects.append(p)
+	projects.append(project)
 	CompanyManager.add_alert("Nouveau projet lancé : %s." % project_name)
 	projects_changed.emit()
 	return true
@@ -77,6 +92,9 @@ func _process_project_month(project: Dictionary):
 	project.months_spent = int(project.months_spent) + 1
 	var tech := float(technologies.get(specialization, 5.0))
 	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * management
+	if str(project.sector) == "CPU":
+		var complexity_factor := lerpf(0.86, 1.28, clampf(float(project.get("complexity", 50.0)) / 100.0, 0.0, 1.0))
+		progress /= complexity_factor
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge)
@@ -128,6 +146,12 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 		base *= float(approach_data.quality)
 		base += rng.randf_range(-4.0, 4.0)
 		metrics[metric] = clampf(base, 25.0, 96.0)
+	var design_estimate: Dictionary = project.get("design_estimate", {})
+	if str(project.sector) == "CPU" and not design_estimate.is_empty():
+		for design_metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
+			var simulated_value := float(metrics.get(design_metric, 50.0))
+			var designed_value := float(design_estimate.get(design_metric, simulated_value))
+			metrics[design_metric] = clampf(simulated_value * 0.62 + designed_value * 0.38, 20.0, 98.0)
 	var internal_ratio := float(approach_data.internal_ratio)
 	var integration_skill := float(technologies.get("integration", 10.0))
 	if internal_ratio >= 0.6:
@@ -154,6 +178,13 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	projects = state.get("projects", []).duplicate(true)
+	for project in projects:
+		if str(project.get("sector", "")) == "CPU":
+			var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
+			var estimate := CPU_DESIGN.evaluate(design)
+			project["cpu_design"] = design
+			project["design_estimate"] = estimate
+			project["complexity"] = float(project.get("complexity", estimate.complexity))
 	technologies = state.get("technologies", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 8282))

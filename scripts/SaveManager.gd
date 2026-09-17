@@ -9,7 +9,7 @@ func save_game():
 		save_completed.emit(false, "Aucune partie à sauvegarder.")
 		return
 	var state := {
-		"version":2,
+		"version":3,
 		"time":TimeManager.get_state(),
 		"economy":Economy.get_state(),
 		"company":CompanyManager.get_state(),

@@ -1,4 +1,4 @@
-# HardwareTycoon / Tech Empire — Prototype V0.2.3
+# HardwareTycoon / Tech Empire — Prototype V0.2.5
 
 Cette version transforme l'ancien prototype temps + économie en première boucle de simulation d'entreprise technologique.
 
@@ -10,6 +10,8 @@ Cette version transforme l'ancien prototype temps + économie en première boucl
 - personnel avec compétence, aptitude, expérience, spécialisation, leadership, salaire et moral ;
 - expérience individuelle et expérience d'équipe/cohésion ;
 - départements avec responsable et autonomie Direct / Supervisé / Autonome ;
+- laboratoire CPU avec cœurs, fréquence, cache, finesse de gravure et TDP ;
+- estimation immédiate de performance, efficacité, fiabilité, innovation, coût, risque et durée ;
 - R&D par phases : Concept, Architecture, Prototype, Alpha, Beta, Validation ;
 - rapports du chef d'équipe à chaque phase ;
 - choix développement interne / hybride-partenariat / externe ;
@@ -41,7 +43,7 @@ Cette V0.2 est une fondation jouable : elle ne cherche pas encore à simuler tou
 
 1. Créer une entreprise.
 2. Aller dans Personnel et observer les compétences/expériences.
-3. Lancer un projet R&D en choisissant secteur, clientèle, approche, priorité et budget.
+3. Concevoir un CPU en réglant son architecture, sa clientèle, son approche, sa priorité et son budget.
 4. Laisser passer les mois jusqu'aux rapports de phases.
 5. Une fois le développement fini, lancer le produit avec prix et capacité.
 6. Vérifier benchmark, réactions clients, presse, ventes, SAV et propositions B2B.
@@ -71,3 +73,13 @@ Cette V0.2 est une fondation jouable : elle ne cherche pas encore à simuler tou
 - Aperçu graphique du processeur dessiné directement par Godot, sans dépendance à un asset externe.
 - Indicateurs et radar marché alimentés par l’état réel de la partie.
 - Mise en page du QG adaptable aux écrans étroits.
+
+
+## V0.2.5 — laboratoire CPU interactif
+
+- Trois points de départ rapides : Efficace, Équilibré et Performance.
+- Réglages techniques en direct : 2 à 32 cœurs, 2,0 à 6,0 GHz, 4 à 96 Mo de cache, 14 à 3 nm et 35 à 250 W.
+- Aperçu du processeur qui réagit au nombre de cœurs, à la gravure et au TDP.
+- Conséquences réelles sur les métriques finales, le coût de fabrication et la vitesse de développement.
+- Indicateur d’adéquation au segment client et alerte claire sur le compromis principal.
+- Migration automatique des anciens projets et produits CPU vers un design équilibré.

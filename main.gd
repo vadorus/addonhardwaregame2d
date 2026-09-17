@@ -1,5 +1,7 @@
 extends Control
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
 const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
 const APP_PANEL := Color(0.071, 0.106, 0.161, 1.0)
@@ -46,6 +48,22 @@ var rd_segment: OptionButton
 var rd_approach: OptionButton
 var rd_focus: OptionButton
 var rd_budget: SpinBox
+var rd_cores: HSlider
+var rd_frequency: HSlider
+var rd_cache: HSlider
+var rd_node: OptionButton
+var rd_tdp: HSlider
+var lab_layout_grid: GridContainer
+var lab_stats_grid: GridContainer
+var lab_chip: Control
+var lab_profile_label: Label
+var lab_summary_label: Label
+var lab_unit_cost_value: Label
+var lab_dev_time_value: Label
+var lab_fit_value: Label
+var lab_warning_label: Label
+var cpu_metric_bars: Dictionary = {}
+var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_price: SpinBox
 var product_capacity: SpinBox
@@ -416,26 +434,287 @@ func _create_personnel_tab():
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
 
 func _create_research_tab():
-	var scroll := _tab_scroll("R&D")
+	var scroll := _tab_scroll("Laboratoire CPU")
 	var box: VBoxContainer = scroll.get_child(0)
-	box.add_child(_section("Lancer un développement produit"))
-	var scope_note := _label("Vertical slice actuelle : processeurs (CPU). Les autres branches sont affichées mais verrouillées pour plus tard.", 13)
-	scope_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(scope_note)
-	var grid := GridContainer.new(); grid.columns=2; box.add_child(grid)
-	grid.add_child(_label("Nom du produit",14)); rd_name=LineEdit.new(); rd_name.placeholder_text="X-Core One"; grid.add_child(rd_name)
-	grid.add_child(_label("Secteur",14)); rd_sector=OptionButton.new(); _fill_sector_options(rd_sector); grid.add_child(rd_sector)
-	grid.add_child(_label("Client cible",14)); rd_segment=OptionButton.new(); _fill_segment_options(rd_segment); grid.add_child(rd_segment)
-	grid.add_child(_label("Approche",14)); rd_approach=OptionButton.new(); _fill_approach_options(rd_approach); grid.add_child(rd_approach)
-	grid.add_child(_label("Priorité",14)); rd_focus=OptionButton.new(); _fill_focus_options(rd_focus); grid.add_child(rd_focus)
-	grid.add_child(_label("Budget mensuel R&D",14)); rd_budget=_spin(10000,250000,2500,45000); grid.add_child(rd_budget)
-	var start:=Button.new(); start.text="Lancer le projet"; start.pressed.connect(_start_project); box.add_child(start)
-	box.add_child(_section("Technologies et savoir-faire")); tech_label=_rich_label(); box.add_child(tech_label)
-	box.add_child(_section("Projets en cours / rapports d'équipe")); projects_label=_rich_label(); box.add_child(projects_label)
-	box.add_child(_section("Brevets")); patents_label=_rich_label(); box.add_child(patents_label)
-	var pat_row:=HBoxContainer.new(); box.add_child(pat_row)
-	var file_pat:=Button.new(); file_pat.text="Déposer le premier brevet candidat (8 000 €)"; file_pat.pressed.connect(_file_patent); pat_row.add_child(file_pat)
-	var lic_pat:=Button.new(); lic_pat.text="Activer/désactiver licence du 1er brevet"; lic_pat.pressed.connect(_toggle_patent_license); pat_row.add_child(lic_pat)
+
+	var heading := VBoxContainer.new()
+	box.add_child(heading)
+	heading.add_child(_eyebrow("LABORATOIRE DE CONCEPTION"))
+	heading.add_child(_label("Donnez une personnalité à votre processeur", 27))
+	var intro := _muted_label("Chaque choix technique change les performances, le coût, la consommation, le risque et le temps de développement.", 13)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(intro)
+
+	lab_layout_grid = GridContainer.new()
+	lab_layout_grid.columns = 2
+	lab_layout_grid.add_theme_constant_override("h_separation", 12)
+	lab_layout_grid.add_theme_constant_override("v_separation", 12)
+	box.add_child(lab_layout_grid)
+
+	var configuration_card := _card(APP_PANEL, 14, 16)
+	configuration_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab_layout_grid.add_child(configuration_card)
+	var configuration_box := VBoxContainer.new()
+	configuration_box.add_theme_constant_override("separation", 11)
+	configuration_card.add_child(configuration_box)
+	configuration_box.add_child(_eyebrow("VOTRE BRIEF"))
+	configuration_box.add_child(_label("Identité et stratégie", 20))
+
+	rd_name = LineEdit.new()
+	rd_name.placeholder_text = "Ex. Nova X8"
+	_add_labeled_control(configuration_box, "Nom du CPU", rd_name)
+
+	rd_segment = OptionButton.new()
+	_fill_segment_options(rd_segment)
+	_select_meta(rd_segment, "MAINSTREAM")
+	rd_segment.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Client cible", rd_segment)
+
+	rd_approach = OptionButton.new()
+	_fill_approach_options(rd_approach)
+	rd_approach.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Méthode de développement", rd_approach)
+
+	rd_focus = OptionButton.new()
+	_fill_focus_options(rd_focus)
+	rd_focus.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Priorité de l'équipe", rd_focus)
+
+	rd_budget = _spin(10000, 250000, 2500, 45000)
+	rd_budget.value_changed.connect(func(_value): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Budget mensuel R&D", rd_budget)
+
+	configuration_box.add_child(_eyebrow("ARCHITECTURE CPU"))
+	var preset_row := HFlowContainer.new()
+	preset_row.add_theme_constant_override("h_separation", 7)
+	preset_row.add_theme_constant_override("v_separation", 7)
+	configuration_box.add_child(preset_row)
+	for preset_data in [["Efficace", "EFFICIENT"], ["Équilibré", "BALANCED"], ["Performance", "PERFORMANCE"]]:
+		var preset_button := Button.new()
+		preset_button.text = str(preset_data[0])
+		var preset_key := str(preset_data[1])
+		preset_button.pressed.connect(func(): _apply_cpu_preset(preset_key))
+		preset_row.add_child(preset_button)
+
+	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs")
+	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1)
+	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo")
+
+	rd_node = OptionButton.new()
+	for node_nm in CPU_DESIGN.available_nodes():
+		rd_node.add_item(CPU_DESIGN.node_label(int(node_nm)))
+		rd_node.set_item_metadata(rd_node.item_count - 1, int(node_nm))
+	_select_meta(rd_node, "7")
+	rd_node.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Procédé de gravure", rd_node)
+
+	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe thermique", 35.0, 250.0, 5.0, 95.0, " W")
+
+	var start := Button.new()
+	start.text = "Lancer ce CPU en développement"
+	start.custom_minimum_size.y = 50
+	start.pressed.connect(_start_project)
+	configuration_box.add_child(start)
+
+	var preview_card := _card(APP_PANEL, 14, 16)
+	preview_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab_layout_grid.add_child(preview_card)
+	var preview_box := VBoxContainer.new()
+	preview_box.add_theme_constant_override("separation", 12)
+	preview_card.add_child(preview_box)
+	preview_box.add_child(_eyebrow("SIMULATION EN DIRECT"))
+	lab_profile_label = _label("CPU équilibré", 24)
+	lab_profile_label.add_theme_color_override("font_color", APP_CYAN)
+	preview_box.add_child(lab_profile_label)
+
+	var chip_frame := PanelContainer.new()
+	chip_frame.custom_minimum_size = Vector2(230, 215)
+	chip_frame.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 14, 0, APP_PANEL_ALT, 0))
+	var chip_script: Script = load("res://ui/ChipPreview.gd")
+	lab_chip = chip_script.new() as Control
+	chip_frame.add_child(lab_chip)
+	preview_box.add_child(chip_frame)
+
+	lab_summary_label = _muted_label("", 13)
+	lab_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab_summary_label.custom_minimum_size.y = 54
+	preview_box.add_child(lab_summary_label)
+
+	lab_stats_grid = GridContainer.new()
+	lab_stats_grid.columns = 3
+	lab_stats_grid.add_theme_constant_override("h_separation", 7)
+	lab_stats_grid.add_theme_constant_override("v_separation", 7)
+	preview_box.add_child(lab_stats_grid)
+	lab_unit_cost_value = _add_inline_metric(lab_stats_grid, "Coût estimé", "—")
+	lab_dev_time_value = _add_inline_metric(lab_stats_grid, "Développement", "—")
+	lab_fit_value = _add_inline_metric(lab_stats_grid, "Adéquation cible", "—")
+
+	var metrics_box := VBoxContainer.new()
+	metrics_box.add_theme_constant_override("separation", 8)
+	preview_box.add_child(metrics_box)
+	_add_lab_metric(metrics_box, "performance", "Performance")
+	_add_lab_metric(metrics_box, "efficiency", "Efficacité")
+	_add_lab_metric(metrics_box, "reliability", "Fiabilité")
+	_add_lab_metric(metrics_box, "innovation", "Innovation")
+
+	var warning_panel := PanelContainer.new()
+	warning_panel.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 10, 1, APP_AMBER, 11))
+	lab_warning_label = _label("", 13)
+	lab_warning_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	warning_panel.add_child(lab_warning_label)
+	preview_box.add_child(warning_panel)
+
+	box.add_child(_section("Savoir-faire de l'entreprise"))
+	var tech_card := _card(APP_SHELL, 12, 12)
+	tech_label = _rich_label()
+	tech_card.add_child(tech_label)
+	box.add_child(tech_card)
+
+	box.add_child(_section("Pipeline R&D et rapports de Camille"))
+	var projects_card := _card(APP_SHELL, 12, 12)
+	projects_label = _rich_label()
+	projects_card.add_child(projects_label)
+	box.add_child(projects_card)
+
+	box.add_child(_section("Brevets"))
+	var patent_card := _card(APP_SHELL, 12, 12)
+	var patent_box := VBoxContainer.new()
+	patent_card.add_child(patent_box)
+	patents_label = _rich_label()
+	patent_box.add_child(patents_label)
+	var patent_actions := HFlowContainer.new()
+	patent_box.add_child(patent_actions)
+	var file_pat := Button.new()
+	file_pat.text = "Déposer le premier brevet candidat (8 000 €)"
+	file_pat.pressed.connect(_file_patent)
+	patent_actions.add_child(file_pat)
+	var license_pat := Button.new()
+	license_pat.text = "Activer / désactiver la licence"
+	license_pat.pressed.connect(_toggle_patent_license)
+	patent_actions.add_child(license_pat)
+	box.add_child(patent_card)
+
+	_refresh_cpu_preview()
+
+func _add_labeled_control(parent: VBoxContainer, title: String, control: Control):
+	var field := VBoxContainer.new()
+	field.add_theme_constant_override("separation", 4)
+	field.add_child(_muted_label(title, 12))
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.add_child(control)
+	parent.add_child(field)
+
+func _add_lab_slider(parent: VBoxContainer, title: String, min_value: float, max_value: float, step: float, initial_value: float, suffix: String, decimals: int = 0) -> HSlider:
+	var field := VBoxContainer.new()
+	field.add_theme_constant_override("separation", 3)
+	parent.add_child(field)
+	var row := HBoxContainer.new()
+	field.add_child(row)
+	var title_label := _muted_label(title, 12)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title_label)
+	var value_label := _label(_format_lab_value(initial_value, suffix, decimals), 13)
+	value_label.add_theme_color_override("font_color", APP_CYAN)
+	row.add_child(value_label)
+	var slider := HSlider.new()
+	slider.min_value = min_value
+	slider.max_value = max_value
+	slider.step = step
+	slider.value = initial_value
+	slider.custom_minimum_size.y = 30
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.value_changed.connect(func(new_value: float):
+		value_label.text = _format_lab_value(new_value, suffix, decimals)
+		_refresh_cpu_preview()
+	)
+	field.add_child(slider)
+	return slider
+
+func _format_lab_value(value: float, suffix: String, decimals: int) -> String:
+	if decimals > 0:
+		return ("%.1f" % value) + suffix
+	return ("%d" % int(round(value))) + suffix
+
+func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
+	var metric_box := VBoxContainer.new()
+	metric_box.add_theme_constant_override("separation", 3)
+	parent.add_child(metric_box)
+	var row := HBoxContainer.new()
+	metric_box.add_child(row)
+	var title_label := _muted_label(title, 12)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title_label)
+	var value_label := _label("—", 12)
+	row.add_child(value_label)
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 8
+	metric_box.add_child(bar)
+	cpu_metric_bars[key] = bar
+	cpu_metric_labels[key] = value_label
+
+func _current_cpu_design() -> Dictionary:
+	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null:
+		return CPU_DESIGN.default_design()
+	return CPU_DESIGN.normalize({
+		"cores": int(rd_cores.value),
+		"frequency_ghz": float(rd_frequency.value),
+		"cache_mb": int(rd_cache.value),
+		"node_nm": int(rd_node.get_item_metadata(rd_node.selected)),
+		"tdp_w": int(rd_tdp.value)
+	})
+
+func _apply_cpu_preset(key: String):
+	var design := CPU_DESIGN.preset(key)
+	rd_cores.value = int(design.cores)
+	rd_frequency.value = float(design.frequency_ghz)
+	rd_cache.value = int(design.cache_mb)
+	_select_meta(rd_node, str(design.node_nm))
+	rd_tdp.value = int(design.tdp_w)
+	_refresh_cpu_preview()
+	status_label.text = "Préréglage %s appliqué. Vous pouvez encore tout ajuster." % key.to_lower()
+
+func _refresh_cpu_preview():
+	if lab_profile_label == null or lab_chip == null:
+		return
+	var design := _current_cpu_design()
+	var evaluation := CPU_DESIGN.evaluate(design)
+	var segment := _meta(rd_segment) if rd_segment != null else "MAINSTREAM"
+	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
+	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
+	var approach_data: Dictionary = GameData.APPROACHES.get(approach_key, GameData.APPROACHES.INTERNAL)
+	var months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
+	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
+	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost))
+	var risk := float(evaluation.risk)
+	var risk_label := "faible"
+	if risk >= 60.0:
+		risk_label = "élevé"
+	elif risk >= 40.0:
+		risk_label = "modéré"
+
+	lab_profile_label.text = str(evaluation.profile)
+	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
+		int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+		_money(estimated_program_cost), risk_label, risk
+	]
+	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
+	lab_dev_time_value.text = "~%d mois" % months
+	lab_fit_value.text = "%.0f / 100" % fit
+	lab_warning_label.text = str(evaluation.tradeoff)
+	lab_warning_label.add_theme_color_override("font_color", APP_RED if risk >= 60.0 else (APP_AMBER if risk >= 40.0 else APP_GREEN))
+
+	for metric_key in ["performance", "efficiency", "reliability", "innovation"]:
+		var score := float(evaluation.get(metric_key, 0.0))
+		if cpu_metric_bars.has(metric_key):
+			var bar: ProgressBar = cpu_metric_bars[metric_key]
+			bar.value = score
+		if cpu_metric_labels.has(metric_key):
+			var metric_label: Label = cpu_metric_labels[metric_key]
+			metric_label.text = "%.0f" % score
+
+	if lab_chip.has_method("set_design"):
+		lab_chip.call("set_design", design, 16.0, false)
 
 func _create_products_tab():
 	var scroll := _tab_scroll("Produits")
@@ -663,6 +942,10 @@ func _update_responsive_layout():
 		dashboard_lower_grid.columns = 1 if compact else 2
 	if dashboard_project_grid != null:
 		dashboard_project_grid.columns = 1 if narrow else 2
+	if lab_layout_grid != null:
+		lab_layout_grid.columns = 1 if compact else 2
+	if lab_stats_grid != null:
+		lab_stats_grid.columns = 1 if narrow else 3
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
@@ -762,8 +1045,8 @@ func _refresh_dashboard():
 		dashboard_market_outlook_label.text = "Le marché CPU sera analysé après la création de l'entreprise."
 		dashboard_action_button.text = "Créer l'entreprise"
 		dashboard_target_tab = 0
-		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
-			dashboard_chip.call("set_progress", 0.0, false)
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 0.0, false)
 		return
 
 	var active_project: Dictionary = {}
@@ -787,7 +1070,8 @@ func _refresh_dashboard():
 		var approach_key := str(active_project.get("approach", "INTERNAL"))
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
-		dashboard_project_meta_label.text = "Processeur • %s • cible %s" % [approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
+		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
+		dashboard_project_meta_label.text = "%d cœurs • %.1f GHz • %d nm • %s • cible %s" % [int(active_design.cores), float(active_design.frequency_ghz), int(active_design.node_nm), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
 		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
 		dashboard_project_progress.value = overall_progress
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
@@ -799,8 +1083,8 @@ func _refresh_dashboard():
 			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
 		dashboard_target_tab = 3
-		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
-			dashboard_chip.call("set_progress", overall_progress, false)
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
 	elif not ready_product.is_empty():
 		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
 		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
@@ -812,8 +1096,8 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
 		dashboard_action_button.text = "Préparer le lancement"
 		dashboard_target_tab = 4
-		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
-			dashboard_chip.call("set_progress", 100.0, false)
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	elif not launched_product.is_empty():
 		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
 		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées" % [int(launched_product.get("months_on_market", 0)), _money(int(launched_product.get("units_sold_total", 0)))]
@@ -825,8 +1109,8 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
 		dashboard_action_button.text = "Analyser le marché"
 		dashboard_target_tab = 5
-		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
-			dashboard_chip.call("set_progress", 100.0, true)
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
 	else:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."
@@ -838,8 +1122,8 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Commençons par une promesse simple : pour qui construisons-nous ce processeur, et pourquoi devrait-il exister ? »"
 		dashboard_action_button.text = "Concevoir le premier CPU"
 		dashboard_target_tab = 3
-		if dashboard_chip != null and dashboard_chip.has_method("set_progress"):
-			dashboard_chip.call("set_progress", 8.0, false)
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
 
 	dashboard_cash_value.text = "%s €" % _money(Economy.money)
 	if Economy.history.is_empty():
@@ -918,26 +1202,52 @@ func _hire_candidate():
 	else: status_label.text="Recrutement impossible."; _refresh_all()
 
 func _refresh_research():
-	if tech_label==null: return
-	var tech_lines:=[]
-	for key in ResearchManager.technologies.keys(): tech_lines.append("• %s : %.1f" % [str(key).capitalize(),float(ResearchManager.technologies[key])])
-	tech_label.text="\n".join(tech_lines) if not tech_lines.is_empty() else "Aucun savoir-faire initialisé."
-	var lines:=[]
-	for p in ResearchManager.projects:
-		var phase:="Terminé"
-		if str(p.status)=="DEVELOPMENT": phase="%s — %.0f%%" % [GameData.PHASES[int(p.phase_index)],float(p.phase_progress)]
-		lines.append("%s [%s] — %s — %d mois — %s" % [str(p.name),GameData.SECTORS[str(p.sector)].label,phase,int(p.months_spent),GameData.APPROACHES[str(p.approach)].label])
-		if not p.reports.is_empty(): lines.append("  Chef d'équipe : %s" % str(p.reports[0].text))
-	projects_label.text="\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Lancez votre premier développement ci-dessus."
-	var pats:=[]
-	for c in PatentManager.candidates: pats.append("Candidat : %s — force %d" % [str(c.title),int(c.strength)])
-	for p in PatentManager.patents: pats.append("Brevet : %s — %s" % [str(p.title),"licencié" if bool(p.licensed) else "exclusif"])
-	patents_label.text="\n".join(pats) if not pats.is_empty() else "Aucun brevet pour le moment. Les projets très innovants peuvent générer des inventions brevetables."
+	if tech_label == null:
+		return
+	_refresh_cpu_preview()
+	var tech_lines: Array[String] = []
+	for key in ResearchManager.technologies.keys():
+		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
+	tech_label.text = "\n".join(tech_lines) if not tech_lines.is_empty() else "Aucun savoir-faire initialisé."
+
+	var lines: Array[String] = []
+	for project in ResearchManager.projects:
+		var phase := "Terminé"
+		if str(project.status) == "DEVELOPMENT":
+			phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
+		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
+		var estimate := CPU_DESIGN.evaluate(design)
+		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
+		lines.append("  %d cœurs • %.1f GHz • %d Mo • %d nm • %d W • coût cible %s €" % [
+			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w), _money(int(estimate.unit_cost))
+		])
+		lines.append("  Cible %s • %s • priorité %s" % [
+			str(GameData.SEGMENTS.get(str(project.segment), {}).get("label", str(project.segment))),
+			str(GameData.APPROACHES[str(project.approach)].label),
+			str(project.get("focus_label", "Équilibré"))
+		])
+		if not project.reports.is_empty():
+			lines.append("  Camille : %s" % str(project.reports[0].text))
+	projects_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
+
+	var patent_lines: Array[String] = []
+	for candidate in PatentManager.candidates:
+		patent_lines.append("Candidat : %s — force %d" % [str(candidate.title), int(candidate.strength)])
+	for patent in PatentManager.patents:
+		patent_lines.append("Brevet : %s — %s" % [str(patent.title), "licencié" if bool(patent.licensed) else "exclusif"])
+	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
 
 func _start_project():
-	var name:=rd_name.text.strip_edges(); if name.is_empty(): name="Projet %s" % GameData.SECTORS[_meta(rd_sector)].label
-	if ResearchManager.start_project(name,_meta(rd_sector),_meta(rd_segment),_meta(rd_approach),_meta(rd_focus),int(rd_budget.value)): rd_name.text=""; status_label.text="Projet R&D lancé."
-	else: status_label.text="Impossible de lancer le projet : trésorerie ou capacité R&D insuffisante."
+	var name := rd_name.text.strip_edges()
+	if name.is_empty():
+		name = "Nova CPU %d" % (ResearchManager.projects.size() + 1)
+	var design := _current_cpu_design()
+	var evaluation := CPU_DESIGN.evaluate(design)
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design):
+		rd_name.text = ""
+		status_label.text = "%s entre en développement — profil %s." % [name, str(evaluation.profile)]
+	else:
+		status_label.text = "Impossible de lancer le projet : trésorerie ou capacité R&D insuffisante."
 	_refresh_all()
 
 func _file_patent(): status_label.text="Brevet déposé." if PatentManager.file_first_candidate() else "Aucun brevet candidat ou trésorerie insuffisante."; _refresh_all()
