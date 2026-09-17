@@ -2,9 +2,17 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
-## État d’implémentation — V0.2.7
+## État d’implémentation — V0.2.8
 
-Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer. Les propositions et le plan retenu sont sauvegardés avec migration des anciennes parties.
+Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer.
+
+Une architecture terminée produit désormais une gamme initiale de trois modèles :
+
+- **Essentiel** valorise les puces partiellement exploitables avec moins de cœurs, de cache et de fréquence ;
+- **Signature** représente le cœur de gamme et le compromis commercial principal ;
+- **Apex** réserve les meilleurs bins à la performance, à l’image et aux marges élevées.
+
+Le rendement dépend de la fiabilité finale, de la complexité, du procédé et de la maturité de la division. Il détermine la répartition des bins, les coûts et les capacités conseillées. Les trois références partagent la même génération, mais possèdent leur propre public, prix, coût, plafond de production et réception commerciale. La demande totale du portefeuille est plafonnée afin que plusieurs modèles ne puissent pas vendre plusieurs fois le même marché. Les propositions, générations et produits sont sauvegardés avec migration des anciennes parties.
 
 ## 1. Ce que le joueur fabrique réellement
 
@@ -205,6 +213,8 @@ Un problème après lancement peut être corrigé par mise à jour, mais avec co
 
 ## 10. Gamme et binning
 
+> **Implémenté en V0.2.8 :** création de la gamme Essentiel / Signature / Apex, rendement générationnel, répartition des bins, coûts, capacités et segments distincts. Les variantes supplémentaires et le réglage manuel de l’allocation viendront ensuite.
+
 La fabrication produit des puces de qualités différentes. Le joueur peut les classer en modèles :
 
 - haut de gamme à fréquence élevée ;
@@ -269,9 +279,9 @@ La fin de commercialisation n'est pas la fin du produit. Il reste des garanties,
 ## 14. Ordre recommandé d'implémentation
 
 1. Socle de division CPU, sauvegarde et maturité.
-2. Objet génération et trois propositions d'architecture.
+2. Objet génération et trois propositions d'architecture — implémenté en V0.2.7.
 3. Paramètres techniques complémentaires avec affichage essentiel/avancé.
-4. Découpage architecture → plusieurs modèles.
+4. Découpage architecture → plusieurs modèles — première version implémentée en V0.2.8.
 5. Procédé, packaging, rendement et contrat de fabrication simplifiés.
 6. Microcode, compatibilité et validation.
 7. Incidents post-lancement, correctifs, garantie et fin de vie.
@@ -285,4 +295,6 @@ La fin de commercialisation n'est pas la fin du produit. Il reste des garanties,
 - Arm, chiplets : https://www.arm.com/glossary/chiplets
 - TSMC, 3DFabric et packaging : https://www.tsmc.com/english/dedicatedFoundry/technology/3DFabric
 - UCIe Consortium, interconnexion die-to-die : https://www.uciexpress.org/specification
+- Intel, familles, niveaux et suffixes de processeurs : https://www.intel.com/content/www/us/en/processors/processor-numbers.html
+- Intel, exemple officiel d’une gamme partageant une plateforme avec cœurs, cache et puissance différenciés : https://www.intel.com/content/www/us/en/products/docs/processors/core-ultra/core-ultra-desktop-processors-series-2-brief.html
 

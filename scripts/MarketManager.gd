@@ -95,6 +95,39 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var gap := score - expectation
 	return {"units":units,"score":score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
 
+func estimate_portfolio_demand(products: Array) -> Dictionary:
+	var result := {}
+	var product_ids_by_sector := {}
+	for product in products:
+		var product_id := str(product.get("id", ""))
+		if product_id.is_empty():
+			continue
+		var demand := estimate_consumer_demand(product)
+		result[product_id] = demand
+		var sector := str(product.get("sector", "CPU"))
+		if not product_ids_by_sector.has(sector):
+			product_ids_by_sector[sector] = []
+		product_ids_by_sector[sector].append(product_id)
+	for sector_value in product_ids_by_sector.keys():
+		var sector := str(sector_value)
+		var ids: Array = product_ids_by_sector[sector_value]
+		var sector_data: Dictionary = GameData.SECTORS.get(sector, GameData.SECTORS.CPU)
+		var market_units := maxi(int(sector_data.market_units), 1)
+		var requested_units := 0
+		for product_id_value in ids:
+			requested_units += int(result[str(product_id_value)].get("units", 0))
+		var brand_score := CompanyManager.get_brand_score()
+		var max_portfolio_share := clampf(0.44 + CompanyManager.get_awareness_bonus() * 0.55 + (brand_score - 40.0) * 0.002, 0.46, 0.78)
+		var portfolio_cap := maxi(1, int(float(market_units) * max_portfolio_share))
+		var scale := minf(1.0, float(portfolio_cap) / maxf(float(requested_units), 1.0))
+		for product_id_value in ids:
+			var product_id := str(product_id_value)
+			var demand: Dictionary = result[product_id]
+			demand["units"] = int(round(float(demand.get("units", 0)) * scale))
+			demand["share"] = float(demand.units) / float(market_units)
+			demand["portfolio_limited"] = scale < 0.999
+	return result
+
 func _evaluate_competitor(product: Dictionary, segment: String) -> float:
 	var weights: Dictionary = GameData.SEGMENTS[segment].weights
 	var score := 0.0
