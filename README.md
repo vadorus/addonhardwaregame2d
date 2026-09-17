@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.2.5 importé et validé sous Godot 4.7.2.**
+**Projet actif — prototype V0.2.6 sous Godot 4.7.2.**
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
@@ -14,7 +14,8 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - cible Windows / PC + Android ;
 - temps avec pause et vitesses x1/x2/x3 ;
 - économie mensuelle et rapports de clôture ;
-- création d'entreprise avec branche CPU active ;
+- création d'entreprise avec division CPU active ;
+- socle générique de divisions, maturité et progression par génération ;
 - personnel, expérience, équipes, départements et délégation ;
 - laboratoire CPU interactif : cœurs, fréquence, cache, gravure et enveloppe thermique ;
 - R&D en plusieurs phases avec rapports techniques ;
@@ -78,7 +79,7 @@ Le workflow `.github/workflows/godot-ci.yml` utilise Godot 4.7.2 et vérifie :
 
 1. import et parsing du projet ;
 2. démarrage headless de la scène principale ;
-3. smoke test : verrou CPU → comparaison des profils techniques → lancement d’une architecture → traitement d’un mois → migration d’une ancienne sauvegarde.
+3. smoke test : verrou CPU/divisions → comparaison des profils techniques → lancement d’une architecture → traitement d’un mois → progression de division → migrations d’anciennes sauvegardes.
 
 La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais elle évite de transmettre une version contenant une erreur GDScript évidente.
 
@@ -86,6 +87,9 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 
 - [`docs/VISION.md`](docs/VISION.md) — vision globale ;
 - [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes ;
+- [`docs/DESIGN_BIBLE.md`](docs/DESIGN_BIBLE.md) — décisions canoniques issues de la conception ;
+- [`docs/CPU_VERTICAL_SLICE.md`](docs/CPU_VERTICAL_SLICE.md) — boucle CPU complète à implémenter ;
+- [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — interface chaleureuse et progression des bureaux ;
 - [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
 - [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — contenu du prototype actuel ;

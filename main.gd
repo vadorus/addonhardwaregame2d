@@ -28,6 +28,7 @@ var month_report_label: Label
 var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
+var division_label: Label
 var staff_label: Label
 var candidate_label: Label
 var tech_label: Label
@@ -120,6 +121,7 @@ func _connect_signals():
 	Economy.month_closed.connect(_on_month_closed)
 	CompanyManager.company_changed.connect(_refresh_all)
 	CompanyManager.reputation_changed.connect(_refresh_all)
+	DivisionManager.divisions_changed.connect(_refresh_all)
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
 	ResearchManager.projects_changed.connect(_refresh_all)
@@ -403,6 +405,11 @@ func _create_company_tab():
 	var box: VBoxContainer = scroll.get_child(0)
 	company_rep_label = _rich_label()
 	box.add_child(company_rep_label)
+	box.add_child(_section("Divisions de l'entreprise"))
+	var division_card := _card(APP_SHELL, 12, 12)
+	division_label = _rich_label()
+	division_card.add_child(division_label)
+	box.add_child(division_card)
 	box.add_child(_section("Budgets mensuels"))
 	var grid := GridContainer.new(); grid.columns = 2; box.add_child(grid)
 	grid.add_child(_label("Marketing",14)); policy_marketing = _spin(0,200000,1000,6000); grid.add_child(policy_marketing)
@@ -1155,15 +1162,31 @@ func _refresh_dashboard():
 			dashboard_market_outlook_label.text = "\n".join(lines)
 
 func _refresh_company():
-	if company_rep_label==null or not CompanyManager.created: return
-	var r:=CompanyManager.reputation
-	var lines:=["Image de l'entreprise :"]
-	for key in ["innovation","reliability","value","support","sustainability","prestige","professional"]: lines.append("• %s : %.1f/100" % [key.capitalize(),float(r[key])])
+	if company_rep_label == null or not CompanyManager.created:
+		return
+	var r := CompanyManager.reputation
+	var lines := ["Image de l'entreprise :"]
+	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
+		lines.append("• %s : %.1f/100" % [key.capitalize(), float(r[key])])
 	lines.append("\nFiliales : %d" % CompanyManager.subsidiaries.size())
-	for sub in CompanyManager.subsidiaries: lines.append("• %s — %s — capital %s €" % [str(sub.name),str(sub.sector),_money(int(sub.capital))])
-	company_rep_label.text="\n".join(lines)
-	policy_marketing.value=float(CompanyManager.policies.marketing_budget); policy_support.value=float(CompanyManager.policies.support_budget); policy_environment.value=float(CompanyManager.policies.environment_budget)
-	_select_meta(policy_support_level,str(CompanyManager.policies.support_level)); _refresh_leader_choices()
+	for sub in CompanyManager.subsidiaries:
+		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
+	company_rep_label.text = "\n".join(lines)
+
+	var division_lines: Array[String] = []
+	for sector_value in DivisionManager.get_active_division_keys():
+		var sector := str(sector_value)
+		var division := DivisionManager.get_division(sector)
+		division_lines.append("[CPU]  %s — active" % str(division.get("label", sector)))
+		division_lines.append("Maturité %.0f/100 • %d génération(s) terminée(s) • stratégie %s" % [float(division.get("maturity", 0.0)), int(division.get("generation_count", 0)), str(division.get("strategy", "BALANCED")).to_lower()])
+	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
+	division_label.text = "\n".join(division_lines)
+
+	policy_marketing.value = float(CompanyManager.policies.marketing_budget)
+	policy_support.value = float(CompanyManager.policies.support_budget)
+	policy_environment.value = float(CompanyManager.policies.environment_budget)
+	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
+	_refresh_leader_choices()
 
 func _apply_policies():
 	CompanyManager.policies.marketing_budget=int(policy_marketing.value); CompanyManager.policies.support_budget=int(policy_support.value); CompanyManager.policies.environment_budget=int(policy_environment.value); CompanyManager.policies.support_level=_meta(policy_support_level); CompanyManager.company_changed.emit(); status_label.text="Politiques mises à jour."

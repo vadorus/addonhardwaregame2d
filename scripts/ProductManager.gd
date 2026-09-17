@@ -52,6 +52,7 @@ func _on_project_completed(project: Dictionary):
 	}
 	_next_id += 1
 	products.append(product)
+	DivisionManager.record_completed_generation(str(project.sector))
 	products_changed.emit()
 
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:

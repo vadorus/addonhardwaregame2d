@@ -2,6 +2,20 @@
 
 Cette roadmap fixe l'ordre de construction du jeu. La vision finale est très large, mais chaque phase doit s'appuyer sur un moteur commun réutilisable.
 
+## Lot immédiat — V0.2.6 et suites CPU
+
+- [x] Documenter les décisions de conception dans une bible versionnée.
+- [x] Ajouter un socle générique de divisions avec CPU seul actif.
+- [x] Sauvegarder la maturité et le nombre de générations d’une division.
+- [ ] Proposer trois plans d’architecture pour une nouvelle génération CPU.
+- [ ] Décliner une architecture en plusieurs modèles de gamme.
+- [ ] Ajouter procédé, packaging, rendement et fournisseur simplifiés.
+- [ ] Ajouter microcode, compatibilité, incidents et correctifs.
+- [ ] Ajouter découvertes d’équipe et recherches dérivées.
+- [ ] Ajouter évolution visuelle du bureau et taxonomie d’icônes.
+
+Documents de référence : `DESIGN_BIBLE.md`, `CPU_VERTICAL_SLICE.md` et `UX_ART_DIRECTION.md`.
+
 ## Phase 0 — Récupération et stabilisation
 
 - [ ] Importer le projet Godot réel depuis le PC.
