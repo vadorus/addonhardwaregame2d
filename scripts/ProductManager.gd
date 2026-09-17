@@ -1,13 +1,17 @@
 extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
 
 signal products_changed
 signal product_launched(product)
+signal cpu_range_created(generation)
 signal sales_report_created(report)
 
 var products: Array = []
+var cpu_generations: Array = []
 var _next_id := 1
+var _next_generation_id := 1
 var _reviewed_products: Dictionary = {}
 
 func _ready():
@@ -15,51 +19,104 @@ func _ready():
 
 func reset():
 	products = []
+	cpu_generations = []
 	_next_id = 1
+	_next_generation_id = 1
 	_reviewed_products = {}
 	products_changed.emit()
 
 func _on_project_completed(project: Dictionary):
-	var sd: Dictionary = GameData.SECTORS[str(project.sector)]
-	var approach: Dictionary = GameData.APPROACHES[str(project.approach)]
-	var metrics: Dictionary = project.final_metrics.duplicate(true)
-	var avg := 0.0
-	for metric in GameData.METRICS:
-		avg += float(metrics.get(metric, 50.0))
-	avg /= float(GameData.METRICS.size())
-	var cpu_design: Dictionary = project.get("cpu_design", {}).duplicate(true)
-	var design_estimate: Dictionary = project.get("design_estimate", {}).duplicate(true)
-	var unit_cost := int(float(sd.base_unit_cost) * (0.76 + avg / 220.0))
-	if str(project.sector) == "CPU":
-		cpu_design = CPU_DESIGN.normalize(cpu_design)
-		design_estimate = CPU_DESIGN.evaluate(cpu_design)
-		var design_cost := int(design_estimate.get("unit_cost", unit_cost))
-		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
-	if str(project.approach) == "INTERNAL":
-		unit_cost = int(unit_cost * 0.92)
-	elif str(project.approach) == "EXTERNAL":
-		unit_cost = int(unit_cost * 1.13)
-	var suggested_price: int = maxi(unit_cost + 5, int(float(sd.reference_price) * (0.72 + avg / 180.0)))
+	if str(project.get("sector", "")) == "CPU":
+		_create_cpu_range(project)
+	else:
+		_create_single_product(project)
+	DivisionManager.record_completed_generation(str(project.get("sector", "")))
+	products_changed.emit()
+
+func _create_cpu_range(project: Dictionary) -> void:
+	var sector_data: Dictionary = GameData.SECTORS.CPU
+	var division := DivisionManager.get_division("CPU")
+	var generation_plan: Dictionary = project.get("generation_plan", {})
+	var generation_index := maxi(
+		int(generation_plan.get("generation_index", 0)),
+		int(division.get("generation_count", 0)) + 1
+	)
+	var generation_id := "CPU-GEN-%03d" % _next_generation_id
+	_next_generation_id += 1
+	var built := CPU_PRODUCT_LINE.build_range(
+		project,
+		generation_id,
+		generation_index,
+		_base_unit_cost(project),
+		int(sector_data.reference_price),
+		maxi(300, int(float(sector_data.market_units) * 0.22)),
+		float(division.get("maturity", 0.0))
+	)
+	var generation: Dictionary = built.get("generation", {})
+	var model_ids: Array = []
+	for template_value in built.get("products", []):
+		var product: Dictionary = template_value
+		product["id"] = "PROD-%03d" % _next_id
+		product["company"] = CompanyManager.company_name
+		_next_id += 1
+		products.append(product)
+		model_ids.append(str(product.id))
+	generation["model_ids"] = model_ids
+	cpu_generations.append(generation)
+	CompanyManager.add_alert("%s devient une gamme de %d CPU : Essentiel, Signature et Apex." % [str(project.get("name", "Nouvelle architecture")), model_ids.size()])
+	cpu_range_created.emit(generation.duplicate(true))
+
+func _create_single_product(project: Dictionary) -> void:
+	var sector := str(project.get("sector", "CPU"))
+	var sector_data: Dictionary = GameData.SECTORS[sector]
+	var approach: Dictionary = GameData.APPROACHES[str(project.get("approach", "INTERNAL"))]
+	var metrics: Dictionary = project.get("final_metrics", {}).duplicate(true)
+	var avg := _metric_average(metrics)
+	var unit_cost := _base_unit_cost(project)
+	var suggested_price: int = maxi(unit_cost + 5, int(float(sector_data.reference_price) * (0.72 + avg / 180.0)))
 	var product := {
-		"id":"PROD-%03d" % _next_id,"project_id":str(project.id),"name":str(project.name),
-		"company":CompanyManager.company_name,"sector":str(project.sector),"target_segment":str(project.segment),
-		"approach":str(project.approach),"internal_ratio":float(approach.internal_ratio),
-		"cpu_design":cpu_design,"design_estimate":design_estimate,
+		"id":"PROD-%03d" % _next_id,"project_id":str(project.get("id", "")),"name":str(project.get("name", "Produit")),
+		"company":CompanyManager.company_name,"sector":sector,"target_segment":str(project.get("segment", "MAINSTREAM")),
+		"approach":str(project.get("approach", "INTERNAL")),"internal_ratio":float(approach.internal_ratio),
+		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
-		"production_capacity":maxi(100, int(float(sd.market_units)*0.22)),"status":"READY",
+		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
 		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0
 	}
 	_next_id += 1
 	products.append(product)
-	DivisionManager.record_completed_generation(str(project.sector))
-	products_changed.emit()
+
+func _base_unit_cost(project: Dictionary) -> int:
+	var sector := str(project.get("sector", "CPU"))
+	var sector_data: Dictionary = GameData.SECTORS[sector]
+	var metrics: Dictionary = project.get("final_metrics", {})
+	var avg := _metric_average(metrics)
+	var unit_cost := int(float(sector_data.base_unit_cost) * (0.76 + avg / 220.0))
+	if sector == "CPU":
+		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
+		var estimate := CPU_DESIGN.evaluate(design)
+		var design_cost := int(estimate.get("unit_cost", unit_cost))
+		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
+	var approach := str(project.get("approach", "INTERNAL"))
+	if approach == "INTERNAL":
+		unit_cost = int(unit_cost * 0.92)
+	elif approach == "EXTERNAL":
+		unit_cost = int(unit_cost * 1.13)
+	return maxi(unit_cost, 1)
+
+func _metric_average(metrics: Dictionary) -> float:
+	var avg := 0.0
+	for metric in GameData.METRICS:
+		avg += float(metrics.get(metric, 50.0))
+	return avg / float(GameData.METRICS.size())
 
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
 			product.price = maxi(price, 1)
-			product.production_capacity = maxi(production_capacity, 1)
+			var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
+			product.production_capacity = clampi(production_capacity, 1, max_capacity)
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
@@ -69,15 +126,18 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 	return false
 
 func process_month():
+	var launched: Array = []
 	for product in products:
-		if str(product.status) != "LAUNCHED":
-			continue
-		_sell_product_month(product)
+		if str(product.status) == "LAUNCHED":
+			launched.append(product)
+	var portfolio_demand := MarketManager.estimate_portfolio_demand(launched)
+	for product in launched:
+		_sell_product_month(product, portfolio_demand.get(str(product.id), {}))
 	products_changed.emit()
 
-func _sell_product_month(product: Dictionary):
-	var demand: Dictionary = MarketManager.estimate_consumer_demand(product)
-	var consumer_units := int(demand.units)
+func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
+	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
+	var consumer_units := int(demand.get("units", 0))
 	var contract := MarketManager.active_contract_for(str(product.id))
 	var b2b_units := 0
 	var b2b_price := 0
@@ -101,10 +161,10 @@ func _sell_product_month(product: Dictionary):
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
-	product.last_month_score = float(demand.score)
-	product.last_month_share = float(demand.share)
+	product.last_month_score = float(demand.get("score", 0.0))
+	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
-	var satisfaction: float = clampf(float(demand.score) + float(demand.expectation_gap)*0.22 + (CompanyManager.get_support_modifier()-1.0)*18.0 - return_rate*35.0, 0.0, 100.0)
+	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
 	product.customer_satisfaction = satisfaction
 	var rep_delta := (satisfaction - 55.0) / 35.0
 	CompanyManager.change_reputation({
@@ -112,7 +172,7 @@ func _sell_product_month(product: Dictionary):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.share}
+	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id))
@@ -123,28 +183,104 @@ func _sell_product_month(product: Dictionary):
 		_reviewed_products[str(product.id)] = true
 
 func get_product(product_id: String) -> Dictionary:
-	for p in products:
-		if str(p.id) == product_id:
-			return p
+	for product in products:
+		if str(product.id) == product_id:
+			return product
+	return {}
+
+func get_generation(generation_id: String) -> Dictionary:
+	for generation in cpu_generations:
+		if str(generation.get("id", "")) == generation_id:
+			return generation
 	return {}
 
 func active_departments() -> Array:
-	for p in products:
-		if str(p.status) == "LAUNCHED":
-			return ["Production","Marketing","Support"]
+	for product in products:
+		if str(product.status) == "LAUNCHED":
+			return ["Production", "Marketing", "Support"]
 	return []
 
 func get_state() -> Dictionary:
-	return {"products":products,"next_id":_next_id,"reviewed_products":_reviewed_products}
+	return {
+		"products":products,
+		"cpu_generations":cpu_generations,
+		"next_id":_next_id,
+		"next_generation_id":_next_generation_id,
+		"reviewed_products":_reviewed_products
+	}
 
 func load_state(state: Dictionary):
 	products = state.get("products", []).duplicate(true)
+	var legacy_generation_by_project := {}
 	for product in products:
-		if str(product.get("sector", "")) == "CPU":
-			var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
-			product["cpu_design"] = design
-			if not product.has("design_estimate") or product.get("design_estimate", {}).is_empty():
-				product["design_estimate"] = CPU_DESIGN.evaluate(design)
+		if str(product.get("sector", "")) != "CPU":
+			continue
+		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
+		product["cpu_design"] = design
+		if not product.has("design_estimate") or product.get("design_estimate", {}).is_empty():
+			product["design_estimate"] = CPU_DESIGN.evaluate(design)
+		var project_id := str(product.get("project_id", product.get("id", "legacy")))
+		if str(product.get("generation_id", "")).is_empty():
+			if not legacy_generation_by_project.has(project_id):
+				legacy_generation_by_project[project_id] = "CPU-GEN-LEGACY-%03d" % (legacy_generation_by_project.size() + 1)
+			product["generation_id"] = str(legacy_generation_by_project[project_id])
+		product["generation_index"] = maxi(int(product.get("generation_index", 1)), 1)
+		product["generation_name"] = str(product.get("generation_name", product.get("name", "CPU historique")))
+		product["sku_tier"] = str(product.get("sku_tier", "LEGACY"))
+		product["sku_label"] = str(product.get("sku_label", "Héritage"))
+		product["sku_order"] = int(product.get("sku_order", 0))
+		product["range_role"] = str(product.get("range_role", "Produit issu d'une ancienne sauvegarde"))
+		product["bin_quality"] = int(product.get("bin_quality", 70))
+		product["bin_share"] = float(product.get("bin_share", 1.0))
+		product["yield_rate"] = float(product.get("yield_rate", 0.72))
+		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
+		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
+
+	cpu_generations = []
+	var saved_generations_value = state.get("cpu_generations", [])
+	if typeof(saved_generations_value) == TYPE_ARRAY:
+		for saved_generation_value in saved_generations_value:
+			if typeof(saved_generation_value) == TYPE_DICTIONARY:
+				cpu_generations.append(saved_generation_value.duplicate(true))
+	_rebuild_missing_generations()
 	_next_id = int(state.get("next_id", 1))
+	_next_generation_id = int(state.get("next_generation_id", cpu_generations.size() + 1))
 	_reviewed_products = state.get("reviewed_products", {}).duplicate(true)
 	products_changed.emit()
+
+func _rebuild_missing_generations() -> void:
+	var known_ids := {}
+	for generation in cpu_generations:
+		known_ids[str(generation.get("id", ""))] = true
+		generation["model_ids"] = []
+	for product in products:
+		if str(product.get("sector", "")) != "CPU":
+			continue
+		var generation_id := str(product.get("generation_id", ""))
+		if not known_ids.has(generation_id):
+			var generation := _legacy_generation_from_product(product)
+			cpu_generations.append(generation)
+			known_ids[generation_id] = true
+		var target := get_generation(generation_id)
+		var model_ids: Array = target.get("model_ids", [])
+		model_ids.append(str(product.get("id", "")))
+		target["model_ids"] = model_ids
+
+func _legacy_generation_from_product(product: Dictionary) -> Dictionary:
+	return {
+		"id":str(product.get("generation_id", "CPU-GEN-LEGACY")),
+		"project_id":str(product.get("project_id", "")),
+		"name":str(product.get("generation_name", product.get("name", "CPU historique"))),
+		"generation_index":maxi(int(product.get("generation_index", 1)), 1),
+		"architecture":product.get("cpu_design", {}).duplicate(true),
+		"architecture_estimate":product.get("design_estimate", {}).duplicate(true),
+		"generation_plan":{},
+		"metrics":product.get("metrics", {}).duplicate(true),
+		"yield_rate":float(product.get("yield_rate", 0.72)),
+		"bin_distribution":{"LEGACY":1.0},
+		"potential_models":1,
+		"initial_model_count":1,
+		"future_model_slots":0,
+		"model_ids":[],
+		"status":"LEGACY"
+	}

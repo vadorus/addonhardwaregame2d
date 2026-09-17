@@ -832,7 +832,7 @@ func _create_products_tab():
 	var scroll := _tab_scroll("Produits")
 	var box: VBoxContainer = scroll.get_child(0)
 	products_label=_rich_label(); box.add_child(products_label)
-	box.add_child(_section("Industrialiser / lancer"))
+	box.add_child(_section("Gamme CPU / industrialiser / lancer"))
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
@@ -1389,22 +1389,74 @@ func _file_patent(): status_label.text="Brevet déposé." if PatentManager.file_
 func _toggle_patent_license(): PatentManager.toggle_license_first(); _refresh_all()
 
 func _refresh_products():
-	if products_label==null: return
-	var current_id:=_meta(product_select) if product_select.item_count>0 else ""; var lines:=[]
-	for p in ProductManager.products: lines.append("• %s — %s — %s | coût %s € | prix %s € | ventes totales %s | satisfaction %.1f" % [str(p.name),GameData.SECTORS[str(p.sector)].label,str(p.status),_money(int(p.unit_cost)),_money(int(p.price)),_money(int(p.units_sold_total)),float(p.customer_satisfaction)])
-	products_label.text="\n".join(lines) if not lines.is_empty() else "Aucun produit. Terminez d'abord un projet R&D."
+	if products_label == null:
+		return
+	var current_id := _meta(product_select) if product_select.item_count > 0 else ""
+	var lines: Array[String] = []
+	for generation in ProductManager.cpu_generations:
+		var ready_count := 0
+		var launched_count := 0
+		for model_id in generation.get("model_ids", []):
+			var model := ProductManager.get_product(str(model_id))
+			if str(model.get("status", "")) == "READY":
+				ready_count += 1
+			elif str(model.get("status", "")) == "LAUNCHED":
+				launched_count += 1
+		lines.append("G%d • %s — rendement %.0f%% • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
+			int(generation.get("generation_index", 1)), str(generation.get("name", "Architecture CPU")),
+			float(generation.get("yield_rate", 0.0)) * 100.0, int(generation.get("model_ids", []).size()),
+			ready_count, launched_count, int(generation.get("future_model_slots", 0))
+		])
+	for product in ProductManager.products:
+		var product_tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
+		lines.append("  • %s [%s] — %s | coût %s € | prix %s € | ventes %s | satisfaction %.1f" % [
+			str(product.name), product_tier, str(product.status), _money(int(product.unit_cost)), _money(int(product.price)),
+			_money(int(product.units_sold_total)), float(product.customer_satisfaction)
+		])
+	products_label.text = "\n".join(lines) if not lines.is_empty() else "Aucun produit. Terminez d'abord un projet R&D."
 	product_select.clear()
-	for p in ProductManager.products: product_select.add_item("%s — %s" % [str(p.name),str(p.status)]); product_select.set_item_metadata(product_select.item_count-1,str(p.id))
-	if current_id!="": _select_meta(product_select,current_id)
-	_refresh_product_details(); _refresh_market_product_options()
+	for product in ProductManager.products:
+		var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
+		product_select.add_item("%s — %s — %s" % [str(product.name), tier, str(product.status)])
+		product_select.set_item_metadata(product_select.item_count - 1, str(product.id))
+	if current_id != "":
+		_select_meta(product_select, current_id)
+	_refresh_product_details()
+	_refresh_market_product_options()
 
 func _refresh_product_details():
-	if product_details_label==null or product_select.item_count==0: product_details_label.text="Aucun produit sélectionné."; return
-	var p:=ProductManager.get_product(_meta(product_select)); if p.is_empty(): return
-	var m: Dictionary = p.get("metrics", {}); var metric_lines: Array = []
-	for metric in GameData.METRICS: metric_lines.append("%s %.1f" % [GameData.metric_label(metric),float(m[metric])])
-	product_details_label.text="%s\nApproche : %s | interne %.0f%%\n%s" % [str(p.name),GameData.APPROACHES[str(p.approach)].label,float(p.internal_ratio)*100.0," • ".join(metric_lines)]
-	product_price.value=float(p.price); product_capacity.value=float(p.production_capacity)
+	if product_details_label == null or product_select.item_count == 0:
+		product_details_label.text = "Aucun produit sélectionné."
+		return
+	var product := ProductManager.get_product(_meta(product_select))
+	if product.is_empty():
+		return
+	var metrics: Dictionary = product.get("metrics", {})
+	var metric_lines: Array[String] = []
+	for metric in GameData.METRICS:
+		metric_lines.append("%s %.1f" % [GameData.metric_label(metric), float(metrics.get(metric, 0.0))])
+	if str(product.get("sector", "")) == "CPU":
+		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
+		var target_label := str(GameData.SEGMENTS.get(str(product.get("target_segment", "MAINSTREAM")), {}).get("label", "Grand public"))
+		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
+			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
+			str(product.get("range_role", "")), target_label,
+			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+			float(product.get("yield_rate", 0.0)) * 100.0, int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
+			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin),
+			" • ".join(metric_lines)
+		]
+	else:
+		product_details_label.text = "%s\nApproche : %s | interne %.0f%%\n%s" % [
+			str(product.name), GameData.APPROACHES[str(product.approach)].label,
+			float(product.internal_ratio) * 100.0, " • ".join(metric_lines)
+		]
+	product_price.value = float(product.price)
+	var has_capacity_limit := product.has("max_monthly_capacity")
+	product_capacity.allow_greater = not has_capacity_limit
+	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
+	product_capacity.value = float(product.production_capacity)
 
 func _launch_product():
 	if product_select.item_count==0: return

@@ -59,6 +59,9 @@ func _ready() -> void:
 	var selected_plan: Dictionary = proposals[1]
 	for proposal_value in proposals:
 		var proposal: Dictionary = proposal_value
+		if int(proposal.get("potential_models", 0)) < 3:
+			_fail("Every CPU generation must support the three-model launch family")
+			return
 		if bool(proposal.get("recommended", false)):
 			recommended_count += 1
 			selected_plan = proposal
@@ -93,6 +96,79 @@ func _ready() -> void:
 		_fail("Monthly report balance does not match economy")
 		return
 
+	var range_project := project.duplicate(true)
+	var completed_metrics := {}
+	var completed_evaluation := CPU_DESIGN.evaluate(cpu_design)
+	for metric in GameData.METRICS:
+		completed_metrics[metric] = float(completed_evaluation.get(metric, 62.0))
+	range_project["final_metrics"] = completed_metrics
+	range_project["status"] = "COMPLETED"
+	ProductManager._on_project_completed(range_project)
+	if ProductManager.cpu_generations.size() != 1 or ProductManager.products.size() != 3:
+		_fail("A completed CPU architecture did not create one generation with three launch models")
+		return
+	var cpu_generation: Dictionary = ProductManager.cpu_generations[0]
+	var essential_model: Dictionary = ProductManager.products[0]
+	var signature_model: Dictionary = ProductManager.products[1]
+	var apex_model: Dictionary = ProductManager.products[2]
+	if str(essential_model.get("sku_tier", "")) != "ESSENTIAL" or str(signature_model.get("sku_tier", "")) != "SIGNATURE" or str(apex_model.get("sku_tier", "")) != "APEX":
+		_fail("CPU product family tiers are missing or out of order")
+		return
+	if str(essential_model.get("generation_id", "")) != str(apex_model.get("generation_id", "")):
+		_fail("CPU models were not linked to the same generation")
+		return
+	if float(apex_model.get("metrics", {}).get("performance", 0.0)) <= float(essential_model.get("metrics", {}).get("performance", 0.0)):
+		_fail("Apex model must outperform the Essential model")
+		return
+	if int(apex_model.get("unit_cost", 0)) <= int(essential_model.get("unit_cost", 0)):
+		_fail("Apex bin must cost more than the Essential bin")
+		return
+	if int(apex_model.get("cpu_design", {}).get("cores", 0)) <= int(essential_model.get("cpu_design", {}).get("cores", 0)):
+		_fail("Product binning did not create distinct CPU configurations")
+		return
+	var bin_total := 0.0
+	for bin_product in ProductManager.products:
+		bin_total += float(bin_product.get("bin_share", 0.0))
+	if absf(bin_total - 1.0) > 0.001:
+		_fail("CPU bin allocation does not total 100 percent")
+		return
+	if float(cpu_generation.get("yield_rate", 0.0)) < 0.46 or float(cpu_generation.get("yield_rate", 0.0)) > 0.92:
+		_fail("CPU generation yield escaped its supported range")
+		return
+
+	var portfolio_demand := MarketManager.estimate_portfolio_demand(ProductManager.products)
+	var portfolio_units := 0
+	for demand_product in ProductManager.products:
+		portfolio_units += int(portfolio_demand.get(str(demand_product.id), {}).get("units", 0))
+	if portfolio_demand.size() != 3 or portfolio_units > int(GameData.SECTORS.CPU.market_units):
+		_fail("Portfolio demand did not cap the CPU family to the available market")
+		return
+
+	var apex_max_capacity := int(apex_model.get("max_monthly_capacity", 1))
+	if not ProductManager.launch_product(str(apex_model.id), int(apex_model.price), apex_max_capacity + 9999):
+		_fail("Could not launch an available CPU family model")
+		return
+	if int(apex_model.production_capacity) != apex_max_capacity:
+		_fail("CPU launch ignored the binning capacity limit")
+		return
+	var product_round_trip := ProductManager.get_state().duplicate(true)
+	ProductManager.reset()
+	ProductManager.load_state(product_round_trip)
+	if ProductManager.cpu_generations.size() != 1 or ProductManager.products.size() != 3:
+		_fail("CPU product family did not survive a save round-trip")
+		return
+	var legacy_product_state := product_round_trip.duplicate(true)
+	legacy_product_state.erase("cpu_generations")
+	legacy_product_state.erase("next_generation_id")
+	for legacy_product in legacy_product_state.get("products", []):
+		legacy_product.erase("generation_id")
+		legacy_product.erase("generation_index")
+		legacy_product.erase("generation_name")
+	ProductManager.load_state(legacy_product_state)
+	if ProductManager.cpu_generations.is_empty() or str(ProductManager.products[0].get("generation_id", "")).is_empty():
+		_fail("Legacy V5 products were not migrated into a CPU generation")
+		return
+
 	var legacy_state := ResearchManager.get_state().duplicate(true)
 	var legacy_projects: Array = legacy_state.get("projects", [])
 	var legacy_project: Dictionary = legacy_projects[0]
@@ -118,7 +194,6 @@ func _ready() -> void:
 		_fail("Generation proposals did not survive a save round-trip")
 		return
 
-	DivisionManager.record_completed_generation("CPU")
 	var division_state := DivisionManager.get_state()
 	DivisionManager.reset("CPU")
 	DivisionManager.load_state(division_state)

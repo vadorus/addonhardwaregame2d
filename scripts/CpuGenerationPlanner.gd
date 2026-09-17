@@ -7,19 +7,19 @@ const PLAN_PROFILES := [
 	{
 		"key":"SAFE", "tag":"PRUDENT", "title":"Révision maîtrisée",
 		"duration_factor":0.84, "risk_delta":-12.0, "confidence_delta":10.0,
-		"life_base":14.0, "model_base":1,
+		"life_base":14.0, "model_base":3,
 		"promise":"Capitaliser sur l'existant pour sortir vite une génération fiable."
 	},
 	{
 		"key":"BALANCED", "tag":"ÉQUILIBRÉ", "title":"Nouvelle génération",
 		"duration_factor":1.00, "risk_delta":0.0, "confidence_delta":0.0,
-		"life_base":20.0, "model_base":2,
+		"life_base":20.0, "model_base":4,
 		"promise":"Faire progresser la plateforme sans mettre toute l'entreprise en danger."
 	},
 	{
 		"key":"BOLD", "tag":"AUDACIEUX", "title":"Projet Horizon",
 		"duration_factor":1.28, "risk_delta":11.0, "confidence_delta":-12.0,
-		"life_base":26.0, "model_base":3,
+		"life_base":26.0, "model_base":5,
 		"promise":"Tenter une rupture capable de porter plusieurs années de produits."
 	}
 ]
@@ -45,6 +45,7 @@ static func normalize_saved_proposal(input: Dictionary) -> Dictionary:
 	proposal["evaluation"] = CPU_DESIGN.evaluate(design)
 	proposal["risks"] = proposal.get("risks", []).duplicate(true)
 	proposal["strengths"] = proposal.get("strengths", []).duplicate(true)
+	proposal["potential_models"] = clampi(maxi(int(proposal.get("potential_models", 3)), 3), 3, 6)
 	proposal["recommended"] = bool(proposal.get("recommended", false))
 	return proposal
 
@@ -155,7 +156,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	competitive_months += float(evaluation.reliability) * 0.06 + float(context.get("technology_score", 0.0)) * 0.10
 	competitive_months += capability * 0.04 - risk * 0.04
 	competitive_months = clampf(competitive_months, 16.0, 52.0)
-	var potential_models := clampi(int(profile.model_base) + int(floor(capability / 40.0)), 2, 6)
+	var potential_models := clampi(int(profile.model_base) + int(floor(capability / 40.0)), 3, 6)
 
 	var metric_deltas := {}
 	for metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
