@@ -96,6 +96,34 @@ func _ready() -> void:
 		_fail("Monthly report balance does not match economy")
 		return
 
+	var decision_guard := 0
+	while ResearchManager.get_pending_phase_decision().is_empty() and decision_guard < 5:
+		SimulationManager.process_month_end()
+		decision_guard += 1
+	var pending_decision := ResearchManager.get_pending_phase_decision()
+	if pending_decision.is_empty():
+		_fail("R&D phase did not create a player decision")
+		return
+	var blocked_phase := int(project.get("phase_index", -1))
+	var blocked_progress := float(project.get("phase_progress", -1.0))
+	SimulationManager.process_month_end()
+	if int(project.get("phase_index", -1)) != blocked_phase or not is_equal_approx(float(project.get("phase_progress", -1.0)), blocked_progress):
+		_fail("R&D project advanced while a phase decision was pending")
+		return
+	var choices: Array = pending_decision.get("choices", [])
+	if choices.size() != 3:
+		_fail("R&D decision must expose exactly three choices")
+		return
+	if not ResearchManager.resolve_phase_decision(str(pending_decision.get("project_id", "")), str(choices[1].get("id", ""))):
+		_fail("Could not resolve R&D phase decision")
+		return
+	if not ResearchManager.get_pending_phase_decision().is_empty():
+		_fail("Resolved R&D decision remained pending")
+		return
+	if int(project.get("phase_index", -1)) != blocked_phase + 1:
+		_fail("Resolving an R&D decision did not advance to the next phase")
+		return
+
 	var range_project := project.duplicate(true)
 	var completed_metrics := {}
 	var completed_evaluation := CPU_DESIGN.evaluate(cpu_design)

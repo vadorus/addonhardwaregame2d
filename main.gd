@@ -116,6 +116,10 @@ var dashboard_secondary_visible := true
 var dashboard_compact_mode := false
 var evolution_panel: Control
 var dashboard_target_tab := 3
+var rd_decision_card: Control
+var rd_decision_label: Label
+var rd_decision_buttons: Array[Button] = []
+var decision_previous_time_scale := 1.0
 
 func _ready():
 	theme = _create_app_theme()
@@ -142,6 +146,8 @@ func _connect_signals():
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
+	ResearchManager.phase_decision_created.connect(_on_phase_decision_created)
+	ResearchManager.phase_decision_resolved.connect(_on_phase_decision_resolved)
 	ProductManager.products_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
@@ -674,6 +680,27 @@ func _create_research_tab():
 	tech_label = _rich_label()
 	tech_card.add_child(tech_label)
 	box.add_child(tech_card)
+
+	box.add_child(_section("Arbitrage R&D"))
+	rd_decision_card = _card(APP_AMBER_DARK, 12, 12)
+	var decision_box := VBoxContainer.new()
+	decision_box.add_theme_constant_override("separation", 9)
+	rd_decision_card.add_child(decision_box)
+	rd_decision_label = _label("Aucune décision en attente.", 14)
+	rd_decision_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	decision_box.add_child(rd_decision_label)
+	var decision_actions := VBoxContainer.new()
+	decision_actions.add_theme_constant_override("separation", 7)
+	decision_box.add_child(decision_actions)
+	for i in range(3):
+		var choice_button := Button.new()
+		choice_button.custom_minimum_size.y = 52
+		var choice_index := i
+		choice_button.pressed.connect(func(): _resolve_rd_decision(choice_index))
+		decision_actions.add_child(choice_button)
+		rd_decision_buttons.append(choice_button)
+	rd_decision_card.visible = false
+	box.add_child(rd_decision_card)
 
 	box.add_child(_section("Pipeline R&D et rapports de Camille"))
 	var projects_card := _card(APP_SHELL, 12, 12)
@@ -1279,11 +1306,11 @@ func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
 
 func _on_month_closed(report: Dictionary):
-	TimeManager.time_scale=0.0
 	var inc_lines:=_breakdown(report.income_breakdown)
 	var exp_lines:=_breakdown(report.expense_breakdown)
 	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
-	month_layer.visible=true
+	month_layer.visible=false
+	status_label.text="Mois %d clôturé • résultat %s € • trésorerie %s €" % [int(report.month), _money(int(report.result)), _money(int(report.money))]
 	_refresh_all()
 
 func _breakdown(data: Dictionary) -> String:
@@ -1294,11 +1321,11 @@ func _breakdown(data: Dictionary) -> String:
 
 func _close_month_report():
 	month_layer.visible=false
-	TimeManager.time_scale=1.0
 
 func _refresh_top():
 	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
 	money_label.text="%s €" % _money(Economy.money)
+	money_label.add_theme_color_override("font_color", APP_GREEN if Economy.money >= 0 else APP_RED)
 
 func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
@@ -1320,7 +1347,7 @@ func _company_visual_stage() -> int:
 		return 3
 	if launched >= 3 or brand >= 63.0 or staff_count >= 8:
 		return 2
-	if launched >= 1 or staff_count >= 4:
+	if launched >= 1:
 		return 1
 	return 0
 
@@ -1391,16 +1418,27 @@ func _refresh_dashboard():
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
 		dashboard_metric_b.text = "%d mois" % int(active_project.get("months_spent", 0))
 		dashboard_metric_c.text = str(active_project.get("focus_label", "Équilibré"))
-		if not active_project.get("reports", []).is_empty():
+		var pending_decision: Dictionary = active_project.get("pending_decision", {})
+		if not pending_decision.is_empty():
+			dashboard_cto_label.text = "« %s »" % str(pending_decision.get("prompt", "Une décision R&D requiert votre arbitrage."))
+			dashboard_cto_button.text = "Décider maintenant"
+			dashboard_action_button.text = "Arbitrer au laboratoire"
+			dashboard_next_step_label.text = "Décision R&D requise : tranchez avant que le projet puisse avancer."
+		elif not active_project.get("reports", []).is_empty():
 			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
+			dashboard_cto_button.text = "Voir le rapport complet"
+			dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+			dashboard_next_step_label.text = "Laissez l'équipe avancer et surveillez le prochain arbitrage R&D."
 		else:
 			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
-		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+			dashboard_cto_button.text = "Voir le rapport complet"
+			dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+			dashboard_next_step_label.text = "Laissez l'équipe avancer et surveillez le prochain arbitrage R&D."
 		dashboard_target_tab = 3
-		dashboard_next_step_label.text = "Laissez l'équipe avancer et surveillez le prochain arbitrage R&D."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
 	elif not ready_product.is_empty():
+		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
 		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
 		dashboard_project_phase_label.text = "PRÊT AU LANCEMENT"
@@ -1415,6 +1453,7 @@ func _refresh_dashboard():
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	elif not launched_product.is_empty():
+		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
 		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées" % [int(launched_product.get("months_on_market", 0)), _money(int(launched_product.get("units_sold_total", 0)))]
 		dashboard_project_phase_label.text = "SUR LE MARCHÉ"
@@ -1429,6 +1468,7 @@ func _refresh_dashboard():
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
 	else:
+		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."
 		dashboard_project_phase_label.text = "NOUVEAU PROJET"
@@ -1540,6 +1580,7 @@ func _refresh_research():
 		return
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
+	_refresh_rd_decision()
 	var tech_lines: Array[String] = []
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
@@ -1550,6 +1591,8 @@ func _refresh_research():
 		var phase := "Terminé"
 		if str(project.status) == "DEVELOPMENT":
 			phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
+			if not project.get("pending_decision", {}).is_empty():
+				phase += " • DÉCISION REQUISE"
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 		var estimate := CPU_DESIGN.evaluate(design)
 		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
@@ -1574,6 +1617,52 @@ func _refresh_research():
 	for patent in PatentManager.patents:
 		patent_lines.append("Brevet : %s — %s" % [str(patent.title), "licencié" if bool(patent.licensed) else "exclusif"])
 	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
+
+func _refresh_rd_decision():
+	if rd_decision_card == null:
+		return
+	var pending := ResearchManager.get_pending_phase_decision()
+	if pending.is_empty():
+		rd_decision_card.visible = false
+		return
+	if TimeManager.time_scale > 0.0:
+		decision_previous_time_scale = TimeManager.time_scale
+		TimeManager.time_scale = 0.0
+	rd_decision_card.visible = true
+	rd_decision_label.text = "%s\n\n%s" % [str(pending.get("title", "Arbitrage R&D")), str(pending.get("prompt", ""))]
+	var choices: Array = pending.get("choices", [])
+	for i in range(rd_decision_buttons.size()):
+		var button := rd_decision_buttons[i]
+		if i < choices.size():
+			var choice: Dictionary = choices[i]
+			button.visible = true
+			button.text = "%s — %s" % [str(choice.get("label", "Choisir")), str(choice.get("effect", ""))]
+		else:
+			button.visible = false
+
+func _resolve_rd_decision(choice_index: int):
+	var pending := ResearchManager.get_pending_phase_decision()
+	if pending.is_empty():
+		return
+	var choices: Array = pending.get("choices", [])
+	if choice_index < 0 or choice_index >= choices.size():
+		return
+	var choice: Dictionary = choices[choice_index]
+	if ResearchManager.resolve_phase_decision(str(pending.get("project_id", "")), str(choice.get("id", ""))):
+		status_label.text = "Décision R&D appliquée : %s." % str(choice.get("label", "choix validé"))
+
+func _on_phase_decision_created(_project: Dictionary, decision: Dictionary):
+	if TimeManager.time_scale > 0.0:
+		decision_previous_time_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	status_label.text = "⚠ Décision R&D requise : %s" % str(decision.get("title", "arbitrage"))
+	_refresh_all()
+
+func _on_phase_decision_resolved(_project: Dictionary, _decision: Dictionary, choice: Dictionary):
+	if TimeManager.time_scale <= 0.0:
+		TimeManager.time_scale = maxf(decision_previous_time_scale, 1.0)
+	status_label.text = "✓ Arbitrage R&D : %s" % str(choice.get("label", "choix appliqué"))
+	_refresh_all()
 
 func _start_project():
 	var name := rd_name.text.strip_edges()
