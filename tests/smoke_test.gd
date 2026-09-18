@@ -58,9 +58,11 @@ func _ready() -> void:
 	var support_before_staff := CompanyManager.get_support_modifier()
 	var production_before_staff := CompanyManager.get_production_execution_modifier()
 	var production_cost_before_staff := CompanyManager.get_production_cost_modifier()
+	var finance_interest_before_staff := CompanyManager.get_finance_interest_modifier()
 	PersonnelManager._add_employee("Prod Test", "Responsable production", "Production", 72, 7.0, "manufacturing", 68, 5000)
 	PersonnelManager._add_employee("Marketing Test", "Responsable marketing", "Marketing", 70, 6.0, "marketing", 68, 4800)
 	PersonnelManager._add_employee("Support Test", "Responsable support", "Support", 70, 6.0, "support", 68, 4500)
+	PersonnelManager._add_employee("Finance Test", "Responsable finance", "Finance", 72, 7.0, "finance", 70, 5200)
 	if CompanyManager.get_production_execution_modifier() <= production_before_staff:
 		_fail("Hiring Production staff did not improve production execution")
 		return
@@ -73,6 +75,20 @@ func _ready() -> void:
 	if CompanyManager.get_support_modifier() <= support_before_staff:
 		_fail("Hiring Support staff did not improve support effectiveness")
 		return
+	if CompanyManager.get_finance_interest_modifier() >= finance_interest_before_staff:
+		_fail("Hiring Finance staff did not reduce the debt interest modifier")
+		return
+	Economy.reset(500_000)
+	Economy.debt = 500_000
+	var expected_interest := Economy.projected_monthly_interest()
+	if expected_interest <= 0:
+		_fail("Finance interest projection returned an invalid amount")
+		return
+	Economy.process_financing_month()
+	if Economy.monthly_expenses != expected_interest:
+		_fail("Monthly financing cost did not use the effective Finance-adjusted rate")
+		return
+	Economy.reset(500_000)
 	PersonnelManager.load_state(founder_personnel_state)
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
