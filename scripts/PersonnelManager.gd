@@ -36,6 +36,20 @@ func _add_employee(full_name: String, role: String, department: String, skill: i
 	_next_id += 1
 	staff.append(emp)
 
+func _active_research_specializations() -> Array[String]:
+	var result: Array[String] = []
+	for family_value in GameData.get_active_product_family_keys():
+		var family := str(family_value)
+		var family_data := GameData.get_product_family(family)
+		var specialization := str(family_data.get("specialization", ""))
+		if not specialization.is_empty() and not result.has(specialization):
+			result.append(specialization)
+	if not result.has("product"):
+		result.append("product")
+	if result.is_empty():
+		result.append("cpu")
+	return result
+
 func generate_candidate(department: String) -> Dictionary:
 	var name := "%s %s" % [FIRST_NAMES[rng.randi_range(0, FIRST_NAMES.size()-1)], LAST_NAMES[rng.randi_range(0, LAST_NAMES.size()-1)]]
 	var skill := rng.randi_range(48, 82)
@@ -43,7 +57,9 @@ func generate_candidate(department: String) -> Dictionary:
 	var leadership := rng.randi_range(28, 82)
 	var specialization := "product"
 	match department:
-		"R&D": specialization = ["cpu","gpu","software","mobile","display","cloud","satellite","ai"][rng.randi_range(0,7)]
+		"R&D":
+			var active_specializations := _active_research_specializations()
+			specialization = active_specializations[rng.randi_range(0, active_specializations.size() - 1)]
 		"Production": specialization = "manufacturing"
 		"Marketing": specialization = "marketing"
 		"Support": specialization = "support"
