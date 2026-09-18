@@ -80,6 +80,9 @@ var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_card_grid: GridContainer
+var quality_incident_card: PanelContainer
+var quality_incident_label: Label
+var quality_incident_buttons: Dictionary = {}
 var product_price: SpinBox
 var product_capacity: SpinBox
 var product_industrialization_label: Label
@@ -1165,6 +1168,28 @@ func _create_products_tab():
 	product_card_grid.add_theme_constant_override("h_separation", 10)
 	product_card_grid.add_theme_constant_override("v_separation", 10)
 	box.add_child(product_card_grid)
+
+	box.add_child(_section("SAV / incidents qualité"))
+	quality_incident_card = _card(APP_AMBER_DARK, 12, 12)
+	quality_incident_card.visible = false
+	box.add_child(quality_incident_card)
+	var quality_box := VBoxContainer.new()
+	quality_box.add_theme_constant_override("separation", 9)
+	quality_incident_card.add_child(quality_box)
+	quality_incident_label = _label("", 13)
+	quality_incident_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quality_box.add_child(quality_incident_label)
+	var quality_actions := HFlowContainer.new()
+	quality_actions.add_theme_constant_override("h_separation", 8)
+	quality_actions.add_theme_constant_override("v_separation", 8)
+	quality_box.add_child(quality_actions)
+	for action_id in ["TARGETED_FIX", "RECALL", "MINIMAL_SUPPORT"]:
+		var action_button := Button.new()
+		action_button.custom_minimum_size.y = 44
+		action_button.pressed.connect(_resolve_quality_incident.bind(action_id))
+		quality_actions.add_child(action_button)
+		quality_incident_buttons[action_id] = action_button
+
 	box.add_child(_section("Industrialiser / lancer"))
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
@@ -1944,6 +1969,7 @@ func _refresh_dashboard():
 
 	var ready_product: Dictionary = {}
 	var launched_product: Dictionary = {}
+	var quality_incident := ProductManager.get_pending_quality_incident()
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "READY" and ready_product.is_empty():
 			ready_product = product
@@ -1976,6 +2002,12 @@ func _refresh_dashboard():
 			dashboard_cto_button.text = "Décider maintenant"
 			dashboard_action_button.text = "Arbitrer au laboratoire"
 			dashboard_next_step_label.text = "Décision R&D requise : tranchez avant que le projet puisse avancer."
+		elif not quality_incident.is_empty():
+			dashboard_cto_label.text = "« Incident qualité sur %s : %d retours nécessitent une réponse SAV. »" % [str(quality_incident.get("product_name", "un produit")), int(quality_incident.get("returns", 0))]
+			dashboard_cto_button.text = "Gérer le SAV"
+			dashboard_action_button.text = "Traiter l'incident qualité"
+			dashboard_next_step_label.text = "Un produit commercialisé demande une décision SAV."
+			dashboard_target_tab = 4
 		elif not active_project.get("reports", []).is_empty():
 			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
 			dashboard_cto_button.text = "Voir le rapport complet"
@@ -1989,6 +2021,22 @@ func _refresh_dashboard():
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
+	elif not quality_incident.is_empty():
+		var incident_product := ProductManager.get_product(str(quality_incident.get("product_id", "")))
+		dashboard_cto_button.text = "Gérer le SAV"
+		dashboard_label.text = str(quality_incident.get("product_name", "Incident qualité"))
+		dashboard_project_meta_label.text = "%d retours • taux %.1f%% • décision SAV requise" % [int(quality_incident.get("returns", 0)), float(quality_incident.get("return_rate", 0.0)) * 100.0]
+		dashboard_project_phase_label.text = "INCIDENT QUALITÉ"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % _money(int(quality_incident.get("warranty_cost", 0)))
+		dashboard_metric_b.text = str(quality_incident.get("severity", "WARNING"))
+		dashboard_metric_c.text = "SAV"
+		dashboard_cto_label.text = "« Nous devons arbitrer entre correction technique, rappel renforcé ou service minimum. »"
+		dashboard_action_button.text = "Traiter l'incident"
+		dashboard_target_tab = 4
+		dashboard_next_step_label.text = "Choisissez une réponse SAV avant que le problème ne dégrade davantage la marque."
+		if dashboard_chip != null and dashboard_chip.has_method("set_design") and not incident_product.is_empty():
+			dashboard_chip.call("set_design", incident_product.get("cpu_design", {}), 100.0, false)
 	elif not ready_product.is_empty():
 		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
@@ -2382,6 +2430,7 @@ func _refresh_products():
 	if current_id != "":
 		_select_meta(product_select, current_id)
 	_refresh_product_details()
+	_refresh_quality_incident()
 	_refresh_market_product_options()
 
 func _refresh_product_cards():
@@ -2418,6 +2467,50 @@ func _select_product_from_card(product_id: String):
 	_select_meta(product_select, product_id)
 	_refresh_product_details()
 	status_label.text = "Produit sélectionné : %s" % str(ProductManager.get_product(product_id).get("name", product_id))
+
+func _refresh_quality_incident():
+	if quality_incident_card == null or quality_incident_label == null:
+		return
+	var incident := ProductManager.get_pending_quality_incident()
+	quality_incident_card.visible = not incident.is_empty()
+	if incident.is_empty():
+		return
+	var product_id := str(incident.get("product_id", ""))
+	var product := ProductManager.get_product(product_id)
+	var severity := str(incident.get("severity", "WARNING"))
+	quality_incident_label.text = "%s • %s\n%d retours ce mois-ci • taux %.1f%% • coût garanties %s €\nChoisissez la réponse de l'entreprise. Une solution forte coûte plus cher mais protège mieux la fiabilité et la marque." % [
+		"INCIDENT CRITIQUE" if severity == "CRITICAL" else "ALERTE QUALITÉ",
+		str(incident.get("product_name", "Produit")),
+		int(incident.get("returns", 0)),
+		float(incident.get("return_rate", 0.0)) * 100.0,
+		_money(int(incident.get("warranty_cost", 0)))
+	]
+	for option in ProductManager.quality_incident_options(product_id):
+		var action_id := str(option.get("id", ""))
+		if not quality_incident_buttons.has(action_id):
+			continue
+		var button: Button = quality_incident_buttons[action_id]
+		var cost := int(option.get("cost", 0))
+		button.text = "%s%s\n%s" % [
+			str(option.get("label", action_id)),
+			" • %s €" % _money(cost) if cost > 0 else " • 0 €",
+			str(option.get("summary", ""))
+		]
+		button.disabled = cost > Economy.money and cost > 0
+	if not product.is_empty() and str(product.get("id", "")) != "":
+		_select_meta(product_select, str(product.get("id", "")))
+
+func _resolve_quality_incident(action_id: String):
+	var incident := ProductManager.get_pending_quality_incident()
+	if incident.is_empty():
+		status_label.text = "Aucun incident qualité en attente."
+		return
+	var product_id := str(incident.get("product_id", ""))
+	if ProductManager.resolve_quality_incident(product_id, action_id):
+		status_label.text = "Incident qualité traité."
+	else:
+		status_label.text = "Action impossible : vérifiez la trésorerie disponible."
+	_refresh_all()
 
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
