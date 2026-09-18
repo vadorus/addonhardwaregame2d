@@ -24,6 +24,12 @@ func _ready() -> void:
 	if not CompanyManager.created:
 		_fail("Company was not created")
 		return
+	if CompanyManager.SUBSIDIARIES_ENABLED:
+		_fail("Subsidiaries must remain locked during the CPU vertical slice")
+		return
+	if CompanyManager.create_subsidiary("Fake Subsidiary", "CPU", 50_000):
+		_fail("Locked subsidiary creation unexpectedly succeeded")
+		return
 	if PersonnelManager.staff.size() != 2:
 		_fail("New companies must start with the two-person garage team")
 		return
