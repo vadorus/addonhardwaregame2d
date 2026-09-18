@@ -121,6 +121,9 @@ var rd_decision_card: Control
 var rd_decision_label: Label
 var rd_decision_buttons: Array[Button] = []
 var decision_previous_time_scale := 1.0
+var progression_toast: PanelContainer
+var progression_toast_label: Label
+var progression_toast_tween: Tween
 
 func _notification(what: int):
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -180,6 +183,7 @@ func _connect_signals():
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
 	PatentManager.patents_changed.connect(_refresh_all)
+	DepartmentProgression.stage_changed.connect(_on_department_stage_changed)
 	SaveManager.save_completed.connect(_on_save_message)
 
 func _build_ui():
@@ -315,6 +319,7 @@ func _build_ui():
 	_update_nav_state()
 	_build_setup_layer()
 	_build_month_layer()
+	_build_progression_toast()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -1032,6 +1037,32 @@ func _build_month_layer():
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
+func _build_progression_toast():
+	progression_toast = PanelContainer.new()
+	progression_toast.anchor_left = 0.5
+	progression_toast.anchor_right = 0.5
+	progression_toast.anchor_top = 0.0
+	progression_toast.anchor_bottom = 0.0
+	progression_toast.offset_left = -280.0
+	progression_toast.offset_right = 280.0
+	progression_toast.offset_top = 18.0
+	progression_toast.offset_bottom = 110.0
+	progression_toast.z_index = 100
+	progression_toast.visible = false
+	progression_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progression_toast.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 14, 2, APP_AMBER, 16))
+	add_child(progression_toast)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	progression_toast.add_child(box)
+	var eyebrow := _eyebrow("ÉVOLUTION DE L'ENTREPRISE")
+	eyebrow.add_theme_color_override("font_color", APP_AMBER)
+	box.add_child(eyebrow)
+	progression_toast_label = _label("", 17)
+	progression_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	progression_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(progression_toast_label)
+
 func _tab_scroll(title: String) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
 	scroll.name = title
@@ -1381,6 +1412,29 @@ func _on_save_message(ok: bool, message: String):
 func _on_solvency_warning(message: String):
 	status_label.text = "⚠ " + message
 	CompanyManager.add_alert(message)
+
+func _on_department_stage_changed(_sector_id: String, previous_stage: int, new_stage: int, state: Dictionary):
+	var title := str(state.get("title", "Un pôle"))
+	var stage_name := str(state.get("stage_name", "Nouveau palier"))
+	var message := "%s évolue : %s" % [title, stage_name]
+	status_label.text = "★ " + message
+	CompanyManager.add_alert(message)
+	MediaManager.publish_business_event(
+		"%s franchit un nouveau cap" % title,
+		"%s passe du palier %d au palier %d : %s. L'entreprise consolide durablement cette évolution." % [title, previous_stage, new_stage, stage_name]
+	)
+	if progression_toast != null and progression_toast_label != null:
+		if progression_toast_tween != null and progression_toast_tween.is_valid():
+			progression_toast_tween.kill()
+		progression_toast_label.text = "%s\n%s" % [title, stage_name]
+		progression_toast.modulate = Color(1, 1, 1, 0)
+		progression_toast.visible = true
+		progression_toast_tween = create_tween()
+		progression_toast_tween.tween_property(progression_toast, "modulate", Color(1, 1, 1, 1), 0.18)
+		progression_toast_tween.tween_interval(3.2)
+		progression_toast_tween.tween_property(progression_toast, "modulate", Color(1, 1, 1, 0), 0.28)
+		progression_toast_tween.tween_callback(func(): progression_toast.visible = false)
+	_refresh_all()
 
 func _on_month_closed(report: Dictionary):
 	var inc_lines:=_breakdown(report.income_breakdown)
