@@ -88,6 +88,19 @@ func process_month(active_departments: Array):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
 	staff_changed.emit()
 
+func _employee_contribution(emp: Dictionary, specialization: String = "") -> float:
+	var exp_bonus: float = minf(float(emp.get("experience_years", 0.0)) * 2.0, 22.0)
+	var spec_bonus := 0.0
+	if specialization != "" and str(emp.get("specialization", "")) == specialization:
+		spec_bonus = 12.0 + minf(float(emp.get("domain_experience", {}).get(specialization, 0.0)), 10.0)
+	return (
+		float(emp.get("skill", 0)) * 0.63
+		+ float(emp.get("aptitude", 0)) * 0.18
+		+ exp_bonus
+		+ spec_bonus
+		+ float(emp.get("morale", 75.0)) * 0.05
+	)
+
 func team_score(department: String, specialization: String = "") -> float:
 	var members: Array = []
 	for emp in staff:
@@ -95,16 +108,34 @@ func team_score(department: String, specialization: String = "") -> float:
 			members.append(emp)
 	if members.is_empty():
 		return 20.0
-	var total := 0.0
-	for emp in members:
-		var exp_bonus: float = minf(float(emp.experience_years) * 2.0, 22.0)
-		var spec_bonus := 0.0
-		if specialization != "" and str(emp.specialization) == specialization:
-			spec_bonus = 12.0 + minf(float(emp.domain_experience.get(specialization, 0.0)), 10.0)
-		total += float(emp.skill) * 0.63 + float(emp.aptitude) * 0.18 + exp_bonus + spec_bonus + float(emp.morale) * 0.05
-	var score := total / float(members.size())
+
+	var best_contribution := 0.0
+	var support_total := 0.0
+	var contributions: Array[float] = []
+	for emp_value in members:
+		var emp: Dictionary = emp_value
+		var contribution := _employee_contribution(emp, specialization)
+		contributions.append(contribution)
+		best_contribution = maxf(best_contribution, contribution)
+	for contribution in contributions:
+		if is_equal_approx(contribution, best_contribution):
+			best_contribution = contribution
+			continue
+		support_total += contribution
+	if contributions.size() > 1:
+		var best_removed := false
+		support_total = 0.0
+		for contribution in contributions:
+			if not best_removed and is_equal_approx(contribution, best_contribution):
+				best_removed = true
+				continue
+			support_total += contribution
+
 	var cohesion := float(CompanyManager.departments.get(department, {}).get("cohesion", 30.0))
-	return clampf(score + cohesion * 0.12, 20.0, 100.0)
+	var depth_bonus := minf(float(members.size()) * 1.5, 9.0)
+	var support_bonus := minf(support_total * 0.045, 18.0)
+	var score := best_contribution * 0.82 + support_bonus + depth_bonus + cohesion * 0.12
+	return clampf(score, 20.0, 100.0)
 
 func get_leader_quality(employee_id: String, department: String) -> float:
 	if employee_id == "":
