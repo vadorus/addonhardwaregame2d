@@ -149,6 +149,7 @@ func _handle_back_request():
 func _ready():
 	theme = _create_app_theme()
 	_build_ui()
+	_apply_mobile_touch_targets(self)
 	_connect_signals()
 	resized.connect(_update_responsive_layout)
 	_refresh_all()
@@ -1205,7 +1206,7 @@ func _build_settings_overlay():
 	var panel_script: Script = load("res://ui/SettingsPanel.gd")
 	settings_layer = panel_script.new() as Control
 	settings_layer.visible = false
-	settings_layer.call("set_compact", size.x < 900.0)
+	settings_layer.call("set_compact", _is_compact_layout())
 	settings_layer.connect("close_requested", _toggle_settings)
 	add_child(settings_layer)
 
@@ -1277,9 +1278,30 @@ func _apply_dashboard_density():
 	if dashboard_advisor_card != null:
 		dashboard_advisor_card.visible = dashboard_secondary_visible or not dashboard_compact_mode
 
+func _is_compact_layout() -> bool:
+	return OS.has_feature("mobile") or size.x < 900.0
+
+func _is_narrow_layout() -> bool:
+	return OS.has_feature("mobile") or size.x < 620.0
+
+func _apply_mobile_touch_targets(node: Node):
+	if not OS.has_feature("mobile"):
+		return
+	if node is BaseButton:
+		var control := node as Control
+		control.custom_minimum_size.y = maxf(control.custom_minimum_size.y, 60.0)
+	elif node is SpinBox or node is LineEdit or node is OptionButton:
+		var control := node as Control
+		control.custom_minimum_size.y = maxf(control.custom_minimum_size.y, 56.0)
+	elif node is HSlider:
+		var control := node as Control
+		control.custom_minimum_size.y = maxf(control.custom_minimum_size.y, 48.0)
+	for child in node.get_children():
+		_apply_mobile_touch_targets(child)
+
 func _update_responsive_layout():
-	var compact := size.x < 900.0
-	var narrow := size.x < 620.0
+	var compact := _is_compact_layout()
+	var narrow := _is_narrow_layout()
 	if compact != dashboard_compact_mode:
 		dashboard_compact_mode = compact
 		dashboard_secondary_visible = not compact
