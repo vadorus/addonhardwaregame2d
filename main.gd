@@ -29,6 +29,7 @@ var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
 var company_reputation_grid: GridContainer
+var company_operations_grid: GridContainer
 var division_label: Label
 var company_finance_label: Label
 var company_finance_cash_value: Label
@@ -633,6 +634,14 @@ func _create_company_tab():
 	division_label = _rich_label()
 	division_card.add_child(division_label)
 	box.add_child(division_card)
+
+	box.add_child(_section("Capacité opérationnelle"))
+	company_operations_grid = GridContainer.new()
+	company_operations_grid.columns = 3
+	company_operations_grid.add_theme_constant_override("h_separation", 10)
+	company_operations_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(company_operations_grid)
+
 	box.add_child(_section("Budgets mensuels"))
 	var grid := GridContainer.new(); grid.columns = 2; box.add_child(grid)
 	grid.add_child(_label("Marketing",14))
@@ -1747,6 +1756,8 @@ func _update_responsive_layout():
 		cpu_generation_card_grid.columns = 1 if compact else 3
 	if company_reputation_grid != null:
 		company_reputation_grid.columns = 2 if compact else 4
+	if company_operations_grid != null:
+		company_operations_grid.columns = 1 if compact else 3
 	if media_card_grid != null:
 		media_card_grid.columns = 1 if compact else 2
 	if contract_card_grid != null:
@@ -2124,6 +2135,7 @@ func _refresh_company():
 	var r := CompanyManager.reputation
 	company_rep_label.text = "Réputation globale %.0f/100 • %d filiale(s)" % [CompanyManager.get_brand_score(), CompanyManager.subsidiaries.size()]
 	_refresh_company_reputation_cards(r)
+	_refresh_company_operations()
 	if company_finance_label != null:
 		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique", "BANKRUPT":"Faillite"}.get(Economy.solvency_status(), "Stable"))
 		var snapshot := Economy.financial_snapshot()
@@ -2168,6 +2180,46 @@ func _refresh_company():
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
 	_refresh_leader_choices()
+
+func _refresh_company_operations():
+	if company_operations_grid == null:
+		return
+	for child in company_operations_grid.get_children():
+		child.queue_free()
+	var rows := [
+		{
+			"title":"Production",
+			"staff":PersonnelManager.department_staff_count("Production"),
+			"execution":CompanyManager.get_production_execution_modifier(),
+			"detail":"Coût réel ×%.2f" % CompanyManager.get_production_cost_modifier()
+		},
+		{
+			"title":"Marketing",
+			"staff":PersonnelManager.department_staff_count("Marketing"),
+			"execution":CompanyManager.get_marketing_execution_modifier(),
+			"detail":"Notoriété %.0f pts" % (CompanyManager.get_awareness_bonus() * 100.0)
+		},
+		{
+			"title":"Support",
+			"staff":PersonnelManager.department_staff_count("Support"),
+			"execution":CompanyManager.get_support_execution_modifier(),
+			"detail":"SAV ×%.2f" % CompanyManager.get_support_modifier()
+		}
+	]
+	for row_value in rows:
+		var row: Dictionary = row_value
+		var execution := float(row.get("execution", 0.0))
+		var panel := _card(APP_PANEL, 10, 10)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		company_operations_grid.add_child(panel)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 5)
+		panel.add_child(box)
+		box.add_child(_muted_label(str(row.get("title", "Pôle")), 11))
+		var value := _label("%.0f%% efficacité" % (execution * 100.0), 18)
+		value.add_theme_color_override("font_color", APP_GREEN if execution >= 1.0 else (APP_AMBER if execution >= 0.88 else APP_RED))
+		box.add_child(value)
+		box.add_child(_muted_label("%d salarié(s) • %s" % [int(row.get("staff", 0)), str(row.get("detail", ""))], 11))
 
 func _refresh_company_reputation_cards(reputation: Dictionary):
 	if company_reputation_grid == null:
