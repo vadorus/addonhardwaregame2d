@@ -612,36 +612,61 @@ func process_month():
 
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
-	var consumer_units := int(demand.get("units", 0))
+	var consumer_units := maxi(int(demand.get("units", 0)), 0)
 	var contract := MarketManager.active_contract_for(str(product.id))
 	var b2b_units := 0
 	var b2b_price := 0
 	if not contract.is_empty():
-		b2b_units = int(contract.units_per_month)
-		b2b_price = int(contract.unit_price)
-	var nominal_capacity := int(product.production_capacity)
+		b2b_units = maxi(int(contract.units_per_month), 0)
+		b2b_price = maxi(int(contract.unit_price), 0)
+
+	var nominal_capacity := maxi(int(product.production_capacity), 1)
 	var profile := industrialization_profile(str(product.id))
 	var production_execution := CompanyManager.get_production_execution_modifier()
 	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
 	var capacity := maxi(1, int(floor(float(nominal_capacity) * production_execution * industrial_capacity)))
 	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
-	var sold_b2b: int = mini(b2b_units, capacity)
-	var remaining_capacity: int = maxi(capacity - sold_b2b, 0)
-	var sold_consumer: int = mini(consumer_units, remaining_capacity)
+	var effective_unit_cost := maxi(1, int(round(float(product.unit_cost) * production_cost_modifier)))
+
+	var inventory_start := maxi(int(product.get("inventory_units", 0)), 0)
+	var target_inventory := stock_target_units(product, capacity)
+	var total_requested := b2b_units + consumer_units
+	var production_needed := maxi(total_requested + target_inventory - inventory_start, 0)
+	var produced_units := mini(production_needed, capacity)
+	var available_units := inventory_start + produced_units
+
+	var sold_b2b := mini(b2b_units, available_units)
+	var after_b2b := maxi(available_units - sold_b2b, 0)
+	var sold_consumer := mini(consumer_units, after_b2b)
 	var total_units := sold_b2b + sold_consumer
+	var lost_b2b := maxi(b2b_units - sold_b2b, 0)
+	var lost_consumer := maxi(consumer_units - sold_consumer, 0)
+	var lost_sales := lost_b2b + lost_consumer
+	var inventory_end := maxi(available_units - total_units, 0)
+
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
-	var production_cost := int(round(float(total_units * int(product.unit_cost)) * production_cost_modifier))
+	var production_cost := produced_units * effective_unit_cost
+	var holding_cost := int(round(float(inventory_end * effective_unit_cost) * STOCK_HOLDING_RATE))
 	var capacity_overhead := int(product.get("monthly_capacity_overhead", 0))
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
-	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if production_cost > 0:
+		Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if holding_cost > 0:
+		Economy.add_expense(holding_cost, "Stockage — %s" % str(product.name))
 	if capacity_overhead > 0:
 		Economy.add_expense(capacity_overhead, "Capacité industrielle — %s" % str(product.name))
+
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
 	return_rate *= float(profile.get("return_factor", 1.0))
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)
-	var warranty_cost := int(round(float(returns * int(product.unit_cost)) * production_cost_modifier * 0.72))
+	var warranty_cost := int(round(float(returns * effective_unit_cost) * 0.72))
 	Economy.add_expense(warranty_cost, "SAV garanties — %s" % str(product.name))
+
+	var previous_lost_sales := maxi(int(product.get("last_month_lost_sales", 0)), 0)
+	product["inventory_units"] = inventory_end
+	product["last_month_produced"] = produced_units
+	product["last_month_lost_sales"] = lost_sales
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
@@ -650,7 +675,26 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
 	_maybe_create_quality_incident(product, total_units, returns, return_rate, warranty_cost)
-	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
+
+	if lost_sales > 0 and previous_lost_sales <= 0:
+		CompanyManager.add_alert("%s est en rupture partielle : %d vente(s) perdues ce mois-ci." % [str(product.name), lost_sales])
+	if lost_b2b > 0:
+		var b2b_shortfall_ratio := float(lost_b2b) / float(maxi(b2b_units, 1))
+		CompanyManager.change_reputation({
+			"professional":-minf(2.0, b2b_shortfall_ratio * 2.0),
+			"support":-minf(1.2, b2b_shortfall_ratio * 1.2)
+		})
+
+	var stockout_ratio := float(lost_sales) / float(maxi(total_requested, 1))
+	var satisfaction: float = clampf(
+		float(demand.get("score", 50.0))
+		+ float(demand.get("expectation_gap", 0.0)) * 0.22
+		+ (CompanyManager.get_support_modifier() - 1.0) * 18.0
+		- return_rate * 35.0
+		- stockout_ratio * 14.0,
+		0.0,
+		100.0
+	)
 	product.customer_satisfaction = satisfaction
 	var rep_delta := (satisfaction - 55.0) / 35.0
 	CompanyManager.change_reputation({
@@ -658,13 +702,22 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
+
 	var report := {
 		"product_id":product.id,
 		"units":total_units,
 		"consumer_units":sold_consumer,
 		"b2b_units":sold_b2b,
+		"produced_units":produced_units,
+		"inventory_start":inventory_start,
+		"inventory_end":inventory_end,
+		"inventory_target":target_inventory,
+		"lost_sales":lost_sales,
+		"lost_b2b":lost_b2b,
+		"lost_consumer":lost_consumer,
 		"revenue":revenue,
 		"production_cost":production_cost,
+		"holding_cost":holding_cost,
 		"capacity_overhead":capacity_overhead,
 		"warranty_cost":warranty_cost,
 		"satisfaction":satisfaction,
@@ -673,8 +726,10 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"effective_capacity":capacity,
 		"production_execution":production_execution,
 		"production_cost_modifier":production_cost_modifier,
+		"effective_unit_cost":effective_unit_cost,
 		"industrial_capacity_factor":industrial_capacity,
 		"return_rate":return_rate,
+		"stock_policy":str(product.get("stock_policy", "BALANCED")),
 		"industrialization":product.get("industrialization", {}).duplicate(true)
 	}
 	sales_report_created.emit(report)
