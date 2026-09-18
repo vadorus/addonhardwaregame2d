@@ -280,6 +280,53 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 		"investment": int(financials.get("investment", 0))
 	}
 
+func offer_update_financials(product_id: String, production_capacity: int) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return {}
+	var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
+	var target_capacity := clampi(production_capacity, 1, max_capacity)
+	var current_capacity := maxi(int(product.get("production_capacity", 1)), 1)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var expansion_units := maxi(target_capacity - current_capacity, 0)
+	var expansion_cost := int(round(float(expansion_units * unit_cost) * INDUSTRIALIZATION_SETUP_RATE))
+	var target_overhead := maxi(250, int(round(float(target_capacity * unit_cost) * CAPACITY_OVERHEAD_RATE)))
+	return {
+		"current_capacity":current_capacity,
+		"target_capacity":target_capacity,
+		"expansion_units":expansion_units,
+		"expansion_cost":expansion_cost,
+		"target_overhead":target_overhead
+	}
+
+func update_product_offer(product_id: String, price: int, production_capacity: int) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	var update := offer_update_financials(product_id, production_capacity)
+	if update.is_empty():
+		return false
+	var expansion_cost := int(update.get("expansion_cost", 0))
+	if expansion_cost > 0 and Economy.money < expansion_cost:
+		return false
+	var previous_price := int(product.get("price", price))
+	var previous_capacity := int(product.get("production_capacity", production_capacity))
+	if expansion_cost > 0:
+		Economy.add_expense(expansion_cost, "Extension industrielle — %s" % str(product.get("name", "Produit")))
+	product["price"] = maxi(price, 1)
+	product["production_capacity"] = int(update.get("target_capacity", previous_capacity))
+	product["monthly_capacity_overhead"] = int(update.get("target_overhead", product.get("monthly_capacity_overhead", 0)))
+	if previous_price != int(product.price) or previous_capacity != int(product.production_capacity):
+		CompanyManager.add_alert(
+			"%s : offre ajustée à %s € et capacité %s unités/mois." % [
+				str(product.get("name", "Produit")),
+				str(product.price),
+				str(product.production_capacity)
+			]
+		)
+	products_changed.emit()
+	return true
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
