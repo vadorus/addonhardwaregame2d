@@ -31,6 +31,15 @@ func _ready() -> void:
 		_fail("Camille must remain the founding CTO")
 		return
 	var founder_personnel_state := PersonnelManager.get_state().duplicate(true)
+	var direct_management := CompanyManager.estimate_department_management_modifier("R&D", "DIRECT", "")
+	var autonomous_without_leader := CompanyManager.estimate_department_management_modifier("R&D", "AUTONOMOUS", "")
+	var autonomous_with_camille := CompanyManager.estimate_department_management_modifier("R&D", "AUTONOMOUS", str(PersonnelManager.staff[0].get("id", "")))
+	if not is_equal_approx(direct_management, 1.0):
+		_fail("Direct department management must remain neutral")
+		return
+	if autonomous_with_camille <= autonomous_without_leader:
+		_fail("A strong department leader did not improve autonomous management")
+		return
 	var founder_rd_score := PersonnelManager.team_score("R&D", "cpu")
 	PersonnelManager._add_employee("Junior Test", "Stagiaire R&D", "R&D", 35, 0.0, "cpu", 15, 2400)
 	var expanded_rd_score := PersonnelManager.team_score("R&D", "cpu")
