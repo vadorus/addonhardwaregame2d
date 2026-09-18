@@ -9,6 +9,7 @@ signal cpu_range_created(generation)
 signal sales_report_created(report)
 signal quality_incident_created(incident)
 signal quality_incident_resolved(incident, action_id)
+signal product_discontinued(product)
 
 var products: Array = []
 var cpu_generations: Array = []
@@ -324,6 +325,34 @@ func update_product_offer(product_id: String, price: int, production_capacity: i
 				str(product.production_capacity)
 			]
 		)
+	products_changed.emit()
+	return true
+
+func discontinuation_blocker(product_id: String) -> String:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return "Ce produit n'est pas actuellement commercialisé."
+	if not product.get("pending_quality_incident", {}).is_empty():
+		return "Résolvez d'abord l'incident qualité en cours."
+	var contract := MarketManager.active_contract_for(product_id)
+	if not contract.is_empty():
+		return "Un contrat B2B actif doit être honoré avant la fin de vente."
+	return ""
+
+func discontinue_product(product_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or not discontinuation_blocker(product_id).is_empty():
+		return false
+	product["status"] = "DISCONTINUED"
+	product["discontinued_market_month"] = MarketManager.market_months
+	product["monthly_capacity_overhead"] = 0
+	product["last_month_sales"] = 0
+	CompanyManager.add_alert("%s n'est plus commercialisé." % str(product.get("name", "Produit")))
+	MediaManager.publish_business_event(
+		"Fin de commercialisation pour %s" % str(product.get("name", "un produit")),
+		"%s arrête la production de cette génération pour concentrer ses ressources sur la suite." % CompanyManager.company_name
+	)
+	product_discontinued.emit(product)
 	products_changed.emit()
 	return true
 
