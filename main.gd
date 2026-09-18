@@ -116,6 +116,8 @@ var dashboard_cto_button: Button
 var dashboard_next_step_label: Label
 var dashboard_stage_label: Label
 var dashboard_details_button: Button
+var dashboard_sector_grid: GridContainer
+var dashboard_sector_cards: Dictionary = {}
 var dashboard_secondary_visible := true
 var dashboard_compact_mode := false
 var evolution_panel: Control
@@ -372,6 +374,61 @@ func _create_dashboard_tab():
 	dashboard_next_step_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_next_step_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	next_box.add_child(dashboard_next_step_label)
+
+	box.add_child(_eyebrow("ÉVOLUTION DES PÔLES"))
+	var sector_intro := _muted_label("Vos locaux évoluent avec vos résultats. Chaque pôle montre le prochain cap à atteindre.", 12)
+	sector_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(sector_intro)
+	dashboard_sector_grid = GridContainer.new()
+	dashboard_sector_grid.columns = 4
+	dashboard_sector_grid.add_theme_constant_override("h_separation", 10)
+	dashboard_sector_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(dashboard_sector_grid)
+	var sector_preview_script: Script = load("res://ui/DepartmentScenePreview.gd")
+	for sector_id_value in DepartmentProgression.SECTOR_ORDER:
+		var sector_id := str(sector_id_value)
+		var state := DepartmentProgression.get_sector_state(sector_id)
+		var sector_card := _card(APP_PANEL, 11, 10)
+		sector_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dashboard_sector_grid.add_child(sector_card)
+		var sector_box := VBoxContainer.new()
+		sector_box.add_theme_constant_override("separation", 6)
+		sector_card.add_child(sector_box)
+		var sector_head := HBoxContainer.new()
+		sector_box.add_child(sector_head)
+		var sector_title := _label(str(state.get("title", sector_id)), 14)
+		sector_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sector_head.add_child(sector_title)
+		var sector_stage := _eyebrow("PALIER 0")
+		sector_stage.add_theme_color_override("font_color", APP_AMBER)
+		sector_head.add_child(sector_stage)
+		var sector_scene := sector_preview_script.new() as Control
+		sector_box.add_child(sector_scene)
+		sector_scene.custom_minimum_size = Vector2(190, 96)
+		var sector_stage_name := _label("Départ", 13)
+		sector_stage_name.add_theme_color_override("font_color", APP_CYAN)
+		sector_box.add_child(sector_stage_name)
+		var sector_progress := ProgressBar.new()
+		sector_progress.show_percentage = false
+		sector_progress.custom_minimum_size.y = 8
+		sector_box.add_child(sector_progress)
+		var sector_hint := _muted_label("", 11)
+		sector_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sector_hint.custom_minimum_size.y = 38
+		sector_box.add_child(sector_hint)
+		var sector_button := Button.new()
+		sector_button.text = "Ouvrir"
+		sector_button.custom_minimum_size.y = 38
+		sector_button.pressed.connect(_open_dashboard_sector.bind(sector_id))
+		sector_box.add_child(sector_button)
+		dashboard_sector_cards[sector_id] = {
+			"stage": sector_stage,
+			"stage_name": sector_stage_name,
+			"progress": sector_progress,
+			"hint": sector_hint,
+			"scene": sector_scene,
+			"button": sector_button
+		}
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -1356,6 +1413,48 @@ func _add_stat_card(parent: GridContainer, title: String) -> Label:
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)
 
+func _open_dashboard_sector(sector_id: String):
+	match sector_id:
+		"LAB":
+			_show_tab(3)
+		"PRODUCTION":
+			_show_tab(4)
+		"MARKET":
+			_show_tab(5)
+		"TEAM":
+			_show_tab(2)
+		_:
+			_show_tab(7)
+
+func _refresh_dashboard_sectors():
+	if dashboard_sector_cards.is_empty():
+		return
+	for sector_id_value in DepartmentProgression.SECTOR_ORDER:
+		var sector_id := str(sector_id_value)
+		if not dashboard_sector_cards.has(sector_id):
+			continue
+		var state := DepartmentProgression.get_sector_state(sector_id)
+		var refs: Dictionary = dashboard_sector_cards[sector_id]
+		var stage := int(state.get("stage", 0))
+		var stage_label: Label = refs.get("stage")
+		var stage_name_label: Label = refs.get("stage_name")
+		var progress: ProgressBar = refs.get("progress")
+		var hint: Label = refs.get("hint")
+		var scene: Control = refs.get("scene")
+		var button: Button = refs.get("button")
+		if stage_label != null:
+			stage_label.text = "PALIER %d" % stage
+		if stage_name_label != null:
+			stage_name_label.text = str(state.get("stage_name", "Départ"))
+		if progress != null:
+			progress.value = float(state.get("progress", 0.0))
+		if hint != null:
+			hint.text = str(state.get("next_hint", "Continuez à développer ce pôle."))
+		if scene != null and scene.has_method("set_state"):
+			scene.call("set_state", sector_id, stage, CompanyManager.company_name if CompanyManager.created else "Tech Empire")
+		if button != null:
+			button.text = "Ouvrir %s" % str(state.get("title", sector_id))
+
 func _toggle_dashboard_details():
 	dashboard_secondary_visible = not dashboard_secondary_visible
 	_apply_dashboard_density()
@@ -1408,6 +1507,8 @@ func _update_responsive_layout():
 		dashboard_lower_grid.columns = 1 if compact else 2
 	if dashboard_project_grid != null:
 		dashboard_project_grid.columns = 1 if narrow else 2
+	if dashboard_sector_grid != null:
+		dashboard_sector_grid.columns = 1 if compact else 4
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -1520,7 +1621,7 @@ func _refresh_top():
 	money_label.add_theme_color_override("font_color", APP_GREEN if Economy.money >= 0 else APP_RED)
 
 func _refresh_all():
-	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	_refresh_top(); _refresh_dashboard(); _refresh_dashboard_sectors(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
 	_refresh_navigation_priority()
 	if evolution_panel != null and evolution_panel.has_method("refresh"):
 		evolution_panel.call("refresh")
