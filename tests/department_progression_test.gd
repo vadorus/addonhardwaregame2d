@@ -24,11 +24,37 @@ func _ready() -> void:
 	for i in range(10):
 		PersonnelManager.staff.append({"leadership":80, "name":"Hire %d" % i})
 
+	DepartmentProgression.evaluate_progression()
 	for sector_id in DepartmentProgression.SECTOR_ORDER:
 		var state := DepartmentProgression.get_sector_state(str(sector_id))
 		if int(state.get("stage", -1)) != 4:
 			_fail("%s did not reach stage 4" % str(sector_id))
 			return
+
+	var saved_progression := DepartmentProgression.get_state()
+	ResearchManager.technologies["cpu"] = 0.0
+	ResearchManager.projects = []
+	ProductManager.products = []
+	CompanyManager.reputation.innovation = 20.0
+	CompanyManager.reputation.reliability = 20.0
+	CompanyManager.reputation.prestige = 20.0
+	while PersonnelManager.staff.size() > 6:
+		PersonnelManager.staff.pop_back()
+
+	for sector_id in DepartmentProgression.SECTOR_ORDER:
+		var persistent_state := DepartmentProgression.get_sector_state(str(sector_id))
+		if int(persistent_state.get("stage", -1)) != 4:
+			_fail("%s stage regressed after score drop" % str(sector_id))
+			return
+
+	DepartmentProgression.reset_progression()
+	DepartmentProgression.load_state(saved_progression)
+	for sector_id in DepartmentProgression.SECTOR_ORDER:
+		var loaded_state := DepartmentProgression.get_sector_state(str(sector_id))
+		if int(loaded_state.get("stage", -1)) != 4:
+			_fail("%s stage was not restored from save state" % str(sector_id))
+			return
+
 	var panel_script: Script = load("res://ui/DepartmentEvolutionPanel.gd")
 	var panel: Control = panel_script.new()
 	add_child(panel)
