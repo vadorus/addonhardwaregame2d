@@ -30,6 +30,14 @@ func _ready() -> void:
 	if str(PersonnelManager.staff[0].get("name", "")) != "Camille Durand":
 		_fail("Camille must remain the founding CTO")
 		return
+	var founder_personnel_state := PersonnelManager.get_state().duplicate(true)
+	var founder_rd_score := PersonnelManager.team_score("R&D", "cpu")
+	PersonnelManager._add_employee("Junior Test", "Stagiaire R&D", "R&D", 35, 0.0, "cpu", 15, 2400)
+	var expanded_rd_score := PersonnelManager.team_score("R&D", "cpu")
+	if expanded_rd_score + 0.001 < founder_rd_score:
+		_fail("Adding a junior employee reduced the R&D team score")
+		return
+	PersonnelManager.load_state(founder_personnel_state)
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
