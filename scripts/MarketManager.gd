@@ -212,14 +212,25 @@ func maybe_generate_b2b(product: Dictionary):
 	opportunity_created.emit(contract)
 	market_changed.emit()
 
+func accept_contract(contract_id: String) -> bool:
+	for c in contracts:
+		if str(c.get("id", "")) != contract_id or str(c.get("status", "")) != "PENDING":
+			continue
+		c.status = "ACTIVE"
+		CompanyManager.change_reputation({"professional":2.0,"prestige":0.5})
+		CompanyManager.add_alert("Contrat signé avec %s pour %s." % [str(c.customer), str(c.product_name)])
+		MediaManager.publish_business_event(
+			"%s signe avec %s" % [CompanyManager.company_name, str(c.customer)],
+			"Le contrat porte sur %d unités mensuelles de %s pendant %d mois." % [int(c.units_per_month), str(c.product_name), int(c.remaining_months)]
+		)
+		market_changed.emit()
+		return true
+	return false
+
 func accept_first_pending_contract() -> bool:
 	for c in contracts:
-		if str(c.status) == "PENDING":
-			c.status = "ACTIVE"
-			CompanyManager.change_reputation({"professional":2.0,"prestige":0.5})
-			CompanyManager.add_alert("Contrat signé avec %s pour %s." % [str(c.customer), str(c.product_name)])
-			market_changed.emit()
-			return true
+		if str(c.get("status", "")) == "PENDING":
+			return accept_contract(str(c.get("id", "")))
 	return false
 
 func active_contract_for(product_id: String) -> Dictionary:
