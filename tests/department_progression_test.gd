@@ -3,10 +3,22 @@ extends Node
 func _ready() -> void:
 	print("[CI] Department progression test starting")
 	SimulationManager.reset_all("Progression Test", "CPU")
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
-		var state := DepartmentProgression.get_sector_state(str(sector_id))
+	if DepartmentProgression.get_pole_ids() != DepartmentProgression.SECTOR_ORDER:
+		_fail("Canonical pole ids diverged from the legacy sector order")
+		return
+	if GameData.get_product_family_keys() != GameData.get_sector_keys():
+		_fail("Canonical product families diverged from the legacy sector API")
+		return
+	if not GameData.is_product_family_active("CPU") or GameData.is_product_family_active("GPU"):
+		_fail("Product family activation does not match the CPU vertical slice")
+		return
+	if CompanyManager.get_pole_departments("LAB") != ["R&D"]:
+		_fail("LAB pole must map to the R&D management department")
+		return
+	for pole_id in DepartmentProgression.get_pole_ids():
+		var state := DepartmentProgression.get_pole_state(str(pole_id))
 		if int(state.get("stage", -1)) != 0:
-			_fail("%s must start at stage 0" % str(sector_id))
+			_fail("%s must start at stage 0" % str(pole_id))
 			return
 
 	ResearchManager.technologies["cpu"] = 95.0
@@ -25,8 +37,8 @@ func _ready() -> void:
 		PersonnelManager.staff.append({"leadership":80, "name":"Hire %d" % i})
 
 	DepartmentProgression.evaluate_progression()
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
-		var state := DepartmentProgression.get_sector_state(str(sector_id))
+	for sector_id in DepartmentProgression.get_pole_ids():
+		var state := DepartmentProgression.get_pole_state(str(sector_id))
 		if int(state.get("stage", -1)) != 4:
 			_fail("%s did not reach stage 4" % str(sector_id))
 			return
@@ -41,16 +53,16 @@ func _ready() -> void:
 	while PersonnelManager.staff.size() > 6:
 		PersonnelManager.staff.pop_back()
 
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
-		var persistent_state := DepartmentProgression.get_sector_state(str(sector_id))
+	for sector_id in DepartmentProgression.get_pole_ids():
+		var persistent_state := DepartmentProgression.get_pole_state(str(sector_id))
 		if int(persistent_state.get("stage", -1)) != 4:
 			_fail("%s stage regressed after score drop" % str(sector_id))
 			return
 
 	DepartmentProgression.reset_progression()
 	DepartmentProgression.load_state(saved_progression)
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
-		var loaded_state := DepartmentProgression.get_sector_state(str(sector_id))
+	for sector_id in DepartmentProgression.get_pole_ids():
+		var loaded_state := DepartmentProgression.get_pole_state(str(sector_id))
 		if int(loaded_state.get("stage", -1)) != 4:
 			_fail("%s stage was not restored from save state" % str(sector_id))
 			return
