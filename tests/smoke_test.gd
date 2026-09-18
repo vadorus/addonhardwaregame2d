@@ -197,6 +197,22 @@ func _ready() -> void:
 	var apex_max_capacity := int(apex_model.get("max_monthly_capacity", 1))
 	var recommended_financials := ProductManager.launch_financials(str(apex_model.id), apex_recommended_capacity)
 	var max_financials := ProductManager.launch_financials(str(apex_model.id), apex_max_capacity)
+	var low_price := maxi(int(apex_model.get("unit_cost", 1)) + 5, int(float(apex_model.price) * 0.75))
+	var high_price := maxi(low_price + 10, int(float(apex_model.price) * 1.45))
+	var low_price_forecast := ProductManager.launch_forecast(str(apex_model.id), low_price, apex_recommended_capacity)
+	var high_price_forecast := ProductManager.launch_forecast(str(apex_model.id), high_price, apex_recommended_capacity)
+	if low_price_forecast.is_empty() or high_price_forecast.is_empty():
+		_fail("Launch forecast was not generated")
+		return
+	if int(low_price_forecast.get("requested_units", 0)) < int(high_price_forecast.get("requested_units", 0)):
+		_fail("Higher launch price unexpectedly increased requested consumer demand")
+		return
+	if float(low_price_forecast.get("utilization", -1.0)) < 0.0 or float(low_price_forecast.get("utilization", 2.0)) > 1.0:
+		_fail("Launch forecast utilization escaped the supported range")
+		return
+	if not low_price_forecast.has("monthly_result") or not low_price_forecast.has("investment"):
+		_fail("Launch forecast omitted economic outputs")
+		return
 	if int(max_financials.get("investment", 0)) <= int(recommended_financials.get("investment", 0)):
 		_fail("Higher production capacity did not increase industrialization investment")
 		return
