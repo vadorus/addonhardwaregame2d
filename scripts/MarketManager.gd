@@ -82,6 +82,21 @@ func benchmark_rank(product: Dictionary) -> int:
 			return i + 1
 	return rows.size()
 
+func _price_demand_factor(product: Dictionary, segment: String, sector_data: Dictionary) -> float:
+	var reference_price := maxf(float(sector_data.get("reference_price", 1)), 1.0)
+	var price_ratio := maxf(float(product.get("price", reference_price)) / reference_price, 0.10)
+	var elasticity := float({
+		"BUDGET":2.6,
+		"MAINSTREAM":2.1,
+		"ENTHUSIAST":1.4,
+		"PRO":1.5,
+		"ENTERPRISE":1.2,
+		"PREMIUM":1.1
+	}.get(segment, 1.8))
+	if price_ratio <= 1.0:
+		return clampf(1.0 + (1.0 - price_ratio) * 0.55, 1.0, 1.30)
+	return clampf(pow(1.0 / price_ratio, elasticity), 0.12, 1.0)
+
 func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var sd: Dictionary = GameData.SECTORS[str(product.sector)]
 	var target := str(product.target_segment)
@@ -96,11 +111,23 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var awareness := CompanyManager.get_awareness_bonus()
 	var relevance := product_market_relevance(product)
 	var effective_score := score - (1.0 - relevance) * 32.0
-	var share: float = clampf(0.08 + (effective_score - competitor_avg) * 0.009 + awareness * 0.42, 0.01, 0.52)
+	var base_share: float = clampf(0.08 + (effective_score - competitor_avg) * 0.009 + awareness * 0.42, 0.01, 0.52)
+	var price_factor := _price_demand_factor(product, target, sd)
+	var share := clampf(base_share * price_factor, 0.005, 0.52)
 	var units := int(float(sd.market_units) * share)
 	var expectation: float = 50.0 + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
 	var gap := effective_score - expectation
-	return {"units":units,"score":score,"effective_score":effective_score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap,"relevance":relevance}
+	return {
+		"units":units,
+		"score":score,
+		"effective_score":effective_score,
+		"competitor_avg":competitor_avg,
+		"share":share,
+		"base_share":base_share,
+		"price_factor":price_factor,
+		"expectation_gap":gap,
+		"relevance":relevance
+	}
 
 func product_market_relevance(product: Dictionary) -> float:
 	var months_old := maxi(int(product.get("months_on_market", 0)) - 6, 0)
