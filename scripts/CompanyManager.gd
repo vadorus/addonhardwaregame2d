@@ -125,14 +125,34 @@ func _campaign_key_from_budget(budget: int) -> String:
 			best_key = key
 	return best_key
 
+func _department_execution_modifier(department: String, specialization: String, outsourced_baseline: float) -> float:
+	if PersonnelManager.department_staff_count(department) <= 0:
+		return outsourced_baseline
+	var team := PersonnelManager.team_score(department, specialization)
+	var management := department_management_modifier(department)
+	var staffing_factor := clampf(0.78 + team / 360.0, 0.88, 1.08)
+	return clampf(staffing_factor * management, 0.78, 1.15)
+
+func get_marketing_execution_modifier() -> float:
+	return _department_execution_modifier("Marketing", "marketing", 0.86)
+
+func get_production_execution_modifier() -> float:
+	return _department_execution_modifier("Production", "manufacturing", 0.84)
+
+func get_support_execution_modifier() -> float:
+	return _department_execution_modifier("Support", "support", 0.86)
+
 func get_awareness_bonus() -> float:
-	return float(get_marketing_campaign().get("awareness", 0.02))
+	var campaign_awareness := float(get_marketing_campaign().get("awareness", 0.02))
+	return campaign_awareness * get_marketing_execution_modifier()
 
 func get_support_modifier() -> float:
+	var policy_modifier := 1.0
 	match str(policies.support_level):
-		"PREMIUM": return 1.18
-		"MINIMAL": return 0.78
-		_: return 1.0
+		"PREMIUM": policy_modifier = 1.18
+		"MINIMAL": policy_modifier = 0.78
+		_: policy_modifier = 1.0
+	return clampf(policy_modifier * get_support_execution_modifier(), 0.62, 1.35)
 
 func set_department_autonomy(department: String, autonomy: String):
 	if departments.has(department):
