@@ -1933,18 +1933,28 @@ func _refresh_launch_financials():
 		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if margin > 0 else APP_RED)
 		return
 	var financials := ProductManager.launch_financials(str(product.get("id", "")), int(product_capacity.value))
-	if financials.is_empty():
+	var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value))
+	if financials.is_empty() or forecast.is_empty():
 		return
 	var investment := int(financials.get("investment", 0))
 	var overhead := int(financials.get("monthly_overhead", 0))
 	var affordable := Economy.money >= investment
-	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s" % [
+	var expected_units := int(forecast.get("expected_units", 0))
+	var utilization := float(forecast.get("utilization", 0.0)) * 100.0
+	var monthly_result := int(forecast.get("monthly_result", 0))
+	var market_share := float(forecast.get("share", 0.0)) * 100.0
+	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nPrévision : ~%s ventes/mois • capacité utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois" % [
 		_money(investment),
 		_money(overhead),
 		_money(margin),
-		"" if affordable else " • TRÉSORERIE INSUFFISANTE"
+		"" if affordable else " • TRÉSORERIE INSUFFISANTE",
+		_money(expected_units),
+		utilization,
+		market_share,
+		_money(monthly_result)
 	]
-	product_industrialization_label.add_theme_color_override("font_color", (APP_GREEN if margin > 0 else APP_RED) if affordable else APP_RED)
+	var healthy := affordable and margin > 0 and monthly_result >= 0
+	product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if healthy else (APP_AMBER if affordable and monthly_result >= 0 else APP_RED))
 
 func _launch_product():
 	if product_select.item_count==0:
