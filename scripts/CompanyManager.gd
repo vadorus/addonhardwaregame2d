@@ -32,6 +32,8 @@ const SUPPORT_PLANS := {
 	"PREMIUM": {"label":"Support premium", "budget":18_000, "modifier":1.18}
 }
 
+const MAX_ENVIRONMENT_BUDGET := 18_000
+
 var policies := {
 	"marketing_campaign": "LOCAL",
 	"marketing_budget": 8000,
@@ -87,13 +89,20 @@ func reset(name: String, sector: String, capital: int = 500_000):
 	Economy.reset(capital)
 	company_changed.emit()
 
+func get_environment_reputation_gain(budget: int = -1) -> float:
+	var applied_budget := int(policies.get("environment_budget", 2500)) if budget < 0 else budget
+	applied_budget = clampi(applied_budget, 0, MAX_ENVIRONMENT_BUDGET)
+	var env_gain: float = clampf(float(applied_budget) / 12000.0, 0.0, 1.5)
+	return env_gain * 0.7
+
 func process_month():
 	Economy.add_expense(7500, "Bureaux et infrastructure")
 	Economy.add_expense(int(policies.marketing_budget), "Marketing")
 	Economy.add_expense(int(policies.support_budget), "SAV / support")
-	Economy.add_expense(int(policies.environment_budget), "Environnement")
-	var env_gain: float = clampf(float(policies.environment_budget) / 12000.0, 0.0, 1.5)
-	change_reputation({"sustainability": env_gain * 0.7})
+	var environment_budget := clampi(int(policies.environment_budget), 0, MAX_ENVIRONMENT_BUDGET)
+	policies["environment_budget"] = environment_budget
+	Economy.add_expense(environment_budget, "Environnement")
+	change_reputation({"sustainability": get_environment_reputation_gain(environment_budget)})
 
 func change_reputation(changes: Dictionary):
 	for key in changes:
@@ -256,6 +265,7 @@ func load_state(state: Dictionary):
 		support_level = _support_key_from_budget(int(policies.get("support_budget", 5000)))
 	policies["support_level"] = support_level
 	policies["support_budget"] = int(get_support_plan(support_level).get("budget", 5000))
+	policies["environment_budget"] = clampi(int(policies.get("environment_budget", 2500)), 0, MAX_ENVIRONMENT_BUDGET)
 	departments = state.get("departments", departments).duplicate(true)
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
 	brands = state.get("brands", []).duplicate(true)
