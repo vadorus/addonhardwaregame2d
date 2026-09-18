@@ -351,6 +351,17 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			return true
 	return false
 
+func _maybe_announce_renewal(product: Dictionary) -> bool:
+	if not MarketManager.should_renew_product(product) or bool(product.get("renewal_alerted", false)):
+		return false
+	product["renewal_alerted"] = true
+	CompanyManager.add_alert("%s arrive en fin de cycle. Préparez une nouvelle génération CPU." % str(product.get("name", "Votre CPU")))
+	MediaManager.publish_business_event(
+		"%s prépare sa relève" % str(product.get("name", "Un CPU")),
+		"La génération actuelle perd en pertinence face aux nouveaux processeurs du marché. Une nouvelle architecture devient prioritaire."
+	)
+	return true
+
 func process_month():
 	var launched: Array = []
 	for product in products:
@@ -393,13 +404,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
-	if MarketManager.should_renew_product(product) and not bool(product.get("renewal_alerted", false)):
-		product["renewal_alerted"] = true
-		CompanyManager.add_alert("%s arrive en fin de cycle. Préparez une nouvelle génération CPU." % str(product.get("name", "Votre CPU")))
-		MediaManager.publish_business_event(
-			"%s prépare sa relève" % str(product.get("name", "Un CPU")),
-			"La génération actuelle perd en pertinence face aux nouveaux processeurs du marché. Une nouvelle architecture devient prioritaire."
-		)
+	_maybe_announce_renewal(product)
 	product.last_month_score = float(demand.get("score", 0.0))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
