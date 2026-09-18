@@ -26,6 +26,8 @@ var policies := {
 	"support_level": "STANDARD"
 }
 
+# Les départements ci-dessous restent l'unité de délégation/management.
+# Ils ne sont pas synonymes des quatre pôles visuels de l'entreprise.
 var departments := {
 	"R&D": {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":35.0},
 	"Production": {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":30.0},
@@ -33,6 +35,16 @@ var departments := {
 	"Support": {"leader_id":"", "autonomy":"AUTONOMOUS", "cohesion":30.0},
 	"Finance": {"leader_id":"", "autonomy":"AUTONOMOUS", "cohesion":30.0}
 }
+
+const POLE_DEPARTMENT_MAP := {
+	"LAB": ["R&D"],
+	"PRODUCTION": ["Production"],
+	"MARKET": ["Marketing", "Support"],
+	"TEAM": []
+}
+
+func get_pole_departments(pole_id: String) -> Array:
+	return POLE_DEPARTMENT_MAP.get(pole_id, []).duplicate()
 
 var subsidiaries: Array = []
 var brands: Array = []
