@@ -118,6 +118,9 @@ var dashboard_metric_c: Label
 var dashboard_action_button: Button
 var dashboard_cto_button: Button
 var dashboard_next_step_label: Label
+var dashboard_onboarding_card: PanelContainer
+var dashboard_onboarding_label: Label
+var dashboard_onboarding_progress: ProgressBar
 var dashboard_stage_label: Label
 var dashboard_details_button: Button
 var dashboard_sector_grid: GridContainer
@@ -378,6 +381,27 @@ func _create_dashboard_tab():
 	dashboard_next_step_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_next_step_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	next_box.add_child(dashboard_next_step_label)
+
+	dashboard_onboarding_card = _card(APP_CYAN_DARK, 12, 12)
+	box.add_child(dashboard_onboarding_card)
+	var onboarding_box := VBoxContainer.new()
+	onboarding_box.add_theme_constant_override("separation", 7)
+	dashboard_onboarding_card.add_child(onboarding_box)
+	var onboarding_head := HBoxContainer.new()
+	onboarding_box.add_child(onboarding_head)
+	var onboarding_title := _eyebrow("PREMIERS PAS")
+	onboarding_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	onboarding_head.add_child(onboarding_title)
+	var onboarding_hint := _muted_label("Objectif : mettre votre premier CPU sur le marché.", 11)
+	onboarding_head.add_child(onboarding_hint)
+	dashboard_onboarding_progress = ProgressBar.new()
+	dashboard_onboarding_progress.max_value = 4.0
+	dashboard_onboarding_progress.show_percentage = false
+	dashboard_onboarding_progress.custom_minimum_size.y = 8
+	onboarding_box.add_child(dashboard_onboarding_progress)
+	dashboard_onboarding_label = _label("", 13)
+	dashboard_onboarding_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	onboarding_box.add_child(dashboard_onboarding_label)
 
 	box.add_child(_eyebrow("ÉVOLUTION DES PÔLES"))
 	var sector_intro := _muted_label("Vos locaux évoluent avec vos résultats. Chaque pôle montre le prochain cap à atteindre.", 12)
@@ -1491,6 +1515,38 @@ func _open_dashboard_sector(sector_id: String):
 		_:
 			_show_tab(7)
 
+func _refresh_dashboard_onboarding():
+	if dashboard_onboarding_card == null or dashboard_onboarding_label == null or dashboard_onboarding_progress == null:
+		return
+	var company_done := CompanyManager.created
+	var project_done := not ResearchManager.projects.is_empty()
+	var decision_done := false
+	for project in ResearchManager.projects:
+		if int(project.get("phase_index", 0)) > 0 or str(project.get("status", "")) == "COMPLETED":
+			decision_done = true
+			break
+	var launch_done := false
+	for product in ProductManager.products:
+		if str(product.get("status", "")) == "LAUNCHED":
+			launch_done = true
+			break
+	var states := [company_done, project_done, decision_done, launch_done]
+	var labels := [
+		"Créer votre entreprise",
+		"Choisir une architecture et lancer le projet CPU",
+		"Prendre votre premier arbitrage R&D",
+		"Industrialiser et lancer votre premier CPU"
+	]
+	var completed := 0
+	var lines: Array[String] = []
+	for i in range(states.size()):
+		if bool(states[i]):
+			completed += 1
+		lines.append("%s  %s" % ["✓" if bool(states[i]) else "○", labels[i]])
+	dashboard_onboarding_progress.value = completed
+	dashboard_onboarding_label.text = "\n".join(lines)
+	dashboard_onboarding_card.visible = not launch_done
+
 func _refresh_dashboard_sectors():
 	if dashboard_sector_cards.is_empty():
 		return
@@ -1694,7 +1750,7 @@ func _refresh_top():
 	money_label.add_theme_color_override("font_color", APP_GREEN if Economy.money >= 0 else APP_RED)
 
 func _refresh_all():
-	_refresh_top(); _refresh_dashboard(); _refresh_dashboard_sectors(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	_refresh_top(); _refresh_dashboard(); _refresh_dashboard_onboarding(); _refresh_dashboard_sectors(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
 	_refresh_navigation_priority()
 	if evolution_panel != null and evolution_panel.has_method("refresh"):
 		evolution_panel.call("refresh")
