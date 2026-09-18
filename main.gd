@@ -32,6 +32,7 @@ var division_label: Label
 var company_finance_label: Label
 var staff_label: Label
 var candidate_label: Label
+var staff_card_grid: GridContainer
 var tech_label: Label
 var projects_label: Label
 var patents_label: Label
@@ -631,7 +632,13 @@ func _create_company_tab():
 func _create_personnel_tab():
 	var scroll := _tab_scroll("Personnel")
 	var box: VBoxContainer = scroll.get_child(0)
+	box.add_child(_section("Équipe"))
 	staff_label = _rich_label(); box.add_child(staff_label)
+	staff_card_grid = GridContainer.new()
+	staff_card_grid.columns = 3
+	staff_card_grid.add_theme_constant_override("h_separation", 10)
+	staff_card_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(staff_card_grid)
 	box.add_child(_section("Recrutement"))
 	recruit_department = OptionButton.new(); _fill_text(recruit_department,["R&D","Production","Marketing","Support","Finance"]); box.add_child(recruit_department)
 	var gen := Button.new(); gen.text="Chercher un candidat"; gen.pressed.connect(_generate_candidate); box.add_child(gen)
@@ -1529,6 +1536,8 @@ func _update_responsive_layout():
 		product_card_grid.columns = 1 if compact else 3
 	if market_benchmark_grid != null:
 		market_benchmark_grid.columns = 1 if compact else 4
+	if staff_card_grid != null:
+		staff_card_grid.columns = 1 if compact else 3
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -1898,17 +1907,48 @@ func _create_subsidiary():
 	_refresh_all()
 
 func _refresh_personnel():
-	if staff_label==null: return
-	var lines:=["Effectif : %d" % PersonnelManager.staff.size()]
-	for emp in PersonnelManager.staff:
-		var leader_mark:=""
-		for dept in CompanyManager.departments:
-			if str(CompanyManager.departments[dept].leader_id)==str(emp.id): leader_mark=" ★ responsable %s" % dept
-		lines.append("• %s — %s | %s | compétence %d | expérience %.1f ans | leadership %d | spé. %s | %s €/mois%s" % [str(emp.name),str(emp.role),str(emp.department),int(emp.skill),float(emp.experience_years),int(emp.leadership),str(emp.specialization),_money(int(emp.salary)),leader_mark])
-	staff_label.text="\n".join(lines)
-	if PersonnelManager.candidate.is_empty(): candidate_label.text="Aucun candidat sélectionné."
+	if staff_label==null:
+		return
+	var payroll := 0
+	for employee in PersonnelManager.staff:
+		payroll += int(employee.get("salary", 0))
+	staff_label.text = "Effectif : %d personnes • masse salariale : %s €/mois" % [PersonnelManager.staff.size(), _money(payroll)]
+	_refresh_staff_cards()
+	if PersonnelManager.candidate.is_empty():
+		candidate_label.text="Aucun candidat sélectionné."
 	else:
-		var c:=PersonnelManager.candidate; candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | salaire : %s €/mois | prime d'embauche : %s €" % [str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),_money(int(c.salary)),_money(int(c.salary)*2)]
+		var c:=PersonnelManager.candidate
+		candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | salaire : %s €/mois | prime d'embauche : %s €" % [str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),_money(int(c.salary)),_money(int(c.salary)*2)]
+
+func _refresh_staff_cards():
+	if staff_card_grid == null:
+		return
+	for child in staff_card_grid.get_children():
+		child.queue_free()
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	for employee in PersonnelManager.staff:
+		var emp: Dictionary = employee
+		var leader_departments: Array[String] = []
+		for dept_value in CompanyManager.departments.keys():
+			var dept := str(dept_value)
+			if str(CompanyManager.departments[dept].leader_id) == str(emp.get("id", "")):
+				leader_departments.append(dept)
+		var badge := "RESPONSABLE" if not leader_departments.is_empty() else str(emp.get("department", "ÉQUIPE")).to_upper()
+		var subtitle := "%s • %s • %.1f ans" % [
+			str(emp.get("role", "Employé")),
+			str(emp.get("specialization", "généraliste")),
+			float(emp.get("experience_years", 0.0))
+		]
+		if not leader_departments.is_empty():
+			subtitle += "\nResponsable : " + ", ".join(leader_departments)
+		var metrics := [
+			{"label":"COMPÉTENCE", "value":"%d" % int(emp.get("skill", 0))},
+			{"label":"LEADERSHIP", "value":"%d" % int(emp.get("leadership", 0))},
+			{"label":"SALAIRE", "value":"%s €" % _money(int(emp.get("salary", 0)))}
+		]
+		var card: Control = card_script.new() as Control
+		staff_card_grid.add_child(card)
+		card.call("configure", str(emp.get("id", "")), str(emp.get("name", "Employé")), subtitle, badge, metrics, "")
 
 func _generate_candidate(): PersonnelManager.generate_candidate(_meta(recruit_department)); _refresh_personnel()
 func _hire_candidate():
