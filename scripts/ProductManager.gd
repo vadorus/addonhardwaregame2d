@@ -97,7 +97,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
 		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0,
-		"cpu_support":CPU_SUPPORT.initial_state(metrics, product.get("cpu_design", {}))
+		"cpu_support":CPU_SUPPORT.initial_state(metrics, project.get("cpu_design", {}))
 	}
 	_next_id += 1
 	products.append(product)
