@@ -142,6 +142,10 @@ func get_production_execution_modifier() -> float:
 func get_support_execution_modifier() -> float:
 	return _department_execution_modifier("Support", "support", 0.86)
 
+func get_production_cost_modifier() -> float:
+	var execution := get_production_execution_modifier()
+	return clampf(1.10 - (execution - 0.84) * 0.45, 0.94, 1.10)
+
 func get_awareness_bonus() -> float:
 	var campaign_awareness := float(get_marketing_campaign().get("awareness", 0.02))
 	return campaign_awareness * get_marketing_execution_modifier()
