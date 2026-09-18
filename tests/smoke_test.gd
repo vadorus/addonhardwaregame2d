@@ -40,7 +40,24 @@ func _ready() -> void:
 	if autonomous_with_camille <= autonomous_without_leader:
 		_fail("A strong department leader did not improve autonomous management")
 		return
+	if PersonnelManager.dismiss_employee(str(PersonnelManager.staff[0].get("id", ""))):
+		_fail("Founding employee could be dismissed")
+		return
 	var founder_rd_score := PersonnelManager.team_score("R&D", "cpu")
+	PersonnelManager._add_employee("Junior Test", "Stagiaire R&D", "R&D", 35, 0.0, "cpu", 15, 2400)
+	var junior_id := str(PersonnelManager.staff[-1].get("id", ""))
+	var junior_salary := int(PersonnelManager.staff[-1].get("salary", 0))
+	CompanyManager.set_department_leader("R&D", junior_id)
+	var money_before_dismissal := Economy.money
+	if not PersonnelManager.dismiss_employee(junior_id):
+		_fail("Non-founder employee could not be dismissed")
+		return
+	if Economy.money != money_before_dismissal - junior_salary:
+		_fail("Employee dismissal did not charge one month of severance")
+		return
+	if str(CompanyManager.departments["R&D"].get("leader_id", "")) != "":
+		_fail("Dismissed department leader was not cleared")
+		return
 	PersonnelManager._add_employee("Junior Test", "Stagiaire R&D", "R&D", 35, 0.0, "cpu", 15, 2400)
 	var expanded_rd_score := PersonnelManager.team_score("R&D", "cpu")
 	if expanded_rd_score + 0.001 < founder_rd_score:
