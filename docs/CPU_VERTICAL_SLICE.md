@@ -2,7 +2,7 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
-## État d’implémentation — V0.2.12-preview.7
+## État d’implémentation — V0.2.12-preview.8
 
 Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer.
 
@@ -17,6 +17,8 @@ Le rendement dépend de la fiabilité finale, de la complexité, du procédé et
 Depuis la preview.6, la chaîne industrielle est également jouable via contrat industriel, packaging et couverture de test. Après lancement, chaque CPU possède une qualité de microcode, une couverture de compatibilité et une dette de support. Des incidents logiciels peuvent apparaître et imposer un choix entre hotfix rapide, correctif validé et programme de compatibilité, avec coût, délai et éventuel compromis de performance.
 
 Depuis la preview.7, les phases R&D, l'analyse SAV, les partenariats industriels et les correctifs logiciels peuvent produire des découvertes d'équipe. Le joueur choisit entre exploiter immédiatement une piste pour un petit gain ou financer une recherche dérivée de deux mois pour créer un savoir-faire durable réutilisable dans les générations suivantes.
+
+Depuis la preview.8, l'IPC cible et la stratégie de compatibilité de plateforme sont des choix explicites dès la conception. Un IPC plus ambitieux augmente performance, coût, complexité et risque. Préserver une plateforme améliore la compatibilité et la stabilité logicielle initiales ; une rupture de plateforme augmente le potentiel d'innovation mais crée davantage de travail microcode et firmware.
 
 ## 1. Ce que le joueur fabrique réellement
 
