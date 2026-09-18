@@ -2482,11 +2482,42 @@ func _repay_financing():
 	_refresh_all()
 
 func _refresh_leader_choices():
-	if leader_select==null or department_select==null: return
-	var dept:=_meta(department_select); leader_select.clear(); leader_select.add_item("Aucun"); leader_select.set_item_metadata(0,"")
-	for emp in PersonnelManager.staff:
-		leader_select.add_item("%s — L%d / Comp%d / %.1f ans" % [str(emp.name),int(emp.leadership),int(emp.skill),float(emp.experience_years)]); leader_select.set_item_metadata(leader_select.item_count-1,str(emp.id))
-	if CompanyManager.departments.has(dept): _select_meta(autonomy_select,str(CompanyManager.departments[dept].autonomy)); _select_meta(leader_select,str(CompanyManager.departments[dept].leader_id))
+	if leader_select == null or department_select == null:
+		return
+	var dept := _meta(department_select)
+	leader_select.clear()
+	leader_select.add_item("Aucun responsable")
+	leader_select.set_item_metadata(0, "")
+
+	var matching: Array = []
+	var others: Array = []
+	for emp_value in PersonnelManager.staff:
+		var emp: Dictionary = emp_value
+		if str(emp.get("department", "")) == dept:
+			matching.append(emp)
+		else:
+			others.append(emp)
+
+	for emp in matching:
+		leader_select.add_item("%s — %s • L%d • Comp%d" % [
+			str(emp.get("name", "Employé")),
+			str(emp.get("role", dept)),
+			int(emp.get("leadership", 0)),
+			int(emp.get("skill", 0))
+		])
+		leader_select.set_item_metadata(leader_select.item_count - 1, str(emp.get("id", "")))
+
+	for emp in others:
+		leader_select.add_item("↳ %s — hors %s • L%d" % [
+			str(emp.get("name", "Employé")),
+			dept,
+			int(emp.get("leadership", 0))
+		])
+		leader_select.set_item_metadata(leader_select.item_count - 1, str(emp.get("id", "")))
+
+	if CompanyManager.departments.has(dept):
+		_select_meta(autonomy_select, str(CompanyManager.departments[dept].autonomy))
+		_select_meta(leader_select, str(CompanyManager.departments[dept].leader_id))
 
 func _apply_department():
 	var dept:=_meta(department_select); CompanyManager.set_department_autonomy(dept,_meta(autonomy_select)); CompanyManager.set_department_leader(dept,_meta(leader_select)); status_label.text="Organisation du département %s mise à jour." % dept; _refresh_all()
