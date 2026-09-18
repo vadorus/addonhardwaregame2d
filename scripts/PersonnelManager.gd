@@ -110,26 +110,13 @@ func team_score(department: String, specialization: String = "") -> float:
 		return 20.0
 
 	var best_contribution := 0.0
-	var support_total := 0.0
-	var contributions: Array[float] = []
+	var total_contribution := 0.0
 	for emp_value in members:
 		var emp: Dictionary = emp_value
 		var contribution := _employee_contribution(emp, specialization)
-		contributions.append(contribution)
 		best_contribution = maxf(best_contribution, contribution)
-	for contribution in contributions:
-		if is_equal_approx(contribution, best_contribution):
-			best_contribution = contribution
-			continue
-		support_total += contribution
-	if contributions.size() > 1:
-		var best_removed := false
-		support_total = 0.0
-		for contribution in contributions:
-			if not best_removed and is_equal_approx(contribution, best_contribution):
-				best_removed = true
-				continue
-			support_total += contribution
+		total_contribution += contribution
+	var support_total := maxf(total_contribution - best_contribution, 0.0)
 
 	var cohesion := float(CompanyManager.departments.get(department, {}).get("cohesion", 30.0))
 	var depth_bonus := minf(float(members.size()) * 1.5, 9.0)
