@@ -111,7 +111,7 @@ func _badge_color(value: String) -> Color:
 	match value.to_upper():
 		"LAUNCHED", "EN VENTE", "VOUS", "RECOMMANDÉ", "ACTIVE":
 			return GREEN
-		"READY", "PRÊT", "RESPONSABLE", "PENDING":
+		"READY", "PRÊT", "RESPONSABLE", "PENDING", "À RENOUVELER":
 			return AMBER
 		"COMPLETED":
 			return CYAN
