@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — Tech Empire 0.2.12-preview.3.**
+**Projet actif — Tech Empire 0.2.12-preview.4.**
 
 La vertical slice jouable est volontairement centrée sur la **gamme CPU**. Les futures gammes (GPU, RAM, cartes mères et autres produits technologiques) restent hors périmètre tant que la boucle CPU n'est pas suffisamment profonde, lisible et équilibrée.
 
@@ -102,7 +102,7 @@ Les paramètres communs incluent le volume, l'échelle UI et la limite FPS.
 
 Version courante :
 
-- jeu : **0.2.12-preview.3** ;
+- jeu : **0.2.12-preview.4** ;
 - Android : versionCode **33** ;
 - Windows : file version **0.2.12.2**.
 
@@ -110,8 +110,8 @@ Les exports excluent les répertoires de développement `tests/`, `docs/` et `to
 
 Le workflow automatique `.github/workflows/preview-builds-v2.yml` produit :
 
-- `TechEmpire-Windows-v0.2.12-preview.3` ;
-- `TechEmpire-Android-v0.2.12-preview.3`.
+- `TechEmpire-Windows-v0.2.12-preview.4` ;
+- `TechEmpire-Android-v0.2.12-preview.4`.
 
 Le workflow de future signature Android permanente est conservé séparément en déclenchement manuel.
 
