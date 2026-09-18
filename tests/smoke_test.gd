@@ -179,6 +179,27 @@ func _ready() -> void:
 	if int(apex_model.production_capacity) != apex_max_capacity:
 		_fail("CPU launch ignored the binning capacity limit")
 		return
+	var fresh_demand := MarketManager.estimate_consumer_demand(apex_model)
+	apex_model["months_on_market"] = 24
+	var aged_demand := MarketManager.estimate_consumer_demand(apex_model)
+	if float(aged_demand.get("relevance", 1.0)) >= float(fresh_demand.get("relevance", 1.0)):
+		_fail("Product relevance did not decay with age")
+		return
+	if int(aged_demand.get("units", 0)) >= int(fresh_demand.get("units", 0)):
+		_fail("Aged product demand did not decline")
+		return
+	apex_model["months_on_market"] = 0
+	var initial_competitor_generation := 1
+	for competitor in MarketManager.competitors.get("CPU", []):
+		initial_competitor_generation = maxi(initial_competitor_generation, int(competitor.get("generation", 1)))
+	for _month in range(20):
+		MarketManager.process_month(ProductManager.products)
+	var evolved_generation := 1
+	for competitor in MarketManager.competitors.get("CPU", []):
+		evolved_generation = maxi(evolved_generation, int(competitor.get("generation", 1)))
+	if evolved_generation <= initial_competitor_generation:
+		_fail("Competitors did not release a new generation")
+		return
 	var product_round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
 	ProductManager.load_state(product_round_trip)

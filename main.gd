@@ -1464,7 +1464,11 @@ func _refresh_dashboard():
 		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
 		dashboard_action_button.text = "Analyser le marché"
 		dashboard_target_tab = 5
-		dashboard_next_step_label.text = "Analysez les ventes et préparez la génération suivante quand vous êtes prêt."
+		var market_relevance := MarketManager.product_market_relevance(launched_product)
+		if market_relevance < 0.72:
+			dashboard_next_step_label.text = "Votre CPU vieillit face aux nouvelles générations. Préparez son successeur."
+		else:
+			dashboard_next_step_label.text = "Analysez les ventes et préparez la génération suivante quand vous êtes prêt."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
 	else:
@@ -1775,6 +1779,7 @@ func _refresh_market():
 	lines.append("\nÉvaluation par clientèle :")
 	for seg in GameData.SEGMENTS.keys(): lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
+	lines.append("Pertinence marché : %.0f%% • %d mois depuis le lancement" % [MarketManager.product_market_relevance(p) * 100.0, int(p.get("months_on_market", 0))])
 	market_label.text="\n".join(lines)
 	var c_lines:=[]
 	for c in MarketManager.contracts:

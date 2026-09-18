@@ -2,10 +2,13 @@ extends Node
 
 signal market_changed
 signal opportunity_created(contract)
+signal competitor_generation_released(competitor)
 
 var competitors: Dictionary = {}
 var contracts: Array = []
 var _next_contract_id := 1
+var market_months := 0
+var months_until_competitor_launch := 14
 var rng := RandomNumberGenerator.new()
 
 func _ready():
@@ -14,6 +17,8 @@ func _ready():
 func reset():
 	contracts = []
 	_next_contract_id = 1
+	market_months = 0
+	months_until_competitor_launch = 14
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
@@ -23,9 +28,9 @@ func _make_competitors(sector: String) -> Array:
 	var sd: Dictionary = GameData.SECTORS[sector]
 	var ref_price := float(sd.reference_price)
 	return [
-		{"name":"Aster %s" % sector,"company":"Aster Systems","price":int(ref_price*0.82),"metrics":_metrics(62,70,68,61,55,58,57)},
-		{"name":"Helix %s Pro" % sector,"company":"Helix Global","price":int(ref_price*1.22),"metrics":_metrics(82,71,79,74,78,76,64)},
-		{"name":"Quantum %s" % sector,"company":"Quantum Works","price":int(ref_price*1.01),"metrics":_metrics(74,77,73,68,72,66,70)}
+		{"name":"Aster %s G1" % sector,"base_name":"Aster %s" % sector,"company":"Aster Systems","price":int(ref_price*0.82),"generation":1,"generation_launched_month":0,"metrics":_metrics(62,70,68,61,55,58,57)},
+		{"name":"Helix %s Pro G1" % sector,"base_name":"Helix %s Pro" % sector,"company":"Helix Global","price":int(ref_price*1.22),"generation":1,"generation_launched_month":0,"metrics":_metrics(82,71,79,74,78,76,64)},
+		{"name":"Quantum %s G1" % sector,"base_name":"Quantum %s" % sector,"company":"Quantum Works","price":int(ref_price*1.01),"generation":1,"generation_launched_month":0,"metrics":_metrics(74,77,73,68,72,66,70)}
 	]
 
 func _metrics(perf: float, eff: float, rel: float, use: float, innov: float, eco: float, sustain: float) -> Dictionary:
@@ -89,11 +94,23 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		competitor_avg += _evaluate_competitor(cp, target)
 	competitor_avg /= maxf(float(comps.size()), 1.0)
 	var awareness := CompanyManager.get_awareness_bonus()
-	var share: float = clampf(0.08 + (score - competitor_avg) * 0.009 + awareness * 0.42, 0.01, 0.52)
+	var relevance := product_market_relevance(product)
+	var effective_score := score - (1.0 - relevance) * 32.0
+	var share: float = clampf(0.08 + (effective_score - competitor_avg) * 0.009 + awareness * 0.42, 0.01, 0.52)
 	var units := int(float(sd.market_units) * share)
 	var expectation: float = 50.0 + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
-	var gap := score - expectation
-	return {"units":units,"score":score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
+	var gap := effective_score - expectation
+	return {"units":units,"score":score,"effective_score":effective_score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap,"relevance":relevance}
+
+func product_market_relevance(product: Dictionary) -> float:
+	var months_old := maxi(int(product.get("months_on_market", 0)) - 6, 0)
+	var natural_relevance := 1.0 - float(months_old) * 0.025
+	var launch_month := int(product.get("market_launch_month", maxi(market_months - int(product.get("months_on_market", 0)), 0)))
+	var newer_generations := 0
+	for competitor in competitors.get(str(product.get("sector", "CPU")), []):
+		if int(competitor.get("generation_launched_month", 0)) > launch_month:
+			newer_generations += 1
+	return clampf(natural_relevance - float(newer_generations) * 0.06, 0.45, 1.0)
 
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}
@@ -194,17 +211,67 @@ func advance_contract(product_id: String):
 	market_changed.emit()
 
 func process_month(products: Array):
+	market_months += 1
+	months_until_competitor_launch -= 1
+	if months_until_competitor_launch <= 0:
+		var active_sectors := GameData.get_active_sector_keys()
+		if not active_sectors.is_empty():
+			_release_competitor_generation(str(active_sectors[rng.randi_range(0, active_sectors.size() - 1)]))
+		months_until_competitor_launch = rng.randi_range(14, 20)
 	for product in products:
 		if str(product.status) == "LAUNCHED":
 			maybe_generate_b2b(product)
 
+func _release_competitor_generation(sector: String):
+	var rows: Array = competitors.get(sector, [])
+	if rows.is_empty():
+		return
+	var index := rng.randi_range(0, rows.size() - 1)
+	var competitor: Dictionary = rows[index]
+	var generation := int(competitor.get("generation", 1)) + 1
+	var metrics: Dictionary = competitor.get("metrics", {}).duplicate(true)
+	metrics["performance"] = clampf(float(metrics.get("performance", 60.0)) + rng.randf_range(4.0, 9.0), 0.0, 98.0)
+	metrics["efficiency"] = clampf(float(metrics.get("efficiency", 60.0)) + rng.randf_range(2.0, 6.0), 0.0, 98.0)
+	metrics["reliability"] = clampf(float(metrics.get("reliability", 60.0)) + rng.randf_range(2.0, 5.0), 0.0, 98.0)
+	metrics["innovation"] = clampf(float(metrics.get("innovation", 60.0)) + rng.randf_range(3.0, 8.0), 0.0, 98.0)
+	metrics["sustainability"] = clampf(float(metrics.get("sustainability", 55.0)) + rng.randf_range(1.0, 4.0), 0.0, 98.0)
+	competitor["metrics"] = metrics
+	competitor["generation"] = generation
+	competitor["generation_launched_month"] = market_months
+	var base_name := str(competitor.get("base_name", competitor.get("name", competitor.get("company", "Concurrent"))))
+	competitor["base_name"] = base_name
+	competitor["name"] = "%s G%d" % [base_name, generation]
+	var reference := float(GameData.SECTORS.get(sector, GameData.SECTORS.CPU).reference_price)
+	competitor["price"] = int(clampf(float(competitor.get("price", reference)) * rng.randf_range(0.96, 1.07), reference * 0.65, reference * 1.45))
+	rows[index] = competitor
+	competitors[sector] = rows
+	CompanyManager.add_alert("%s dévoile une nouvelle génération %s." % [str(competitor.get("company", "Un concurrent")), str(competitor.get("name", "produit"))])
+	MediaManager.publish_business_event(
+		"%s renouvelle sa gamme %s" % [str(competitor.get("company", "Un concurrent")), sector],
+		"La nouvelle génération relève les performances du marché. Les produits plus anciens vont progressivement perdre en attractivité."
+	)
+	competitor_generation_released.emit(competitor.duplicate(true))
+	market_changed.emit()
+
 func get_state() -> Dictionary:
-	return {"competitors":competitors,"contracts":contracts,"next_contract_id":_next_contract_id,"rng_seed":rng.seed,"rng_state":rng.state}
+	return {"competitors":competitors,"contracts":contracts,"next_contract_id":_next_contract_id,"market_months":market_months,"months_until_competitor_launch":months_until_competitor_launch,"rng_seed":rng.seed,"rng_state":rng.state}
 
 func load_state(state: Dictionary):
 	competitors = state.get("competitors", {}).duplicate(true)
 	contracts = state.get("contracts", []).duplicate(true)
 	_next_contract_id = int(state.get("next_contract_id", 1))
+	market_months = int(state.get("market_months", 0))
+	months_until_competitor_launch = int(state.get("months_until_competitor_launch", 14))
+	for sector_value in competitors.keys():
+		var sector := str(sector_value)
+		var rows: Array = competitors[sector]
+		for i in range(rows.size()):
+			var competitor: Dictionary = rows[i]
+			competitor["generation"] = maxi(int(competitor.get("generation", 1)), 1)
+			competitor["generation_launched_month"] = int(competitor.get("generation_launched_month", 0))
+			competitor["base_name"] = str(competitor.get("base_name", competitor.get("name", competitor.get("company", "Concurrent"))))
+			rows[i] = competitor
+		competitors[sector] = rows
 	rng.seed = int(state.get("rng_seed", 43021))
 	rng.state = int(state.get("rng_state", rng.state))
 	market_changed.emit()

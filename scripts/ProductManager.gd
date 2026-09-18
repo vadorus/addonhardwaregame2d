@@ -119,6 +119,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.production_capacity = clampi(production_capacity, 1, max_capacity)
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
+			product["market_launch_month"] = MarketManager.market_months
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
 			product_launched.emit(product)
 			products_changed.emit()
