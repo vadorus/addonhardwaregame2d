@@ -52,6 +52,7 @@ var rd_approach: OptionButton
 var rd_focus: OptionButton
 var rd_budget: SpinBox
 var cpu_generation_select: OptionButton
+var cpu_generation_card_grid: GridContainer
 var cpu_generation_summary_label: Label
 var active_cpu_generation_plan: Dictionary = {}
 var rd_cores: HSlider
@@ -705,6 +706,11 @@ func _create_research_tab():
 	request_generation.custom_minimum_size.y = 44
 	request_generation.pressed.connect(_request_cpu_generation_plans)
 	configuration_box.add_child(request_generation)
+	cpu_generation_card_grid = GridContainer.new()
+	cpu_generation_card_grid.columns = 3
+	cpu_generation_card_grid.add_theme_constant_override("h_separation", 8)
+	cpu_generation_card_grid.add_theme_constant_override("v_separation", 8)
+	configuration_box.add_child(cpu_generation_card_grid)
 	cpu_generation_select = OptionButton.new()
 	cpu_generation_select.item_selected.connect(func(_index): _refresh_generation_plan_summary())
 	_add_labeled_control(configuration_box, "Plans proposés", cpu_generation_select)
@@ -951,7 +957,43 @@ func _refresh_generation_plan_options():
 		_select_meta(cpu_generation_select, previous_id)
 	elif cpu_generation_select.item_count > 0:
 		cpu_generation_select.select(0)
+	_refresh_generation_plan_cards()
 	_refresh_generation_plan_summary()
+
+func _refresh_generation_plan_cards():
+	if cpu_generation_card_grid == null:
+		return
+	for child in cpu_generation_card_grid.get_children():
+		child.queue_free()
+	var proposals := ResearchManager.get_cpu_generation_proposals()
+	if proposals.is_empty():
+		return
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	for proposal_value in proposals:
+		var proposal: Dictionary = proposal_value
+		var badge := "RECOMMANDÉ" if bool(proposal.get("recommended", false)) else str(proposal.get("tag", "PLAN"))
+		var subtitle := "%s\n%s" % [
+			"G%d • %s" % [int(proposal.get("generation_index", 1)), str(proposal.get("promise", ""))],
+			"Confiance %.0f/100 • cible %.0f/100" % [float(proposal.get("confidence", 0.0)), float(proposal.get("target_fit", 0.0))]
+		]
+		var metrics := [
+			{"label":"DURÉE", "value":"~%d mois" % int(proposal.get("estimated_months", 0))},
+			{"label":"COÛT", "value":"%s €" % _money(int(proposal.get("program_cost", 0)))},
+			{"label":"RISQUE", "value":"%.0f/100" % float(proposal.get("risk", 0.0))}
+		]
+		var card: Control = card_script.new() as Control
+		cpu_generation_card_grid.add_child(card)
+		card.call("configure", str(proposal.get("id", "")), str(proposal.get("title", "Architecture")), subtitle, badge, metrics, "Sélectionner")
+		card.connect("entity_selected", Callable(self, "_select_generation_plan_from_card"))
+
+func _select_generation_plan_from_card(plan_id: String):
+	if cpu_generation_select == null:
+		return
+	_select_meta(cpu_generation_select, plan_id)
+	_refresh_generation_plan_summary()
+	var proposal := ResearchManager.get_cpu_generation_proposal(plan_id)
+	if not proposal.is_empty():
+		status_label.text = "Plan sélectionné : %s. Vous pouvez lire le détail puis l'appliquer." % str(proposal.get("title", plan_id))
 
 func _selected_cpu_generation_plan() -> Dictionary:
 	if cpu_generation_select == null or cpu_generation_select.item_count == 0:
@@ -1538,6 +1580,8 @@ func _update_responsive_layout():
 		market_benchmark_grid.columns = 1 if compact else 4
 	if staff_card_grid != null:
 		staff_card_grid.columns = 1 if compact else 3
+	if cpu_generation_card_grid != null:
+		cpu_generation_card_grid.columns = 1 if compact else 3
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
