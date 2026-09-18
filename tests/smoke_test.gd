@@ -266,8 +266,13 @@ func _ready() -> void:
 	if low_price_forecast.is_empty() or high_price_forecast.is_empty():
 		_fail("Launch forecast was not generated")
 		return
-	if int(low_price_forecast.get("requested_units", 0)) < int(high_price_forecast.get("requested_units", 0)):
-		_fail("Higher launch price unexpectedly increased requested consumer demand")
+	var low_requested := int(low_price_forecast.get("requested_units", 0))
+	var high_requested := int(high_price_forecast.get("requested_units", 0))
+	if low_requested <= high_requested:
+		_fail("Higher launch price did not reduce requested consumer demand")
+		return
+	if high_requested > int(round(float(low_requested) * 0.90)):
+		_fail("Price elasticity is too weak to create a meaningful volume tradeoff")
 		return
 	if float(low_price_forecast.get("utilization", -1.0)) < 0.0 or float(low_price_forecast.get("utilization", 2.0)) > 1.0:
 		_fail("Launch forecast utilization escaped the supported range")
