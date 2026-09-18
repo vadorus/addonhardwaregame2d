@@ -70,6 +70,7 @@ var lab_warning_label: Label
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
+var product_card_grid: GridContainer
 var product_price: SpinBox
 var product_capacity: SpinBox
 var product_industrialization_label: Label
@@ -1044,8 +1045,15 @@ func _refresh_cpu_preview():
 func _create_products_tab():
 	var scroll := _tab_scroll("Produits")
 	var box: VBoxContainer = scroll.get_child(0)
+	box.add_child(_section("Générations CPU"))
 	products_label=_rich_label(); box.add_child(products_label)
-	box.add_child(_section("Gamme CPU / industrialiser / lancer"))
+	box.add_child(_section("Modèles"))
+	product_card_grid = GridContainer.new()
+	product_card_grid.columns = 3
+	product_card_grid.add_theme_constant_override("h_separation", 10)
+	product_card_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(product_card_grid)
+	box.add_child(_section("Industrialiser / lancer"))
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
@@ -1509,6 +1517,8 @@ func _update_responsive_layout():
 		dashboard_project_grid.columns = 1 if narrow else 2
 	if dashboard_sector_grid != null:
 		dashboard_sector_grid.columns = 1 if compact else 4
+	if product_card_grid != null:
+		product_card_grid.columns = 1 if compact else 3
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -2022,13 +2032,8 @@ func _refresh_products():
 			float(generation.get("yield_rate", 0.0)) * 100.0, int(generation.get("model_ids", []).size()),
 			ready_count, launched_count, int(generation.get("future_model_slots", 0))
 		])
-	for product in ProductManager.products:
-		var product_tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
-		lines.append("  • %s [%s] — %s | coût %s € | prix %s € | ventes %s | satisfaction %.1f" % [
-			str(product.name), product_tier, str(product.status), _money(int(product.unit_cost)), _money(int(product.price)),
-			_money(int(product.units_sold_total)), float(product.customer_satisfaction)
-		])
-	products_label.text = "\n".join(lines) if not lines.is_empty() else "Aucun produit. Terminez d'abord un projet R&D."
+	products_label.text = "\n".join(lines) if not lines.is_empty() else "Aucune génération CPU. Terminez d'abord un projet R&D."
+	_refresh_product_cards()
 	product_select.clear()
 	for product in ProductManager.products:
 		var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
@@ -2038,6 +2043,41 @@ func _refresh_products():
 		_select_meta(product_select, current_id)
 	_refresh_product_details()
 	_refresh_market_product_options()
+
+func _refresh_product_cards():
+	if product_card_grid == null:
+		return
+	for child in product_card_grid.get_children():
+		child.queue_free()
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	for product in ProductManager.products:
+		var card := card_script.new()
+		product_card_grid.add_child(card)
+		var generation := int(product.get("generation_index", 1))
+		var tier := str(product.get("sku_label", "Modèle"))
+		var role := str(product.get("range_role", ""))
+		var status := str(product.get("status", "READY"))
+		var subtitle := "G%d • %s" % [generation, tier]
+		if not role.is_empty():
+			subtitle += " • " + role
+		var sales_text := _money(int(product.get("last_month_sales", 0)))
+		if int(product.get("last_month_sales", 0)) <= 0:
+			sales_text = _money(int(product.get("units_sold_total", 0)))
+		var metrics := [
+			{"label":"COÛT", "value":"%s €" % _money(int(product.get("unit_cost", 0)))},
+			{"label":"PRIX", "value":"%s €" % _money(int(product.get("price", 0)))},
+			{"label":"VENTES", "value":sales_text}
+		]
+		var action := "Configurer" if status == "READY" else "Voir le produit"
+		card.configure(str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, status, metrics, action)
+		card.entity_selected.connect(_select_product_from_card)
+
+func _select_product_from_card(product_id: String):
+	if product_select == null:
+		return
+	_select_meta(product_select, product_id)
+	_refresh_product_details()
+	status_label.text = "Produit sélectionné : %s" % str(ProductManager.get_product(product_id).get("name", product_id))
 
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
