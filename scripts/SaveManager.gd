@@ -1,15 +1,21 @@
 extends Node
 
 signal save_completed(ok, message)
+signal autosave_completed(ok)
 
 const SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
 
-func save_game():
-	if not CompanyManager.created:
-		save_completed.emit(false, "Aucune partie à sauvegarder.")
-		return
-	var state := {
+func _ready():
+	if not TimeManager.month_changed.is_connected(_on_month_changed):
+		TimeManager.month_changed.connect(_on_month_changed)
+
+func _on_month_changed(_month: int, _year: int):
+	if CompanyManager.created:
+		autosave_game()
+
+func _build_state() -> Dictionary:
+	return {
 		"version":SAVE_VERSION,
 		"time":TimeManager.get_state(),
 		"economy":Economy.get_state(),
@@ -22,13 +28,28 @@ func save_game():
 		"market":MarketManager.get_state(),
 		"media":MediaManager.get_state()
 	}
+
+func _write_state() -> bool:
+	if not CompanyManager.created:
+		return false
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
-		save_completed.emit(false, "Impossible d'ouvrir le fichier de sauvegarde.")
-		return
-	file.store_string(JSON.stringify(state))
+		return false
+	file.store_string(JSON.stringify(_build_state()))
 	file.close()
-	save_completed.emit(true, "Partie sauvegardée.")
+	return true
+
+func save_game():
+	if not CompanyManager.created:
+		save_completed.emit(false, "Aucune partie à sauvegarder.")
+		return
+	var ok := _write_state()
+	save_completed.emit(ok, "Partie sauvegardée." if ok else "Impossible d'ouvrir le fichier de sauvegarde.")
+
+func autosave_game() -> bool:
+	var ok := _write_state()
+	autosave_completed.emit(ok)
+	return ok
 
 func load_game() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):

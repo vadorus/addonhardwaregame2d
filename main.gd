@@ -122,6 +122,30 @@ var rd_decision_label: Label
 var rd_decision_buttons: Array[Button] = []
 var decision_previous_time_scale := 1.0
 
+func _notification(what: int):
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if CompanyManager.created:
+			SaveManager.autosave_game()
+	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_handle_back_request()
+
+func _handle_back_request():
+	if navigation_layer != null and navigation_layer.visible:
+		navigation_layer.visible = false
+		return
+	if settings_layer != null and settings_layer.visible:
+		settings_layer.visible = false
+		return
+	if month_layer != null and month_layer.visible:
+		month_layer.visible = false
+		return
+	if tabs != null and tabs.current_tab != 0:
+		_show_tab(0)
+		return
+	if CompanyManager.created:
+		SaveManager.autosave_game()
+	get_tree().quit()
+
 func _ready():
 	theme = _create_app_theme()
 	_build_ui()

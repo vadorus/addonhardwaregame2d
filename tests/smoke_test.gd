@@ -27,6 +27,12 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
+	if not SaveManager.autosave_game():
+		_fail("Autosave could not write the current game")
+		return
+	if not FileAccess.file_exists(SaveManager.SAVE_PATH):
+		_fail("Autosave file was not created")
+		return
 	var initial_economy_state := Economy.get_state().duplicate(true)
 	if not Economy.request_financing(250_000):
 		_fail("Could not obtain initial financing")
