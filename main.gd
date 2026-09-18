@@ -2051,7 +2051,7 @@ func _refresh_product_cards():
 		child.queue_free()
 	var card_script: Script = load("res://ui/EntityCard.gd")
 	for product in ProductManager.products:
-		var card := card_script.new()
+		var card: Control = card_script.new() as Control
 		product_card_grid.add_child(card)
 		var generation := int(product.get("generation_index", 1))
 		var tier := str(product.get("sku_label", "Modèle"))
@@ -2069,8 +2069,8 @@ func _refresh_product_cards():
 			{"label":"VENTES", "value":sales_text}
 		]
 		var action := "Configurer" if status == "READY" else "Voir le produit"
-		card.configure(str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, status, metrics, action)
-		card.entity_selected.connect(_select_product_from_card)
+		card.call("configure", str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, status, metrics, action)
+		card.connect("entity_selected", Callable(self, "_select_product_from_card"))
 
 func _select_product_from_card(product_id: String):
 	if product_select == null:
