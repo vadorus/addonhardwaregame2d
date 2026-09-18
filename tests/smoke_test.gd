@@ -513,6 +513,16 @@ func _ready() -> void:
 	if not MarketManager.should_renew_product(apex_model):
 		_fail("A clearly aged CPU was not marked for renewal")
 		return
+	apex_model["renewal_alerted"] = false
+	if not ProductManager._maybe_announce_renewal(apex_model):
+		_fail("Aged CPU did not emit its renewal announcement")
+		return
+	if ProductManager._maybe_announce_renewal(apex_model):
+		_fail("CPU renewal announcement was emitted more than once")
+		return
+	if not bool(apex_model.get("renewal_alerted", false)):
+		_fail("CPU renewal announcement was not persisted on the product")
+		return
 	if float(aged_demand.get("relevance", 1.0)) >= float(fresh_demand.get("relevance", 1.0)):
 		_fail("Product relevance did not decay with age")
 		return
@@ -520,6 +530,7 @@ func _ready() -> void:
 		_fail("Aged product demand did not decline")
 		return
 	apex_model["months_on_market"] = 0
+	apex_model["renewal_alerted"] = false
 	var initial_competitor_generation := 1
 	for competitor in MarketManager.competitors.get("CPU", []):
 		initial_competitor_generation = maxi(initial_competitor_generation, int(competitor.get("generation", 1)))
