@@ -2039,6 +2039,25 @@ func _current_industrialization_choices() -> Dictionary:
 		"testing":_meta(product_testing_select)
 	})
 
+func _industrialization_choice_summary(choices: Dictionary) -> String:
+	var normalized := INDUSTRIALIZATION.normalize_choices(choices)
+	var contract_data := INDUSTRIALIZATION.contract(str(normalized.contract))
+	var packaging_data := INDUSTRIALIZATION.packaging(str(normalized.packaging))
+	var testing_data := INDUSTRIALIZATION.testing(str(normalized.testing))
+	return "%s • %s • %s" % [
+		str(contract_data.get("label", normalized.contract)),
+		str(packaging_data.get("label", normalized.packaging)),
+		str(testing_data.get("label", normalized.testing))
+	]
+
+func _industrialization_factor_summary(profile: Dictionary) -> String:
+	return "investissement ×%.2f • coût variable ×%.2f • capacité ×%.2f • retours ×%.2f" % [
+		float(profile.get("setup_factor", 1.0)),
+		float(profile.get("unit_cost_factor", 1.0)),
+		float(profile.get("capacity_factor", 1.0)),
+		float(profile.get("return_factor", 1.0))
+	]
+
 func _set_industrialization_controls(input: Dictionary, editable: bool):
 	var choices := INDUSTRIALIZATION.normalize_choices(input)
 	if product_contract_select != null:
@@ -3067,8 +3086,11 @@ func _refresh_launch_financials():
 	var product := ProductManager.get_product(_meta(product_select))
 	if product.is_empty():
 		return
-	var margin := int(product_price.value) - int(product.get("unit_cost", 0))
-	if str(product.get("status", "")) == "DISCONTINUED":
+	var status := str(product.get("status", ""))
+	var selected_choices := _current_industrialization_choices() if status == "READY" else ProductManager.get_industrialization_choices(str(product.get("id", "")))
+	var effective_unit_cost := ProductManager.effective_unit_cost(str(product.get("id", "")), selected_choices)
+	var margin := int(product_price.value) - effective_unit_cost
+	if status == "DISCONTINUED":
 		product_industrialization_label.text = "Fin de vente • %s mois commercialisés • %s unités vendues au total.\nLa ligne de production est arrêtée et ne génère plus de frais fixes." % [
 			int(product.get("months_on_market", 0)),
 			_money(int(product.get("units_sold_total", 0)))
@@ -3086,23 +3108,31 @@ func _refresh_launch_financials():
 		var expected_units := int(forecast.get("expected_units", 0))
 		var monthly_result := int(forecast.get("monthly_result", 0))
 		var price_factor := float(forecast.get("price_factor", 1.0))
+		var profile := ProductManager.industrialization_profile(str(product.get("id", "")))
+		var stored_choices := ProductManager.get_industrialization_choices(str(product.get("id", "")))
 		var affordable := expansion_cost <= Economy.money
-		product_industrialization_label.text = "Ligne active : %s unités/mois actuellement • cible %s • capacité utile %s\nAjustement : %s € maintenant • frais fixes cible %s €/mois • marge %s €/unité%s\nPrévision : ~%s ventes/mois • résultat produit ~%s €/mois • demande ×%.2f" % [
+		product_industrialization_label.text = "Chaîne figée : %s\n%s\nCoût industriel réel : %s €/unité • marge %s €/unité\nLigne active : %s unités/mois actuellement • cible %s • capacité utile %s\nAjustement : %s € maintenant • frais fixes cible %s €/mois%s\nPrévision : ~%s ventes/mois • résultat produit ~%s €/mois • retours ~%.1f%% • demande ×%.2f" % [
+			_industrialization_choice_summary(stored_choices),
+			_industrialization_factor_summary(profile),
+			_money(effective_unit_cost),
+			_money(margin),
 			_money(int(product.get("production_capacity", 0))),
 			_money(int(update.get("target_capacity", product_capacity.value))),
 			_money(effective_capacity),
 			_money(expansion_cost),
 			_money(target_overhead),
-			_money(margin),
 			"" if affordable else " • TRÉSORERIE INSUFFISANTE",
 			_money(expected_units),
 			_money(monthly_result),
+			float(forecast.get("return_rate", 0.0)) * 100.0,
 			price_factor
 		]
 		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if affordable and monthly_result >= 0 and margin > 0 else (APP_AMBER if affordable else APP_RED))
 		return
-	var financials := ProductManager.launch_financials(str(product.get("id", "")), int(product_capacity.value))
-	var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value))
+	var choices := _current_industrialization_choices()
+	var profile := INDUSTRIALIZATION.evaluate(choices)
+	var financials := ProductManager.launch_financials(str(product.get("id", "")), int(product_capacity.value), choices)
+	var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value), choices)
 	if financials.is_empty() or forecast.is_empty():
 		return
 	var investment := int(financials.get("investment", 0))
@@ -3122,9 +3152,12 @@ func _refresh_launch_financials():
 		price_effect = "demande réduite"
 	elif price_factor > 1.08:
 		price_effect = "volume stimulé"
-	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nProduction : capacité nominale %s • capacité utile %s (équipe %.0f%%)\nPrévision : ~%s ventes/mois • ligne utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois\nEffet du prix : %s (demande ×%.2f)" % [
+	product_industrialization_label.text = "Chaîne : %s\n%s\nIndustrialisation : %s € maintenant • %s €/mois de ligne réservée • coût réel %s €/unité • marge %s €/unité%s\nProduction : capacité nominale %s • capacité utile %s (équipe %.0f%%)\nPrévision : ~%s ventes/mois • ligne utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois • retours ~%.1f%%\nEffet du prix : %s (demande ×%.2f)" % [
+		_industrialization_choice_summary(choices),
+		_industrialization_factor_summary(profile),
 		_money(investment),
 		_money(overhead),
+		_money(effective_unit_cost),
 		_money(margin),
 		"" if affordable else " • TRÉSORERIE INSUFFISANTE",
 		_money(int(product_capacity.value)),
@@ -3134,6 +3167,7 @@ func _refresh_launch_financials():
 		utilization,
 		market_share,
 		_money(monthly_result),
+		float(forecast.get("return_rate", 0.0)) * 100.0,
 		price_effect,
 		price_factor
 	]
@@ -3194,7 +3228,8 @@ func _launch_product():
 			status_label.text = "Impossible de modifier cette offre."
 		_refresh_all()
 		return
-	var financials := ProductManager.launch_financials(product_id, int(product_capacity.value))
+	var choices := _current_industrialization_choices()
+	var financials := ProductManager.launch_financials(product_id, int(product_capacity.value), choices)
 	if financials.is_empty():
 		status_label.text = "Produit indisponible."
 		return
@@ -3202,8 +3237,8 @@ func _launch_product():
 	if Economy.money < investment:
 		status_label.text = "Trésorerie insuffisante : %s € requis pour industrialiser cette capacité." % _money(investment)
 		return
-	if ProductManager.launch_product(product_id, int(product_price.value), int(product_capacity.value)):
-		status_label.text = "Produit lancé • %s € investis dans la capacité industrielle." % _money(investment)
+	if ProductManager.launch_product(product_id, int(product_price.value), int(product_capacity.value), choices):
+		status_label.text = "Produit lancé • %s € investis • %s." % [_money(investment), _industrialization_choice_summary(choices)]
 	else:
 		status_label.text = "Ce produit est déjà lancé ou indisponible."
 	_refresh_all()
