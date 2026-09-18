@@ -757,7 +757,10 @@ func _create_personnel_tab():
 	_fill_text(recruit_department,["R&D","Production","Marketing","Support","Finance"])
 	recruit_department.item_selected.connect(func(_index): _refresh_recruitment_context())
 	box.add_child(recruit_department)
-	var gen := Button.new(); gen.text="Chercher un candidat"; gen.pressed.connect(_generate_candidate); box.add_child(gen)
+	var gen := Button.new()
+	gen.text = "Chercher un candidat — %s €" % _money(PersonnelManager.CANDIDATE_SEARCH_COST)
+	gen.pressed.connect(_generate_candidate)
+	box.add_child(gen)
 	candidate_label = _rich_label(); box.add_child(candidate_label)
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
 
@@ -2141,7 +2144,7 @@ func _operational_hiring_recommendation(include_market_roles: bool = false) -> D
 func _select_recruitment_department(department: String):
 	if recruit_department != null:
 		_select_meta(recruit_department, department)
-		PersonnelManager.generate_candidate(department)
+		_refresh_recruitment_context()
 	_show_tab(2)
 
 func _refresh_dashboard():
@@ -2646,10 +2649,20 @@ func _refresh_staff_cards():
 		staff_card_grid.add_child(card)
 		card.call("configure", str(emp.get("id", "")), str(emp.get("name", "Employé")), subtitle, badge, metrics, "")
 
-func _generate_candidate(): PersonnelManager.generate_candidate(_meta(recruit_department)); _refresh_personnel()
+func _generate_candidate():
+	var department := _meta(recruit_department)
+	if PersonnelManager.search_candidate(department):
+		status_label.text = "Recherche lancée : %s € de frais de recrutement." % _money(PersonnelManager.CANDIDATE_SEARCH_COST)
+	else:
+		status_label.text = "Recherche impossible : trésorerie insuffisante."
+	_refresh_personnel()
+
 func _hire_candidate():
-	if PersonnelManager.hire_candidate(): status_label.text="Candidat recruté."; PersonnelManager.generate_candidate(_meta(recruit_department))
-	else: status_label.text="Recrutement impossible."; _refresh_all()
+	if PersonnelManager.hire_candidate():
+		status_label.text = "Candidat recruté. Lancez une nouvelle recherche pour trouver un autre profil."
+	else:
+		status_label.text = "Recrutement impossible : vérifiez la trésorerie et le candidat."
+	_refresh_all()
 
 func _refresh_research():
 	if tech_label == null:
