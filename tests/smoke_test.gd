@@ -328,6 +328,23 @@ func _ready() -> void:
 	if evolved_generation <= initial_competitor_generation:
 		_fail("Competitors did not release a new generation")
 		return
+
+	var market_state_before_contract_test := MarketManager.get_state().duplicate(true)
+	MarketManager.contracts = [
+		{"id":"B2B-TEST-A","product_id":str(apex_model.id),"product_name":str(apex_model.name),"customer":"Alpha Systems","units_per_month":120,"unit_price":300,"remaining_months":12,"status":"PENDING"},
+		{"id":"B2B-TEST-B","product_id":str(apex_model.id),"product_name":str(apex_model.name),"customer":"Beta Cloud","units_per_month":200,"unit_price":320,"remaining_months":9,"status":"PENDING"}
+	]
+	if not MarketManager.accept_contract("B2B-TEST-B"):
+		_fail("Could not accept the selected B2B contract")
+		return
+	if str(MarketManager.contracts[0].get("status", "")) != "PENDING":
+		_fail("Accepting one B2B contract changed another pending proposal")
+		return
+	if str(MarketManager.contracts[1].get("status", "")) != "ACTIVE":
+		_fail("Selected B2B contract did not become active")
+		return
+	MarketManager.load_state(market_state_before_contract_test)
+
 	var product_round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
 	ProductManager.load_state(product_round_trip)
