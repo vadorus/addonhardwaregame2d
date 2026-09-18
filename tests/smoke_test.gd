@@ -434,8 +434,8 @@ func _ready() -> void:
 	if float(quality_industrial_forecast.get("return_rate", 1.0)) >= float(default_industrial_forecast.get("return_rate", 0.0)):
 		_fail("Premium packaging and intensive testing did not reduce return risk")
 		return
-	if int(partner_industrial_forecast.get("production_cost", 0)) >= int(default_industrial_forecast.get("production_cost", 0)):
-		_fail("Foundry partnership did not reduce projected production cost")
+	if int(partner_industrial_forecast.get("effective_unit_cost", 0)) >= int(default_industrial_forecast.get("effective_unit_cost", 0)):
+		_fail("Foundry partnership did not reduce effective unit production cost")
 		return
 
 	var low_price := maxi(int(apex_model.get("unit_cost", 1)) + 5, int(float(apex_model.price) * 0.75))
