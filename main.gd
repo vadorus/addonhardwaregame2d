@@ -236,6 +236,7 @@ func _connect_signals():
 	MediaManager.news_changed.connect(_refresh_media)
 	PatentManager.patents_changed.connect(_refresh_all)
 	DiscoveryManager.discoveries_changed.connect(_refresh_all)
+	TechnologyManager.technologies_changed.connect(_refresh_all)
 	DepartmentProgression.stage_changed.connect(_on_department_stage_changed)
 	SaveManager.save_completed.connect(_on_save_message)
 
@@ -2928,6 +2929,16 @@ func _refresh_research():
 	var tech_lines: Array[String] = []
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
+	var reusable_technologies := TechnologyManager.get_unlocked()
+	if not reusable_technologies.is_empty():
+		tech_lines.append("")
+		tech_lines.append("TECHNOLOGIES RÉUTILISABLES")
+		for technology_value in reusable_technologies:
+			var technology: Dictionary = technology_value
+			tech_lines.append("★ %s — %s" % [
+				str(technology.get("label", technology.get("id", "Technologie"))),
+				str(technology.get("summary", ""))
+			])
 	tech_label.text = "\n".join(tech_lines) if not tech_lines.is_empty() else "Aucun savoir-faire initialisé."
 
 	var lines: Array[String] = []
