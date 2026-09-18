@@ -3,7 +3,7 @@ extends Node
 signal update_available(info: Dictionary)
 signal update_check_finished(has_update: bool)
 
-const BUILD_VERSION := "0.2.12-preview.4"
+const BUILD_VERSION := "0.2.12-preview.5"
 const REQUEST_TIMEOUT_SECONDS := 8.0
 
 var _http: HTTPRequest
