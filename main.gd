@@ -102,6 +102,7 @@ var product_capacity: SpinBox
 var product_contract_select: OptionButton
 var product_packaging_select: OptionButton
 var product_testing_select: OptionButton
+var product_stock_policy_select: OptionButton
 var product_industrialization_label: Label
 var product_launch_button: Button
 var product_discontinue_button: Button
@@ -1358,6 +1359,15 @@ func _create_products_tab():
 	_fill_industrialization_options(product_testing_select, INDUSTRIALIZATION.TESTING)
 	product_testing_select.item_selected.connect(func(_index): _refresh_launch_financials())
 	grid.add_child(product_testing_select)
+
+	grid.add_child(_label("Politique de stock",14))
+	product_stock_policy_select = OptionButton.new()
+	for policy_id in ["LEAN","BALANCED","SECURE"]:
+		var policy := ProductManager.get_stock_policy(policy_id)
+		product_stock_policy_select.add_item(str(policy.get("label", policy_id)))
+		product_stock_policy_select.set_item_metadata(product_stock_policy_select.item_count - 1, policy_id)
+	product_stock_policy_select.item_selected.connect(func(_index): _apply_stock_policy_from_ui())
+	grid.add_child(product_stock_policy_select)
 
 	product_industrialization_label = _muted_label("Sélectionnez un produit pour estimer l'industrialisation.", 13)
 	product_industrialization_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -3260,6 +3270,16 @@ func _start_software_fix(action_id: String):
 		status_label.text = "Impossible de lancer ce correctif : vérifiez la trésorerie ou l'état du produit."
 	_refresh_all()
 
+func _apply_stock_policy_from_ui():
+	if product_select == null or product_stock_policy_select == null or product_select.item_count == 0:
+		return
+	var product_id := _meta(product_select)
+	var policy_id := _meta(product_stock_policy_select)
+	if ProductManager.set_stock_policy(product_id, policy_id):
+		var policy := ProductManager.get_stock_policy(policy_id)
+		status_label.text = "Politique de stock : %s." % str(policy.get("label", policy_id))
+		_refresh_launch_financials()
+
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
 		product_details_label.text = "Aucun produit sélectionné."
@@ -3301,6 +3321,9 @@ func _refresh_product_details():
 	var status := str(product.get("status", ""))
 	var industrialization_choices: Dictionary = product.get("industrialization", INDUSTRIALIZATION.default_choices())
 	_set_industrialization_controls(industrialization_choices, status == "READY")
+	if product_stock_policy_select != null:
+		_select_meta(product_stock_policy_select, str(product.get("stock_policy", "BALANCED")))
+		product_stock_policy_select.disabled = status == "DISCONTINUED"
 	if product_launch_button != null:
 		product_launch_button.visible = status != "DISCONTINUED"
 		product_launch_button.text = "Mettre à jour prix / capacité" if status == "LAUNCHED" else "Lancer sur le marché"
