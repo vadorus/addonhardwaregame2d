@@ -126,12 +126,15 @@ func _campaign_key_from_budget(budget: int) -> String:
 	return best_key
 
 func _department_execution_modifier(department: String, specialization: String, outsourced_baseline: float) -> float:
-	if PersonnelManager.department_staff_count(department) <= 0:
+	var staff_count := PersonnelManager.department_staff_count(department)
+	if staff_count <= 0:
 		return outsourced_baseline
 	var team := PersonnelManager.team_score(department, specialization)
 	var management := department_management_modifier(department)
 	var staffing_factor := clampf(0.78 + team / 360.0, 0.88, 1.08)
-	return clampf(staffing_factor * management, 0.78, 1.15)
+	var managed_execution := staffing_factor * management
+	var recruitment_floor := outsourced_baseline + minf(float(staff_count) * 0.025, 0.10)
+	return clampf(maxf(managed_execution, recruitment_floor), outsourced_baseline, 1.15)
 
 func get_marketing_execution_modifier() -> float:
 	return _department_execution_modifier("Marketing", "marketing", 0.86)
