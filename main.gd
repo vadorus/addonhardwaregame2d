@@ -40,6 +40,8 @@ var company_finance_runway_value: Label
 var staff_label: Label
 var candidate_label: Label
 var staff_card_grid: GridContainer
+var staff_dismiss_dialog: ConfirmationDialog
+var pending_dismiss_employee_id := ""
 var tech_label: Label
 var projects_label: Label
 var patents_label: Label
@@ -763,6 +765,11 @@ func _create_personnel_tab():
 	box.add_child(gen)
 	candidate_label = _rich_label(); box.add_child(candidate_label)
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
+
+	staff_dismiss_dialog = ConfirmationDialog.new()
+	staff_dismiss_dialog.title = "Confirmer le départ"
+	staff_dismiss_dialog.confirmed.connect(_confirm_employee_dismissal)
+	add_child(staff_dismiss_dialog)
 
 func _create_research_tab():
 	var scroll := _tab_scroll("Laboratoire CPU")
@@ -2635,7 +2642,8 @@ func _refresh_staff_cards():
 			var dept := str(dept_value)
 			if str(CompanyManager.departments[dept].leader_id) == str(emp.get("id", "")):
 				leader_departments.append(dept)
-		var badge := "RESPONSABLE" if not leader_departments.is_empty() else str(emp.get("department", "ÉQUIPE")).to_upper()
+		var founder := bool(emp.get("founder", false))
+		var badge := "FONDATEUR" if founder else ("RESPONSABLE" if not leader_departments.is_empty() else str(emp.get("department", "ÉQUIPE")).to_upper())
 		var subtitle := "%s • %s • %.1f ans" % [
 			str(emp.get("role", "Employé")),
 			str(emp.get("specialization", "généraliste")),
@@ -2650,7 +2658,36 @@ func _refresh_staff_cards():
 		]
 		var card: Control = card_script.new() as Control
 		staff_card_grid.add_child(card)
-		card.call("configure", str(emp.get("id", "")), str(emp.get("name", "Employé")), subtitle, badge, metrics, "")
+		var action := "" if founder else "Licencier • %s €" % _money(PersonnelManager.dismissal_cost(str(emp.get("id", ""))))
+		card.call("configure", str(emp.get("id", "")), str(emp.get("name", "Employé")), subtitle, badge, metrics, action)
+		if not founder:
+			card.connect("entity_selected", Callable(self, "_request_employee_dismissal"))
+
+func _request_employee_dismissal(employee_id: String):
+	var employee := PersonnelManager.get_employee(employee_id)
+	if employee.is_empty() or bool(employee.get("founder", false)):
+		status_label.text = "Les fondateurs ne peuvent pas être licenciés."
+		return
+	pending_dismiss_employee_id = employee_id
+	var severance := PersonnelManager.dismissal_cost(employee_id)
+	staff_dismiss_dialog.dialog_text = "Licencier %s ?\n\nIndemnité immédiate : %s €\nSalaire économisé ensuite : %s €/mois.\nSi cette personne dirige un département, le poste de responsable sera libéré." % [
+		str(employee.get("name", "ce salarié")),
+		_money(severance),
+		_money(int(employee.get("salary", 0)))
+	]
+	staff_dismiss_dialog.popup_centered()
+
+func _confirm_employee_dismissal():
+	if pending_dismiss_employee_id.is_empty():
+		return
+	var employee := PersonnelManager.get_employee(pending_dismiss_employee_id)
+	var employee_name := str(employee.get("name", "Salarié"))
+	if PersonnelManager.dismiss_employee(pending_dismiss_employee_id):
+		status_label.text = "%s a quitté l'entreprise." % employee_name
+	else:
+		status_label.text = "Impossible de licencier ce salarié."
+	pending_dismiss_employee_id = ""
+	_refresh_all()
 
 func _generate_candidate():
 	var department := _meta(recruit_department)
