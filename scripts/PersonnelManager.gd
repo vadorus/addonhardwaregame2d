@@ -8,6 +8,8 @@ var candidate: Dictionary = {}
 var _next_id := 1
 var rng := RandomNumberGenerator.new()
 
+const CANDIDATE_SEARCH_COST := 1_500
+
 const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
 const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon","Laurent","Michel","Leroy","Dubois","Robert"]
 
@@ -73,6 +75,13 @@ func generate_candidate(department: String) -> Dictionary:
 	}
 	candidate_changed.emit(candidate)
 	return candidate
+
+func search_candidate(department: String) -> bool:
+	if Economy.money < CANDIDATE_SEARCH_COST:
+		return false
+	Economy.add_expense(CANDIDATE_SEARCH_COST, "Recherche de candidat")
+	generate_candidate(department)
+	return true
 
 func hire_candidate() -> bool:
 	if candidate.is_empty():
