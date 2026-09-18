@@ -1,5 +1,9 @@
 extends Node
 
+signal stage_changed(sector_id, previous_stage, new_stage, state)
+
+var achieved_stages: Dictionary = {}
+
 const SECTOR_ORDER := ["LAB", "PRODUCTION", "MARKET", "TEAM"]
 
 const DEFINITIONS := {
@@ -52,6 +56,38 @@ const DEFINITIONS := {
 	}
 }
 
+func reset_progression():
+	achieved_stages = {}
+	for sector_id in SECTOR_ORDER:
+		var score := _score_for(str(sector_id))
+		var raw_stage := _stage_from_score(score, _thresholds_for(str(sector_id)))
+		achieved_stages[str(sector_id)] = raw_stage
+
+func evaluate_progression():
+	if achieved_stages.is_empty():
+		reset_progression()
+		return
+	for sector_id_value in SECTOR_ORDER:
+		var sector_id := str(sector_id_value)
+		var score := _score_for(sector_id)
+		var raw_stage := _stage_from_score(score, _thresholds_for(sector_id))
+		var previous_stage := int(achieved_stages.get(sector_id, raw_stage))
+		var new_stage := maxi(previous_stage, raw_stage)
+		achieved_stages[sector_id] = new_stage
+		if new_stage > previous_stage:
+			stage_changed.emit(sector_id, previous_stage, new_stage, get_sector_state(sector_id))
+
+func get_state() -> Dictionary:
+	return {"achieved_stages": achieved_stages.duplicate(true)}
+
+func load_state(state: Dictionary):
+	achieved_stages = {}
+	var stored: Dictionary = state.get("achieved_stages", {})
+	for sector_id_value in SECTOR_ORDER:
+		var sector_id := str(sector_id_value)
+		var raw_stage := _stage_from_score(_score_for(sector_id), _thresholds_for(sector_id))
+		achieved_stages[sector_id] = clampi(int(stored.get(sector_id, raw_stage)), raw_stage, 4)
+
 func get_all_states() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for sector_id in SECTOR_ORDER:
@@ -63,7 +99,8 @@ func get_sector_state(sector_id: String) -> Dictionary:
 		return {}
 	var score := _score_for(sector_id)
 	var thresholds := _thresholds_for(sector_id)
-	var stage := _stage_from_score(score, thresholds)
+	var raw_stage := _stage_from_score(score, thresholds)
+	var stage := maxi(raw_stage, int(achieved_stages.get(sector_id, raw_stage)))
 	var stages: Array = definition.get("stages", [])
 	var progress := _progress_to_next(score, thresholds, stage)
 	return {
