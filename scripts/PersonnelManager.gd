@@ -20,20 +20,20 @@ func reset(starting_sector: String):
 	staff = []
 	_next_id = 1
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
-	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
+	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200, true)
+	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700, true)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
 	generate_candidate("R&D")
 	staff_changed.emit()
 
-func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int):
+func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, founder: bool = false):
 	var emp := {
 		"id":"EMP-%04d" % _next_id,
 		"name":full_name,"role":role,"department":department,
 		"skill":skill,"aptitude":clampi(skill + rng.randi_range(-8, 8), 35, 95),
 		"experience_years":experience,"specialization":specialization,
 		"domain_experience":{specialization: experience},"leadership":leadership,
-		"salary":salary,"morale":75.0
+		"salary":salary,"morale":75.0,"founder":founder
 	}
 	_next_id += 1
 	staff.append(emp)
@@ -92,6 +92,33 @@ func hire_candidate() -> bool:
 	Economy.add_expense(signing_cost, "Recrutement")
 	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary))
 	candidate = {}
+	staff_changed.emit()
+	return true
+
+func dismissal_cost(employee_id: String) -> int:
+	var employee := get_employee(employee_id)
+	if employee.is_empty() or bool(employee.get("founder", false)):
+		return -1
+	return maxi(int(employee.get("salary", 0)), 0)
+
+func dismiss_employee(employee_id: String) -> bool:
+	var employee := get_employee(employee_id)
+	if employee.is_empty() or bool(employee.get("founder", false)):
+		return false
+	var severance := dismissal_cost(employee_id)
+	if severance < 0:
+		return false
+	if severance > 0:
+		Economy.add_expense(severance, "Indemnité de départ")
+	for department_value in CompanyManager.departments.keys():
+		var department := str(department_value)
+		if str(CompanyManager.departments[department].get("leader_id", "")) == employee_id:
+			CompanyManager.set_department_leader(department, "")
+	for i in range(staff.size() - 1, -1, -1):
+		if str(staff[i].get("id", "")) == employee_id:
+			staff.remove_at(i)
+			break
+	CompanyManager.add_alert("%s quitte l'entreprise après une indemnité de %d €." % [str(employee.get("name", "Un salarié")), severance])
 	staff_changed.emit()
 	return true
 
@@ -184,6 +211,10 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	for employee in staff:
+		if not employee.has("founder"):
+			var employee_name := str(employee.get("name", ""))
+			employee["founder"] = employee_name == "Camille Durand" or employee_name == "Alex Moreau"
 	candidate = state.get("candidate", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 1947))
