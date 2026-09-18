@@ -144,6 +144,7 @@ var dashboard_secondary_visible := true
 var dashboard_compact_mode := false
 var evolution_panel: Control
 var dashboard_target_tab := 3
+var dashboard_recruit_department := ""
 var rd_decision_card: Control
 var rd_decision_label: Label
 var rd_decision_buttons: Array[Button] = []
@@ -1619,7 +1620,10 @@ func _toggle_navigation_menu():
 		navigation_layer.visible = not navigation_layer.visible
 
 func _open_navigation_priority():
-	_show_tab(dashboard_target_tab)
+	if dashboard_target_tab == 2 and not dashboard_recruit_department.is_empty():
+		_select_recruitment_department(dashboard_recruit_department)
+	else:
+		_show_tab(dashboard_target_tab)
 
 func _refresh_navigation_priority():
 	if navigation_priority_button == null or navigation_priority_label == null:
@@ -1718,7 +1722,10 @@ func _add_stat_card(parent: GridContainer, title: String) -> Label:
 	return value_label
 
 func _dashboard_primary_action():
-	_show_tab(dashboard_target_tab)
+	if dashboard_target_tab == 2 and not dashboard_recruit_department.is_empty():
+		_select_recruitment_department(dashboard_recruit_department)
+	else:
+		_show_tab(dashboard_target_tab)
 
 func _open_dashboard_sector(sector_id: String):
 	match sector_id:
@@ -2125,6 +2132,7 @@ func _select_recruitment_department(department: String):
 func _refresh_dashboard():
 	if dashboard_label == null:
 		return
+	dashboard_recruit_department = ""
 	if not CompanyManager.created:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
@@ -2264,6 +2272,7 @@ func _refresh_dashboard():
 			dashboard_next_step_label.text = "Votre CPU vieillit face aux nouvelles générations. Préparez son successeur."
 		elif not operations_hire.is_empty() and int(launched_product.get("months_on_market", 0)) >= 1:
 			var hire_department := str(operations_hire.get("department", ""))
+			dashboard_recruit_department = hire_department
 			dashboard_cto_label.text = "« %s »" % str(operations_hire.get("message", "Renforcez l'équipe."))
 			dashboard_action_button.text = str(operations_hire.get("title", "Renforcer l'équipe"))
 			dashboard_target_tab = 2
