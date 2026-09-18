@@ -26,6 +26,12 @@ const MARKETING_CAMPAIGNS := {
 	"GLOBAL": {"label":"Campagne mondiale", "budget":120_000, "awareness":0.36}
 }
 
+const SUPPORT_PLANS := {
+	"MINIMAL": {"label":"Support minimal", "budget":2_500, "modifier":0.78},
+	"STANDARD": {"label":"Support standard", "budget":5_000, "modifier":1.00},
+	"PREMIUM": {"label":"Support premium", "budget":18_000, "modifier":1.18}
+}
+
 var policies := {
 	"marketing_campaign": "LOCAL",
 	"marketing_budget": 8000,
@@ -153,12 +159,35 @@ func get_awareness_bonus() -> float:
 	var campaign_awareness := float(get_marketing_campaign().get("awareness", 0.02))
 	return campaign_awareness * get_marketing_execution_modifier()
 
+func get_support_plan_keys() -> Array:
+	return SUPPORT_PLANS.keys()
+
+func get_support_plan(key: String = "") -> Dictionary:
+	var plan_key := key if not key.is_empty() else str(policies.get("support_level", "STANDARD"))
+	return SUPPORT_PLANS.get(plan_key, SUPPORT_PLANS.STANDARD)
+
+func set_support_plan(key: String) -> bool:
+	if not SUPPORT_PLANS.has(key):
+		return false
+	var plan: Dictionary = SUPPORT_PLANS[key]
+	policies["support_level"] = key
+	policies["support_budget"] = int(plan.get("budget", 5000))
+	company_changed.emit()
+	return true
+
+func _support_key_from_budget(budget: int) -> String:
+	var best_key := "STANDARD"
+	var best_distance := 2_147_483_647
+	for key_value in SUPPORT_PLANS.keys():
+		var key := str(key_value)
+		var distance := absi(int(SUPPORT_PLANS[key].get("budget", 0)) - budget)
+		if distance < best_distance:
+			best_distance = distance
+			best_key = key
+	return best_key
+
 func get_support_modifier() -> float:
-	var policy_modifier := 1.0
-	match str(policies.support_level):
-		"PREMIUM": policy_modifier = 1.18
-		"MINIMAL": policy_modifier = 0.78
-		_: policy_modifier = 1.0
+	var policy_modifier := float(get_support_plan().get("modifier", 1.0))
 	return clampf(policy_modifier * get_support_execution_modifier(), 0.62, 1.35)
 
 func set_department_autonomy(department: String, autonomy: String):
@@ -221,6 +250,12 @@ func load_state(state: Dictionary):
 		marketing_campaign = _campaign_key_from_budget(int(policies.get("marketing_budget", 8000)))
 	policies["marketing_campaign"] = marketing_campaign
 	policies["marketing_budget"] = int(get_marketing_campaign(marketing_campaign).get("budget", 8000))
+
+	var support_level := str(policies.get("support_level", ""))
+	if not SUPPORT_PLANS.has(support_level):
+		support_level = _support_key_from_budget(int(policies.get("support_budget", 5000)))
+	policies["support_level"] = support_level
+	policies["support_budget"] = int(get_support_plan(support_level).get("budget", 5000))
 	departments = state.get("departments", departments).duplicate(true)
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
 	brands = state.get("brands", []).duplicate(true)
