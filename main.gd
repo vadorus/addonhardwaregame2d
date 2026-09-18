@@ -2471,7 +2471,15 @@ func _refresh_launch_financials():
 	var utilization := float(forecast.get("utilization", 0.0)) * 100.0
 	var monthly_result := int(forecast.get("monthly_result", 0))
 	var market_share := float(forecast.get("share", 0.0)) * 100.0
-	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nPrévision : ~%s ventes/mois • capacité utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois" % [
+	var price_factor := float(forecast.get("price_factor", 1.0))
+	var price_effect := "neutre"
+	if price_factor < 0.70:
+		price_effect = "fort frein sur la demande"
+	elif price_factor < 0.92:
+		price_effect = "demande réduite"
+	elif price_factor > 1.08:
+		price_effect = "volume stimulé"
+	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nPrévision : ~%s ventes/mois • capacité utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois\nEffet du prix : %s (demande ×%.2f)" % [
 		_money(investment),
 		_money(overhead),
 		_money(margin),
@@ -2479,7 +2487,9 @@ func _refresh_launch_financials():
 		_money(expected_units),
 		utilization,
 		market_share,
-		_money(monthly_result)
+		_money(monthly_result),
+		price_effect,
+		price_factor
 	]
 	var healthy := affordable and margin > 0 and monthly_result >= 0
 	product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if healthy else (APP_AMBER if affordable and monthly_result >= 0 else APP_RED))
