@@ -45,6 +45,26 @@ func _ready() -> void:
 			_fail("R&D candidate specialization escaped the active CPU vertical slice: %s" % specialization)
 			return
 	PersonnelManager.load_state(founder_personnel_state)
+	var marketing_before_staff := CompanyManager.get_awareness_bonus()
+	var support_before_staff := CompanyManager.get_support_modifier()
+	var production_before_staff := CompanyManager.get_production_execution_modifier()
+	var production_cost_before_staff := CompanyManager.get_production_cost_modifier()
+	PersonnelManager._add_employee("Prod Test", "Responsable production", "Production", 72, 7.0, "manufacturing", 68, 5000)
+	PersonnelManager._add_employee("Marketing Test", "Responsable marketing", "Marketing", 70, 6.0, "marketing", 68, 4800)
+	PersonnelManager._add_employee("Support Test", "Responsable support", "Support", 70, 6.0, "support", 68, 4500)
+	if CompanyManager.get_production_execution_modifier() <= production_before_staff:
+		_fail("Hiring Production staff did not improve production execution")
+		return
+	if CompanyManager.get_production_cost_modifier() >= production_cost_before_staff:
+		_fail("Hiring Production staff did not reduce production cost overhead")
+		return
+	if CompanyManager.get_awareness_bonus() <= marketing_before_staff:
+		_fail("Hiring Marketing staff did not improve campaign awareness")
+		return
+	if CompanyManager.get_support_modifier() <= support_before_staff:
+		_fail("Hiring Support staff did not improve support effectiveness")
+		return
+	PersonnelManager.load_state(founder_personnel_state)
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
