@@ -88,6 +88,7 @@ var quality_incident_buttons: Dictionary = {}
 var product_price: SpinBox
 var product_capacity: SpinBox
 var product_industrialization_label: Label
+var product_launch_button: Button
 var market_product_select: OptionButton
 var market_benchmark_grid: GridContainer
 var policy_marketing: OptionButton
@@ -1231,7 +1232,10 @@ func _create_products_tab():
 	box.add_child(product_industrialization_label)
 	product_capacity.value_changed.connect(func(_value): _refresh_launch_financials())
 	product_price.value_changed.connect(func(_value): _refresh_launch_financials())
-	var launch:=Button.new(); launch.text="Lancer sur le marché"; launch.pressed.connect(_launch_product); box.add_child(launch)
+	product_launch_button = Button.new()
+	product_launch_button.text = "Lancer sur le marché"
+	product_launch_button.pressed.connect(_launch_product)
+	box.add_child(product_launch_button)
 
 func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
@@ -2741,6 +2745,8 @@ func _refresh_product_details():
 			float(product.internal_ratio) * 100.0, " • ".join(metric_lines)
 		]
 	product_price.value = float(product.price)
+	if product_launch_button != null:
+		product_launch_button.text = "Mettre à jour prix / capacité" if str(product.get("status", "")) == "LAUNCHED" else "Lancer sur le marché"
 	var has_capacity_limit := product.has("max_monthly_capacity")
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
@@ -2755,12 +2761,30 @@ func _refresh_launch_financials():
 		return
 	var margin := int(product_price.value) - int(product.get("unit_cost", 0))
 	if str(product.get("status", "")) == "LAUNCHED":
-		product_industrialization_label.text = "Ligne active • investissement initial %s € • frais fixes %s €/mois • marge affichée %s €/unité" % [
-			_money(int(product.get("launch_investment", 0))),
-			_money(int(product.get("monthly_capacity_overhead", 0))),
-			_money(margin)
+		var update := ProductManager.offer_update_financials(str(product.get("id", "")), int(product_capacity.value))
+		var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value))
+		if update.is_empty() or forecast.is_empty():
+			return
+		var expansion_cost := int(update.get("expansion_cost", 0))
+		var target_overhead := int(update.get("target_overhead", product.get("monthly_capacity_overhead", 0)))
+		var effective_capacity := int(forecast.get("effective_capacity", int(product_capacity.value)))
+		var expected_units := int(forecast.get("expected_units", 0))
+		var monthly_result := int(forecast.get("monthly_result", 0))
+		var price_factor := float(forecast.get("price_factor", 1.0))
+		var affordable := expansion_cost <= Economy.money
+		product_industrialization_label.text = "Ligne active : %s unités/mois actuellement • cible %s • capacité utile %s\nAjustement : %s € maintenant • frais fixes cible %s €/mois • marge %s €/unité%s\nPrévision : ~%s ventes/mois • résultat produit ~%s €/mois • demande ×%.2f" % [
+			_money(int(product.get("production_capacity", 0))),
+			_money(int(update.get("target_capacity", product_capacity.value))),
+			_money(effective_capacity),
+			_money(expansion_cost),
+			_money(target_overhead),
+			_money(margin),
+			"" if affordable else " • TRÉSORERIE INSUFFISANTE",
+			_money(expected_units),
+			_money(monthly_result),
+			price_factor
 		]
-		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if margin > 0 else APP_RED)
+		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if affordable and monthly_result >= 0 and margin > 0 else (APP_AMBER if affordable else APP_RED))
 		return
 	var financials := ProductManager.launch_financials(str(product.get("id", "")), int(product_capacity.value))
 	var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value))
@@ -2805,6 +2829,29 @@ func _launch_product():
 	if product_select.item_count==0:
 		return
 	var product_id := _meta(product_select)
+	var product := ProductManager.get_product(product_id)
+	if product.is_empty():
+		status_label.text = "Produit indisponible."
+		return
+	if str(product.get("status", "")) == "LAUNCHED":
+		var update := ProductManager.offer_update_financials(product_id, int(product_capacity.value))
+		if update.is_empty():
+			status_label.text = "Ajustement indisponible."
+			return
+		var expansion_cost := int(update.get("expansion_cost", 0))
+		if expansion_cost > Economy.money:
+			status_label.text = "Trésorerie insuffisante : %s € requis pour étendre la ligne." % _money(expansion_cost)
+			return
+		if ProductManager.update_product_offer(product_id, int(product_price.value), int(product_capacity.value)):
+			status_label.text = "Offre mise à jour • prix %s € • capacité %s/mois%s." % [
+				_money(int(product_price.value)),
+				_money(int(product_capacity.value)),
+				" • extension %s €" % _money(expansion_cost) if expansion_cost > 0 else ""
+			]
+		else:
+			status_label.text = "Impossible de modifier cette offre."
+		_refresh_all()
+		return
 	var financials := ProductManager.launch_financials(product_id, int(product_capacity.value))
 	if financials.is_empty():
 		status_label.text = "Produit indisponible."
