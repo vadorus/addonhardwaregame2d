@@ -7,6 +7,8 @@ signal products_changed
 signal product_launched(product)
 signal cpu_range_created(generation)
 signal sales_report_created(report)
+signal quality_incident_created(incident)
+signal quality_incident_resolved(incident, action_id)
 
 var products: Array = []
 var cpu_generations: Array = []
@@ -16,6 +18,8 @@ var _reviewed_products: Dictionary = {}
 
 const INDUSTRIALIZATION_SETUP_RATE := 0.12
 const CAPACITY_OVERHEAD_RATE := 0.015
+const QUALITY_INCIDENT_RETURN_RATE := 0.09
+const QUALITY_INCIDENT_MIN_RETURNS := 20
 
 func _ready():
 	ResearchManager.project_completed.connect(_on_project_completed)
@@ -113,6 +117,108 @@ func _metric_average(metrics: Dictionary) -> float:
 	for metric in GameData.METRICS:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
+
+func get_pending_quality_incident() -> Dictionary:
+	for product in products:
+		var incident: Dictionary = product.get("pending_quality_incident", {})
+		if not incident.is_empty():
+			return incident.duplicate(true)
+	return {}
+
+func quality_incident_options(product_id: String) -> Array[Dictionary]:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return []
+	var incident: Dictionary = product.get("pending_quality_incident", {})
+	if incident.is_empty():
+		return []
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var last_sales := maxi(int(product.get("last_month_sales", 0)), 1)
+	var targeted_cost := maxi(5_000, unit_cost * 120)
+	var recall_cost := maxi(15_000, int(round(float(unit_cost * last_sales) * 0.20)))
+	return [
+		{"id":"TARGETED_FIX", "label":"Correction ciblée", "cost":targeted_cost, "summary":"+5 fiabilité • +5 satisfaction • impact réputation positif"},
+		{"id":"RECALL", "label":"Rappel renforcé", "cost":recall_cost, "summary":"+9 fiabilité • +12 satisfaction • forte protection de la marque"},
+		{"id":"MINIMAL_SUPPORT", "label":"Service minimum", "cost":0, "summary":"Aucun coût immédiat • satisfaction et réputation en baisse"}
+	]
+
+func resolve_quality_incident(product_id: String, action_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return false
+	var incident: Dictionary = product.get("pending_quality_incident", {})
+	if incident.is_empty():
+		return false
+	var selected: Dictionary = {}
+	for option in quality_incident_options(product_id):
+		if str(option.get("id", "")) == action_id:
+			selected = option
+			break
+	if selected.is_empty():
+		return false
+	var cost := int(selected.get("cost", 0))
+	if cost > 0 and Economy.money < cost:
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, "Incident qualité — %s" % str(product.get("name", "Produit")))
+	var metrics: Dictionary = product.get("metrics", {})
+	var satisfaction := float(product.get("customer_satisfaction", 50.0))
+	match action_id:
+		"TARGETED_FIX":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 5.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction + 5.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":0.8, "support":0.5, "professional":0.3})
+		"RECALL":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 9.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction + 12.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":2.0, "support":2.0, "professional":0.8, "prestige":0.4})
+		"MINIMAL_SUPPORT":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 1.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction - 5.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":-1.0, "support":-2.0, "professional":-0.8, "prestige":-0.5})
+		_:
+			return false
+	product["metrics"] = metrics
+	product["pending_quality_incident"] = {}
+	product["quality_incident_cooldown"] = 6
+	CompanyManager.add_alert("%s : incident qualité traité — %s." % [str(product.get("name", "Produit")), str(selected.get("label", action_id))])
+	MediaManager.publish_business_event(
+		"%s répond à un incident qualité" % CompanyManager.company_name,
+		"%s : %s." % [str(product.get("name", "Produit")), str(selected.get("summary", ""))]
+	)
+	quality_incident_resolved.emit(incident.duplicate(true), action_id)
+	products_changed.emit()
+	return true
+
+func _maybe_create_quality_incident(product: Dictionary, total_units: int, returns: int, return_rate: float, warranty_cost: int) -> void:
+	var cooldown := maxi(int(product.get("quality_incident_cooldown", 0)), 0)
+	if cooldown > 0:
+		product["quality_incident_cooldown"] = cooldown - 1
+		return
+	var pending: Dictionary = product.get("pending_quality_incident", {})
+	if not pending.is_empty():
+		return
+	if total_units <= 0 or return_rate < QUALITY_INCIDENT_RETURN_RATE or returns < QUALITY_INCIDENT_MIN_RETURNS:
+		return
+	var severity := "CRITICAL" if return_rate >= 0.15 or returns >= 100 else "WARNING"
+	var incident := {
+		"id":"QI-%s-%d" % [str(product.get("id", "PRODUCT")), int(product.get("months_on_market", 0))],
+		"product_id":str(product.get("id", "")),
+		"product_name":str(product.get("name", "Produit")),
+		"severity":severity,
+		"returns":returns,
+		"return_rate":return_rate,
+		"warranty_cost":warranty_cost,
+		"month":TimeManager.month,
+		"year":TimeManager.year
+	}
+	product["pending_quality_incident"] = incident
+	CompanyManager.add_alert("Incident qualité : %s enregistre %d retours ce mois-ci." % [str(product.get("name", "Produit")), returns])
+	MediaManager.publish_business_event(
+		"Des retours touchent %s" % str(product.get("name", "Produit")),
+		"L'entreprise doit choisir entre correction ciblée, rappel renforcé ou service minimum."
+	)
+	quality_incident_created.emit(incident.duplicate(true))
 
 func launch_financials(product_id: String, production_capacity: int) -> Dictionary:
 	var product := get_product(product_id)
@@ -233,6 +339,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.last_month_score = float(demand.get("score", 0.0))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
+	_maybe_create_quality_incident(product, total_units, returns, return_rate, warranty_cost)
 	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
 	product.customer_satisfaction = satisfaction
 	var rep_delta := (satisfaction - 55.0) / 35.0
@@ -304,6 +411,8 @@ func load_state(state: Dictionary):
 		product["yield_rate"] = float(product.get("yield_rate", 0.72))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
+		product["pending_quality_incident"] = product.get("pending_quality_incident", {}).duplicate(true)
+		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
