@@ -101,6 +101,37 @@ func _ready() -> void:
 		return
 	CompanyManager.load_state(initial_company_state)
 
+	var previous_support_modifier := -1.0
+	var previous_support_budget := -1
+	for support_key in ["MINIMAL", "STANDARD", "PREMIUM"]:
+		if not CompanyManager.set_support_plan(support_key):
+			_fail("Could not select support plan %s" % support_key)
+			return
+		var support_plan := CompanyManager.get_support_plan()
+		var support_modifier := CompanyManager.get_support_modifier()
+		var support_budget := int(support_plan.get("budget", -1))
+		if support_modifier <= previous_support_modifier:
+			_fail("Support effectiveness is not increasing between plan tiers")
+			return
+		if support_budget <= previous_support_budget:
+			_fail("Support budget is not increasing between plan tiers")
+			return
+		previous_support_modifier = support_modifier
+		previous_support_budget = support_budget
+	var legacy_support_state := initial_company_state.duplicate(true)
+	var legacy_support_policies: Dictionary = legacy_support_state.get("policies", {}).duplicate(true)
+	legacy_support_policies.erase("support_level")
+	legacy_support_policies["support_budget"] = 17_000
+	legacy_support_state["policies"] = legacy_support_policies
+	CompanyManager.load_state(legacy_support_state)
+	if str(CompanyManager.policies.get("support_level", "")) != "PREMIUM":
+		_fail("Legacy support budget did not migrate to the nearest support plan")
+		return
+	if int(CompanyManager.policies.get("support_budget", 0)) != 18_000:
+		_fail("Migrated support budget was not normalized to the support plan cost")
+		return
+	CompanyManager.load_state(initial_company_state)
+
 	if not SaveManager.autosave_game():
 		_fail("Autosave could not write the current game")
 		return
