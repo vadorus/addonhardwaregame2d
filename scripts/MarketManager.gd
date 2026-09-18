@@ -42,6 +42,24 @@ func price_score(product: Dictionary) -> float:
 	var ratio: float = float(product.price) / maxf(reference, 1.0)
 	return clampf(118.0 - ratio * 58.0, 5.0, 100.0)
 
+func software_support_score(product: Dictionary) -> float:
+	var support: Dictionary = product.get("cpu_support", {})
+	if support.is_empty():
+		return 100.0
+	var microcode := float(support.get("microcode_quality", 70.0))
+	var compatibility := float(support.get("compatibility", 70.0))
+	return clampf(microcode * 0.52 + compatibility * 0.48, 0.0, 100.0)
+
+func software_support_penalty(product: Dictionary) -> float:
+	var score := software_support_score(product)
+	var penalty := maxf(70.0 - score, 0.0) * 0.20
+	var support: Dictionary = product.get("cpu_support", {})
+	if not support.get("pending_issue", {}).is_empty():
+		penalty += 3.0
+	if not support.get("active_fix", {}).is_empty():
+		penalty += 1.0
+	return clampf(penalty, 0.0, 12.0)
+
 func evaluate_product(product: Dictionary, segment: String) -> float:
 	var weights: Dictionary = GameData.SEGMENTS[segment].weights
 	var score := 0.0
@@ -50,7 +68,8 @@ func evaluate_product(product: Dictionary, segment: String) -> float:
 	score += price_score(product) * float(weights.get("price", 0.0))
 	var brand_bonus := (CompanyManager.get_brand_score() - 50.0) * 0.08 if str(product.company) == CompanyManager.company_name else 0.0
 	var support_bonus := (float(CompanyManager.reputation.support) - 50.0) * 0.05 if str(product.company) == CompanyManager.company_name else 0.0
-	return clampf(score + brand_bonus + support_bonus, 0.0, 100.0)
+	var software_penalty := software_support_penalty(product) if str(product.company) == CompanyManager.company_name else 0.0
+	return clampf(score + brand_bonus + support_bonus - software_penalty, 0.0, 100.0)
 
 func segment_scores(product: Dictionary) -> Dictionary:
 	var result := {}
