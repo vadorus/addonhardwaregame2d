@@ -3270,6 +3270,20 @@ func _start_software_fix(action_id: String):
 		status_label.text = "Impossible de lancer ce correctif : vérifiez la trésorerie ou l'état du produit."
 	_refresh_all()
 
+func _stock_policy_label(policy_id: String) -> String:
+	return str(ProductManager.get_stock_policy(policy_id).get("label", policy_id))
+
+func _stock_forecast_summary(forecast: Dictionary) -> String:
+	return "%s • production %s • stock %s → %s (cible %s) • stockage %s € • ventes perdues %s" % [
+		_stock_policy_label(str(forecast.get("stock_policy", "BALANCED"))),
+		_money(int(forecast.get("expected_produced", 0))),
+		_money(int(forecast.get("inventory_start", 0))),
+		_money(int(forecast.get("inventory_end", 0))),
+		_money(int(forecast.get("inventory_target", 0))),
+		_money(int(forecast.get("holding_cost", 0))),
+		_money(int(forecast.get("lost_sales", 0)))
+	]
+
 func _apply_stock_policy_from_ui():
 	if product_select == null or product_stock_policy_select == null or product_select.item_count == 0:
 		return
@@ -3312,6 +3326,12 @@ func _refresh_product_details():
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin),
 			" • ".join(metric_lines)
 		]
+		product_details_label.text += "\nStock : %s • %s unité(s) en inventaire • production mois %s • ventes perdues %s" % [
+			_stock_policy_label(str(product.get("stock_policy", "BALANCED"))),
+			_money(int(product.get("inventory_units", 0))),
+			_money(int(product.get("last_month_produced", 0))),
+			_money(int(product.get("last_month_lost_sales", 0)))
+		]
 	else:
 		product_details_label.text = "%s\nApproche : %s | interne %.0f%%\n%s" % [
 			str(product.name), GameData.APPROACHES[str(product.approach)].label,
@@ -3349,9 +3369,10 @@ func _refresh_launch_financials():
 	var effective_unit_cost := ProductManager.effective_unit_cost(str(product.get("id", "")), selected_choices)
 	var margin := int(product_price.value) - effective_unit_cost
 	if status == "DISCONTINUED":
-		product_industrialization_label.text = "Fin de vente • %s mois commercialisés • %s unités vendues au total.\nLa ligne de production est arrêtée et ne génère plus de frais fixes." % [
+		product_industrialization_label.text = "Fin de vente • %s mois commercialisés • %s unités vendues au total.\nLa ligne de production est arrêtée et ne génère plus de frais fixes. Stock restant : %s unité(s)." % [
 			int(product.get("months_on_market", 0)),
-			_money(int(product.get("units_sold_total", 0)))
+			_money(int(product.get("units_sold_total", 0))),
+			_money(int(product.get("inventory_units", 0)))
 		]
 		product_industrialization_label.add_theme_color_override("font_color", APP_MUTED)
 		return
@@ -3385,6 +3406,7 @@ func _refresh_launch_financials():
 			float(forecast.get("return_rate", 0.0)) * 100.0,
 			price_factor
 		]
+		product_industrialization_label.text += "\nStock : " + _stock_forecast_summary(forecast)
 		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if affordable and monthly_result >= 0 and margin > 0 else (APP_AMBER if affordable else APP_RED))
 		return
 	var choices := _current_industrialization_choices()
@@ -3429,6 +3451,7 @@ func _refresh_launch_financials():
 		price_effect,
 		price_factor
 	]
+	product_industrialization_label.text += "\nStock : " + _stock_forecast_summary(forecast)
 	var healthy := affordable and margin > 0 and monthly_result >= 0
 	product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if healthy else (APP_AMBER if affordable and monthly_result >= 0 else APP_RED))
 
