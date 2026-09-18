@@ -2,6 +2,7 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
+const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
 
 signal products_changed
 signal product_launched(product)
@@ -221,34 +222,67 @@ func _maybe_create_quality_incident(product: Dictionary, total_units: int, retur
 	)
 	quality_incident_created.emit(incident.duplicate(true))
 
-func launch_financials(product_id: String, production_capacity: int) -> Dictionary:
+func get_industrialization_choices(product_id: String, options: Dictionary = {}) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return INDUSTRIALIZATION.default_choices()
+	var source := options
+	if source.is_empty():
+		source = product.get("industrialization", {})
+	return INDUSTRIALIZATION.normalize_choices(source)
+
+func industrialization_profile(product_id: String, options: Dictionary = {}) -> Dictionary:
+	return INDUSTRIALIZATION.evaluate(get_industrialization_choices(product_id, options))
+
+func effective_unit_cost(product_id: String, options: Dictionary = {}) -> int:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return 0
+	var profile := industrialization_profile(product_id, options)
+	var modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
+	return maxi(1, int(round(float(product.get("unit_cost", 1)) * modifier)))
+
+func launch_financials(product_id: String, production_capacity: int, options: Dictionary = {}) -> Dictionary:
 	var product := get_product(product_id)
 	if product.is_empty():
 		return {}
 	var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
 	var capacity := clampi(production_capacity, 1, max_capacity)
 	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
-	var investment := maxi(2500, int(round(float(capacity * unit_cost) * INDUSTRIALIZATION_SETUP_RATE)))
-	var monthly_overhead := maxi(250, int(round(float(capacity * unit_cost) * CAPACITY_OVERHEAD_RATE)))
+	var profile := industrialization_profile(product_id, options)
+	var investment := maxi(2500, int(round(
+		float(capacity * unit_cost)
+		* INDUSTRIALIZATION_SETUP_RATE
+		* float(profile.get("setup_factor", 1.0))
+	)))
+	var monthly_overhead := maxi(250, int(round(
+		float(capacity * unit_cost)
+		* CAPACITY_OVERHEAD_RATE
+		* float(profile.get("overhead_factor", 1.0))
+	)))
 	return {
 		"capacity": capacity,
 		"investment": investment,
-		"monthly_overhead": monthly_overhead
+		"monthly_overhead": monthly_overhead,
+		"industrialization": get_industrialization_choices(product_id, options),
+		"profile": profile
 	}
 
-func launch_forecast(product_id: String, price: int, production_capacity: int) -> Dictionary:
+func launch_forecast(product_id: String, price: int, production_capacity: int, options: Dictionary = {}) -> Dictionary:
 	var product := get_product(product_id)
 	if product.is_empty():
 		return {}
 	var preview := product.duplicate(true)
 	preview["price"] = maxi(price, 1)
-	var financials := launch_financials(product_id, production_capacity)
+	var financials := launch_financials(product_id, production_capacity, options)
 	if financials.is_empty():
 		return {}
+	var profile: Dictionary = financials.get("profile", {})
 	var capacity := int(financials.get("capacity", 1))
 	var production_execution := CompanyManager.get_production_execution_modifier()
-	var effective_capacity := maxi(1, int(floor(float(capacity) * production_execution)))
-	var production_cost_modifier := CompanyManager.get_production_cost_modifier()
+	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
+	var effective_capacity := maxi(1, int(floor(float(capacity) * production_execution * industrial_capacity)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
 	preview["production_capacity"] = capacity
 	var demand := MarketManager.estimate_consumer_demand(preview)
 	var requested_units := maxi(int(demand.get("units", 0)), 0)
@@ -256,9 +290,10 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 	var revenue := expected_units * int(preview.price)
 	var production_cost := int(round(float(expected_units * int(preview.get("unit_cost", 0))) * production_cost_modifier))
 	var return_rate: float = clampf((100.0 - float(preview.get("metrics", {}).get("reliability", 50.0))) / 240.0, 0.005, 0.22)
+	return_rate *= float(profile.get("return_factor", 1.0))
 	return_rate /= CompanyManager.get_support_modifier()
 	var expected_returns := int(round(float(expected_units) * return_rate))
-	var warranty_cost := int(round(float(expected_returns * int(preview.get("unit_cost", 0))) * 0.72))
+	var warranty_cost := int(round(float(expected_returns * int(preview.get("unit_cost", 0)) * production_cost_modifier) * 0.72))
 	var monthly_overhead := int(financials.get("monthly_overhead", 0))
 	var monthly_result := revenue - production_cost - warranty_cost - monthly_overhead
 	var utilization := float(expected_units) / float(maxi(capacity, 1))
@@ -267,6 +302,9 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 		"effective_capacity": effective_capacity,
 		"production_execution": production_execution,
 		"production_cost_modifier": production_cost_modifier,
+		"industrial_capacity_factor": industrial_capacity,
+		"return_rate": return_rate,
+		"industrialization": financials.get("industrialization", {}),
 		"requested_units": requested_units,
 		"expected_units": expected_units,
 		"utilization": clampf(utilization, 0.0, 1.0),
@@ -289,9 +327,18 @@ func offer_update_financials(product_id: String, production_capacity: int) -> Di
 	var target_capacity := clampi(production_capacity, 1, max_capacity)
 	var current_capacity := maxi(int(product.get("production_capacity", 1)), 1)
 	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var profile := industrialization_profile(product_id)
 	var expansion_units := maxi(target_capacity - current_capacity, 0)
-	var expansion_cost := int(round(float(expansion_units * unit_cost) * INDUSTRIALIZATION_SETUP_RATE))
-	var target_overhead := maxi(250, int(round(float(target_capacity * unit_cost) * CAPACITY_OVERHEAD_RATE)))
+	var expansion_cost := int(round(
+		float(expansion_units * unit_cost)
+		* INDUSTRIALIZATION_SETUP_RATE
+		* float(profile.get("setup_factor", 1.0))
+	))
+	var target_overhead := maxi(250, int(round(
+		float(target_capacity * unit_cost)
+		* CAPACITY_OVERHEAD_RATE
+		* float(profile.get("overhead_factor", 1.0))
+	)))
 	return {
 		"current_capacity":current_capacity,
 		"target_capacity":target_capacity,
@@ -356,10 +403,10 @@ func discontinue_product(product_id: String) -> bool:
 	products_changed.emit()
 	return true
 
-func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
+func launch_product(product_id: String, price: int, production_capacity: int, options: Dictionary = {}) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
-			var financials := launch_financials(product_id, production_capacity)
+			var financials := launch_financials(product_id, production_capacity, options)
 			if financials.is_empty():
 				return false
 			var investment := int(financials.get("investment", 0))
@@ -369,6 +416,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.production_capacity = int(financials.get("capacity", 1))
 			product["launch_investment"] = investment
 			product["monthly_capacity_overhead"] = int(financials.get("monthly_overhead", 0))
+			product["industrialization"] = financials.get("industrialization", INDUSTRIALIZATION.default_choices()).duplicate(true)
 			Economy.add_expense(investment, "Industrialisation — %s" % str(product.name))
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
@@ -411,9 +459,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		b2b_units = int(contract.units_per_month)
 		b2b_price = int(contract.unit_price)
 	var nominal_capacity := int(product.production_capacity)
+	var profile := industrialization_profile(str(product.id))
 	var production_execution := CompanyManager.get_production_execution_modifier()
-	var capacity := maxi(1, int(floor(float(nominal_capacity) * production_execution)))
-	var production_cost_modifier := CompanyManager.get_production_cost_modifier()
+	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
+	var capacity := maxi(1, int(floor(float(nominal_capacity) * production_execution * industrial_capacity)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
 	var sold_b2b: int = mini(b2b_units, capacity)
 	var remaining_capacity: int = maxi(capacity - sold_b2b, 0)
 	var sold_consumer: int = mini(consumer_units, remaining_capacity)
@@ -426,9 +476,10 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	if capacity_overhead > 0:
 		Economy.add_expense(capacity_overhead, "Capacité industrielle — %s" % str(product.name))
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
+	return_rate *= float(profile.get("return_factor", 1.0))
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)
-	var warranty_cost := int(returns * int(product.unit_cost) * 0.72)
+	var warranty_cost := int(round(float(returns * int(product.unit_cost)) * production_cost_modifier * 0.72))
 	Economy.add_expense(warranty_cost, "SAV garanties — %s" % str(product.name))
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
@@ -460,7 +511,10 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"nominal_capacity":nominal_capacity,
 		"effective_capacity":capacity,
 		"production_execution":production_execution,
-		"production_cost_modifier":production_cost_modifier
+		"production_cost_modifier":production_cost_modifier,
+		"industrial_capacity_factor":industrial_capacity,
+		"return_rate":return_rate,
+		"industrialization":product.get("industrialization", {}).duplicate(true)
 	}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
@@ -527,6 +581,7 @@ func load_state(state: Dictionary):
 		product["pending_quality_incident"] = product.get("pending_quality_incident", {}).duplicate(true)
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
+		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
