@@ -1,6 +1,7 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
 const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
@@ -89,6 +90,9 @@ var quality_incident_label: Label
 var quality_incident_buttons: Dictionary = {}
 var product_price: SpinBox
 var product_capacity: SpinBox
+var product_contract_select: OptionButton
+var product_packaging_select: OptionButton
+var product_testing_select: OptionButton
 var product_industrialization_label: Label
 var product_launch_button: Button
 var product_discontinue_button: Button
@@ -1262,6 +1266,25 @@ func _create_products_tab():
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
 	grid.add_child(_label("Prix de vente",14)); product_price=_spin(1,1000000,5,300); grid.add_child(product_price)
 	grid.add_child(_label("Capacité mensuelle",14)); product_capacity=_spin(1,1000000,100,5000); grid.add_child(product_capacity)
+
+	grid.add_child(_label("Contrat industriel",14))
+	product_contract_select = OptionButton.new()
+	_fill_industrialization_options(product_contract_select, INDUSTRIALIZATION.CONTRACTS)
+	product_contract_select.item_selected.connect(func(_index): _refresh_launch_financials())
+	grid.add_child(product_contract_select)
+
+	grid.add_child(_label("Packaging",14))
+	product_packaging_select = OptionButton.new()
+	_fill_industrialization_options(product_packaging_select, INDUSTRIALIZATION.PACKAGING)
+	product_packaging_select.item_selected.connect(func(_index): _refresh_launch_financials())
+	grid.add_child(product_packaging_select)
+
+	grid.add_child(_label("Tests en production",14))
+	product_testing_select = OptionButton.new()
+	_fill_industrialization_options(product_testing_select, INDUSTRIALIZATION.TESTING)
+	product_testing_select.item_selected.connect(func(_index): _refresh_launch_financials())
+	grid.add_child(product_testing_select)
+
 	product_industrialization_label = _muted_label("Sélectionnez un produit pour estimer l'industrialisation.", 13)
 	product_industrialization_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(product_industrialization_label)
@@ -1998,6 +2021,35 @@ func _refresh_environment_policy_info():
 		CompanyManager.get_environment_reputation_gain(budget),
 		_money(CompanyManager.MAX_ENVIRONMENT_BUDGET)
 	]
+
+func _fill_industrialization_options(option: OptionButton, rows: Dictionary):
+	option.clear()
+	for key_value in rows.keys():
+		var key := str(key_value)
+		var data: Dictionary = rows[key]
+		option.add_item(str(data.get("label", key)))
+		option.set_item_metadata(option.item_count - 1, key)
+
+func _current_industrialization_choices() -> Dictionary:
+	if product_contract_select == null or product_packaging_select == null or product_testing_select == null:
+		return INDUSTRIALIZATION.default_choices()
+	return INDUSTRIALIZATION.normalize_choices({
+		"contract":_meta(product_contract_select),
+		"packaging":_meta(product_packaging_select),
+		"testing":_meta(product_testing_select)
+	})
+
+func _set_industrialization_controls(input: Dictionary, editable: bool):
+	var choices := INDUSTRIALIZATION.normalize_choices(input)
+	if product_contract_select != null:
+		_select_meta(product_contract_select, str(choices.contract))
+		product_contract_select.disabled = not editable
+	if product_packaging_select != null:
+		_select_meta(product_packaging_select, str(choices.packaging))
+		product_packaging_select.disabled = not editable
+	if product_testing_select != null:
+		_select_meta(product_testing_select, str(choices.testing))
+		product_testing_select.disabled = not editable
 
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
@@ -2993,6 +3045,8 @@ func _refresh_product_details():
 		]
 	product_price.value = float(product.price)
 	var status := str(product.get("status", ""))
+	var industrialization_choices := product.get("industrialization", INDUSTRIALIZATION.default_choices())
+	_set_industrialization_controls(industrialization_choices, status == "READY")
 	if product_launch_button != null:
 		product_launch_button.visible = status != "DISCONTINUED"
 		product_launch_button.text = "Mettre à jour prix / capacité" if status == "LAUNCHED" else "Lancer sur le marché"
