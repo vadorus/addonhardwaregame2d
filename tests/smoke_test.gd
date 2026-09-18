@@ -395,6 +395,43 @@ func _ready() -> void:
 		_fail("CPU launch did not charge the industrialization investment")
 		return
 
+	var economy_before_offer_update := Economy.get_state().duplicate(true)
+	var original_price := int(apex_model.get("price", 1))
+	var original_overhead := int(apex_model.get("monthly_capacity_overhead", 0))
+	var money_before_reduction := Economy.money
+	if not ProductManager.update_product_offer(str(apex_model.id), original_price + 10, apex_recommended_capacity):
+		_fail("Could not reduce production capacity after launch")
+		return
+	if int(apex_model.get("production_capacity", 0)) != apex_recommended_capacity:
+		_fail("Post-launch capacity reduction was not applied")
+		return
+	if int(apex_model.get("price", 0)) != original_price + 10:
+		_fail("Post-launch price change was not applied")
+		return
+	if Economy.money != money_before_reduction:
+		_fail("Reducing production capacity incorrectly refunded or charged cash")
+		return
+	if int(apex_model.get("monthly_capacity_overhead", 0)) >= original_overhead:
+		_fail("Reducing production capacity did not lower fixed overhead")
+		return
+
+	var reexpansion := ProductManager.offer_update_financials(str(apex_model.id), apex_max_capacity)
+	var reexpansion_cost := int(reexpansion.get("expansion_cost", 0))
+	if reexpansion_cost <= 0:
+		_fail("Re-expanding production capacity did not require investment")
+		return
+	Economy.money = reexpansion_cost + 1000
+	if not ProductManager.update_product_offer(str(apex_model.id), original_price, apex_max_capacity):
+		_fail("Could not re-expand production capacity after launch")
+		return
+	if Economy.money != 1000:
+		_fail("Production capacity extension cost was not charged")
+		return
+	if int(apex_model.get("production_capacity", 0)) != apex_max_capacity:
+		_fail("Post-launch capacity expansion was not applied")
+		return
+	Economy.load_state(economy_before_offer_update)
+
 	var reliability_before_incident := float(apex_model.get("metrics", {}).get("reliability", 50.0))
 	var satisfaction_before_incident := float(apex_model.get("customer_satisfaction", 50.0))
 	var support_before_incident := float(CompanyManager.reputation.get("support", 50.0))
