@@ -1,6 +1,6 @@
 extends Node
 
-const BUILD_VERSION := "0.2.12-preview.4"
+const BUILD_VERSION := "0.2.12-preview.5"
 const QUEUE_PATH := "user://bug_reports_queue.json"
 const MAX_DESCRIPTION_LENGTH := 1200
 const MAX_QUEUE_SIZE := 50
