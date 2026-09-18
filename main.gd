@@ -2210,12 +2210,15 @@ func _refresh_dashboard():
 
 	var ready_product: Dictionary = {}
 	var launched_product: Dictionary = {}
+	var discontinued_product: Dictionary = {}
 	var quality_incident := ProductManager.get_pending_quality_incident()
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "READY" and ready_product.is_empty():
 			ready_product = product
 		elif str(product.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
 			launched_product = product
+		elif str(product.get("status", "")) == "DISCONTINUED" and discontinued_product.is_empty():
+			discontinued_product = product
 
 	var visual_stage := _company_visual_stage()
 	if dashboard_stage_label != null:
@@ -2326,6 +2329,24 @@ func _refresh_dashboard():
 			dashboard_next_step_label.text = "Analysez les ventes et préparez la génération suivante quand vous êtes prêt."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
+	elif not discontinued_product.is_empty():
+		dashboard_cto_button.text = "Voir l'historique produit"
+		dashboard_label.text = "La génération précédente est terminée"
+		dashboard_project_meta_label.text = "%s • %s unités vendues avant la fin de vente" % [
+			str(discontinued_product.get("name", "Ancien CPU")),
+			_money(int(discontinued_product.get("units_sold_total", 0)))
+		]
+		dashboard_project_phase_label.text = "NOUVELLE GÉNÉRATION"
+		dashboard_project_progress.value = 0.0
+		dashboard_metric_a.text = "G%d" % (int(discontinued_product.get("generation_index", 1)) + 1)
+		dashboard_metric_b.text = "R&D"
+		dashboard_metric_c.text = "Successeur"
+		dashboard_cto_label.text = "« La ligne précédente est arrêtée. C'est le bon moment pour transformer les retours marché en nouvelle architecture. »"
+		dashboard_action_button.text = "Concevoir la génération suivante"
+		dashboard_target_tab = 3
+		dashboard_next_step_label.text = "Ouvrez le laboratoire et préparez le successeur de votre ancienne génération."
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", discontinued_product.get("cpu_design", {}), 100.0, false)
 	else:
 		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = "Votre première génération"
