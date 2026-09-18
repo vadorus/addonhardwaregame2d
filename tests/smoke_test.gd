@@ -132,6 +132,21 @@ func _ready() -> void:
 		return
 	CompanyManager.load_state(initial_company_state)
 
+	var low_environment_gain := CompanyManager.get_environment_reputation_gain(2_500)
+	var max_environment_gain := CompanyManager.get_environment_reputation_gain(CompanyManager.MAX_ENVIRONMENT_BUDGET)
+	if max_environment_gain <= low_environment_gain:
+		_fail("Environment reputation gain did not increase with spending")
+		return
+	var legacy_environment_state := initial_company_state.duplicate(true)
+	var legacy_environment_policies: Dictionary = legacy_environment_state.get("policies", {}).duplicate(true)
+	legacy_environment_policies["environment_budget"] = 200_000
+	legacy_environment_state["policies"] = legacy_environment_policies
+	CompanyManager.load_state(legacy_environment_state)
+	if int(CompanyManager.policies.get("environment_budget", 0)) != CompanyManager.MAX_ENVIRONMENT_BUDGET:
+		_fail("Legacy environment budget was not clamped to the useful maximum")
+		return
+	CompanyManager.load_state(initial_company_state)
+
 	if not SaveManager.autosave_game():
 		_fail("Autosave could not write the current game")
 		return
