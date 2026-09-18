@@ -109,7 +109,7 @@ func _apply_data() -> void:
 
 func _badge_color(value: String) -> Color:
 	match value.to_upper():
-		"LAUNCHED", "EN VENTE", "VOUS":
+		"LAUNCHED", "EN VENTE", "VOUS", "RECOMMANDÉ":
 			return GREEN
 		"READY", "PRÊT", "RESPONSABLE":
 			return AMBER
