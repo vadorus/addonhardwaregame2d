@@ -22,6 +22,7 @@ var money_label: Label
 var status_label: Label
 var tabs: TabContainer
 var setup_layer: Control
+var setup_content_grid: GridContainer
 var month_layer: Control
 var month_report_label: Label
 
@@ -1275,18 +1276,92 @@ func _create_evolution_tab():
 
 func _build_setup_layer():
 	setup_layer = ColorRect.new()
-	setup_layer.color = Color(0.05,0.06,0.08,0.97)
+	setup_layer.color = APP_BG
 	setup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(setup_layer)
-	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); setup_layer.add_child(center)
-	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
-	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
-	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("La vertical slice actuelle commence par la branche CPU. Développez vos équipes, vos technologies et plusieurs générations de processeurs avant l’ouverture des autres gammes produit.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
-	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
-	setup_sector=OptionButton.new(); _fill_product_family_options(setup_sector); box.add_child(setup_sector)
-	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
-	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	setup_layer.add_child(center)
+
+	var panel := _card(APP_SHELL, 20, 22)
+	panel.custom_minimum_size = Vector2(760, 520)
+	center.add_child(panel)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 16)
+	panel.add_child(root)
+
+	var brand := VBoxContainer.new()
+	brand.add_theme_constant_override("separation", 3)
+	root.add_child(brand)
+	var eyebrow := _eyebrow("TECH EMPIRE")
+	eyebrow.add_theme_color_override("font_color", APP_AMBER)
+	brand.add_child(eyebrow)
+	var title := _label("Du garage au groupe technologique", 30)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	brand.add_child(title)
+	var subtitle := _muted_label("Concevez vos processeurs, construisez vos équipes et faites grandir chaque pôle de l'entreprise.", 13)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	brand.add_child(subtitle)
+
+	setup_content_grid = GridContainer.new()
+	setup_content_grid.columns = 2
+	setup_content_grid.add_theme_constant_override("h_separation", 18)
+	setup_content_grid.add_theme_constant_override("v_separation", 14)
+	root.add_child(setup_content_grid)
+
+	var preview_card := _card(APP_PANEL, 12, 12)
+	preview_card.custom_minimum_size = Vector2(330, 300)
+	setup_content_grid.add_child(preview_card)
+	var preview_box := VBoxContainer.new()
+	preview_box.add_theme_constant_override("separation", 8)
+	preview_card.add_child(preview_box)
+	preview_box.add_child(_eyebrow("VOTRE PREMIER QG"))
+	var preview_title := _label("Garage fondateur", 19)
+	preview_title.add_theme_color_override("font_color", APP_AMBER)
+	preview_box.add_child(preview_title)
+	var office_script: Script = load("res://ui/OfficeScene.gd")
+	var office_preview: Control = office_script.new() as Control
+	office_preview.custom_minimum_size = Vector2(310, 180)
+	preview_box.add_child(office_preview)
+	if office_preview.has_method("set_stage"):
+		office_preview.call("set_stage", 0, "Votre entreprise")
+	var preview_hint := _muted_label("Vous commencez à deux. Le garage évoluera avec vos lancements, vos équipes et votre réputation.", 12)
+	preview_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_box.add_child(preview_hint)
+
+	var form_card := _card(APP_PANEL, 12, 12)
+	form_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	setup_content_grid.add_child(form_card)
+	var form := VBoxContainer.new()
+	form.add_theme_constant_override("separation", 10)
+	form_card.add_child(form)
+	form.add_child(_eyebrow("FONDER L'ENTREPRISE"))
+	setup_name = LineEdit.new()
+	setup_name.placeholder_text = "Nom de l'entreprise"
+	setup_name.text = "Nova Technologies"
+	setup_name.custom_minimum_size.y = 44
+	_add_labeled_control(form, "Nom", setup_name)
+	setup_sector = OptionButton.new()
+	_fill_product_family_options(setup_sector)
+	_add_labeled_control(form, "Première gamme produit", setup_sector)
+
+	var start_info := _muted_label("Capital initial : 500 000 € • équipe : Camille + Alex • première gamme : CPU", 12)
+	start_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	form.add_child(start_info)
+
+	var start := Button.new()
+	start.text = "Fonder l'entreprise"
+	start.custom_minimum_size.y = 52
+	start.pressed.connect(_start_new_game)
+	form.add_child(start)
+
+	var load := Button.new()
+	load.text = "Reprendre une sauvegarde"
+	load.custom_minimum_size.y = 44
+	load.pressed.connect(_load_game)
+	form.add_child(load)
 
 func _build_month_layer():
 	month_layer=ColorRect.new(); month_layer.color=Color(0,0,0,0.72); month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.visible=false; add_child(month_layer)
@@ -1756,6 +1831,8 @@ func _update_responsive_layout():
 		_apply_dashboard_density()
 	if navigation_grid != null:
 		navigation_grid.columns = 1 if compact else 2
+	if setup_content_grid != null:
+		setup_content_grid.columns = 1 if compact else 2
 	if dashboard_grid != null:
 		dashboard_grid.columns = 1 if compact else 2
 	if dashboard_stats_grid != null:
