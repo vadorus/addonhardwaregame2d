@@ -56,10 +56,18 @@ func repay_financing(amount: int = 100_000) -> bool:
 	transaction_recorded.emit("financing_repayment", "Remboursement financement", repayment)
 	return true
 
-func process_financing_month():
+func effective_monthly_interest_rate() -> float:
+	return MONTHLY_INTEREST_RATE * CompanyManager.get_finance_interest_modifier()
+
+func projected_monthly_interest() -> int:
 	if debt <= 0:
+		return 0
+	return maxi(1, int(round(float(debt) * effective_monthly_interest_rate())))
+
+func process_financing_month():
+	var interest := projected_monthly_interest()
+	if interest <= 0:
 		return
-	var interest := maxi(1, int(round(float(debt) * MONTHLY_INTEREST_RATE)))
 	add_expense(interest, "Intérêts financement")
 
 func solvency_status() -> String:
@@ -119,7 +127,7 @@ func financial_snapshot() -> Dictionary:
 	var income_source: Dictionary = latest.get("income_breakdown", {}) if not latest.is_empty() else income_breakdown
 	var top_expense := _largest_breakdown_entry(expense_source)
 	var top_income := _largest_breakdown_entry(income_source)
-	var projected_interest := maxi(0, int(round(float(debt) * MONTHLY_INTEREST_RATE)))
+	var projected_interest := projected_monthly_interest()
 
 	var recommendation := "Continuez à investir sans dépasser votre capacité de financement."
 	var status := solvency_status()
@@ -141,6 +149,7 @@ func financial_snapshot() -> Dictionary:
 		"top_expense": top_expense,
 		"top_income": top_income,
 		"projected_interest": projected_interest,
+		"effective_interest_rate": effective_monthly_interest_rate(),
 		"debt_capacity_remaining": maxi(MAX_DEBT - debt, 0),
 		"recommendation": recommendation
 	}
