@@ -71,7 +71,7 @@ func _create_cpu_range(project: Dictionary) -> void:
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
-		product["cpu_support"] = CPU_SUPPORT.initial_state(product.get("metrics", {}), product.get("cpu_design", {}))
+		product["cpu_support"] = _initial_cpu_support_state(product.get("metrics", {}), product.get("cpu_design", {}))
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
@@ -97,7 +97,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
 		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0,
-		"cpu_support":CPU_SUPPORT.initial_state(metrics, project.get("cpu_design", {}))
+		"cpu_support":_initial_cpu_support_state(metrics, project.get("cpu_design", {}))
 	}
 	_next_id += 1
 	products.append(product)
@@ -125,6 +125,12 @@ func _metric_average(metrics: Dictionary) -> float:
 	for metric in GameData.METRICS:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
+
+func _initial_cpu_support_state(metrics: Dictionary, design: Dictionary) -> Dictionary:
+	var support := CPU_SUPPORT.initial_state(metrics, design)
+	support["microcode_quality"] = clampf(float(support.get("microcode_quality", 60.0)) + TechnologyManager.initial_microcode_bonus(), 0.0, 100.0)
+	support["compatibility"] = clampf(float(support.get("compatibility", 60.0)) + TechnologyManager.initial_compatibility_bonus(), 0.0, 100.0)
+	return support
 
 func get_pending_software_issue() -> Dictionary:
 	for product in products:
@@ -216,7 +222,7 @@ func _process_cpu_support_month(product: Dictionary) -> void:
 		support,
 		product.get("metrics", {}),
 		int(product.get("months_on_market", 0))
-	)
+	) * TechnologyManager.support_debt_modifier()
 	var issue: Dictionary = support.get("pending_issue", {})
 	if issue.is_empty() and float(support.get("support_debt", 0.0)) >= CPU_SUPPORT.ISSUE_THRESHOLD:
 		issue = CPU_SUPPORT.issue_from_state(
@@ -352,7 +358,11 @@ func get_industrialization_choices(product_id: String, options: Dictionary = {})
 	return INDUSTRIALIZATION.normalize_choices(source)
 
 func industrialization_profile(product_id: String, options: Dictionary = {}) -> Dictionary:
-	return INDUSTRIALIZATION.evaluate(get_industrialization_choices(product_id, options))
+	var profile := INDUSTRIALIZATION.evaluate(get_industrialization_choices(product_id, options))
+	profile["setup_factor"] = clampf(float(profile.get("setup_factor", 1.0)) * TechnologyManager.industrial_modifier("setup"), 0.45, 1.75)
+	profile["unit_cost_factor"] = clampf(float(profile.get("unit_cost_factor", 1.0)) * TechnologyManager.industrial_modifier("unit_cost"), 0.75, 1.30)
+	profile["capacity_factor"] = clampf(float(profile.get("capacity_factor", 1.0)) * TechnologyManager.industrial_modifier("capacity"), 0.65, 1.40)
+	return profile
 
 func effective_unit_cost(product_id: String, options: Dictionary = {}) -> int:
 	var product := get_product(product_id)
@@ -705,7 +715,11 @@ func load_state(state: Dictionary):
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
 		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
-		product["cpu_support"] = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
+		var saved_support: Dictionary = product.get("cpu_support", {})
+		if saved_support.is_empty():
+			product["cpu_support"] = _initial_cpu_support_state(product.get("metrics", {}), product.get("cpu_design", {}))
+		else:
+			product["cpu_support"] = CPU_SUPPORT.normalize_state(saved_support, product.get("metrics", {}), product.get("cpu_design", {}))
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
