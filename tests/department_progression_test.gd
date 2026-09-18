@@ -50,7 +50,7 @@ func _ready() -> void:
 	CompanyManager.reputation.innovation = 20.0
 	CompanyManager.reputation.reliability = 20.0
 	CompanyManager.reputation.prestige = 20.0
-	while PersonnelManager.staff.size() > 6:
+	while PersonnelManager.staff.size() > 2:
 		PersonnelManager.staff.pop_back()
 
 	for sector_id in DepartmentProgression.get_pole_ids():
