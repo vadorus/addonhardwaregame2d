@@ -45,6 +45,7 @@ var products_label: Label
 var product_details_label: Label
 var market_label: Label
 var contract_label: Label
+var contract_card_grid: GridContainer
 var media_label: Label
 var media_card_grid: GridContainer
 
@@ -1189,8 +1190,14 @@ func _create_market_tab():
 	box.add_child(market_benchmark_grid)
 	box.add_child(_section("Lecture du marché"))
 	market_label=_rich_label(); box.add_child(market_label)
-	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
-	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
+	box.add_child(_section("Contrats B2B"))
+	contract_label = _muted_label("Aucune proposition.", 12)
+	box.add_child(contract_label)
+	contract_card_grid = GridContainer.new()
+	contract_card_grid.columns = 2
+	contract_card_grid.add_theme_constant_override("h_separation", 10)
+	contract_card_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(contract_card_grid)
 
 func _create_media_tab():
 	var scroll := _tab_scroll("Presse & médias")
@@ -1717,6 +1724,8 @@ func _update_responsive_layout():
 		company_reputation_grid.columns = 2 if compact else 4
 	if media_card_grid != null:
 		media_card_grid.columns = 1 if compact else 2
+	if contract_card_grid != null:
+		contract_card_grid.columns = 1 if compact else 2
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -2537,10 +2546,7 @@ func _refresh_market():
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
 	lines.append("Pertinence marché : %.0f%% • %d mois depuis le lancement" % [MarketManager.product_market_relevance(p) * 100.0, int(p.get("months_on_market", 0))])
 	market_label.text="\n".join(lines)
-	var c_lines:=[]
-	for c in MarketManager.contracts:
-		c_lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [str(c.customer),str(c.product_name),_money(int(c.units_per_month)),_money(int(c.unit_price)),int(c.remaining_months),str(c.status)])
-	contract_label.text="\n".join(c_lines) if not c_lines.is_empty() else "Aucune proposition. Les produits adaptés au calcul, à l'efficacité ou à la fiabilité peuvent attirer des entreprises."
+	_refresh_contract_cards()
 
 func _clear_market_benchmark_cards():
 	if market_benchmark_grid == null:
@@ -2565,7 +2571,49 @@ func _refresh_market_benchmark_cards(rows: Array):
 		]
 		card.call("configure", "BENCH-%d" % i, str(row.get("name", "Produit")), subtitle, badge, metrics, "")
 
-func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
+func _refresh_contract_cards():
+	if contract_card_grid == null or contract_label == null:
+		return
+	for child in contract_card_grid.get_children():
+		child.queue_free()
+	if MarketManager.contracts.is_empty():
+		contract_label.text = "Aucune proposition. Les produits adaptés au calcul, à l'efficacité ou à la fiabilité peuvent attirer des entreprises."
+		return
+	var pending := 0
+	var active := 0
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	for contract_value in MarketManager.contracts:
+		var contract: Dictionary = contract_value
+		var status := str(contract.get("status", "PENDING"))
+		if status == "PENDING":
+			pending += 1
+		elif status == "ACTIVE":
+			active += 1
+		var monthly_revenue := int(contract.get("units_per_month", 0)) * int(contract.get("unit_price", 0))
+		var metrics := [
+			{"label":"VOLUME/MOIS", "value":_money(int(contract.get("units_per_month", 0)))},
+			{"label":"PRIX UNIT.", "value":"%s €" % _money(int(contract.get("unit_price", 0)))},
+			{"label":"REVENU/MOIS", "value":"%s €" % _money(monthly_revenue)}
+		]
+		var subtitle := "%s • %d mois restants" % [str(contract.get("product_name", "Produit")), int(contract.get("remaining_months", 0))]
+		var action := "Accepter ce contrat" if status == "PENDING" else ""
+		var card: Control = card_script.new() as Control
+		contract_card_grid.add_child(card)
+		card.call("configure", str(contract.get("id", "")), str(contract.get("customer", "Client B2B")), subtitle, status, metrics, action)
+		if status == "PENDING":
+			card.connect("entity_selected", Callable(self, "_accept_contract_by_id"))
+	contract_label.text = "%d proposition(s) en attente • %d contrat(s) actif(s)" % [pending, active]
+
+func _accept_contract_by_id(contract_id: String):
+	if MarketManager.accept_contract(contract_id):
+		status_label.text = "Contrat B2B accepté."
+	else:
+		status_label.text = "Ce contrat n'est plus disponible."
+	_refresh_all()
+
+func _accept_contract():
+	status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."
+	_refresh_all()
 
 func _refresh_media():
 	if media_label == null:
