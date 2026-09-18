@@ -327,8 +327,76 @@ func _ready() -> void:
 		_fail("Legacy V3 save was not migrated to the CPU division")
 		return
 
+	if not _validate_first_generation_financing():
+		return
+
 	print("[CI] Smoke test passed")
 	get_tree().quit(0)
+
+func _validate_first_generation_financing() -> bool:
+	SimulationManager.reset_all("First Generation Balance", "CPU")
+	var proposals := ResearchManager.prepare_cpu_generation_proposals(
+		"MAINSTREAM", "INTERNAL", "BALANCED", 42_000, CPU_DESIGN.preset("BALANCED")
+	)
+	if proposals.size() != 3:
+		_fail("Balance test could not prepare CPU generation plans")
+		return false
+	var selected: Dictionary = proposals[0]
+	for proposal_value in proposals:
+		var proposal: Dictionary = proposal_value
+		if bool(proposal.get("recommended", false)):
+			selected = proposal
+			break
+	var design: Dictionary = selected.get("design", CPU_DESIGN.preset("BALANCED"))
+	if not ResearchManager.start_project("First Gen", "CPU", "MAINSTREAM", "INTERNAL", "BALANCED", 42_000, design, selected):
+		_fail("Balance test could not start the first CPU generation")
+		return false
+	var project: Dictionary = ResearchManager.projects[0]
+	var elapsed_months := 0
+	while str(project.get("status", "")) == "DEVELOPMENT" and elapsed_months < 24:
+		var pending := ResearchManager.get_pending_phase_decision()
+		if not pending.is_empty():
+			if not ResearchManager.resolve_phase_decision(str(pending.get("project_id", "")), "FIX_WEAKNESS"):
+				_fail("Balance test could not resolve a phase decision")
+				return false
+			continue
+		SimulationManager.process_month_end()
+		elapsed_months += 1
+		if Economy.bankrupt:
+			_fail("First CPU generation becomes bankrupt before R&D can finish")
+			return false
+	if str(project.get("status", "")) != "COMPLETED":
+		_fail("First CPU generation did not complete within 24 months")
+		return false
+	if ProductManager.products.size() < 3:
+		_fail("First CPU generation did not produce the launch family")
+		return false
+
+	var launch_model: Dictionary = ProductManager.products[1]
+	var launch_financials := ProductManager.launch_financials(
+		str(launch_model.get("id", "")),
+		int(launch_model.get("recommended_capacity", launch_model.get("production_capacity", 1)))
+	)
+	var investment := int(launch_financials.get("investment", 0))
+	var financing_steps := 0
+	while Economy.money < investment and Economy.debt < Economy.MAX_DEBT and financing_steps < 4:
+		if not Economy.request_financing(250_000):
+			break
+		financing_steps += 1
+	if Economy.money < investment:
+		_fail("First CPU cannot be industrialized even after available financing")
+		return false
+	if not ProductManager.launch_product(
+		str(launch_model.get("id", "")),
+		int(launch_model.get("price", 1)),
+		int(launch_model.get("recommended_capacity", 1))
+	):
+		_fail("First CPU could not be launched after financing")
+		return false
+	if Economy.bankrupt:
+		_fail("First CPU launch path ended in unavoidable bankruptcy")
+		return false
+	return true
 
 func _fail(message: String) -> void:
 	push_error("[CI] " + message)
