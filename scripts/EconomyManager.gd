@@ -5,9 +5,12 @@ signal month_closed(report)
 signal transaction_recorded(kind, category, amount)
 signal financing_changed(debt)
 signal solvency_warning(message)
+signal bankruptcy_triggered(report)
 
 const MAX_DEBT := 1_000_000
 const MONTHLY_INTEREST_RATE := 0.012
+const BANKRUPTCY_CASH_THRESHOLD := -1_000_000
+const BANKRUPTCY_NEGATIVE_MONTHS := 3
 
 var money: int = 500_000
 var debt: int = 0
@@ -17,6 +20,7 @@ var monthly_expenses: int = 0
 var income_breakdown: Dictionary = {}
 var expense_breakdown: Dictionary = {}
 var history: Array = []
+var bankrupt := false
 
 func reset(starting_capital: int = 500_000):
 	money = starting_capital
@@ -27,6 +31,7 @@ func reset(starting_capital: int = 500_000):
 	income_breakdown = {}
 	expense_breakdown = {}
 	history = []
+	bankrupt = false
 	money_changed.emit(money)
 	financing_changed.emit(debt)
 
@@ -58,6 +63,8 @@ func process_financing_month():
 	add_expense(interest, "Intérêts financement")
 
 func solvency_status() -> String:
+	if bankrupt:
+		return "BANKRUPT"
 	if money <= -500_000 or debt >= 900_000:
 		return "CRITICAL"
 	if money < 0 or debt >= 500_000:
@@ -87,8 +94,14 @@ func close_month() -> Dictionary:
 		negative_months += 1
 	else:
 		negative_months = 0
+	var bankruptcy_now := false
+	if not bankrupt and money <= BANKRUPTCY_CASH_THRESHOLD and negative_months >= BANKRUPTCY_NEGATIVE_MONTHS:
+		bankrupt = true
+		bankruptcy_now = true
 	var status := solvency_status()
-	if status == "CRITICAL":
+	if status == "BANKRUPT":
+		solvency_warning.emit("Faillite : l'entreprise est durablement insolvable.")
+	elif status == "CRITICAL":
 		solvency_warning.emit("Trésorerie critique : réduisez les dépenses, lancez un produit ou cherchez un financement.")
 	elif status == "TENSE":
 		solvency_warning.emit("Trésorerie sous tension : surveillez votre dette et votre prochain lancement.")
@@ -100,6 +113,7 @@ func close_month() -> Dictionary:
 		"debt": debt,
 		"negative_months": negative_months,
 		"solvency_status": status,
+		"bankrupt": bankrupt,
 		"income_breakdown": income_breakdown.duplicate(true),
 		"expense_breakdown": expense_breakdown.duplicate(true),
 		"month": TimeManager.month,
@@ -113,6 +127,8 @@ func close_month() -> Dictionary:
 	income_breakdown = {}
 	expense_breakdown = {}
 	month_closed.emit(report)
+	if bankruptcy_now:
+		bankruptcy_triggered.emit(report)
 	return report
 
 func get_state() -> Dictionary:
@@ -120,7 +136,7 @@ func get_state() -> Dictionary:
 		"money":money, "debt":debt, "negative_months":negative_months,
 		"monthly_income":monthly_income, "monthly_expenses":monthly_expenses,
 		"income_breakdown":income_breakdown, "expense_breakdown":expense_breakdown,
-		"history":history
+		"history":history, "bankrupt":bankrupt
 	}
 
 func load_state(state: Dictionary):
@@ -132,5 +148,6 @@ func load_state(state: Dictionary):
 	income_breakdown = state.get("income_breakdown", {}).duplicate(true)
 	expense_breakdown = state.get("expense_breakdown", {}).duplicate(true)
 	history = state.get("history", []).duplicate(true)
+	bankrupt = bool(state.get("bankrupt", false))
 	money_changed.emit(money)
 	financing_changed.emit(debt)
