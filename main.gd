@@ -2286,8 +2286,11 @@ func _refresh_dashboard():
 		dashboard_target_tab = 5
 		var market_relevance := MarketManager.product_market_relevance(launched_product)
 		var operations_hire := _operational_hiring_recommendation(true)
-		if market_relevance < 0.72:
-			dashboard_next_step_label.text = "Votre CPU vieillit face aux nouvelles générations. Préparez son successeur."
+		if MarketManager.should_renew_product(launched_product):
+			dashboard_cto_label.text = "« Cette génération arrive en fin de cycle. Si nous attendons encore, les concurrents vont creuser l'écart. »"
+			dashboard_action_button.text = "Préparer la génération suivante"
+			dashboard_target_tab = 3
+			dashboard_next_step_label.text = "Votre CPU vieillit face aux nouvelles générations. Lancez maintenant le travail sur son successeur."
 		elif not operations_hire.is_empty() and int(launched_product.get("months_on_market", 0)) >= 1:
 			var hire_department := str(operations_hire.get("department", ""))
 			dashboard_recruit_department = hire_department
@@ -2817,6 +2820,7 @@ func _refresh_product_cards():
 		var tier := str(product.get("sku_label", "Modèle"))
 		var role := str(product.get("range_role", ""))
 		var status := str(product.get("status", "READY"))
+		var badge := "À RENOUVELER" if MarketManager.should_renew_product(product) else status
 		var subtitle := "G%d • %s" % [generation, tier]
 		if not role.is_empty():
 			subtitle += " • " + role
@@ -2829,7 +2833,7 @@ func _refresh_product_cards():
 			{"label":"VENTES", "value":sales_text}
 		]
 		var action := "Configurer" if status == "READY" else "Voir le produit"
-		card.call("configure", str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, status, metrics, action)
+		card.call("configure", str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, badge, metrics, action)
 		card.connect("entity_selected", Callable(self, "_select_product_from_card"))
 
 func _select_product_from_card(product_id: String):
