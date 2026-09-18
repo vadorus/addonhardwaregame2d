@@ -307,6 +307,37 @@ func _ready() -> void:
 	if Economy.money != cash_before_launch - int(max_financials.get("investment", 0)):
 		_fail("CPU launch did not charge the industrialization investment")
 		return
+
+	var reliability_before_incident := float(apex_model.get("metrics", {}).get("reliability", 50.0))
+	var satisfaction_before_incident := float(apex_model.get("customer_satisfaction", 50.0))
+	var support_before_incident := float(CompanyManager.reputation.get("support", 50.0))
+	ProductManager._maybe_create_quality_incident(apex_model, 200, 30, 0.15, 5_000)
+	var quality_incident := ProductManager.get_pending_quality_incident()
+	if quality_incident.is_empty() or str(quality_incident.get("product_id", "")) != str(apex_model.id):
+		_fail("High return rate did not create a quality incident")
+		return
+	if ProductManager.quality_incident_options(str(apex_model.id)).size() != 3:
+		_fail("Quality incident did not expose three player responses")
+		return
+	if not ProductManager.resolve_quality_incident(str(apex_model.id), "MINIMAL_SUPPORT"):
+		_fail("Minimal support response could not resolve a quality incident")
+		return
+	if not ProductManager.get_pending_quality_incident().is_empty():
+		_fail("Resolved quality incident remained pending")
+		return
+	if int(apex_model.get("quality_incident_cooldown", 0)) != 6:
+		_fail("Quality incident cooldown was not applied")
+		return
+	if float(apex_model.get("customer_satisfaction", 50.0)) >= satisfaction_before_incident:
+		_fail("Minimal support response did not reduce customer satisfaction")
+		return
+	if float(CompanyManager.reputation.get("support", 50.0)) >= support_before_incident:
+		_fail("Minimal support response did not hurt support reputation")
+		return
+	apex_model.get("metrics", {})["reliability"] = reliability_before_incident
+	apex_model["customer_satisfaction"] = satisfaction_before_incident
+	CompanyManager.reputation["support"] = support_before_incident
+
 	var fresh_demand := MarketManager.estimate_consumer_demand(apex_model)
 	apex_model["months_on_market"] = 24
 	var aged_demand := MarketManager.estimate_consumer_demand(apex_model)
