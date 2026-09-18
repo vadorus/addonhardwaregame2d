@@ -94,6 +94,7 @@ var policy_marketing_info: Label
 var policy_support: OptionButton
 var policy_support_info: Label
 var policy_environment: SpinBox
+var policy_environment_info: Label
 var department_select: OptionButton
 var autonomy_select: OptionButton
 var leader_select: OptionButton
@@ -662,7 +663,14 @@ func _create_company_tab():
 	policy_support_info = _muted_label("", 12)
 	policy_support_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	grid.add_child(policy_support_info)
-	grid.add_child(_label("Environnement",14)); policy_environment = _spin(0,200000,500,2500); grid.add_child(policy_environment)
+	grid.add_child(_label("Environnement",14))
+	policy_environment = _spin(0,CompanyManager.MAX_ENVIRONMENT_BUDGET,500,2500)
+	policy_environment.value_changed.connect(func(_value): _refresh_environment_policy_info())
+	grid.add_child(policy_environment)
+	grid.add_child(_label("Effet environnement",14))
+	policy_environment_info = _muted_label("", 12)
+	policy_environment_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grid.add_child(policy_environment_info)
 	var apply := Button.new(); apply.text = "Appliquer les politiques"; apply.pressed.connect(_apply_policies); box.add_child(apply)
 
 	box.add_child(_section("Trésorerie & financement"))
@@ -1843,6 +1851,16 @@ func _refresh_support_policy_info():
 		float(data.get("modifier", 1.0))
 	]
 
+func _refresh_environment_policy_info():
+	if policy_environment == null or policy_environment_info == null:
+		return
+	var budget := int(policy_environment.value)
+	policy_environment_info.text = "%s €/mois • durabilité +%.2f point(s)/mois • plafond utile %s €" % [
+		_money(budget),
+		CompanyManager.get_environment_reputation_gain(budget),
+		_money(CompanyManager.MAX_ENVIRONMENT_BUDGET)
+	]
+
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
 	return str(option.get_item_metadata(option.selected))
@@ -2204,6 +2222,7 @@ func _refresh_company():
 	_select_meta(policy_support, str(CompanyManager.policies.get("support_level", "STANDARD")))
 	_refresh_support_policy_info()
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
+	_refresh_environment_policy_info()
 	_refresh_leader_choices()
 
 func _refresh_company_operations():
@@ -2283,7 +2302,7 @@ func _refresh_company_reputation_cards(reputation: Dictionary):
 func _apply_policies():
 	CompanyManager.set_marketing_campaign(_meta(policy_marketing))
 	CompanyManager.set_support_plan(_meta(policy_support))
-	CompanyManager.policies.environment_budget = int(policy_environment.value)
+	CompanyManager.policies.environment_budget = clampi(int(policy_environment.value), 0, CompanyManager.MAX_ENVIRONMENT_BUDGET)
 	CompanyManager.company_changed.emit()
 	var campaign := CompanyManager.get_marketing_campaign()
 	var support_plan := CompanyManager.get_support_plan()
