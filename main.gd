@@ -2623,6 +2623,8 @@ func _refresh_launch_financials():
 	var overhead := int(financials.get("monthly_overhead", 0))
 	var affordable := Economy.money >= investment
 	var expected_units := int(forecast.get("expected_units", 0))
+	var effective_capacity := int(forecast.get("effective_capacity", int(product_capacity.value)))
+	var production_execution := float(forecast.get("production_execution", 1.0)) * 100.0
 	var utilization := float(forecast.get("utilization", 0.0)) * 100.0
 	var monthly_result := int(forecast.get("monthly_result", 0))
 	var market_share := float(forecast.get("share", 0.0)) * 100.0
@@ -2634,11 +2636,14 @@ func _refresh_launch_financials():
 		price_effect = "demande réduite"
 	elif price_factor > 1.08:
 		price_effect = "volume stimulé"
-	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nPrévision : ~%s ventes/mois • capacité utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois\nEffet du prix : %s (demande ×%.2f)" % [
+	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s\nProduction : capacité nominale %s • capacité utile %s (équipe %.0f%%)\nPrévision : ~%s ventes/mois • ligne utilisée %.0f%% • part ~%.1f%% • résultat produit ~%s €/mois\nEffet du prix : %s (demande ×%.2f)" % [
 		_money(investment),
 		_money(overhead),
 		_money(margin),
 		"" if affordable else " • TRÉSORERIE INSUFFISANTE",
+		_money(int(product_capacity.value)),
+		_money(effective_capacity),
+		production_execution,
 		_money(expected_units),
 		utilization,
 		market_share,
