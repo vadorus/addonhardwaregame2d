@@ -1,8 +1,6 @@
-name: Preview Builds
+name: Signed Preview (manual)
 
 on:
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 permissions:
