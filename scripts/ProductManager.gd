@@ -24,6 +24,12 @@ var _reviewed_products: Dictionary = {}
 
 const INDUSTRIALIZATION_SETUP_RATE := 0.12
 const CAPACITY_OVERHEAD_RATE := 0.015
+const STOCK_HOLDING_RATE := 0.006
+const STOCK_POLICIES := {
+	"LEAN":{"label":"Flux tendu","target_ratio":0.10,"summary":"Peu de capital immobilisé, mais plus de risque de rupture."},
+	"BALANCED":{"label":"Stock équilibré","target_ratio":0.35,"summary":"Un tampon raisonnable entre coût de stockage et disponibilité."},
+	"SECURE":{"label":"Stock sécurisé","target_ratio":0.70,"summary":"Plus de disponibilité, mais davantage de cash immobilisé et de frais de stockage."}
+}
 const QUALITY_INCIDENT_RETURN_RATE := 0.09
 const QUALITY_INCIDENT_MIN_RETURNS := 20
 
@@ -348,6 +354,24 @@ func _maybe_create_quality_incident(product: Dictionary, total_units: int, retur
 	)
 	quality_incident_created.emit(incident.duplicate(true))
 
+func get_stock_policy_keys() -> Array:
+	return STOCK_POLICIES.keys()
+
+func get_stock_policy(key: String) -> Dictionary:
+	return STOCK_POLICIES.get(key, STOCK_POLICIES.BALANCED)
+
+func set_stock_policy(product_id: String, key: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or not STOCK_POLICIES.has(key):
+		return false
+	product["stock_policy"] = key
+	products_changed.emit()
+	return true
+
+func stock_target_units(product: Dictionary, effective_capacity: int) -> int:
+	var policy := get_stock_policy(str(product.get("stock_policy", "BALANCED")))
+	return maxi(0, int(round(float(effective_capacity) * float(policy.get("target_ratio", 0.35)))))
+
 func get_industrialization_choices(product_id: String, options: Dictionary = {}) -> Dictionary:
 	var product := get_product(product_id)
 	if product.is_empty():
@@ -549,6 +573,10 @@ func launch_product(product_id: String, price: int, production_capacity: int, op
 			product["launch_investment"] = investment
 			product["monthly_capacity_overhead"] = int(financials.get("monthly_overhead", 0))
 			product["industrialization"] = financials.get("industrialization", INDUSTRIALIZATION.default_choices()).duplicate(true)
+			product["stock_policy"] = str(product.get("stock_policy", "BALANCED"))
+			product["inventory_units"] = maxi(int(product.get("inventory_units", 0)), 0)
+			product["last_month_produced"] = 0
+			product["last_month_lost_sales"] = 0
 			Economy.add_expense(investment, "Industrialisation — %s" % str(product.name))
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
@@ -715,6 +743,11 @@ func load_state(state: Dictionary):
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
 		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
+		var stock_policy := str(product.get("stock_policy", "BALANCED"))
+		product["stock_policy"] = stock_policy if STOCK_POLICIES.has(stock_policy) else "BALANCED"
+		product["inventory_units"] = maxi(int(product.get("inventory_units", 0)), 0)
+		product["last_month_produced"] = maxi(int(product.get("last_month_produced", 0)), 0)
+		product["last_month_lost_sales"] = maxi(int(product.get("last_month_lost_sales", 0)), 0)
 		var saved_support: Dictionary = product.get("cpu_support", {})
 		if saved_support.is_empty():
 			product["cpu_support"] = _initial_cpu_support_state(product.get("metrics", {}), product.get("cpu_design", {}))
