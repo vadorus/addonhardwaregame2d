@@ -2499,6 +2499,7 @@ func _refresh_quality_incident():
 		button.disabled = cost > Economy.money and cost > 0
 	if not product.is_empty() and str(product.get("id", "")) != "":
 		_select_meta(product_select, str(product.get("id", "")))
+		_refresh_product_details()
 
 func _resolve_quality_incident(action_id: String):
 	var incident := ProductManager.get_pending_quality_incident()
