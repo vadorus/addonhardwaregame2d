@@ -704,6 +704,11 @@ func _create_company_tab():
 	repay_button.custom_minimum_size.y = 44
 	repay_button.pressed.connect(_repay_financing)
 	finance_actions.add_child(repay_button)
+	var report_button := Button.new()
+	report_button.text = "Voir le dernier rapport"
+	report_button.custom_minimum_size.y = 44
+	report_button.pressed.connect(_open_last_month_report)
+	finance_actions.add_child(report_button)
 	box.add_child(finance_card)
 
 	box.add_child(_section("Délégation des départements"))
@@ -1289,7 +1294,7 @@ func _build_month_layer():
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,430); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",12); panel.add_child(box)
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
-	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
+	var cont:=Button.new(); cont.text="Fermer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
 func _build_progression_toast():
 	progression_toast = PanelContainer.new()
@@ -1935,10 +1940,31 @@ func _on_department_stage_changed(_sector_id: String, previous_stage: int, new_s
 		progression_toast_tween.tween_callback(func(): progression_toast.visible = false)
 	_refresh_all()
 
+func _format_month_report(report: Dictionary) -> String:
+	var inc_lines := _breakdown(report.get("income_breakdown", {}))
+	var exp_lines := _breakdown(report.get("expense_breakdown", {}))
+	return "Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €\nDette : %s €\nSituation : %s" % [
+		int(report.get("month", TimeManager.month)),
+		int(report.get("year", TimeManager.year)),
+		_money(int(report.get("income", 0))),
+		inc_lines,
+		_money(int(report.get("expenses", 0))),
+		exp_lines,
+		_money(int(report.get("result", 0))),
+		_money(int(report.get("money", Economy.money))),
+		_money(int(report.get("debt", Economy.debt))),
+		str(report.get("solvency_status", Economy.solvency_status()))
+	]
+
+func _open_last_month_report():
+	if Economy.history.is_empty():
+		status_label.text = "Aucun mois clôturé pour le moment."
+		return
+	month_report_label.text = _format_month_report(Economy.history[Economy.history.size() - 1])
+	month_layer.visible = true
+
 func _on_month_closed(report: Dictionary):
-	var inc_lines:=_breakdown(report.income_breakdown)
-	var exp_lines:=_breakdown(report.expense_breakdown)
-	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
+	month_report_label.text = _format_month_report(report)
 	month_layer.visible=false
 	status_label.text="Mois %d clôturé • résultat %s € • trésorerie %s €" % [int(report.month), _money(int(report.result)), _money(int(report.money))]
 	_refresh_all()
