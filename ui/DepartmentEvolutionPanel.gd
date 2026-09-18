@@ -24,18 +24,18 @@ func _ready() -> void:
 	grid.add_theme_constant_override("v_separation", 12)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(grid)
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
+	for sector_id in DepartmentProgression.get_pole_ids():
 		_build_sector_card(str(sector_id))
 	refresh()
 
 func _build_header() -> void:
-	var title := _label("Évolution des secteurs", 27, TEXT)
+	var title := _label("Évolution des pôles", 27, TEXT)
 	add_child(title)
-	var intro := _label("Chaque département grandit avec votre entreprise. Les locaux, les équipes et les capacités évoluent avec vos résultats.", 13, MUTED)
+	var intro := _label("Chaque pôle grandit avec votre entreprise. Les locaux, les équipes et les capacités évoluent avec vos résultats.", 13, MUTED)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(intro)
 func _build_sector_card(sector_id: String) -> void:
-	var state := DepartmentProgression.get_sector_state(sector_id)
+	var state := DepartmentProgression.get_pole_state(sector_id)
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", _stylebox(PANEL, 14, 1, LINE, 14))
@@ -101,11 +101,11 @@ func _build_sector_card(sector_id: String) -> void:
 		"stage_panels": stage_panels, "stage_labels": stage_labels
 	}
 func refresh() -> void:
-	for sector_id in DepartmentProgression.SECTOR_ORDER:
+	for sector_id in DepartmentProgression.get_pole_ids():
 		var key := str(sector_id)
 		if not cards.has(key):
 			continue
-		var state := DepartmentProgression.get_sector_state(key)
+		var state := DepartmentProgression.get_pole_state(key)
 		var refs: Dictionary = cards[key]
 		var stage := int(state.get("stage", 0))
 		refs.badge.text = "PALIER %d" % stage
