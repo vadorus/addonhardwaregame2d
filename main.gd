@@ -70,6 +70,8 @@ var active_cpu_generation_plan: Dictionary = {}
 var rd_cores: HSlider
 var rd_frequency: HSlider
 var rd_cache: HSlider
+var rd_ipc: HSlider
+var rd_compatibility: OptionButton
 var rd_node: OptionButton
 var rd_tdp: HSlider
 var lab_layout_grid: GridContainer
@@ -885,6 +887,16 @@ func _create_research_tab():
 	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs")
 	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1)
 	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo")
+	rd_ipc = _add_lab_slider(configuration_box, "IPC cible", 0.85, 1.30, 0.05, 1.0, "×", 2)
+
+	rd_compatibility = OptionButton.new()
+	for compatibility_key in ["PRESERVE", "BALANCED", "BREAK"]:
+		var compatibility_data: Dictionary = CPU_DESIGN.COMPATIBILITY_PROFILES[compatibility_key]
+		rd_compatibility.add_item(str(compatibility_data.get("label", compatibility_key)))
+		rd_compatibility.set_item_metadata(rd_compatibility.item_count - 1, compatibility_key)
+	_select_meta(rd_compatibility, "BALANCED")
+	rd_compatibility.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Compatibilité de plateforme", rd_compatibility)
 
 	rd_node = OptionButton.new()
 	for node_nm in CPU_DESIGN.available_nodes():
@@ -1062,7 +1074,9 @@ func _add_lab_slider(parent: VBoxContainer, title: String, min_value: float, max
 	return slider
 
 func _format_lab_value(value: float, suffix: String, decimals: int) -> String:
-	if decimals > 0:
+	if decimals >= 2:
+		return ("%.2f" % value) + suffix
+	if decimals == 1:
 		return ("%.1f" % value) + suffix
 	return ("%d" % int(round(value))) + suffix
 
@@ -1085,12 +1099,14 @@ func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 	cpu_metric_labels[key] = value_label
 
 func _current_cpu_design() -> Dictionary:
-	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null:
+	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_ipc == null or rd_compatibility == null or rd_node == null or rd_tdp == null:
 		return CPU_DESIGN.default_design()
 	return CPU_DESIGN.normalize({
 		"cores": int(rd_cores.value),
 		"frequency_ghz": float(rd_frequency.value),
 		"cache_mb": int(rd_cache.value),
+		"ipc_factor": float(rd_ipc.value),
+		"compatibility_mode": _meta(rd_compatibility),
 		"node_nm": int(rd_node.get_item_metadata(rd_node.selected)),
 		"tdp_w": int(rd_tdp.value)
 	})
@@ -1180,10 +1196,11 @@ func _refresh_generation_plan_summary():
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
-	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • IPC %.2f× • %d nm • %d W\nCompatibilité : %s\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
-		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
+		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), float(design.get("ipc_factor", 1.0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
+		str(CPU_DESIGN.COMPATIBILITY_PROFILES.get(str(design.get("compatibility_mode", "BALANCED")), {}).get("label", "Compatibilité équilibrée")),
 		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
 		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("target_fit", 0.0)),
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
@@ -1208,6 +1225,8 @@ func _set_cpu_design_controls(input: Dictionary):
 	rd_cores.value = int(design.cores)
 	rd_frequency.value = float(design.frequency_ghz)
 	rd_cache.value = int(design.cache_mb)
+	rd_ipc.value = float(design.ipc_factor)
+	_select_meta(rd_compatibility, str(design.compatibility_mode))
 	_select_meta(rd_node, str(design.node_nm))
 	rd_tdp.value = int(design.tdp_w)
 	_refresh_cpu_preview()
@@ -1237,8 +1256,9 @@ func _refresh_cpu_preview():
 		risk_label = "modéré"
 
 	lab_profile_label.text = str(evaluation.profile)
-	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
-		int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • IPC %.2f× • %d nm • %d W\n%s\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
+		int(design.cores), float(design.frequency_ghz), int(design.cache_mb), float(design.ipc_factor), int(design.node_nm), int(design.tdp_w),
+		str(evaluation.get("compatibility_label", "Compatibilité équilibrée")),
 		_money(estimated_program_cost), risk_label, risk
 	]
 	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
@@ -2920,9 +2940,10 @@ func _refresh_research():
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 		var estimate := CPU_DESIGN.evaluate(design)
 		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
-		lines.append("  %d cœurs • %.1f GHz • %d Mo • %d nm • %d W • coût cible %s €" % [
-			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w), _money(int(estimate.unit_cost))
+		lines.append("  %d cœurs • %.1f GHz • %d Mo • IPC %.2f× • %d nm • %d W • coût cible %s €" % [
+			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), float(design.ipc_factor), int(design.node_nm), int(design.tdp_w), _money(int(estimate.unit_cost))
 		])
+		lines.append("  Plateforme : %s" % str(estimate.get("compatibility_label", "Compatibilité équilibrée")))
 		lines.append("  Cible %s • %s • priorité %s" % [
 			str(GameData.SEGMENTS.get(str(project.segment), {}).get("label", str(project.segment))),
 			str(GameData.APPROACHES[str(project.approach)].label),
@@ -3250,10 +3271,11 @@ func _refresh_product_details():
 			int(support.get("patch_level", 0)),
 			float(support.get("support_debt", 0.0))
 		]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n%s\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • IPC %.2f× • %d nm • %d W\nPlateforme : %s\n%s\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
-			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), float(design.ipc_factor), int(design.node_nm), int(design.tdp_w),
+			str(CPU_DESIGN.COMPATIBILITY_PROFILES.get(str(design.compatibility_mode), {}).get("label", "Compatibilité équilibrée")),
 			support_line,
 			float(product.get("yield_rate", 0.0)) * 100.0, int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin),
