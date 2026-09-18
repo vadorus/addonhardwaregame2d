@@ -1,6 +1,8 @@
 extends RefCounted
 class_name CpuSupportModel
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 const ISSUE_THRESHOLD := 8.0
 
 const FIX_OPTIONS := {
@@ -33,11 +35,14 @@ const FIX_OPTIONS := {
 	}
 }
 
-static func initial_state(metrics: Dictionary) -> Dictionary:
+static func initial_state(metrics: Dictionary, design_input: Dictionary = {}) -> Dictionary:
+	var design := CPU_DESIGN.normalize(design_input)
+	var design_eval := CPU_DESIGN.evaluate(design)
 	var reliability := float(metrics.get("reliability", 60.0))
 	var innovation := float(metrics.get("innovation", 50.0))
-	var microcode := clampf(54.0 + reliability * 0.34 - maxf(innovation - 70.0, 0.0) * 0.12, 45.0, 92.0)
-	var compatibility := clampf(58.0 + reliability * 0.30 - maxf(innovation - 72.0, 0.0) * 0.16, 42.0, 94.0)
+	var ipc_factor := float(design.get("ipc_factor", 1.0))
+	var microcode := clampf(54.0 + reliability * 0.34 - maxf(innovation - 70.0, 0.0) * 0.12 - maxf(ipc_factor - 1.0, 0.0) * 10.0, 40.0, 94.0)
+	var compatibility := clampf(58.0 + reliability * 0.30 - maxf(innovation - 72.0, 0.0) * 0.16 + float(design_eval.get("platform_compatibility_bonus", 0.0)), 35.0, 98.0)
 	return {
 		"microcode_quality":microcode,
 		"compatibility":compatibility,
@@ -47,8 +52,8 @@ static func initial_state(metrics: Dictionary) -> Dictionary:
 		"active_fix":{}
 	}
 
-static func normalize_state(input: Dictionary, metrics: Dictionary) -> Dictionary:
-	var state := initial_state(metrics)
+static func normalize_state(input: Dictionary, metrics: Dictionary, design: Dictionary = {}) -> Dictionary:
+	var state := initial_state(metrics, design)
 	for key in input.keys():
 		state[key] = input[key]
 	state["microcode_quality"] = clampf(float(state.get("microcode_quality", 60.0)), 0.0, 100.0)
