@@ -72,6 +72,7 @@ var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_price: SpinBox
 var product_capacity: SpinBox
+var product_industrialization_label: Label
 var market_product_select: OptionButton
 var policy_marketing: SpinBox
 var policy_support: SpinBox
@@ -991,6 +992,11 @@ func _create_products_tab():
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
 	grid.add_child(_label("Prix de vente",14)); product_price=_spin(1,1000000,5,300); grid.add_child(product_price)
 	grid.add_child(_label("Capacité mensuelle",14)); product_capacity=_spin(1,1000000,100,5000); grid.add_child(product_capacity)
+	product_industrialization_label = _muted_label("Sélectionnez un produit pour estimer l'industrialisation.", 13)
+	product_industrialization_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(product_industrialization_label)
+	product_capacity.value_changed.connect(func(_value): _refresh_launch_financials())
+	product_price.value_changed.connect(func(_value): _refresh_launch_financials())
 	var launch:=Button.new(); launch.text="Lancer sur le marché"; launch.pressed.connect(_launch_product); box.add_child(launch)
 
 func _create_market_tab():
@@ -1909,11 +1915,54 @@ func _refresh_product_details():
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
+	_refresh_launch_financials()
+
+func _refresh_launch_financials():
+	if product_industrialization_label == null or product_select == null or product_select.item_count == 0:
+		return
+	var product := ProductManager.get_product(_meta(product_select))
+	if product.is_empty():
+		return
+	var margin := int(product_price.value) - int(product.get("unit_cost", 0))
+	if str(product.get("status", "")) == "LAUNCHED":
+		product_industrialization_label.text = "Ligne active • investissement initial %s € • frais fixes %s €/mois • marge affichée %s €/unité" % [
+			_money(int(product.get("launch_investment", 0))),
+			_money(int(product.get("monthly_capacity_overhead", 0))),
+			_money(margin)
+		]
+		product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if margin > 0 else APP_RED)
+		return
+	var financials := ProductManager.launch_financials(str(product.get("id", "")), int(product_capacity.value))
+	if financials.is_empty():
+		return
+	var investment := int(financials.get("investment", 0))
+	var overhead := int(financials.get("monthly_overhead", 0))
+	var affordable := Economy.money >= investment
+	product_industrialization_label.text = "Industrialisation : %s € maintenant • %s €/mois de ligne réservée • marge %s €/unité%s" % [
+		_money(investment),
+		_money(overhead),
+		_money(margin),
+		"" if affordable else " • TRÉSORERIE INSUFFISANTE"
+	]
+	product_industrialization_label.add_theme_color_override("font_color", (APP_GREEN if margin > 0 else APP_RED) if affordable else APP_RED)
 
 func _launch_product():
-	if product_select.item_count==0: return
-	if ProductManager.launch_product(_meta(product_select),int(product_price.value),int(product_capacity.value)): status_label.text="Produit lancé : la presse et les clients vont maintenant le juger."
-	else: status_label.text="Ce produit est déjà lancé ou indisponible."; _refresh_all()
+	if product_select.item_count==0:
+		return
+	var product_id := _meta(product_select)
+	var financials := ProductManager.launch_financials(product_id, int(product_capacity.value))
+	if financials.is_empty():
+		status_label.text = "Produit indisponible."
+		return
+	var investment := int(financials.get("investment", 0))
+	if Economy.money < investment:
+		status_label.text = "Trésorerie insuffisante : %s € requis pour industrialiser cette capacité." % _money(investment)
+		return
+	if ProductManager.launch_product(product_id, int(product_price.value), int(product_capacity.value)):
+		status_label.text = "Produit lancé • %s € investis dans la capacité industrielle." % _money(investment)
+	else:
+		status_label.text = "Ce produit est déjà lancé ou indisponible."
+	_refresh_all()
 
 func _refresh_market_product_options():
 	if market_product_select==null: return
