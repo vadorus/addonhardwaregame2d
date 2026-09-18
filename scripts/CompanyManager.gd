@@ -33,6 +33,7 @@ const SUPPORT_PLANS := {
 }
 
 const MAX_ENVIRONMENT_BUDGET := 18_000
+const SUBSIDIARIES_ENABLED := false
 
 var policies := {
 	"marketing_campaign": "LOCAL",
@@ -237,7 +238,9 @@ func department_management_modifier(department: String) -> float:
 	)
 
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
-	if not GameData.is_sector_active(sector):
+	if not SUBSIDIARIES_ENABLED:
+		return false
+	if not GameData.is_product_family_active(sector):
 		return false
 	if capital < 50000 or Economy.money < capital:
 		return false
