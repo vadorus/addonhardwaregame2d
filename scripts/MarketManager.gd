@@ -139,6 +139,11 @@ func product_market_relevance(product: Dictionary) -> float:
 			newer_generations += 1
 	return clampf(natural_relevance - float(newer_generations) * 0.06, 0.45, 1.0)
 
+func should_renew_product(product: Dictionary) -> bool:
+	if str(product.get("status", "")) != "LAUNCHED":
+		return false
+	return product_market_relevance(product) < 0.72
+
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}
 	var product_ids_by_sector := {}
