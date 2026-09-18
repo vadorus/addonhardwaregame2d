@@ -24,6 +24,12 @@ func _ready() -> void:
 	if not CompanyManager.created:
 		_fail("Company was not created")
 		return
+	if PersonnelManager.staff.size() != 2:
+		_fail("New companies must start with the two-person garage team")
+		return
+	if str(PersonnelManager.staff[0].get("name", "")) != "Camille Durand":
+		_fail("Camille must remain the founding CTO")
+		return
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
