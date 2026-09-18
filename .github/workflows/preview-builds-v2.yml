@@ -99,29 +99,24 @@ jobs:
 
       - name: Export Android preview
         shell: bash
-        env:
-          RELEASE_KEYSTORE_B64: ${{ secrets.TECH_EMPIRE_ANDROID_KEYSTORE_B64 }}
-          RELEASE_KEY_ALIAS: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p build/android
-          if [[ -n "$RELEASE_KEYSTORE_B64" && -n "$RELEASE_KEY_ALIAS" && -n "$RELEASE_KEY_PASSWORD" ]]; then
-            KEYSTORE="$RUNNER_TEMP/techempire-release.jks"
-            printf '%s' "$RELEASE_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
-            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$KEYSTORE"
-            export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$RELEASE_KEY_ALIAS"
-            export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$RELEASE_KEY_PASSWORD"
-            godot --headless --path . --export-release "Android" build/android/TechEmpire.apk
-          else
-            echo "Permanent Android signing secrets are not configured yet; using temporary debug signing."
-            KEYSTORE="$RUNNER_TEMP/debug.keystore"
-            keytool -genkeypair -keystore "$KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt
-            export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$KEYSTORE"
-            export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
-            export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
-            godot --headless --path . --export-debug "Android" build/android/TechEmpire.apk
-          fi
+          KEYSTORE="$RUNNER_TEMP/debug.keystore"
+          keytool -genkeypair \
+            -keystore "$KEYSTORE" \
+            -storepass android \
+            -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -noprompt
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$KEYSTORE"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          godot --headless --path . --export-debug "Android" build/android/TechEmpire.apk
           test -s build/android/TechEmpire.apk
 
       - name: Upload Android preview
