@@ -4,7 +4,7 @@ signal save_completed(ok, message)
 signal autosave_completed(ok)
 
 const SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 7
+const SAVE_VERSION := 8
 
 func _ready():
 	if not TimeManager.month_changed.is_connected(_on_month_changed):
@@ -26,7 +26,8 @@ func _build_state() -> Dictionary:
 		"patents":PatentManager.get_state(),
 		"products":ProductManager.get_state(),
 		"market":MarketManager.get_state(),
-		"media":MediaManager.get_state()
+		"media":MediaManager.get_state(),
+		"department_progression":DepartmentProgression.get_state()
 	}
 
 func _write_state() -> bool:
@@ -74,6 +75,7 @@ func load_game() -> bool:
 	ProductManager.load_state(state.get("products", {}))
 	MarketManager.load_state(state.get("market", {}))
 	MediaManager.load_state(state.get("media", {}))
+	DepartmentProgression.load_state(state.get("department_progression", {}))
 	TimeManager.load_state(state.get("time", {}))
 	save_completed.emit(true, "Partie chargée.")
 	return true
