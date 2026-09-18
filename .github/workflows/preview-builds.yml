@@ -39,7 +39,7 @@ jobs:
       - name: Upload Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: TechEmpire-Windows-v0.2.12-preview.7
+          name: TechEmpire-Windows-v0.2.12-preview.8
           path: build/windows/
           if-no-files-found: error
           retention-days: 14
@@ -125,7 +125,7 @@ jobs:
       - name: Upload Android preview
         uses: actions/upload-artifact@v4
         with:
-          name: TechEmpire-Android-v0.2.12-preview.7
+          name: TechEmpire-Android-v0.2.12-preview.8
           path: build/android/TechEmpire.apk
           if-no-files-found: error
           retention-days: 14
