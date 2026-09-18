@@ -505,8 +505,14 @@ func _ready() -> void:
 	CompanyManager.reputation["support"] = support_before_incident
 
 	var fresh_demand := MarketManager.estimate_consumer_demand(apex_model)
+	if MarketManager.should_renew_product(apex_model):
+		_fail("Freshly launched CPU was marked for renewal too early")
+		return
 	apex_model["months_on_market"] = 24
 	var aged_demand := MarketManager.estimate_consumer_demand(apex_model)
+	if not MarketManager.should_renew_product(apex_model):
+		_fail("A clearly aged CPU was not marked for renewal")
+		return
 	if float(aged_demand.get("relevance", 1.0)) >= float(fresh_demand.get("relevance", 1.0)):
 		_fail("Product relevance did not decay with age")
 		return
