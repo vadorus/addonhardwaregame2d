@@ -134,6 +134,67 @@ func _ready() -> void:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
 
+	var discovery_economy_state := Economy.get_state().duplicate(true)
+	var discovery_research_state := ResearchManager.get_state().duplicate(true)
+	var discovery_manager_state := DiscoveryManager.get_state().duplicate(true)
+	DiscoveryManager.reset()
+	var fake_discovery_project := {"id":"PRJ-DISCOVERY-TEST", "sector":"CPU"}
+	var fake_discovery_report := {"phase":"Prototype", "weakness":"efficiency"}
+	DiscoveryManager._on_phase_report(fake_discovery_project, fake_discovery_report)
+	DiscoveryManager._on_phase_report(fake_discovery_project, fake_discovery_report)
+	if DiscoveryManager.pending.size() != 1:
+		_fail("Prototype discovery trigger was not one-shot")
+		return
+	var first_discovery := DiscoveryManager.get_pending_discovery()
+	if str(first_discovery.get("template_id", "")) != "POWER_MANAGEMENT":
+		_fail("Efficiency weakness did not create the expected power-management discovery")
+		return
+	var cpu_tech_before_exploit := float(ResearchManager.technologies.get("cpu", 0.0))
+	var money_before_discovery := Economy.money
+	if not DiscoveryManager.resolve_discovery(str(first_discovery.get("id", "")), "EXPLOIT_NOW"):
+		_fail("Immediate discovery exploitation failed")
+		return
+	if Economy.money != money_before_discovery - 4_000:
+		_fail("Immediate discovery exploitation cost was not charged")
+		return
+	if float(ResearchManager.technologies.get("cpu", 0.0)) <= cpu_tech_before_exploit:
+		_fail("Immediate discovery exploitation did not improve company know-how")
+		return
+	if not DiscoveryManager.get_pending_discovery().is_empty():
+		_fail("Resolved immediate discovery remained pending")
+		return
+
+	var derived_discovery := DiscoveryManager.create_test_discovery("CACHE_POLICY", "DERIVED-TEST")
+	if derived_discovery.is_empty():
+		_fail("Could not create derived-research discovery")
+		return
+	var cpu_tech_before_research := float(ResearchManager.technologies.get("cpu", 0.0))
+	if not DiscoveryManager.resolve_discovery(str(derived_discovery.get("id", "")), "DERIVED_RESEARCH"):
+		_fail("Could not launch derived research")
+		return
+	if DiscoveryManager.get_active_research().size() != 1:
+		_fail("Derived research did not enter the active queue")
+		return
+	var discovery_round_trip := DiscoveryManager.get_state().duplicate(true)
+	DiscoveryManager.load_state(discovery_round_trip)
+	if DiscoveryManager.get_active_research().size() != 1:
+		_fail("Derived research did not survive state round-trip")
+		return
+	DiscoveryManager.process_month()
+	if DiscoveryManager.get_active_research().is_empty():
+		_fail("Two-month derived research completed too early")
+		return
+	DiscoveryManager.process_month()
+	if not DiscoveryManager.get_active_research().is_empty():
+		_fail("Derived research did not complete after its expected duration")
+		return
+	if float(ResearchManager.technologies.get("cpu", 0.0)) <= cpu_tech_before_research:
+		_fail("Completed derived research did not improve durable CPU know-how")
+		return
+	DiscoveryManager.load_state(discovery_manager_state)
+	ResearchManager.load_state(discovery_research_state)
+	Economy.load_state(discovery_economy_state)
+
 	var initial_company_state := CompanyManager.get_state().duplicate(true)
 	var previous_awareness := -1.0
 	var previous_budget := -1
