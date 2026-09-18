@@ -318,6 +318,30 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 	PatentManager.create_candidate(project)
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
 
+func get_project_by_id(project_id: String) -> Dictionary:
+	for project in projects:
+		if str(project.get("id", "")) == project_id:
+			return project
+	return {}
+
+func add_technology_bonus(key: String, amount: float) -> float:
+	var current := float(technologies.get(key, 0.0))
+	var updated := clampf(current + amount, 0.0, 100.0)
+	technologies[key] = updated
+	projects_changed.emit()
+	return updated
+
+func apply_project_metric_bonus(project_id: String, metric: String, amount: float) -> bool:
+	var project := get_project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	var desired: Dictionary = project.get("desired_metrics", {})
+	desired[metric] = clampf(float(desired.get(metric, 55.0)) + amount, 0.0, 100.0)
+	project["desired_metrics"] = desired
+	project["quality_accumulator"] = float(project.get("quality_accumulator", 0.0)) + maxf(amount, 0.0) * 0.8
+	projects_changed.emit()
+	return true
+
 func active_departments() -> Array:
 	for p in projects:
 		if str(p.status) == "DEVELOPMENT":
