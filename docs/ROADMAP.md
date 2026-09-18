@@ -10,7 +10,7 @@ Cette roadmap fixe l'ordre de construction du jeu. La vision finale est très la
 - [x] Proposer trois plans d’architecture pour une nouvelle génération CPU.
 - [x] Décliner une architecture en plusieurs modèles de gamme.
 - [x] Ajouter procédé, packaging, rendement et contrat industriel simplifiés.
-- [ ] Ajouter microcode, compatibilité et correctifs post-lancement.
+- [x] Ajouter microcode, compatibilité et correctifs post-lancement.
 - [x] Ajouter incidents qualité et réponses SAV.
 - [ ] Ajouter découvertes d’équipe et recherches dérivées.
 - [x] Ajouter évolution visuelle du bureau.
