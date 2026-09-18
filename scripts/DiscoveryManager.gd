@@ -8,6 +8,7 @@ signal derived_research_completed(research)
 const TEMPLATES := {
 	"POWER_MANAGEMENT": {
 		"title":"Gestion de puissance adaptative",
+		"technology":"ADAPTIVE_POWER",
 		"summary":"L'équipe a identifié une méthode de gestion de puissance qui peut améliorer l'efficacité des futures conceptions.",
 		"metric":"efficiency",
 		"immediate_metric":3.0,
@@ -21,6 +22,7 @@ const TEMPLATES := {
 	},
 	"CACHE_POLICY": {
 		"title":"Politique de cache optimisée",
+		"technology":"SMART_CACHE",
 		"summary":"Les mesures de prototype révèlent une politique de cache réutilisable pour augmenter les performances sans pousser uniquement la fréquence.",
 		"metric":"performance",
 		"immediate_metric":3.0,
@@ -34,6 +36,7 @@ const TEMPLATES := {
 	},
 	"VALIDATION_RULES": {
 		"title":"Méthode de validation croisée",
+		"technology":"CROSS_VALIDATION",
 		"summary":"Une faiblesse du prototype a conduit l'équipe à formaliser une méthode de validation qui peut améliorer la fiabilité des générations suivantes.",
 		"metric":"reliability",
 		"immediate_metric":3.5,
@@ -47,6 +50,7 @@ const TEMPLATES := {
 	},
 	"FOUNDRY_RULES": {
 		"title":"Règles de conception fonderie",
+		"technology":"FOUNDRY_DRC",
 		"summary":"Le partenariat industriel a permis d'identifier des règles de conception qui améliorent rendement et préparation industrielle.",
 		"metric":"",
 		"immediate_metric":0.0,
@@ -60,6 +64,7 @@ const TEMPLATES := {
 	},
 	"SAV_RELIABILITY": {
 		"title":"Retour SAV transformé en savoir",
+		"technology":"FIELD_FAILURE_ANALYTICS",
 		"summary":"L'analyse d'un défaut terrain a produit une règle de conception réutilisable pour améliorer la fiabilité des futures générations.",
 		"metric":"reliability",
 		"immediate_metric":0.0,
@@ -73,6 +78,7 @@ const TEMPLATES := {
 	},
 	"MICROCODE_TOOLING": {
 		"title":"Outillage microcode réutilisable",
+		"technology":"MICROCODE_TOOLING",
 		"summary":"Le correctif logiciel a permis de formaliser de nouveaux outils de validation firmware et compatibilité.",
 		"metric":"",
 		"immediate_metric":0.0,
@@ -277,6 +283,9 @@ func process_month():
 	for research in finished:
 		var template: Dictionary = TEMPLATES.get(str(research.get("template_id", "")), {})
 		ResearchManager.add_technology_bonus(str(template.get("tech_key", "cpu")), float(template.get("research_tech", 4.0)))
+		var reusable_technology := str(template.get("technology", ""))
+		if not reusable_technology.is_empty():
+			TechnologyManager.unlock(reusable_technology, str(research.get("title", "Recherche dérivée")))
 		var secondary_key := str(template.get("secondary_key", ""))
 		if not secondary_key.is_empty():
 			ResearchManager.add_technology_bonus(secondary_key, float(template.get("secondary_gain", 1.0)))
