@@ -225,9 +225,10 @@ func _ready() -> void:
 	if Economy.debt != 250_000 or Economy.money != 750_000:
 		_fail("Financing did not update debt and cash correctly")
 		return
+	var expected_initial_interest := Economy.projected_monthly_interest()
 	Economy.process_financing_month()
-	if int(Economy.expense_breakdown.get("Intérêts financement", 0)) != 3000:
-		_fail("Monthly financing interest was not charged")
+	if int(Economy.expense_breakdown.get("Intérêts financement", 0)) != expected_initial_interest:
+		_fail("Monthly financing interest did not match the effective Finance-adjusted rate")
 		return
 	Economy.load_state(initial_economy_state)
 	if Economy.debt != 0 or Economy.money != 500_000:
