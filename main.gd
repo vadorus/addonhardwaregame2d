@@ -81,6 +81,10 @@ var lab_unit_cost_value: Label
 var lab_dev_time_value: Label
 var lab_fit_value: Label
 var lab_warning_label: Label
+var discovery_card: PanelContainer
+var discovery_label: Label
+var discovery_buttons: Dictionary = {}
+var derived_research_label: Label
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
@@ -229,6 +233,7 @@ func _connect_signals():
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
 	PatentManager.patents_changed.connect(_refresh_all)
+	DiscoveryManager.discoveries_changed.connect(_refresh_all)
 	DepartmentProgression.stage_changed.connect(_on_department_stage_changed)
 	SaveManager.save_completed.connect(_on_save_message)
 
@@ -950,6 +955,30 @@ func _create_research_tab():
 	tech_label = _rich_label()
 	tech_card.add_child(tech_label)
 	box.add_child(tech_card)
+
+	box.add_child(_section("Découvertes & recherches dérivées"))
+	discovery_card = _card(APP_CYAN_DARK, 12, 12)
+	discovery_card.visible = false
+	box.add_child(discovery_card)
+	var discovery_box := VBoxContainer.new()
+	discovery_box.add_theme_constant_override("separation", 8)
+	discovery_card.add_child(discovery_box)
+	discovery_label = _label("", 13)
+	discovery_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	discovery_box.add_child(discovery_label)
+	var discovery_actions := HFlowContainer.new()
+	discovery_actions.add_theme_constant_override("h_separation", 8)
+	discovery_actions.add_theme_constant_override("v_separation", 8)
+	discovery_box.add_child(discovery_actions)
+	for action_id in ["EXPLOIT_NOW", "DERIVED_RESEARCH"]:
+		var discovery_button := Button.new()
+		discovery_button.custom_minimum_size.y = 48
+		discovery_button.pressed.connect(_resolve_discovery.bind(action_id))
+		discovery_actions.add_child(discovery_button)
+		discovery_buttons[action_id] = discovery_button
+	derived_research_label = _muted_label("Aucune recherche dérivée en cours.", 12)
+	derived_research_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(derived_research_label)
 
 	box.add_child(_section("Arbitrage R&D"))
 	rd_decision_card = _card(APP_AMBER_DARK, 12, 12)
@@ -2875,6 +2904,7 @@ func _refresh_research():
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
 	_refresh_rd_decision()
+	_refresh_discoveries()
 	var tech_lines: Array[String] = []
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
@@ -2911,6 +2941,52 @@ func _refresh_research():
 	for patent in PatentManager.patents:
 		patent_lines.append("Brevet : %s — %s" % [str(patent.title), "licencié" if bool(patent.licensed) else "exclusif"])
 	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
+
+func _refresh_discoveries():
+	if discovery_card == null or discovery_label == null or derived_research_label == null:
+		return
+	var discovery := DiscoveryManager.get_pending_discovery()
+	discovery_card.visible = not discovery.is_empty()
+	if not discovery.is_empty():
+		discovery_label.text = "DÉCOUVERTE — %s\n%s\n\nChoisissez entre un gain immédiat limité et une recherche dérivée plus lente mais durable." % [
+			str(discovery.get("title", "Piste technique")),
+			str(discovery.get("summary", ""))
+		]
+		for option in DiscoveryManager.resolution_options(str(discovery.get("id", ""))):
+			var action_id := str(option.get("id", ""))
+			if not discovery_buttons.has(action_id):
+				continue
+			var button: Button = discovery_buttons[action_id]
+			var cost := int(option.get("cost", 0))
+			var months := int(option.get("months", 0))
+			button.text = "%s • %s €%s\n%s" % [
+				str(option.get("label", action_id)),
+				_money(cost),
+				" • %d mois" % months if months > 0 else " • immédiat",
+				str(option.get("summary", ""))
+			]
+			button.disabled = cost > Economy.money
+
+	var research_lines: Array[String] = []
+	for research_value in DiscoveryManager.get_active_research():
+		var research: Dictionary = research_value
+		research_lines.append("• %s — encore %d/%d mois" % [
+			str(research.get("title", "Recherche dérivée")),
+			int(research.get("remaining_months", 0)),
+			int(research.get("total_months", 0))
+		])
+	derived_research_label.text = "\n".join(research_lines) if not research_lines.is_empty() else "Aucune recherche dérivée en cours."
+
+func _resolve_discovery(action_id: String):
+	var discovery := DiscoveryManager.get_pending_discovery()
+	if discovery.is_empty():
+		status_label.text = "Aucune découverte en attente."
+		return
+	if DiscoveryManager.resolve_discovery(str(discovery.get("id", "")), action_id):
+		status_label.text = "Découverte traitée : %s." % str(discovery.get("title", "piste technique"))
+	else:
+		status_label.text = "Impossible d'exploiter cette découverte : vérifiez la trésorerie."
+	_refresh_all()
 
 func _refresh_rd_decision():
 	if rd_decision_card == null:
