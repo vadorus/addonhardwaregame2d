@@ -74,7 +74,7 @@ func _draw_person(pos: Vector2, shirt: Color):
 	draw_line(pos + Vector2(4, 29), pos + Vector2(7, 42), Color("#20262b"), 3)
 
 func _draw_people(w: float, h: float, desk_x: float, desk_w: float):
-	var count := [2, 3, 4, 6, 8][stage]
+	var count: int = int([2, 3, 4, 6, 8][stage])
 	var shirts := [Color("#315f78"), Color("#6b557c"), Color("#3c785e"), Color("#8a6045")]
 	for i in range(count):
 		var row := i / 4
