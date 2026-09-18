@@ -558,6 +558,58 @@ func _ready() -> void:
 	apex_model["customer_satisfaction"] = satisfaction_before_incident
 	CompanyManager.reputation["support"] = support_before_incident
 
+	var support_economy_state := Economy.get_state().duplicate(true)
+	var support_company_state := CompanyManager.get_state().duplicate(true)
+	var support_metrics: Dictionary = apex_model.get("metrics", {}).duplicate(true)
+	var support_state: Dictionary = apex_model.get("cpu_support", {}).duplicate(true)
+	var healthy_market_score := MarketManager.evaluate_product(apex_model, str(apex_model.get("target_segment", "MAINSTREAM")))
+	apex_model["cpu_support"] = {
+		"microcode_quality":48.0,
+		"compatibility":50.0,
+		"support_debt":8.0,
+		"patch_level":0,
+		"pending_issue":{},
+		"active_fix":{}
+	}
+	ProductManager._process_cpu_support_month(apex_model)
+	var software_issue := ProductManager.get_pending_software_issue()
+	if software_issue.is_empty() or str(software_issue.get("product_id", "")) != str(apex_model.id):
+		_fail("Software support debt did not create a CPU software incident")
+		return
+	var degraded_market_score := MarketManager.evaluate_product(apex_model, str(apex_model.get("target_segment", "MAINSTREAM")))
+	if degraded_market_score >= healthy_market_score:
+		_fail("CPU software incident did not reduce market appeal")
+		return
+	if ProductManager.software_fix_options(str(apex_model.id)).size() != 3:
+		_fail("CPU software incident did not expose three fix strategies")
+		return
+	var performance_before_hotfix := float(apex_model.get("metrics", {}).get("performance", 0.0))
+	var money_before_hotfix := Economy.money
+	if not ProductManager.start_software_fix(str(apex_model.id), "HOTFIX"):
+		_fail("CPU hotfix could not be started")
+		return
+	if Economy.money != money_before_hotfix - 8_000:
+		_fail("CPU hotfix cost was not charged")
+		return
+	ProductManager._process_cpu_support_month(apex_model)
+	if not ProductManager.get_pending_software_issue().is_empty():
+		_fail("Completed hotfix did not clear the software incident")
+		return
+	var patched_support: Dictionary = apex_model.get("cpu_support", {})
+	if int(patched_support.get("patch_level", 0)) != 1:
+		_fail("Completed hotfix did not increment patch level")
+		return
+	if float(apex_model.get("metrics", {}).get("performance", 0.0)) >= performance_before_hotfix:
+		_fail("Rapid hotfix did not apply its advertised performance tradeoff")
+		return
+	if float(patched_support.get("microcode_quality", 0.0)) <= 48.0:
+		_fail("Completed hotfix did not improve microcode quality")
+		return
+	apex_model["cpu_support"] = support_state
+	apex_model["metrics"] = support_metrics
+	Economy.load_state(support_economy_state)
+	CompanyManager.load_state(support_company_state)
+
 	var fresh_demand := MarketManager.estimate_consumer_demand(apex_model)
 	if MarketManager.should_renew_product(apex_model):
 		_fail("Freshly launched CPU was marked for renewal too early")
@@ -654,6 +706,7 @@ func _ready() -> void:
 		legacy_product.erase("generation_index")
 		legacy_product.erase("generation_name")
 		legacy_product.erase("industrialization")
+		legacy_product.erase("cpu_support")
 	ProductManager.load_state(legacy_product_state)
 	if ProductManager.cpu_generations.is_empty() or str(ProductManager.products[0].get("generation_id", "")).is_empty():
 		_fail("Legacy V5 products were not migrated into a CPU generation")
@@ -661,6 +714,10 @@ func _ready() -> void:
 	var migrated_industrialization: Dictionary = ProductManager.products[0].get("industrialization", {})
 	if str(migrated_industrialization.get("contract", "")) != "RESERVED" or str(migrated_industrialization.get("packaging", "")) != "STANDARD" or str(migrated_industrialization.get("testing", "")) != "BALANCED":
 		_fail("Legacy product did not migrate to the default industrialization strategy")
+		return
+	var migrated_support: Dictionary = ProductManager.products[0].get("cpu_support", {})
+	if migrated_support.is_empty() or not migrated_support.has("microcode_quality") or not migrated_support.has("compatibility"):
+		_fail("Legacy CPU did not migrate to a software support state")
 		return
 
 	var legacy_state := ResearchManager.get_state().duplicate(true)
