@@ -100,6 +100,7 @@ var policy_environment_info: Label
 var department_select: OptionButton
 var autonomy_select: OptionButton
 var leader_select: OptionButton
+var department_management_info: Label
 var subsidiary_name: LineEdit
 var subsidiary_sector: OptionButton
 var subsidiary_capital: SpinBox
@@ -716,9 +717,23 @@ func _create_company_tab():
 
 	box.add_child(_section("Délégation des départements"))
 	var dgrid := GridContainer.new(); dgrid.columns = 2; box.add_child(dgrid)
-	dgrid.add_child(_label("Département",14)); department_select = OptionButton.new(); _fill_text(department_select, ["R&D","Production","Marketing","Support","Finance"]); department_select.item_selected.connect(func(_i): _refresh_leader_choices()); dgrid.add_child(department_select)
-	dgrid.add_child(_label("Autonomie",14)); autonomy_select = OptionButton.new(); _fill_simple(autonomy_select,{"DIRECT":"Direct","SUPERVISED":"Supervisé","AUTONOMOUS":"Autonome"}); dgrid.add_child(autonomy_select)
-	dgrid.add_child(_label("Responsable",14)); leader_select = OptionButton.new(); dgrid.add_child(leader_select)
+	dgrid.add_child(_label("Département",14))
+	department_select = OptionButton.new()
+	_fill_text(department_select, ["R&D","Production","Marketing","Support","Finance"])
+	department_select.item_selected.connect(func(_i): _refresh_leader_choices())
+	dgrid.add_child(department_select)
+	dgrid.add_child(_label("Autonomie",14))
+	autonomy_select = OptionButton.new()
+	_fill_simple(autonomy_select,{"DIRECT":"Direct","SUPERVISED":"Supervisé","AUTONOMOUS":"Autonome"})
+	autonomy_select.item_selected.connect(func(_i): _refresh_department_management_preview())
+	dgrid.add_child(autonomy_select)
+	dgrid.add_child(_label("Responsable",14))
+	leader_select = OptionButton.new()
+	leader_select.item_selected.connect(func(_i): _refresh_department_management_preview())
+	dgrid.add_child(leader_select)
+	department_management_info = _muted_label("", 12)
+	department_management_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(department_management_info)
 	var delegate_btn := Button.new(); delegate_btn.text = "Affecter responsable et autonomie"; delegate_btn.pressed.connect(_apply_department); box.add_child(delegate_btn)
 	box.add_child(_section("Groupe / filiales"))
 	var sgrid := GridContainer.new(); sgrid.columns=2; box.add_child(sgrid)
@@ -2518,6 +2533,37 @@ func _refresh_leader_choices():
 	if CompanyManager.departments.has(dept):
 		_select_meta(autonomy_select, str(CompanyManager.departments[dept].autonomy))
 		_select_meta(leader_select, str(CompanyManager.departments[dept].leader_id))
+	_refresh_department_management_preview()
+
+func _refresh_department_management_preview():
+	if department_management_info == null or department_select == null or autonomy_select == null or leader_select == null:
+		return
+	if department_select.item_count == 0 or autonomy_select.item_count == 0 or leader_select.item_count == 0:
+		return
+	var department := _meta(department_select)
+	var autonomy := _meta(autonomy_select)
+	var leader_id := _meta(leader_select)
+	var modifier := CompanyManager.estimate_department_management_modifier(department, autonomy, leader_id)
+	var leader := PersonnelManager.get_employee(leader_id)
+	var leader_text := "aucun responsable"
+	if not leader.is_empty():
+		leader_text = str(leader.get("name", "Responsable"))
+	var effect := "neutre"
+	if modifier >= 1.05:
+		effect = "excellent"
+	elif modifier >= 0.98:
+		effect = "solide"
+	elif modifier < 0.85:
+		effect = "fragile"
+	elif modifier < 0.95:
+		effect = "limité"
+	department_management_info.text = "%s • %s • efficacité de management ×%.2f (%s)." % [
+		str({"DIRECT":"Gestion directe","SUPERVISED":"Supervision","AUTONOMOUS":"Autonomie"}.get(autonomy, autonomy)),
+		leader_text,
+		modifier,
+		effect
+	]
+	department_management_info.add_theme_color_override("font_color", APP_GREEN if modifier >= 0.98 else (APP_AMBER if modifier >= 0.85 else APP_RED))
 
 func _apply_department():
 	var dept:=_meta(department_select); CompanyManager.set_department_autonomy(dept,_meta(autonomy_select)); CompanyManager.set_department_leader(dept,_meta(leader_select)); status_label.text="Organisation du département %s mise à jour." % dept; _refresh_all()
