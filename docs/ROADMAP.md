@@ -59,7 +59,7 @@ Objectif : prouver une boucle de jeu complète, pas seulement un écran de conce
 
 ## Phase 2 — Moteur industriel générique
 
-- [ ] Technologies réutilisables.
+- [x] Technologies réutilisables.
 - [ ] Composants.
 - [ ] Produits.
 - [ ] Services.
