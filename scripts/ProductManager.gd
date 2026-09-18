@@ -245,12 +245,15 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 	if financials.is_empty():
 		return {}
 	var capacity := int(financials.get("capacity", 1))
+	var production_execution := CompanyManager.get_production_execution_modifier()
+	var effective_capacity := maxi(1, int(floor(float(capacity) * production_execution)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier()
 	preview["production_capacity"] = capacity
 	var demand := MarketManager.estimate_consumer_demand(preview)
 	var requested_units := maxi(int(demand.get("units", 0)), 0)
-	var expected_units := mini(requested_units, capacity)
+	var expected_units := mini(requested_units, effective_capacity)
 	var revenue := expected_units * int(preview.price)
-	var production_cost := expected_units * int(preview.get("unit_cost", 0))
+	var production_cost := int(round(float(expected_units * int(preview.get("unit_cost", 0))) * production_cost_modifier))
 	var return_rate: float = clampf((100.0 - float(preview.get("metrics", {}).get("reliability", 50.0))) / 240.0, 0.005, 0.22)
 	return_rate /= CompanyManager.get_support_modifier()
 	var expected_returns := int(round(float(expected_units) * return_rate))
@@ -260,6 +263,9 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 	var utilization := float(expected_units) / float(maxi(capacity, 1))
 	return {
 		"capacity": capacity,
+		"effective_capacity": effective_capacity,
+		"production_execution": production_execution,
+		"production_cost_modifier": production_cost_modifier,
 		"requested_units": requested_units,
 		"expected_units": expected_units,
 		"utilization": clampf(utilization, 0.0, 1.0),
@@ -316,13 +322,16 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	if not contract.is_empty():
 		b2b_units = int(contract.units_per_month)
 		b2b_price = int(contract.unit_price)
-	var capacity := int(product.production_capacity)
+	var nominal_capacity := int(product.production_capacity)
+	var production_execution := CompanyManager.get_production_execution_modifier()
+	var capacity := maxi(1, int(floor(float(nominal_capacity) * production_execution)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier()
 	var sold_b2b: int = mini(b2b_units, capacity)
 	var remaining_capacity: int = maxi(capacity - sold_b2b, 0)
 	var sold_consumer: int = mini(consumer_units, remaining_capacity)
 	var total_units := sold_b2b + sold_consumer
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
-	var production_cost := total_units * int(product.unit_cost)
+	var production_cost := int(round(float(total_units * int(product.unit_cost)) * production_cost_modifier))
 	var capacity_overhead := int(product.get("monthly_capacity_overhead", 0))
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
@@ -348,7 +357,22 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"capacity_overhead":capacity_overhead,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
+	var report := {
+		"product_id":product.id,
+		"units":total_units,
+		"consumer_units":sold_consumer,
+		"b2b_units":sold_b2b,
+		"revenue":revenue,
+		"production_cost":production_cost,
+		"capacity_overhead":capacity_overhead,
+		"warranty_cost":warranty_cost,
+		"satisfaction":satisfaction,
+		"share":demand.get("share", 0.0),
+		"nominal_capacity":nominal_capacity,
+		"effective_capacity":capacity,
+		"production_execution":production_execution,
+		"production_cost_modifier":production_cost_modifier
+	}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id))
