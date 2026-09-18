@@ -88,6 +88,8 @@ var subsidiary_capital: SpinBox
 var nav_buttons: Array[Button] = []
 var navigation_layer: Control
 var navigation_grid: GridContainer
+var navigation_priority_button: Button
+var navigation_priority_label: Label
 var nav_context_label: Label
 var settings_layer: Control
 var dashboard_grid: GridContainer
@@ -1198,6 +1200,18 @@ func _build_navigation_overlay():
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 
+	box.add_child(_eyebrow("À FAIRE MAINTENANT"))
+	navigation_priority_label = _muted_label("La prochaine décision apparaîtra ici.", 12)
+	navigation_priority_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(navigation_priority_label)
+	navigation_priority_button = Button.new()
+	navigation_priority_button.text = "Ouvrir la prochaine décision"
+	navigation_priority_button.custom_minimum_size.y = 58
+	navigation_priority_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	navigation_priority_button.pressed.connect(_open_navigation_priority)
+	box.add_child(navigation_priority_button)
+
+	box.add_child(_eyebrow("EXPLORER"))
 	navigation_grid = GridContainer.new()
 	navigation_grid.columns = 2
 	navigation_grid.add_theme_constant_override("h_separation", 10)
@@ -1237,7 +1251,48 @@ func _build_navigation_overlay():
 
 func _toggle_navigation_menu():
 	if navigation_layer != null:
+		_refresh_navigation_priority()
 		navigation_layer.visible = not navigation_layer.visible
+
+func _open_navigation_priority():
+	_show_tab(dashboard_target_tab)
+
+func _refresh_navigation_priority():
+	if navigation_priority_button == null or navigation_priority_label == null:
+		return
+	var action_text := "Créer votre entreprise"
+	var context_text := "Commencez votre histoire depuis le garage."
+	var target := 0
+	var pending_decision := ResearchManager.get_pending_phase_decision()
+	if not CompanyManager.created:
+		action_text = "Créer l'entreprise"
+		context_text = "Donnez un nom à votre entreprise et ouvrez le laboratoire CPU."
+		target = 0
+	elif not pending_decision.is_empty():
+		action_text = "⚠ Résoudre l'arbitrage R&D"
+		context_text = str(pending_decision.get("title", "Une décision R&D attend votre validation."))
+		target = 3
+	else:
+		target = dashboard_target_tab
+		if dashboard_next_step_label != null:
+			context_text = dashboard_next_step_label.text
+		match target:
+			1: action_text = "◆ Gérer l'entreprise"
+			2: action_text = "● Gérer l'équipe"
+			3: action_text = "◈ Ouvrir le laboratoire CPU"
+			4: action_text = "▣ Préparer le produit"
+			5: action_text = "↗ Analyser le marché"
+			6: action_text = "▤ Consulter la presse"
+			7: action_text = "◆ Voir l'évolution"
+			_: action_text = "⌂ Revenir au QG"
+	var solvency := Economy.solvency_status() if CompanyManager.created else "STABLE"
+	if solvency != "STABLE" and pending_decision.is_empty():
+		action_text = "◆ Sécuriser la trésorerie"
+		context_text = "La trésorerie est sous tension. Vérifiez dette, dépenses et financement avant d'accélérer."
+		target = 1
+	dashboard_target_tab = target
+	navigation_priority_button.text = action_text
+	navigation_priority_label.text = context_text
 
 func _build_settings_overlay():
 	var panel_script: Script = load("res://ui/SettingsPanel.gd")
@@ -1466,6 +1521,7 @@ func _refresh_top():
 
 func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	_refresh_navigation_priority()
 	if evolution_panel != null and evolution_panel.has_method("refresh"):
 		evolution_panel.call("refresh")
 
