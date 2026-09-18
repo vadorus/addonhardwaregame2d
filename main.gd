@@ -1883,7 +1883,7 @@ func _update_responsive_layout():
 	if company_reputation_grid != null:
 		company_reputation_grid.columns = 2 if compact else 4
 	if company_operations_grid != null:
-		company_operations_grid.columns = 1 if compact else 3
+		company_operations_grid.columns = 1 if compact else 4
 	if media_card_grid != null:
 		media_card_grid.columns = 1 if compact else 2
 	if contract_card_grid != null:
@@ -2371,10 +2371,12 @@ func _refresh_company():
 		if company_finance_runway_value != null:
 			company_finance_runway_value.text = runway_text
 		company_finance_runway_value.add_theme_color_override("font_color", APP_GREEN if runway < 0.0 or runway >= 6.0 else (APP_AMBER if runway >= 3.0 else APP_RED))
-		company_finance_label.text = "Situation : %s • tendance %s • intérêts prévus %s €/mois\nPoste de dépense principal : %s\n%s" % [
+		var effective_rate := float(snapshot.get("effective_interest_rate", Economy.MONTHLY_INTEREST_RATE)) * 100.0
+		company_finance_label.text = "Situation : %s • tendance %s • intérêts prévus %s €/mois à %.2f%%\nPoste de dépense principal : %s\n%s" % [
 			status_text,
 			trend_text,
 			_money(int(snapshot.get("projected_interest", 0))),
+			effective_rate,
 			expense_text,
 			str(snapshot.get("recommendation", ""))
 		]
@@ -2419,6 +2421,12 @@ func _refresh_company_operations():
 			"staff":PersonnelManager.department_staff_count("Support"),
 			"execution":CompanyManager.get_support_execution_modifier(),
 			"detail":"SAV ×%.2f" % CompanyManager.get_support_modifier()
+		},
+		{
+			"title":"Finance",
+			"staff":PersonnelManager.department_staff_count("Finance"),
+			"execution":CompanyManager.get_finance_execution_modifier(),
+			"detail":"Intérêts ×%.2f" % CompanyManager.get_finance_interest_modifier()
 		}
 	]
 	for row_value in rows:
