@@ -71,7 +71,7 @@ func _create_cpu_range(project: Dictionary) -> void:
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
-		product["cpu_support"] = CPU_SUPPORT.initial_state(product.get("metrics", {}))
+		product["cpu_support"] = CPU_SUPPORT.initial_state(product.get("metrics", {}), product.get("cpu_design", {}))
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
@@ -97,7 +97,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
 		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0,
-		"cpu_support":CPU_SUPPORT.initial_state(metrics)
+		"cpu_support":CPU_SUPPORT.initial_state(metrics, product.get("cpu_design", {}))
 	}
 	_next_id += 1
 	products.append(product)
@@ -138,7 +138,7 @@ func software_fix_options(product_id: String) -> Array[Dictionary]:
 	var product := get_product(product_id)
 	if product.is_empty():
 		return []
-	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
 	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
 		return []
 	return CPU_SUPPORT.fix_options()
@@ -147,7 +147,7 @@ func start_software_fix(product_id: String, action_id: String) -> bool:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
 		return false
-	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
 	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
 		return false
 	var option := CPU_SUPPORT.fix_option(action_id)
@@ -175,7 +175,7 @@ func start_software_fix(product_id: String, action_id: String) -> bool:
 	return true
 
 func _process_cpu_support_month(product: Dictionary) -> void:
-	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
 	var active_fix: Dictionary = support.get("active_fix", {})
 	if not active_fix.is_empty():
 		var remaining := maxi(int(active_fix.get("remaining_months", 1)) - 1, 0)
@@ -705,7 +705,7 @@ func load_state(state: Dictionary):
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
 		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
-		product["cpu_support"] = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+		product["cpu_support"] = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
