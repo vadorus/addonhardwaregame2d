@@ -582,6 +582,33 @@ func _ready() -> void:
 		return
 	MarketManager.load_state(market_state_before_contract_test)
 
+	var before_discontinue_products := ProductManager.get_state().duplicate(true)
+	var before_discontinue_market := MarketManager.get_state().duplicate(true)
+	MarketManager.contracts = [
+		{"id":"B2B-BLOCK","product_id":str(apex_model.id),"product_name":str(apex_model.name),"customer":"Locked Client","units_per_month":80,"unit_price":310,"remaining_months":4,"status":"ACTIVE"}
+	]
+	if ProductManager.discontinuation_blocker(str(apex_model.id)).is_empty():
+		_fail("Active B2B contract did not block product discontinuation")
+		return
+	if ProductManager.discontinue_product(str(apex_model.id)):
+		_fail("Product was discontinued despite an active B2B contract")
+		return
+	MarketManager.contracts[0]["status"] = "COMPLETED"
+	if not ProductManager.discontinue_product(str(apex_model.id)):
+		_fail("Product could not be discontinued after B2B completion")
+		return
+	if str(apex_model.get("status", "")) != "DISCONTINUED":
+		_fail("Discontinued product did not enter the expected status")
+		return
+	if int(apex_model.get("monthly_capacity_overhead", -1)) != 0:
+		_fail("Discontinued product kept fixed production overhead")
+		return
+	if ProductManager.update_product_offer(str(apex_model.id), int(apex_model.price), int(apex_model.production_capacity)):
+		_fail("Discontinued product still accepted live offer changes")
+		return
+	ProductManager.load_state(before_discontinue_products)
+	MarketManager.load_state(before_discontinue_market)
+
 	var product_round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
 	ProductManager.load_state(product_round_trip)
