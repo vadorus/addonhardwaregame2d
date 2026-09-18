@@ -47,6 +47,23 @@ func _ready() -> void:
 		_fail("Adding a junior employee reduced the R&D team score")
 		return
 	PersonnelManager.load_state(founder_personnel_state)
+	var search_economy_state := Economy.get_state().duplicate(true)
+	var money_before_search := Economy.money
+	if not PersonnelManager.search_candidate("Production"):
+		_fail("Candidate search unexpectedly failed with sufficient cash")
+		return
+	if Economy.money != money_before_search - PersonnelManager.CANDIDATE_SEARCH_COST:
+		_fail("Candidate search fee was not charged")
+		return
+	if str(PersonnelManager.candidate.get("department", "")) != "Production":
+		_fail("Paid candidate search returned the wrong department")
+		return
+	Economy.money = PersonnelManager.CANDIDATE_SEARCH_COST - 1
+	if PersonnelManager.search_candidate("Marketing"):
+		_fail("Candidate search succeeded without enough cash")
+		return
+	Economy.load_state(search_economy_state)
+	PersonnelManager.load_state(founder_personnel_state)
 	for _candidate_roll in range(12):
 		var candidate := PersonnelManager.generate_candidate("R&D")
 		var specialization := str(candidate.get("specialization", ""))
