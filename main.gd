@@ -3064,7 +3064,7 @@ func _refresh_product_details():
 		]
 	product_price.value = float(product.price)
 	var status := str(product.get("status", ""))
-	var industrialization_choices := product.get("industrialization", INDUSTRIALIZATION.default_choices())
+	var industrialization_choices: Dictionary = product.get("industrialization", INDUSTRIALIZATION.default_choices())
 	_set_industrialization_controls(industrialization_choices, status == "READY")
 	if product_launch_button != null:
 		product_launch_button.visible = status != "DISCONTINUED"
