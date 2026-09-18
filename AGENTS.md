@@ -5,7 +5,7 @@ Ces règles s'appliquent à tout le dépôt.
 ## Source de vérité
 
 - Moteur cible : **Godot 4.7.2**, GDScript, sans dépendance .NET.
-- Version preview actuelle : **0.2.12-preview.5**.
+- Version preview actuelle : **0.2.12-preview.6**.
 - Le dépôt GitHub est la source de vérité.
 - Ne pas considérer une modification comme validée uniquement parce qu'un fichier a été écrit : le parse, le boot et les tests doivent passer.
 
