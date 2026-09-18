@@ -344,6 +344,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
 			product["market_launch_month"] = MarketManager.market_months
+			product["renewal_alerted"] = false
 			CompanyManager.add_alert("%s est officiellement lancé après %s € d'investissement industriel." % [str(product.name), str(investment)])
 			product_launched.emit(product)
 			products_changed.emit()
@@ -392,6 +393,13 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
+	if MarketManager.should_renew_product(product) and not bool(product.get("renewal_alerted", false)):
+		product["renewal_alerted"] = true
+		CompanyManager.add_alert("%s arrive en fin de cycle. Préparez une nouvelle génération CPU." % str(product.get("name", "Votre CPU")))
+		MediaManager.publish_business_event(
+			"%s prépare sa relève" % str(product.get("name", "Un CPU")),
+			"La génération actuelle perd en pertinence face aux nouveaux processeurs du marché. Une nouvelle architecture devient prioritaire."
+		)
 	product.last_month_score = float(demand.get("score", 0.0))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
@@ -484,6 +492,7 @@ func load_state(state: Dictionary):
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
 		product["pending_quality_incident"] = product.get("pending_quality_incident", {}).duplicate(true)
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
+		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
