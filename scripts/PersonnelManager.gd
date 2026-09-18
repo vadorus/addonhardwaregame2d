@@ -117,6 +117,13 @@ func _employee_contribution(emp: Dictionary, specialization: String = "") -> flo
 		+ float(emp.get("morale", 75.0)) * 0.05
 	)
 
+func department_staff_count(department: String) -> int:
+	var count := 0
+	for emp in staff:
+		if str(emp.get("department", "")) == department:
+			count += 1
+	return count
+
 func team_score(department: String, specialization: String = "") -> float:
 	var members: Array = []
 	for emp in staff:
