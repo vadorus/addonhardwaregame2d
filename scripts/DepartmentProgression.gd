@@ -178,7 +178,7 @@ func _market_score() -> float:
 	return clampf(float(launched) * 9.0 + best_share * 100.0 * 1.15 + brand_bonus, 0.0, 100.0)
 
 func _team_score() -> float:
-	var growth := maxi(PersonnelManager.staff.size() - 6, 0)
+	var growth := maxi(PersonnelManager.staff.size() - 2, 0)
 	var leadership_bonus := 0.0
 	for employee in PersonnelManager.staff:
 		leadership_bonus += maxf(float(employee.get("leadership", 0)) - 60.0, 0.0) * 0.04
