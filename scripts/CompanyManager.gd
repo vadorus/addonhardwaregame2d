@@ -209,17 +209,25 @@ func set_department_leader(department: String, employee_id: String):
 		departments[department].leader_id = employee_id
 		company_changed.emit()
 
-func department_management_modifier(department: String) -> float:
+func estimate_department_management_modifier(department: String, autonomy: String, leader_id: String) -> float:
 	if not departments.has(department):
 		return 1.0
-	var data: Dictionary = departments[department]
-	var autonomy := str(data.autonomy)
-	var leader_quality := PersonnelManager.get_leader_quality(str(data.leader_id), department)
+	var leader_quality := PersonnelManager.get_leader_quality(leader_id, department)
 	if autonomy == "DIRECT":
 		return 1.0
 	if autonomy == "SUPERVISED":
 		return clampf(0.91 + leader_quality / 800.0, 0.86, 1.07)
 	return clampf(0.78 + leader_quality / 420.0, 0.65, 1.10)
+
+func department_management_modifier(department: String) -> float:
+	if not departments.has(department):
+		return 1.0
+	var data: Dictionary = departments[department]
+	return estimate_department_management_modifier(
+		department,
+		str(data.get("autonomy", "SUPERVISED")),
+		str(data.get("leader_id", ""))
+	)
 
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
 	if not GameData.is_sector_active(sector):
