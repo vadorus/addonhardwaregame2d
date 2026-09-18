@@ -75,6 +75,7 @@ var product_price: SpinBox
 var product_capacity: SpinBox
 var product_industrialization_label: Label
 var market_product_select: OptionButton
+var market_benchmark_grid: GridContainer
 var policy_marketing: SpinBox
 var policy_support: SpinBox
 var policy_environment: SpinBox
@@ -1070,6 +1071,13 @@ func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
 	var box: VBoxContainer = scroll.get_child(0)
 	market_product_select=OptionButton.new(); market_product_select.item_selected.connect(func(_i): _refresh_market()); box.add_child(market_product_select)
+	box.add_child(_section("Positionnement"))
+	market_benchmark_grid = GridContainer.new()
+	market_benchmark_grid.columns = 4
+	market_benchmark_grid.add_theme_constant_override("h_separation", 10)
+	market_benchmark_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(market_benchmark_grid)
+	box.add_child(_section("Lecture du marché"))
 	market_label=_rich_label(); box.add_child(market_label)
 	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
 	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
@@ -1519,6 +1527,8 @@ func _update_responsive_layout():
 		dashboard_sector_grid.columns = 1 if compact else 4
 	if product_card_grid != null:
 		product_card_grid.columns = 1 if compact else 3
+	if market_benchmark_grid != null:
+		market_benchmark_grid.columns = 1 if compact else 4
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -2181,12 +2191,18 @@ func _refresh_market_product_options():
 func _refresh_market():
 	if market_label==null: return
 	_refresh_market_product_options()
-	if market_product_select.item_count==0: market_label.text="Lancez un produit pour obtenir benchmarks, retours clients et parts de marché."; contract_label.text="Aucun contrat."; return
-	var p:=ProductManager.get_product(_meta(market_product_select)); if p.is_empty(): return
-	var bench:=MarketManager.benchmark_for(p); var lines:=["Benchmark %s :" % str(p.name)]
-	for i in range(bench.size()): lines.append("%d. %s — %.1f pts — %s €%s" % [i+1,str(bench[i].name),float(bench[i].score),_money(int(bench[i].price))," ← vous" if bool(bench[i].player) else ""])
-	lines.append("\nÉvaluation par clientèle :")
-	for seg in GameData.SEGMENTS.keys(): lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
+	_clear_market_benchmark_cards()
+	if market_product_select.item_count==0:
+		market_label.text="Lancez un produit pour obtenir benchmarks, retours clients et parts de marché."
+		contract_label.text="Aucun contrat."
+		return
+	var p:=ProductManager.get_product(_meta(market_product_select))
+	if p.is_empty(): return
+	var bench:=MarketManager.benchmark_for(p)
+	_refresh_market_benchmark_cards(bench)
+	var lines:=["Évaluation par clientèle :"]
+	for seg in GameData.SEGMENTS.keys():
+		lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
 	lines.append("Pertinence marché : %.0f%% • %d mois depuis le lancement" % [MarketManager.product_market_relevance(p) * 100.0, int(p.get("months_on_market", 0))])
 	market_label.text="\n".join(lines)
@@ -2194,6 +2210,29 @@ func _refresh_market():
 	for c in MarketManager.contracts:
 		c_lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [str(c.customer),str(c.product_name),_money(int(c.units_per_month)),_money(int(c.unit_price)),int(c.remaining_months),str(c.status)])
 	contract_label.text="\n".join(c_lines) if not c_lines.is_empty() else "Aucune proposition. Les produits adaptés au calcul, à l'efficacité ou à la fiabilité peuvent attirer des entreprises."
+
+func _clear_market_benchmark_cards():
+	if market_benchmark_grid == null:
+		return
+	for child in market_benchmark_grid.get_children():
+		child.queue_free()
+
+func _refresh_market_benchmark_cards(rows: Array):
+	if market_benchmark_grid == null:
+		return
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	for i in range(rows.size()):
+		var row: Dictionary = rows[i]
+		var card: Control = card_script.new() as Control
+		market_benchmark_grid.add_child(card)
+		var badge := "VOUS" if bool(row.get("player", false)) else "CONCURRENT"
+		var subtitle := str(row.get("company", "Marché CPU"))
+		var metrics := [
+			{"label":"RANG", "value":"#%d" % (i + 1)},
+			{"label":"SCORE", "value":"%.1f" % float(row.get("score", 0.0))},
+			{"label":"PRIX", "value":"%s €" % _money(int(row.get("price", 0)))}
+		]
+		card.call("configure", "BENCH-%d" % i, str(row.get("name", "Produit")), subtitle, badge, metrics, "")
 
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
 
