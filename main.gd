@@ -28,6 +28,7 @@ var month_report_label: Label
 var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
+var company_reputation_grid: GridContainer
 var division_label: Label
 var company_finance_label: Label
 var staff_label: Label
@@ -41,6 +42,7 @@ var product_details_label: Label
 var market_label: Label
 var contract_label: Label
 var media_label: Label
+var media_card_grid: GridContainer
 
 var setup_name: LineEdit
 var setup_sector: OptionButton
@@ -609,8 +611,14 @@ func _create_dashboard_tab():
 func _create_company_tab():
 	var scroll := _tab_scroll("Entreprise")
 	var box: VBoxContainer = scroll.get_child(0)
-	company_rep_label = _rich_label()
+	box.add_child(_section("Image de l'entreprise"))
+	company_rep_label = _muted_label("", 12)
 	box.add_child(company_rep_label)
+	company_reputation_grid = GridContainer.new()
+	company_reputation_grid.columns = 4
+	company_reputation_grid.add_theme_constant_override("h_separation", 10)
+	company_reputation_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(company_reputation_grid)
 	box.add_child(_section("Divisions de l'entreprise"))
 	var division_card := _card(APP_SHELL, 12, 12)
 	division_label = _rich_label()
@@ -1164,7 +1172,14 @@ func _create_market_tab():
 func _create_media_tab():
 	var scroll := _tab_scroll("Presse & médias")
 	var box: VBoxContainer = scroll.get_child(0)
-	media_label=_rich_label(); box.add_child(media_label)
+	box.add_child(_section("Fil d'actualité"))
+	media_label = _muted_label("Les événements importants apparaissent ici.", 12)
+	box.add_child(media_label)
+	media_card_grid = GridContainer.new()
+	media_card_grid.columns = 2
+	media_card_grid.add_theme_constant_override("h_separation", 10)
+	media_card_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(media_card_grid)
 
 func _create_evolution_tab():
 	var scroll := _tab_scroll("Évolution des secteurs")
@@ -1675,6 +1690,10 @@ func _update_responsive_layout():
 		staff_card_grid.columns = 1 if compact else 3
 	if cpu_generation_card_grid != null:
 		cpu_generation_card_grid.columns = 1 if compact else 3
+	if company_reputation_grid != null:
+		company_reputation_grid.columns = 2 if compact else 4
+	if media_card_grid != null:
+		media_card_grid.columns = 1 if compact else 2
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -2004,13 +2023,8 @@ func _refresh_company():
 	if company_rep_label == null or not CompanyManager.created:
 		return
 	var r := CompanyManager.reputation
-	var lines := ["Image de l'entreprise :"]
-	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
-		lines.append("• %s : %.1f/100" % [key.capitalize(), float(r[key])])
-	lines.append("\nFiliales : %d" % CompanyManager.subsidiaries.size())
-	for sub in CompanyManager.subsidiaries:
-		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
-	company_rep_label.text = "\n".join(lines)
+	company_rep_label.text = "Réputation globale %.0f/100 • %d filiale(s)" % [CompanyManager.get_brand_score(), CompanyManager.subsidiaries.size()]
+	_refresh_company_reputation_cards(r)
 	if company_finance_label != null:
 		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique", "BANKRUPT":"Faillite"}.get(Economy.solvency_status(), "Stable"))
 		company_finance_label.text = "Trésorerie : %s €\nDette : %s € / %s €\nIntérêts : 1,2%% / mois\nSituation : %s" % [_money(Economy.money), _money(Economy.debt), _money(Economy.MAX_DEBT), status_text]
@@ -2029,6 +2043,40 @@ func _refresh_company():
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
 	_refresh_leader_choices()
+
+func _refresh_company_reputation_cards(reputation: Dictionary):
+	if company_reputation_grid == null:
+		return
+	for child in company_reputation_grid.get_children():
+		child.queue_free()
+	var labels := {
+		"innovation":"Innovation",
+		"reliability":"Fiabilité",
+		"value":"Rapport qualité/prix",
+		"support":"Support",
+		"sustainability":"Durabilité",
+		"prestige":"Prestige",
+		"professional":"Crédibilité pro"
+	}
+	for key_value in labels.keys():
+		var key := str(key_value)
+		var value := float(reputation.get(key, 0.0))
+		var panel := _card(APP_PANEL, 10, 10)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		company_reputation_grid.add_child(panel)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 5)
+		panel.add_child(box)
+		box.add_child(_muted_label(str(labels[key]), 11))
+		var value_label := _label("%.0f / 100" % value, 19)
+		value_label.add_theme_color_override("font_color", APP_GREEN if value >= 70.0 else (APP_AMBER if value >= 45.0 else APP_RED))
+		box.add_child(value_label)
+		var bar := ProgressBar.new()
+		bar.max_value = 100.0
+		bar.value = value
+		bar.show_percentage = false
+		bar.custom_minimum_size.y = 7
+		box.add_child(bar)
 
 func _apply_policies():
 	CompanyManager.policies.marketing_budget=int(policy_marketing.value); CompanyManager.policies.support_budget=int(policy_support.value); CompanyManager.policies.environment_budget=int(policy_environment.value); CompanyManager.policies.support_level=_meta(policy_support_level); CompanyManager.company_changed.emit(); status_label.text="Politiques mises à jour."
@@ -2436,10 +2484,39 @@ func _refresh_market_benchmark_cards(rows: Array):
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
 
 func _refresh_media():
-	if media_label==null: return
-	var lines:=[]
-	for n in MediaManager.news.slice(0,20): lines.append("[%02d/%d] %s — %s\n%s" % [int(n.month),int(n.year),str(n.category),str(n.headline),str(n.body)])
-	media_label.text="\n\n".join(lines) if not lines.is_empty() else "Aucune actualité."
+	if media_label == null:
+		return
+	if MediaManager.news.is_empty():
+		media_label.text = "Aucune actualité. Les lancements, concurrents et étapes de l'entreprise alimenteront ce fil."
+	else:
+		media_label.text = "%d actualité(s) • les plus récentes en premier" % mini(MediaManager.news.size(), 20)
+	_refresh_media_cards()
+
+func _refresh_media_cards():
+	if media_card_grid == null:
+		return
+	for child in media_card_grid.get_children():
+		child.queue_free()
+	var card_script: Script = load("res://ui/EntityCard.gd")
+	var recent_news: Array = MediaManager.news.slice(0, 20)
+	for index in range(recent_news.size()):
+		var item: Dictionary = recent_news[index]
+		var card: Control = card_script.new() as Control
+		media_card_grid.add_child(card)
+		var metrics := [
+			{"label":"MOIS", "value":"%02d/%d" % [int(item.get("month", 1)), int(item.get("year", 2025))]},
+			{"label":"CATÉGORIE", "value":str(item.get("category", "Actualité"))},
+			{"label":"ORDRE", "value":"#%d" % (index + 1)}
+		]
+		card.call(
+			"configure",
+			"NEWS-%d" % index,
+			str(item.get("headline", "Actualité")),
+			str(item.get("body", "")),
+			str(item.get("category", "NEWS")).to_upper(),
+			metrics,
+			""
+		)
 
 func _select_meta(option: OptionButton, wanted: String):
 	for i in range(option.item_count):
