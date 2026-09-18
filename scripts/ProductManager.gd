@@ -129,6 +129,44 @@ func launch_financials(product_id: String, production_capacity: int) -> Dictiona
 		"monthly_overhead": monthly_overhead
 	}
 
+func launch_forecast(product_id: String, price: int, production_capacity: int) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	var preview := product.duplicate(true)
+	preview["price"] = maxi(price, 1)
+	var financials := launch_financials(product_id, production_capacity)
+	if financials.is_empty():
+		return {}
+	var capacity := int(financials.get("capacity", 1))
+	preview["production_capacity"] = capacity
+	var demand := MarketManager.estimate_consumer_demand(preview)
+	var requested_units := maxi(int(demand.get("units", 0)), 0)
+	var expected_units := mini(requested_units, capacity)
+	var revenue := expected_units * int(preview.price)
+	var production_cost := expected_units * int(preview.get("unit_cost", 0))
+	var return_rate: float = clampf((100.0 - float(preview.get("metrics", {}).get("reliability", 50.0))) / 240.0, 0.005, 0.22)
+	return_rate /= CompanyManager.get_support_modifier()
+	var expected_returns := int(round(float(expected_units) * return_rate))
+	var warranty_cost := int(round(float(expected_returns * int(preview.get("unit_cost", 0))) * 0.72))
+	var monthly_overhead := int(financials.get("monthly_overhead", 0))
+	var monthly_result := revenue - production_cost - warranty_cost - monthly_overhead
+	var utilization := float(expected_units) / float(maxi(capacity, 1))
+	return {
+		"capacity": capacity,
+		"requested_units": requested_units,
+		"expected_units": expected_units,
+		"utilization": clampf(utilization, 0.0, 1.0),
+		"share": float(demand.get("share", 0.0)),
+		"score": float(demand.get("score", 0.0)),
+		"revenue": revenue,
+		"production_cost": production_cost,
+		"warranty_cost": warranty_cost,
+		"monthly_overhead": monthly_overhead,
+		"monthly_result": monthly_result,
+		"investment": int(financials.get("investment", 0))
+	}
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
