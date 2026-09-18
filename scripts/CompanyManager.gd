@@ -19,8 +19,16 @@ var reputation := {
 	"professional": 45.0
 }
 
+const MARKETING_CAMPAIGNS := {
+	"NONE": {"label":"Aucune campagne", "budget":0, "awareness":0.02},
+	"LOCAL": {"label":"Campagne locale", "budget":8_000, "awareness":0.22},
+	"NATIONAL": {"label":"Campagne nationale", "budget":35_000, "awareness":0.30},
+	"GLOBAL": {"label":"Campagne mondiale", "budget":120_000, "awareness":0.36}
+}
+
 var policies := {
-	"marketing_budget": 6000,
+	"marketing_campaign": "LOCAL",
+	"marketing_budget": 8000,
 	"support_budget": 5000,
 	"environment_budget": 2500,
 	"support_level": "STANDARD"
@@ -59,7 +67,7 @@ func reset(name: String, sector: String, capital: int = 500_000):
 		"innovation":50.0,"reliability":50.0,"value":50.0,"support":50.0,
 		"sustainability":50.0,"prestige":35.0,"professional":45.0
 	}
-	policies = {"marketing_budget":6000,"support_budget":5000,"environment_budget":2500,"support_level":"STANDARD"}
+	policies = {"marketing_campaign":"LOCAL","marketing_budget":8000,"support_budget":5000,"environment_budget":2500,"support_level":"STANDARD"}
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
 		"Production":{"leader_id":"","autonomy":"SUPERVISED","cohesion":30.0},
@@ -90,8 +98,35 @@ func change_reputation(changes: Dictionary):
 func get_brand_score() -> float:
 	return (float(reputation.prestige) + float(reputation.reliability) + float(reputation.innovation)) / 3.0
 
+func get_marketing_campaign_keys() -> Array:
+	return MARKETING_CAMPAIGNS.keys()
+
+func get_marketing_campaign(key: String = "") -> Dictionary:
+	var campaign_key := key if not key.is_empty() else str(policies.get("marketing_campaign", "LOCAL"))
+	return MARKETING_CAMPAIGNS.get(campaign_key, MARKETING_CAMPAIGNS.LOCAL)
+
+func set_marketing_campaign(key: String) -> bool:
+	if not MARKETING_CAMPAIGNS.has(key):
+		return false
+	var campaign: Dictionary = MARKETING_CAMPAIGNS[key]
+	policies["marketing_campaign"] = key
+	policies["marketing_budget"] = int(campaign.get("budget", 0))
+	company_changed.emit()
+	return true
+
+func _campaign_key_from_budget(budget: int) -> String:
+	var best_key := "LOCAL"
+	var best_distance := 2_147_483_647
+	for key_value in MARKETING_CAMPAIGNS.keys():
+		var key := str(key_value)
+		var distance := absi(int(MARKETING_CAMPAIGNS[key].get("budget", 0)) - budget)
+		if distance < best_distance:
+			best_distance = distance
+			best_key = key
+	return best_key
+
 func get_awareness_bonus() -> float:
-	return clampf(log(1.0 + float(policies.marketing_budget)) / 35.0, 0.02, 0.34)
+	return float(get_marketing_campaign().get("awareness", 0.02))
 
 func get_support_modifier() -> float:
 	match str(policies.support_level):
@@ -152,6 +187,13 @@ func load_state(state: Dictionary):
 	created = bool(state.get("created", false))
 	reputation = state.get("reputation", reputation).duplicate(true)
 	policies = state.get("policies", policies).duplicate(true)
+	if not policies.has("marketing_campaign"):
+		policies["marketing_campaign"] = _campaign_key_from_budget(int(policies.get("marketing_budget", 8000)))
+	var marketing_campaign := str(policies.get("marketing_campaign", "LOCAL"))
+	if not MARKETING_CAMPAIGNS.has(marketing_campaign):
+		marketing_campaign = _campaign_key_from_budget(int(policies.get("marketing_budget", 8000)))
+	policies["marketing_campaign"] = marketing_campaign
+	policies["marketing_budget"] = int(get_marketing_campaign(marketing_campaign).get("budget", 8000))
 	departments = state.get("departments", departments).duplicate(true)
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
 	brands = state.get("brands", []).duplicate(true)
