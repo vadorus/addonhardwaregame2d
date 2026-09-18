@@ -84,7 +84,8 @@ var product_capacity: SpinBox
 var product_industrialization_label: Label
 var market_product_select: OptionButton
 var market_benchmark_grid: GridContainer
-var policy_marketing: SpinBox
+var policy_marketing: OptionButton
+var policy_marketing_info: Label
 var policy_support: SpinBox
 var policy_environment: SpinBox
 var policy_support_level: OptionButton
@@ -630,7 +631,15 @@ func _create_company_tab():
 	box.add_child(division_card)
 	box.add_child(_section("Budgets mensuels"))
 	var grid := GridContainer.new(); grid.columns = 2; box.add_child(grid)
-	grid.add_child(_label("Marketing",14)); policy_marketing = _spin(0,200000,1000,6000); grid.add_child(policy_marketing)
+	grid.add_child(_label("Marketing",14))
+	policy_marketing = OptionButton.new()
+	_fill_marketing_campaigns(policy_marketing)
+	policy_marketing.item_selected.connect(func(_index): _refresh_marketing_policy_info())
+	grid.add_child(policy_marketing)
+	policy_marketing_info = _muted_label("", 12)
+	policy_marketing_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grid.add_child(_label("Effet campagne",14))
+	grid.add_child(policy_marketing_info)
 	grid.add_child(_label("SAV / support",14)); policy_support = _spin(0,200000,1000,5000); grid.add_child(policy_support)
 	grid.add_child(_label("Environnement",14)); policy_environment = _spin(0,200000,500,2500); grid.add_child(policy_environment)
 	grid.add_child(_label("Politique SAV",14)); policy_support_level = OptionButton.new(); _fill_simple(policy_support_level, {"MINIMAL":"Minimal","STANDARD":"Standard","PREMIUM":"Premium"}); grid.add_child(policy_support_level)
@@ -1746,6 +1755,24 @@ func _fill_approach_options(option: OptionButton):
 func _fill_focus_options(option: OptionButton):
 	option.clear(); for key in GameData.get_focus_keys(): option.add_item(str(GameData.FOCUS_OPTIONS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
 
+func _fill_marketing_campaigns(option: OptionButton):
+	option.clear()
+	for key_value in CompanyManager.get_marketing_campaign_keys():
+		var key := str(key_value)
+		var data := CompanyManager.get_marketing_campaign(key)
+		option.add_item("%s — %s €/mois" % [str(data.get("label", key)), _money(int(data.get("budget", 0)))])
+		option.set_item_metadata(option.item_count - 1, key)
+
+func _refresh_marketing_policy_info():
+	if policy_marketing == null or policy_marketing_info == null or policy_marketing.item_count == 0:
+		return
+	var key := _meta(policy_marketing)
+	var data := CompanyManager.get_marketing_campaign(key)
+	policy_marketing_info.text = "%s €/mois • notoriété +%.0f pts de potentiel commercial" % [
+		_money(int(data.get("budget", 0))),
+		float(data.get("awareness", 0.0)) * 100.0
+	]
+
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
 	return str(option.get_item_metadata(option.selected))
@@ -2078,7 +2105,8 @@ func _refresh_company():
 	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
 	division_label.text = "\n".join(division_lines)
 
-	policy_marketing.value = float(CompanyManager.policies.marketing_budget)
+	_select_meta(policy_marketing, str(CompanyManager.policies.get("marketing_campaign", "LOCAL")))
+	_refresh_marketing_policy_info()
 	policy_support.value = float(CompanyManager.policies.support_budget)
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
@@ -2119,7 +2147,13 @@ func _refresh_company_reputation_cards(reputation: Dictionary):
 		box.add_child(bar)
 
 func _apply_policies():
-	CompanyManager.policies.marketing_budget=int(policy_marketing.value); CompanyManager.policies.support_budget=int(policy_support.value); CompanyManager.policies.environment_budget=int(policy_environment.value); CompanyManager.policies.support_level=_meta(policy_support_level); CompanyManager.company_changed.emit(); status_label.text="Politiques mises à jour."
+	CompanyManager.set_marketing_campaign(_meta(policy_marketing))
+	CompanyManager.policies.support_budget = int(policy_support.value)
+	CompanyManager.policies.environment_budget = int(policy_environment.value)
+	CompanyManager.policies.support_level = _meta(policy_support_level)
+	CompanyManager.company_changed.emit()
+	var campaign := CompanyManager.get_marketing_campaign()
+	status_label.text = "Politiques mises à jour • %s (%s €/mois)." % [str(campaign.get("label", "Marketing")), _money(int(campaign.get("budget", 0)))]
 
 func _request_financing():
 	if Economy.request_financing(250_000):
