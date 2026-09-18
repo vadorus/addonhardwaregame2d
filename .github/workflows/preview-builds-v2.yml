@@ -1,0 +1,133 @@
+name: Preview Builds V2
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Godot 4.7.2 with export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Export Windows debug preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/windows
+          godot --headless --path . --export-debug "Windows Desktop" build/windows/TechEmpire.exe
+          test -s build/windows/TechEmpire.exe
+
+      - name: Upload Windows preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: TechEmpire-Windows-v0.2.12-preview.1
+          path: build/windows/
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    name: Android preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prepare preinstalled Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "build-tools;36.1.0" "platforms;android-36"
+
+      - name: Setup Godot 4.7.2 with export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Configure Godot Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.7.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/shutdown_adb_on_exit = true
+          export/android/force_system_user = false
+          EOF
+
+      - name: Export Android preview
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.TECH_EMPIRE_ANDROID_KEYSTORE_B64 }}
+          RELEASE_KEY_ALIAS: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/android
+          if [[ -n "$RELEASE_KEYSTORE_B64" && -n "$RELEASE_KEY_ALIAS" && -n "$RELEASE_KEY_PASSWORD" ]]; then
+            KEYSTORE="$RUNNER_TEMP/techempire-release.jks"
+            printf '%s' "$RELEASE_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$KEYSTORE"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$RELEASE_KEY_ALIAS"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$RELEASE_KEY_PASSWORD"
+            godot --headless --path . --export-release "Android" build/android/TechEmpire.apk
+          else
+            echo "Permanent Android signing secrets are not configured yet; using temporary debug signing."
+            KEYSTORE="$RUNNER_TEMP/debug.keystore"
+            keytool -genkeypair -keystore "$KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt
+            export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$KEYSTORE"
+            export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+            export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+            godot --headless --path . --export-debug "Android" build/android/TechEmpire.apk
+          fi
+          test -s build/android/TechEmpire.apk
+
+      - name: Upload Android preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: TechEmpire-Android-v0.2.12-preview.1
+          path: build/android/TechEmpire.apk
+          if-no-files-found: error
+          retention-days: 14
