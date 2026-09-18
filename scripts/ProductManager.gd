@@ -14,6 +14,9 @@ var _next_id := 1
 var _next_generation_id := 1
 var _reviewed_products: Dictionary = {}
 
+const INDUSTRIALIZATION_SETUP_RATE := 0.12
+const CAPACITY_OVERHEAD_RATE := 0.015
+
 func _ready():
 	ResearchManager.project_completed.connect(_on_project_completed)
 
@@ -111,16 +114,39 @@ func _metric_average(metrics: Dictionary) -> float:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
 
+func launch_financials(product_id: String, production_capacity: int) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
+	var capacity := clampi(production_capacity, 1, max_capacity)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var investment := maxi(2500, int(round(float(capacity * unit_cost) * INDUSTRIALIZATION_SETUP_RATE)))
+	var monthly_overhead := maxi(250, int(round(float(capacity * unit_cost) * CAPACITY_OVERHEAD_RATE)))
+	return {
+		"capacity": capacity,
+		"investment": investment,
+		"monthly_overhead": monthly_overhead
+	}
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
+			var financials := launch_financials(product_id, production_capacity)
+			if financials.is_empty():
+				return false
+			var investment := int(financials.get("investment", 0))
+			if Economy.money < investment:
+				return false
 			product.price = maxi(price, 1)
-			var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
-			product.production_capacity = clampi(production_capacity, 1, max_capacity)
+			product.production_capacity = int(financials.get("capacity", 1))
+			product["launch_investment"] = investment
+			product["monthly_capacity_overhead"] = int(financials.get("monthly_overhead", 0))
+			Economy.add_expense(investment, "Industrialisation — %s" % str(product.name))
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
 			product["market_launch_month"] = MarketManager.market_months
-			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
+			CompanyManager.add_alert("%s est officiellement lancé après %s € d'investissement industriel." % [str(product.name), str(investment)])
 			product_launched.emit(product)
 			products_changed.emit()
 			return true
@@ -152,8 +178,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var total_units := sold_b2b + sold_consumer
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
 	var production_cost := total_units * int(product.unit_cost)
+	var capacity_overhead := int(product.get("monthly_capacity_overhead", 0))
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if capacity_overhead > 0:
+		Economy.add_expense(capacity_overhead, "Capacité industrielle — %s" % str(product.name))
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)
@@ -173,7 +202,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
+	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"capacity_overhead":capacity_overhead,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id))
@@ -236,6 +265,10 @@ func load_state(state: Dictionary):
 		product["yield_rate"] = float(product.get("yield_rate", 0.72))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
+		if str(product.get("status", "")) == "LAUNCHED":
+			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
+			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
+			product["monthly_capacity_overhead"] = int(product.get("monthly_capacity_overhead", financials.get("monthly_overhead", 0)))
 
 	cpu_generations = []
 	var saved_generations_value = state.get("cpu_generations", [])
