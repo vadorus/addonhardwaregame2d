@@ -87,6 +87,7 @@ func _apply_data() -> void:
 	badge_label.text = badge_text
 	badge_label.add_theme_color_override("font_color", _badge_color(badge_text))
 	action_button.text = action_text
+	action_button.visible = not action_text.is_empty()
 	for child in metrics_grid.get_children():
 		child.free()
 	for metric_value in metrics_data:
@@ -108,7 +109,7 @@ func _apply_data() -> void:
 
 func _badge_color(value: String) -> Color:
 	match value.to_upper():
-		"LAUNCHED", "EN VENTE":
+		"LAUNCHED", "EN VENTE", "VOUS":
 			return GREEN
 		"READY", "PRÊT":
 			return AMBER
