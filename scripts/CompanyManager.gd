@@ -160,6 +160,13 @@ func get_production_execution_modifier() -> float:
 func get_support_execution_modifier() -> float:
 	return _department_execution_modifier("Support", "support", 0.86)
 
+func get_finance_execution_modifier() -> float:
+	return _department_execution_modifier("Finance", "finance", 0.88)
+
+func get_finance_interest_modifier() -> float:
+	var execution := get_finance_execution_modifier()
+	return clampf(1.06 - (execution - 0.88) * 0.45, 0.92, 1.06)
+
 func get_production_cost_modifier() -> float:
 	var execution := get_production_execution_modifier()
 	return clampf(1.10 - (execution - 0.84) * 0.45, 0.94, 1.10)
