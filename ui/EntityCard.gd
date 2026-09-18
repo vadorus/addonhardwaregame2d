@@ -113,7 +113,7 @@ func _badge_color(value: String) -> Color:
 			return GREEN
 		"READY", "PRÊT", "RESPONSABLE", "PENDING", "À RENOUVELER":
 			return AMBER
-		"COMPLETED":
+		"COMPLETED", "FIN DE VENTE":
 			return CYAN
 		"BLOCKED", "ERREUR":
 			return RED
