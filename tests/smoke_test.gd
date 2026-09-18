@@ -60,6 +60,24 @@ func _ready() -> void:
 		_fail("Bankruptcy state did not reset after loading a healthy economy")
 		return
 
+	Economy.history = [
+		{"result":-80_000, "expense_breakdown":{"R&D":60_000, "Salaires":30_000}, "income_breakdown":{}},
+		{"result":-60_000, "expense_breakdown":{"R&D":55_000, "Salaires":30_000}, "income_breakdown":{"Ventes":20_000}},
+		{"result":-40_000, "expense_breakdown":{"R&D":50_000, "Salaires":30_000}, "income_breakdown":{"Ventes":35_000}}
+	]
+	Economy.money = 240_000
+	var finance_snapshot := Economy.financial_snapshot()
+	if str(finance_snapshot.get("trend", "")) != "IMPROVING":
+		_fail("Financial snapshot did not detect improving results")
+		return
+	if str(finance_snapshot.get("top_expense", {}).get("category", "")) != "R&D":
+		_fail("Financial snapshot did not identify the largest expense")
+		return
+	if float(finance_snapshot.get("runway_months", 0.0)) <= 0.0:
+		_fail("Financial snapshot did not expose a positive runway")
+		return
+	Economy.load_state(initial_economy_state)
+
 	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"))
 	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"))
 	if float(performance.get("performance", 0.0)) <= float(efficient.get("performance", 0.0)):
