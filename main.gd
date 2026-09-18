@@ -421,9 +421,9 @@ func _create_dashboard_tab():
 	dashboard_sector_grid.add_theme_constant_override("v_separation", 10)
 	box.add_child(dashboard_sector_grid)
 	var sector_preview_script: Script = load("res://ui/DepartmentScenePreview.gd")
-	for sector_id_value in DepartmentProgression.SECTOR_ORDER:
+	for sector_id_value in DepartmentProgression.get_pole_ids():
 		var sector_id := str(sector_id_value)
-		var state := DepartmentProgression.get_sector_state(sector_id)
+		var state := DepartmentProgression.get_pole_state(sector_id)
 		var sector_card := _card(APP_PANEL, 11, 10)
 		sector_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		dashboard_sector_grid.add_child(sector_card)
@@ -664,7 +664,7 @@ func _create_company_tab():
 	box.add_child(_section("Groupe / filiales"))
 	var sgrid := GridContainer.new(); sgrid.columns=2; box.add_child(sgrid)
 	sgrid.add_child(_label("Nom",14)); subsidiary_name=LineEdit.new(); subsidiary_name.placeholder_text="Nova Cloud"; sgrid.add_child(subsidiary_name)
-	sgrid.add_child(_label("Secteur",14)); subsidiary_sector=OptionButton.new(); _fill_sector_options(subsidiary_sector); sgrid.add_child(subsidiary_sector)
+	sgrid.add_child(_label("Gamme produit",14)); subsidiary_sector=OptionButton.new(); _fill_product_family_options(subsidiary_sector); sgrid.add_child(subsidiary_sector)
 	sgrid.add_child(_label("Capital",14)); subsidiary_capital=_spin(50000,5000000,10000,100000); sgrid.add_child(subsidiary_capital)
 	var sub_btn:=Button.new(); sub_btn.text="Créer une filiale"; sub_btn.pressed.connect(_create_subsidiary); box.add_child(sub_btn)
 
@@ -1182,7 +1182,7 @@ func _create_media_tab():
 	box.add_child(media_card_grid)
 
 func _create_evolution_tab():
-	var scroll := _tab_scroll("Évolution des secteurs")
+	var scroll := _tab_scroll("Évolution des pôles")
 	var box: VBoxContainer = scroll.get_child(0)
 	var panel_script: Script = load("res://ui/DepartmentEvolutionPanel.gd")
 	evolution_panel = panel_script.new() as Control
@@ -1198,9 +1198,9 @@ func _build_setup_layer():
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
 	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("La vertical slice actuelle commence par la branche CPU. Développez vos équipes, vos technologies et plusieurs générations de processeurs avant l’ouverture des autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var desc:=_label("La vertical slice actuelle commence par la branche CPU. Développez vos équipes, vos technologies et plusieurs générations de processeurs avant l’ouverture des autres gammes produit.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
-	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
+	setup_sector=OptionButton.new(); _fill_product_family_options(setup_sector); box.add_child(setup_sector)
 	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
 	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
 
@@ -1423,7 +1423,7 @@ func _build_navigation_overlay():
 		["▣", "Produits", "Prix, capacité et lancement", 4],
 		["↗", "Marché", "Ventes et concurrence", 5],
 		["▤", "Presse", "Actualités et réputation", 6],
-		["◆", "Évolution", "Voir grandir chaque secteur", 7]
+		["◆", "Évolution", "Voir grandir chaque pôle", 7]
 	]
 	for entry in entries:
 		var button := Button.new()
@@ -1602,11 +1602,11 @@ func _refresh_dashboard_onboarding():
 func _refresh_dashboard_sectors():
 	if dashboard_sector_cards.is_empty():
 		return
-	for sector_id_value in DepartmentProgression.SECTOR_ORDER:
+	for sector_id_value in DepartmentProgression.get_pole_ids():
 		var sector_id := str(sector_id_value)
 		if not dashboard_sector_cards.has(sector_id):
 			continue
-		var state := DepartmentProgression.get_sector_state(sector_id)
+		var state := DepartmentProgression.get_pole_state(sector_id)
 		var refs: Dictionary = dashboard_sector_cards[sector_id]
 		var stage := int(state.get("stage", 0))
 		var stage_label: Label = refs.get("stage")
@@ -1709,17 +1709,18 @@ func _fill_text(option: OptionButton, items: Array):
 func _fill_simple(option: OptionButton, items: Dictionary):
 	option.clear(); for key in items.keys(): option.add_item(str(items[key])); option.set_item_metadata(option.item_count-1,str(key))
 
-func _fill_sector_options(option: OptionButton):
+func _fill_product_family_options(option: OptionButton):
 	option.clear()
-	for key in GameData.get_sector_keys():
-		var sector_key := str(key)
-		var active := GameData.is_sector_active(sector_key)
-		var item_label := str(GameData.SECTORS[key].label)
+	for key in GameData.get_product_family_keys():
+		var family_key := str(key)
+		var active := GameData.is_product_family_active(family_key)
+		var family_data := GameData.get_product_family(family_key)
+		var item_label := str(family_data.get("label", family_key))
 		if not active:
 			item_label += " — à venir"
 		option.add_item(item_label)
 		var item_index := option.item_count - 1
-		option.set_item_metadata(item_index, sector_key)
+		option.set_item_metadata(item_index, family_key)
 		option.set_item_disabled(item_index, not active)
 
 func _fill_segment_options(option: OptionButton):
