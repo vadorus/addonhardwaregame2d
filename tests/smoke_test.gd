@@ -412,6 +412,32 @@ func _ready() -> void:
 	var apex_max_capacity := int(apex_model.get("max_monthly_capacity", 1))
 	var recommended_financials := ProductManager.launch_financials(str(apex_model.id), apex_recommended_capacity)
 	var max_financials := ProductManager.launch_financials(str(apex_model.id), apex_max_capacity)
+
+	var flexible_choices := {"contract":"FLEXIBLE","packaging":"STANDARD","testing":"ECONOMY"}
+	var partner_choices := {"contract":"PARTNER","packaging":"STANDARD","testing":"BALANCED"}
+	var quality_choices := {"contract":"PARTNER","packaging":"PREMIUM","testing":"INTENSIVE"}
+	var flexible_financials := ProductManager.launch_financials(str(apex_model.id), apex_recommended_capacity, flexible_choices)
+	var quality_financials := ProductManager.launch_financials(str(apex_model.id), apex_recommended_capacity, quality_choices)
+	if int(flexible_financials.get("investment", 0)) >= int(recommended_financials.get("investment", 0)):
+		_fail("Flexible industrial contract did not reduce launch investment")
+		return
+	if int(quality_financials.get("investment", 0)) <= int(recommended_financials.get("investment", 0)):
+		_fail("Premium industrial strategy did not increase launch investment")
+		return
+	var default_industrial_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity)
+	var flexible_industrial_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity, flexible_choices)
+	var quality_industrial_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity, quality_choices)
+	var partner_industrial_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity, partner_choices)
+	if float(flexible_industrial_forecast.get("return_rate", 0.0)) <= float(default_industrial_forecast.get("return_rate", 0.0)):
+		_fail("Economy industrial testing did not increase return risk")
+		return
+	if float(quality_industrial_forecast.get("return_rate", 1.0)) >= float(default_industrial_forecast.get("return_rate", 0.0)):
+		_fail("Premium packaging and intensive testing did not reduce return risk")
+		return
+	if int(partner_industrial_forecast.get("production_cost", 0)) >= int(default_industrial_forecast.get("production_cost", 0)):
+		_fail("Foundry partnership did not reduce projected production cost")
+		return
+
 	var low_price := maxi(int(apex_model.get("unit_cost", 1)) + 5, int(float(apex_model.price) * 0.75))
 	var high_price := maxi(low_price + 10, int(float(apex_model.price) * 1.45))
 	var low_price_forecast := ProductManager.launch_forecast(str(apex_model.id), low_price, apex_recommended_capacity)
@@ -459,6 +485,10 @@ func _ready() -> void:
 		return
 	if Economy.money != cash_before_launch - int(max_financials.get("investment", 0)):
 		_fail("CPU launch did not charge the industrialization investment")
+		return
+	var stored_industrialization: Dictionary = apex_model.get("industrialization", {})
+	if str(stored_industrialization.get("contract", "")) != "RESERVED" or str(stored_industrialization.get("testing", "")) != "BALANCED":
+		_fail("Default industrialization strategy was not stored on launch")
 		return
 
 	var economy_before_offer_update := Economy.get_state().duplicate(true)
@@ -623,9 +653,14 @@ func _ready() -> void:
 		legacy_product.erase("generation_id")
 		legacy_product.erase("generation_index")
 		legacy_product.erase("generation_name")
+		legacy_product.erase("industrialization")
 	ProductManager.load_state(legacy_product_state)
 	if ProductManager.cpu_generations.is_empty() or str(ProductManager.products[0].get("generation_id", "")).is_empty():
 		_fail("Legacy V5 products were not migrated into a CPU generation")
+		return
+	var migrated_industrialization: Dictionary = ProductManager.products[0].get("industrialization", {})
+	if str(migrated_industrialization.get("contract", "")) != "RESERVED" or str(migrated_industrialization.get("packaging", "")) != "STANDARD" or str(migrated_industrialization.get("testing", "")) != "BALANCED":
+		_fail("Legacy product did not migrate to the default industrialization strategy")
 		return
 
 	var legacy_state := ResearchManager.get_state().duplicate(true)
