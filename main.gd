@@ -136,6 +136,8 @@ var decision_previous_time_scale := 1.0
 var progression_toast: PanelContainer
 var progression_toast_label: Label
 var progression_toast_tween: Tween
+var bankruptcy_layer: ColorRect
+var bankruptcy_label: Label
 
 func _notification(what: int):
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -150,6 +152,8 @@ func _handle_back_request():
 		return
 	if settings_layer != null and settings_layer.visible:
 		settings_layer.visible = false
+		return
+	if bankruptcy_layer != null and bankruptcy_layer.visible:
 		return
 	if month_layer != null and month_layer.visible:
 		month_layer.visible = false
@@ -181,6 +185,7 @@ func _connect_signals():
 	Economy.month_closed.connect(_on_month_closed)
 	Economy.financing_changed.connect(func(_debt): _refresh_all())
 	Economy.solvency_warning.connect(_on_solvency_warning)
+	Economy.bankruptcy_triggered.connect(_on_bankruptcy_triggered)
 	CompanyManager.company_changed.connect(_refresh_all)
 	CompanyManager.reputation_changed.connect(_refresh_all)
 	DivisionManager.divisions_changed.connect(_refresh_all)
@@ -332,6 +337,7 @@ func _build_ui():
 	_build_setup_layer()
 	_build_month_layer()
 	_build_progression_toast()
+	_build_bankruptcy_layer()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -1217,6 +1223,37 @@ func _build_progression_toast():
 	progression_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(progression_toast_label)
 
+func _build_bankruptcy_layer():
+	bankruptcy_layer = ColorRect.new()
+	bankruptcy_layer.color = Color(0.01, 0.015, 0.025, 0.96)
+	bankruptcy_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bankruptcy_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	bankruptcy_layer.z_index = 140
+	bankruptcy_layer.visible = false
+	add_child(bankruptcy_layer)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bankruptcy_layer.add_child(center)
+	var panel := _card(APP_SHELL, 18, 18)
+	panel.custom_minimum_size = Vector2(560, 360)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	panel.add_child(box)
+	var kicker := _eyebrow("FIN DE PARTIE")
+	kicker.add_theme_color_override("font_color", APP_RED)
+	box.add_child(kicker)
+	box.add_child(_label("L'entreprise est en faillite", 28))
+	bankruptcy_label = _rich_label()
+	bankruptcy_label.custom_minimum_size.y = 150
+	box.add_child(bankruptcy_label)
+	var restart := Button.new()
+	restart.text = "Recommencer avec cette entreprise"
+	restart.custom_minimum_size.y = 52
+	restart.pressed.connect(_restart_after_bankruptcy)
+	box.add_child(restart)
+
 func _tab_scroll(title: String) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
 	scroll.name = title
@@ -1704,6 +1741,28 @@ func _on_solvency_warning(message: String):
 	status_label.text = "⚠ " + message
 	CompanyManager.add_alert(message)
 
+func _on_bankruptcy_triggered(report: Dictionary):
+	TimeManager.time_scale = 0.0
+	if bankruptcy_layer != null:
+		bankruptcy_layer.visible = true
+	if bankruptcy_label != null:
+		bankruptcy_label.text = "Après %d mois dans le rouge, la trésorerie atteint %s € et la dette %s €.\n\nLa partie est terminée. Vous pouvez relancer la même entreprise à son capital initial de 500 000 €." % [
+			int(report.get("negative_months", Economy.negative_months)),
+			_money(int(report.get("money", Economy.money))),
+			_money(int(report.get("debt", Economy.debt)))
+		]
+	status_label.text = "Faillite : l'entreprise ne peut plus continuer."
+
+func _restart_after_bankruptcy():
+	var company_name := CompanyManager.company_name
+	var sector := CompanyManager.starting_sector
+	SimulationManager.reset_all(company_name, sector)
+	TimeManager.time_scale = 1.0
+	if bankruptcy_layer != null:
+		bankruptcy_layer.visible = false
+	SaveManager.autosave_game()
+	_refresh_all()
+
 func _on_department_stage_changed(_sector_id: String, previous_stage: int, new_stage: int, state: Dictionary):
 	var title := str(state.get("title", "Un pôle"))
 	var stage_name := str(state.get("stage_name", "Nouveau palier"))
@@ -1953,7 +2012,7 @@ func _refresh_company():
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
 	company_rep_label.text = "\n".join(lines)
 	if company_finance_label != null:
-		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique"}.get(Economy.solvency_status(), "Stable"))
+		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique", "BANKRUPT":"Faillite"}.get(Economy.solvency_status(), "Stable"))
 		company_finance_label.text = "Trésorerie : %s €\nDette : %s € / %s €\nIntérêts : 1,2%% / mois\nSituation : %s" % [_money(Economy.money), _money(Economy.debt), _money(Economy.MAX_DEBT), status_text]
 
 	var division_lines: Array[String] = []
