@@ -1,6 +1,7 @@
 extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_SUPPORT := preload("res://scripts/CpuSupportModel.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
@@ -335,6 +336,45 @@ func _ready() -> void:
 		return
 	if float(efficient.get("efficiency", 0.0)) <= float(performance.get("efficiency", 0.0)):
 		_fail("Efficient preset is not more efficient")
+		return
+
+	var ipc_base_design := CPU_DESIGN.preset("BALANCED")
+	ipc_base_design["ipc_factor"] = 1.0
+	ipc_base_design["compatibility_mode"] = "BALANCED"
+	var ipc_high_design := ipc_base_design.duplicate(true)
+	ipc_high_design["ipc_factor"] = 1.25
+	var ipc_base_eval := CPU_DESIGN.evaluate(ipc_base_design)
+	var ipc_high_eval := CPU_DESIGN.evaluate(ipc_high_design)
+	if float(ipc_high_eval.get("performance", 0.0)) <= float(ipc_base_eval.get("performance", 0.0)):
+		_fail("Higher IPC did not improve CPU performance")
+		return
+	if float(ipc_high_eval.get("complexity", 0.0)) <= float(ipc_base_eval.get("complexity", 0.0)):
+		_fail("Higher IPC did not increase CPU complexity")
+		return
+	if int(ipc_high_eval.get("unit_cost", 0)) <= int(ipc_base_eval.get("unit_cost", 0)):
+		_fail("Higher IPC did not increase CPU manufacturing cost")
+		return
+
+	var preserve_design := ipc_base_design.duplicate(true)
+	preserve_design["compatibility_mode"] = "PRESERVE"
+	var break_design := ipc_base_design.duplicate(true)
+	break_design["compatibility_mode"] = "BREAK"
+	var preserve_eval := CPU_DESIGN.evaluate(preserve_design)
+	var break_eval := CPU_DESIGN.evaluate(break_design)
+	var support_metrics := {
+		"performance":70.0,
+		"efficiency":70.0,
+		"reliability":70.0,
+		"innovation":70.0,
+		"sustainability":70.0
+	}
+	var preserve_support := CPU_SUPPORT.initial_state(support_metrics, preserve_design)
+	var break_support := CPU_SUPPORT.initial_state(support_metrics, break_design)
+	if float(preserve_support.get("compatibility", 0.0)) <= float(break_support.get("compatibility", 0.0)):
+		_fail("Preserving the platform did not improve initial compatibility")
+		return
+	if float(break_eval.get("innovation", 0.0)) <= float(preserve_eval.get("innovation", 0.0)):
+		_fail("Breaking platform compatibility did not create an innovation upside")
 		return
 
 	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
@@ -775,6 +815,10 @@ func _ready() -> void:
 	var migrated_industrialization: Dictionary = ProductManager.products[0].get("industrialization", {})
 	if str(migrated_industrialization.get("contract", "")) != "RESERVED" or str(migrated_industrialization.get("packaging", "")) != "STANDARD" or str(migrated_industrialization.get("testing", "")) != "BALANCED":
 		_fail("Legacy product did not migrate to the default industrialization strategy")
+		return
+	var migrated_design: Dictionary = ProductManager.products[0].get("cpu_design", {})
+	if not is_equal_approx(float(migrated_design.get("ipc_factor", 0.0)), 1.0) or str(migrated_design.get("compatibility_mode", "")) != "BALANCED":
+		_fail("Legacy CPU design did not migrate to default IPC and compatibility settings")
 		return
 	var migrated_support: Dictionary = ProductManager.products[0].get("cpu_support", {})
 	if migrated_support.is_empty() or not migrated_support.has("microcode_quality") or not migrated_support.has("compatibility"):
