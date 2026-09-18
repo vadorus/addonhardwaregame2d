@@ -193,12 +193,36 @@ func _ready() -> void:
 		_fail("Portfolio demand did not cap the CPU family to the available market")
 		return
 
+	var apex_recommended_capacity := int(apex_model.get("recommended_capacity", 1))
 	var apex_max_capacity := int(apex_model.get("max_monthly_capacity", 1))
+	var recommended_financials := ProductManager.launch_financials(str(apex_model.id), apex_recommended_capacity)
+	var max_financials := ProductManager.launch_financials(str(apex_model.id), apex_max_capacity)
+	if int(max_financials.get("investment", 0)) <= int(recommended_financials.get("investment", 0)):
+		_fail("Higher production capacity did not increase industrialization investment")
+		return
+	if int(max_financials.get("monthly_overhead", 0)) <= int(recommended_financials.get("monthly_overhead", 0)):
+		_fail("Higher production capacity did not increase monthly fixed overhead")
+		return
+	var cash_before_launch := Economy.money
+	Economy.money = int(max_financials.get("investment", 0)) - 1
+	if ProductManager.launch_product(str(apex_model.id), int(apex_model.price), apex_max_capacity):
+		_fail("CPU launch succeeded without enough cash for industrialization")
+		return
+	Economy.money = cash_before_launch
 	if not ProductManager.launch_product(str(apex_model.id), int(apex_model.price), apex_max_capacity + 9999):
 		_fail("Could not launch an available CPU family model")
 		return
 	if int(apex_model.production_capacity) != apex_max_capacity:
 		_fail("CPU launch ignored the binning capacity limit")
+		return
+	if int(apex_model.get("launch_investment", 0)) != int(max_financials.get("investment", 0)):
+		_fail("CPU launch did not store the industrialization investment")
+		return
+	if int(apex_model.get("monthly_capacity_overhead", 0)) != int(max_financials.get("monthly_overhead", 0)):
+		_fail("CPU launch did not store the monthly capacity overhead")
+		return
+	if Economy.money != cash_before_launch - int(max_financials.get("investment", 0)):
+		_fail("CPU launch did not charge the industrialization investment")
 		return
 	var fresh_demand := MarketManager.estimate_consumer_demand(apex_model)
 	apex_model["months_on_market"] = 24
