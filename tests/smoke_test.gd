@@ -361,15 +361,15 @@ func _ready() -> void:
 	break_design["compatibility_mode"] = "BREAK"
 	var preserve_eval := CPU_DESIGN.evaluate(preserve_design)
 	var break_eval := CPU_DESIGN.evaluate(break_design)
-	var support_metrics := {
+	var design_support_metrics := {
 		"performance":70.0,
 		"efficiency":70.0,
 		"reliability":70.0,
 		"innovation":70.0,
 		"sustainability":70.0
 	}
-	var preserve_support := CPU_SUPPORT.initial_state(support_metrics, preserve_design)
-	var break_support := CPU_SUPPORT.initial_state(support_metrics, break_design)
+	var preserve_support := CPU_SUPPORT.initial_state(design_support_metrics, preserve_design)
+	var break_support := CPU_SUPPORT.initial_state(design_support_metrics, break_design)
 	if float(preserve_support.get("compatibility", 0.0)) <= float(break_support.get("compatibility", 0.0)):
 		_fail("Preserving the platform did not improve initial compatibility")
 		return
