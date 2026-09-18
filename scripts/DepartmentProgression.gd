@@ -88,11 +88,24 @@ func load_state(state: Dictionary):
 		var raw_stage := _stage_from_score(_score_for(sector_id), _thresholds_for(sector_id))
 		achieved_stages[sector_id] = clampi(int(stored.get(sector_id, raw_stage)), raw_stage, 4)
 
-func get_all_states() -> Array[Dictionary]:
+# Terminologie canonique : un pôle représente une grande zone de l'entreprise
+# (Laboratoire, Production, Marché, Équipe). Les noms "sector_*" restent en
+# compatibilité avec les anciennes sauvegardes et les anciens appels.
+func get_pole_ids() -> Array:
+	return SECTOR_ORDER.duplicate()
+
+func get_all_pole_states() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for sector_id in SECTOR_ORDER:
-		result.append(get_sector_state(sector_id))
+	for pole_id in get_pole_ids():
+		result.append(get_pole_state(str(pole_id)))
 	return result
+
+func get_pole_state(pole_id: String) -> Dictionary:
+	return get_sector_state(pole_id)
+
+func get_all_states() -> Array[Dictionary]:
+	return get_all_pole_states()
+
 func get_sector_state(sector_id: String) -> Dictionary:
 	var definition: Dictionary = DEFINITIONS.get(sector_id, {})
 	if definition.is_empty():
