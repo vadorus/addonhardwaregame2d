@@ -138,6 +138,8 @@ func _ready() -> void:
 	var discovery_economy_state := Economy.get_state().duplicate(true)
 	var discovery_research_state := ResearchManager.get_state().duplicate(true)
 	var discovery_manager_state := DiscoveryManager.get_state().duplicate(true)
+	var reusable_technology_state := TechnologyManager.get_state().duplicate(true)
+	TechnologyManager.reset()
 	DiscoveryManager.reset()
 	var fake_discovery_project := {"id":"PRJ-DISCOVERY-TEST", "sector":"CPU"}
 	var fake_discovery_report := {"phase":"Prototype", "weakness":"efficiency"}
@@ -163,6 +165,9 @@ func _ready() -> void:
 		return
 	if not DiscoveryManager.get_pending_discovery().is_empty():
 		_fail("Resolved immediate discovery remained pending")
+		return
+	if TechnologyManager.has_technology("ADAPTIVE_POWER"):
+		_fail("Immediate discovery exploitation incorrectly unlocked a reusable technology")
 		return
 
 	var derived_discovery := DiscoveryManager.create_test_discovery("CACHE_POLICY", "DERIVED-TEST")
@@ -192,6 +197,28 @@ func _ready() -> void:
 	if float(ResearchManager.technologies.get("cpu", 0.0)) <= cpu_tech_before_research:
 		_fail("Completed derived research did not improve durable CPU know-how")
 		return
+	if not TechnologyManager.has_technology("SMART_CACHE"):
+		_fail("Completed cache research did not unlock its reusable technology")
+		return
+	if TechnologyManager.metric_bonus("performance") <= 0.0:
+		_fail("Reusable cache technology did not expose a performance bonus")
+		return
+	var reusable_round_trip := TechnologyManager.get_state().duplicate(true)
+	TechnologyManager.reset()
+	TechnologyManager.load_state(reusable_round_trip)
+	if not TechnologyManager.has_technology("SMART_CACHE"):
+		_fail("Reusable technology did not survive state round-trip")
+		return
+	if TechnologyManager.unlock("SMART_CACHE", "duplicate test"):
+		_fail("Reusable technology could be unlocked twice")
+		return
+	if not TechnologyManager.unlock("FOUNDRY_DRC", "industrial test"):
+		_fail("Could not unlock foundry reusable technology")
+		return
+	if TechnologyManager.industrial_modifier("unit_cost") >= 1.0 or TechnologyManager.industrial_modifier("capacity") <= 1.0:
+		_fail("Foundry reusable technology did not improve industrial economics")
+		return
+	TechnologyManager.load_state(reusable_technology_state)
 	DiscoveryManager.load_state(discovery_manager_state)
 	ResearchManager.load_state(discovery_research_state)
 	Economy.load_state(discovery_economy_state)
