@@ -737,12 +737,15 @@ func _create_company_tab():
 	department_management_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(department_management_info)
 	var delegate_btn := Button.new(); delegate_btn.text = "Affecter responsable et autonomie"; delegate_btn.pressed.connect(_apply_department); box.add_child(delegate_btn)
-	box.add_child(_section("Groupe / filiales"))
+	box.add_child(_section("Groupe / filiales — à venir"))
+	var subsidiary_hint := _muted_label("La création de filiales reste verrouillée pendant la vertical slice CPU. Elle reviendra quand les divisions supplémentaires auront une vraie simulation économique.", 12)
+	subsidiary_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(subsidiary_hint)
 	var sgrid := GridContainer.new(); sgrid.columns=2; box.add_child(sgrid)
-	sgrid.add_child(_label("Nom",14)); subsidiary_name=LineEdit.new(); subsidiary_name.placeholder_text="Nova Cloud"; sgrid.add_child(subsidiary_name)
-	sgrid.add_child(_label("Gamme produit",14)); subsidiary_sector=OptionButton.new(); _fill_product_family_options(subsidiary_sector); sgrid.add_child(subsidiary_sector)
-	sgrid.add_child(_label("Capital",14)); subsidiary_capital=_spin(50000,5000000,10000,100000); sgrid.add_child(subsidiary_capital)
-	var sub_btn:=Button.new(); sub_btn.text="Créer une filiale"; sub_btn.pressed.connect(_create_subsidiary); box.add_child(sub_btn)
+	sgrid.add_child(_label("Nom",14)); subsidiary_name=LineEdit.new(); subsidiary_name.placeholder_text="Fonction indisponible"; subsidiary_name.editable = false; sgrid.add_child(subsidiary_name)
+	sgrid.add_child(_label("Gamme produit",14)); subsidiary_sector=OptionButton.new(); _fill_product_family_options(subsidiary_sector); subsidiary_sector.disabled = true; sgrid.add_child(subsidiary_sector)
+	sgrid.add_child(_label("Capital",14)); subsidiary_capital=_spin(50000,5000000,10000,100000); subsidiary_capital.editable = false; sgrid.add_child(subsidiary_capital)
+	var sub_btn:=Button.new(); sub_btn.text="Filiales verrouillées dans cette preview"; sub_btn.disabled = true; box.add_child(sub_btn)
 
 func _create_personnel_tab():
 	var scroll := _tab_scroll("Personnel")
