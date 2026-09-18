@@ -3,6 +3,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
 const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
+const CPU_SUPPORT := preload("res://scripts/CpuSupportModel.gd")
 
 signal products_changed
 signal product_launched(product)
@@ -11,6 +12,9 @@ signal sales_report_created(report)
 signal quality_incident_created(incident)
 signal quality_incident_resolved(incident, action_id)
 signal product_discontinued(product)
+signal software_issue_created(issue)
+signal software_fix_started(product_id, fix)
+signal software_fix_completed(product_id, fix)
 
 var products: Array = []
 var cpu_generations: Array = []
@@ -67,6 +71,7 @@ func _create_cpu_range(project: Dictionary) -> void:
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
+		product["cpu_support"] = CPU_SUPPORT.initial_state(product.get("metrics", {}))
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
@@ -91,7 +96,8 @@ func _create_single_product(project: Dictionary) -> void:
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
-		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0
+		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0,
+		"cpu_support":CPU_SUPPORT.initial_state(metrics)
 	}
 	_next_id += 1
 	products.append(product)
@@ -119,6 +125,120 @@ func _metric_average(metrics: Dictionary) -> float:
 	for metric in GameData.METRICS:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
+
+func get_pending_software_issue() -> Dictionary:
+	for product in products:
+		var support: Dictionary = product.get("cpu_support", {})
+		var issue: Dictionary = support.get("pending_issue", {})
+		if not issue.is_empty():
+			return issue.duplicate(true)
+	return {}
+
+func software_fix_options(product_id: String) -> Array[Dictionary]:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return []
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
+		return []
+	return CPU_SUPPORT.fix_options()
+
+func start_software_fix(product_id: String, action_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
+		return false
+	var option := CPU_SUPPORT.fix_option(action_id)
+	if option.is_empty():
+		return false
+	var cost := int(option.get("cost", 0))
+	if cost > Economy.money:
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, "Correctif microcode — %s" % str(product.get("name", "CPU")))
+	var fix := option.duplicate(true)
+	fix["id"] = action_id
+	fix["remaining_months"] = int(option.get("months", 1))
+	fix["started_month"] = TimeManager.month
+	fix["started_year"] = TimeManager.year
+	support["active_fix"] = fix
+	product["cpu_support"] = support
+	CompanyManager.add_alert("%s : %s lancé, délai estimé %d mois." % [
+		str(product.get("name", "CPU")),
+		str(option.get("label", action_id)),
+		int(option.get("months", 1))
+	])
+	software_fix_started.emit(product_id, fix.duplicate(true))
+	products_changed.emit()
+	return true
+
+func _process_cpu_support_month(product: Dictionary) -> void:
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
+	var active_fix: Dictionary = support.get("active_fix", {})
+	if not active_fix.is_empty():
+		var remaining := maxi(int(active_fix.get("remaining_months", 1)) - 1, 0)
+		active_fix["remaining_months"] = remaining
+		if remaining <= 0:
+			support["microcode_quality"] = clampf(
+				float(support.get("microcode_quality", 60.0)) + float(active_fix.get("microcode_gain", 0.0)),
+				0.0, 100.0
+			)
+			support["compatibility"] = clampf(
+				float(support.get("compatibility", 60.0)) + float(active_fix.get("compatibility_gain", 0.0)),
+				0.0, 100.0
+			)
+			support["support_debt"] = maxf(float(support.get("support_debt", 0.0)) - CPU_SUPPORT.ISSUE_THRESHOLD, 0.0)
+			support["patch_level"] = int(support.get("patch_level", 0)) + 1
+			support["pending_issue"] = {}
+			support["active_fix"] = {}
+			var metrics: Dictionary = product.get("metrics", {})
+			metrics["performance"] = clampf(
+				float(metrics.get("performance", 50.0)) + float(active_fix.get("performance_delta", 0.0)),
+				0.0, 100.0
+			)
+			product["metrics"] = metrics
+			product["customer_satisfaction"] = clampf(float(product.get("customer_satisfaction", 50.0)) + 4.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"support":0.7,"reliability":0.5,"professional":0.4})
+			CompanyManager.add_alert("%s : %s déployé avec succès." % [str(product.get("name", "CPU")), str(active_fix.get("label", "Correctif"))])
+			MediaManager.publish_business_event(
+				"%s reçoit un correctif logiciel" % str(product.get("name", "CPU")),
+				"%s améliore la stabilité et la compatibilité de cette génération." % CompanyManager.company_name
+			)
+			software_fix_completed.emit(str(product.get("id", "")), active_fix.duplicate(true))
+		else:
+			support["active_fix"] = active_fix
+		product["cpu_support"] = support
+		return
+
+	support["support_debt"] = float(support.get("support_debt", 0.0)) + CPU_SUPPORT.monthly_debt_gain(
+		support,
+		product.get("metrics", {}),
+		int(product.get("months_on_market", 0))
+	)
+	var issue: Dictionary = support.get("pending_issue", {})
+	if issue.is_empty() and float(support.get("support_debt", 0.0)) >= CPU_SUPPORT.ISSUE_THRESHOLD:
+		issue = CPU_SUPPORT.issue_from_state(
+			str(product.get("id", "")),
+			str(product.get("name", "CPU")),
+			support,
+			TimeManager.month,
+			TimeManager.year
+		)
+		support["pending_issue"] = issue
+		product["customer_satisfaction"] = clampf(float(product.get("customer_satisfaction", 50.0)) - 4.0, 0.0, 100.0)
+		CompanyManager.change_reputation({"support":-0.6,"professional":-0.4})
+		CompanyManager.add_alert("Incident logiciel : %s demande un correctif %s." % [
+			str(product.get("name", "CPU")),
+			str(issue.get("type", "MICROCODE")).to_lower()
+		])
+		MediaManager.publish_business_event(
+			"Incident logiciel sur %s" % str(product.get("name", "CPU")),
+			"Des problèmes de microcode ou de compatibilité commencent à affecter certains utilisateurs."
+		)
+		software_issue_created.emit(issue.duplicate(true))
+	product["cpu_support"] = support
 
 func get_pending_quality_incident() -> Dictionary:
 	for product in products:
@@ -449,6 +569,7 @@ func process_month():
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(launched)
 	for product in launched:
 		_sell_product_month(product, portfolio_demand.get(str(product.id), {}))
+		_process_cpu_support_month(product)
 	products_changed.emit()
 
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
@@ -584,6 +705,7 @@ func load_state(state: Dictionary):
 		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
 		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
 		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
+		product["cpu_support"] = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}))
 		if str(product.get("status", "")) == "LAUNCHED":
 			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
 			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
