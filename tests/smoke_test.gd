@@ -566,6 +566,81 @@ func _ready() -> void:
 		_fail("Foundry partnership did not reduce effective unit production cost")
 		return
 
+	apex_model["stock_policy"] = "LEAN"
+	var lean_stock_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity)
+	apex_model["stock_policy"] = "SECURE"
+	var secure_stock_forecast := ProductManager.launch_forecast(str(apex_model.id), int(apex_model.price), apex_recommended_capacity)
+	if int(secure_stock_forecast.get("inventory_target", 0)) <= int(lean_stock_forecast.get("inventory_target", 0)):
+		_fail("Secure stock policy did not target more inventory than lean policy")
+		return
+	apex_model["stock_policy"] = "BALANCED"
+
+	var stock_economy_state := Economy.get_state().duplicate(true)
+	var stock_company_state := CompanyManager.get_state().duplicate(true)
+	var stock_metrics: Dictionary = apex_model.get("metrics", {}).duplicate(true)
+	stock_metrics["reliability"] = 98.0
+	var inventory_product := {
+		"id":"STOCK-TEST-INVENTORY",
+		"name":"Stock Test Inventory",
+		"sector":"CPU",
+		"company":CompanyManager.company_name,
+		"status":"LAUNCHED",
+		"target_segment":"MAINSTREAM",
+		"price":300,
+		"unit_cost":100,
+		"production_capacity":100,
+		"monthly_capacity_overhead":0,
+		"industrialization":INDUSTRIALIZATION.default_choices(),
+		"stock_policy":"SECURE",
+		"inventory_units":0,
+		"last_month_produced":0,
+		"last_month_lost_sales":0,
+		"last_month_sales":0,
+		"units_sold_total":0,
+		"months_on_market":0,
+		"last_month_score":0.0,
+		"last_month_share":0.0,
+		"last_month_returns":0,
+		"customer_satisfaction":60.0,
+		"pending_quality_incident":{},
+		"quality_incident_cooldown":0,
+		"renewal_alerted":false,
+		"metrics":stock_metrics,
+		"cpu_design":apex_model.get("cpu_design", {}).duplicate(true)
+	}
+	ProductManager._reviewed_products["STOCK-TEST-INVENTORY"] = true
+	ProductManager._sell_product_month(inventory_product, {"units":20,"score":70.0,"share":0.05,"expectation_gap":0.0})
+	if int(inventory_product.get("last_month_produced", 0)) <= int(inventory_product.get("last_month_sales", 0)):
+		_fail("Secure stock policy did not build inventory above current sales")
+		return
+	if int(inventory_product.get("inventory_units", 0)) <= 0:
+		_fail("Unsold production was not retained as inventory")
+		return
+	if int(Economy.expense_breakdown.get("Stockage — Stock Test Inventory", 0)) <= 0:
+		_fail("Stored inventory did not generate holding cost")
+		return
+
+	var rupture_product: Dictionary = inventory_product.duplicate(true)
+	rupture_product["id"] = "STOCK-TEST-RUPTURE"
+	rupture_product["name"] = "Stock Test Rupture"
+	rupture_product["stock_policy"] = "LEAN"
+	rupture_product["production_capacity"] = 10
+	rupture_product["inventory_units"] = 0
+	rupture_product["last_month_lost_sales"] = 0
+	rupture_product["months_on_market"] = 0
+	ProductManager._reviewed_products["STOCK-TEST-RUPTURE"] = true
+	ProductManager._sell_product_month(rupture_product, {"units":100,"score":70.0,"share":0.05,"expectation_gap":0.0})
+	if int(rupture_product.get("last_month_lost_sales", 0)) <= 0:
+		_fail("Insufficient production capacity did not create lost sales")
+		return
+	if int(rupture_product.get("inventory_units", 0)) != 0:
+		_fail("Stockout test unexpectedly ended with inventory")
+		return
+	ProductManager._reviewed_products.erase("STOCK-TEST-INVENTORY")
+	ProductManager._reviewed_products.erase("STOCK-TEST-RUPTURE")
+	Economy.load_state(stock_economy_state)
+	CompanyManager.load_state(stock_company_state)
+
 	var low_price := maxi(int(apex_model.get("unit_cost", 1)) + 5, int(float(apex_model.price) * 0.75))
 	var high_price := maxi(low_price + 10, int(float(apex_model.price) * 1.45))
 	var low_price_forecast := ProductManager.launch_forecast(str(apex_model.id), low_price, apex_recommended_capacity)
