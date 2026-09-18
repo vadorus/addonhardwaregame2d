@@ -1585,7 +1585,7 @@ func _refresh_company():
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
 	company_rep_label.text = "\n".join(lines)
 	if company_finance_label != null:
-		var status_text := {"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique"}.get(Economy.solvency_status(), "Stable")
+		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique"}.get(Economy.solvency_status(), "Stable"))
 		company_finance_label.text = "Trésorerie : %s €\nDette : %s € / %s €\nIntérêts : 1,2%% / mois\nSituation : %s" % [_money(Economy.money), _money(Economy.debt), _money(Economy.MAX_DEBT), status_text]
 
 	var division_lines: Array[String] = []
