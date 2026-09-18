@@ -159,6 +159,7 @@ func launch_forecast(product_id: String, price: int, production_capacity: int) -
 		"utilization": clampf(utilization, 0.0, 1.0),
 		"share": float(demand.get("share", 0.0)),
 		"score": float(demand.get("score", 0.0)),
+		"price_factor": float(demand.get("price_factor", 1.0)),
 		"revenue": revenue,
 		"production_cost": production_cost,
 		"warranty_cost": warranty_cost,
