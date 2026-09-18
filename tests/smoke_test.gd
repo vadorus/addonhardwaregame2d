@@ -27,6 +27,39 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
+
+	var initial_company_state := CompanyManager.get_state().duplicate(true)
+	var previous_awareness := -1.0
+	var previous_budget := -1
+	for campaign_key in ["NONE", "LOCAL", "NATIONAL", "GLOBAL"]:
+		if not CompanyManager.set_marketing_campaign(campaign_key):
+			_fail("Could not select marketing campaign %s" % campaign_key)
+			return
+		var campaign := CompanyManager.get_marketing_campaign()
+		var awareness := CompanyManager.get_awareness_bonus()
+		var budget := int(campaign.get("budget", -1))
+		if awareness <= previous_awareness:
+			_fail("Marketing awareness is not increasing between campaign tiers")
+			return
+		if budget <= previous_budget:
+			_fail("Marketing budget is not increasing between campaign tiers")
+			return
+		previous_awareness = awareness
+		previous_budget = budget
+	var legacy_company_state := initial_company_state.duplicate(true)
+	var legacy_policies: Dictionary = legacy_company_state.get("policies", {}).duplicate(true)
+	legacy_policies.erase("marketing_campaign")
+	legacy_policies["marketing_budget"] = 34_000
+	legacy_company_state["policies"] = legacy_policies
+	CompanyManager.load_state(legacy_company_state)
+	if str(CompanyManager.policies.get("marketing_campaign", "")) != "NATIONAL":
+		_fail("Legacy marketing budget did not migrate to the nearest campaign tier")
+		return
+	if int(CompanyManager.policies.get("marketing_budget", 0)) != 35_000:
+		_fail("Migrated marketing budget was not normalized to the campaign cost")
+		return
+	CompanyManager.load_state(initial_company_state)
+
 	if not SaveManager.autosave_game():
 		_fail("Autosave could not write the current game")
 		return
