@@ -38,6 +38,13 @@ func _ready() -> void:
 		_fail("Adding a junior employee reduced the R&D team score")
 		return
 	PersonnelManager.load_state(founder_personnel_state)
+	for _candidate_roll in range(12):
+		var candidate := PersonnelManager.generate_candidate("R&D")
+		var specialization := str(candidate.get("specialization", ""))
+		if specialization != "cpu" and specialization != "product":
+			_fail("R&D candidate specialization escaped the active CPU vertical slice: %s" % specialization)
+			return
+	PersonnelManager.load_state(founder_personnel_state)
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
