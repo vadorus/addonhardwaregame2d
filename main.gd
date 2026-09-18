@@ -91,6 +91,9 @@ var product_price: SpinBox
 var product_capacity: SpinBox
 var product_industrialization_label: Label
 var product_launch_button: Button
+var product_discontinue_button: Button
+var product_discontinue_dialog: ConfirmationDialog
+var pending_discontinue_product_id := ""
 var market_product_select: OptionButton
 var market_benchmark_grid: GridContainer
 var policy_marketing: OptionButton
@@ -1268,6 +1271,17 @@ func _create_products_tab():
 	product_launch_button.text = "Lancer sur le marché"
 	product_launch_button.pressed.connect(_launch_product)
 	box.add_child(product_launch_button)
+
+	product_discontinue_button = Button.new()
+	product_discontinue_button.text = "Arrêter la commercialisation"
+	product_discontinue_button.visible = false
+	product_discontinue_button.pressed.connect(_request_product_discontinuation)
+	box.add_child(product_discontinue_button)
+
+	product_discontinue_dialog = ConfirmationDialog.new()
+	product_discontinue_dialog.title = "Confirmer la fin de vente"
+	product_discontinue_dialog.confirmed.connect(_confirm_product_discontinuation)
+	add_child(product_discontinue_dialog)
 
 func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
@@ -2860,7 +2874,7 @@ func _refresh_product_cards():
 		var tier := str(product.get("sku_label", "Modèle"))
 		var role := str(product.get("range_role", ""))
 		var status := str(product.get("status", "READY"))
-		var badge := "À RENOUVELER" if MarketManager.should_renew_product(product) else status
+		var badge := "FIN DE VENTE" if status == "DISCONTINUED" else ("À RENOUVELER" if MarketManager.should_renew_product(product) else status)
 		var subtitle := "G%d • %s" % [generation, tier]
 		if not role.is_empty():
 			subtitle += " • " + role
@@ -2872,7 +2886,7 @@ func _refresh_product_cards():
 			{"label":"PRIX", "value":"%s €" % _money(int(product.get("price", 0)))},
 			{"label":"VENTES", "value":sales_text}
 		]
-		var action := "Configurer" if status == "READY" else "Voir le produit"
+		var action := "Configurer" if status == "READY" else ("Historique" if status == "DISCONTINUED" else "Voir le produit")
 		card.call("configure", str(product.get("id", "")), str(product.get("name", "Produit")), subtitle, badge, metrics, action)
 		card.connect("entity_selected", Callable(self, "_select_product_from_card"))
 
@@ -2957,8 +2971,15 @@ func _refresh_product_details():
 			float(product.internal_ratio) * 100.0, " • ".join(metric_lines)
 		]
 	product_price.value = float(product.price)
+	var status := str(product.get("status", ""))
 	if product_launch_button != null:
-		product_launch_button.text = "Mettre à jour prix / capacité" if str(product.get("status", "")) == "LAUNCHED" else "Lancer sur le marché"
+		product_launch_button.visible = status != "DISCONTINUED"
+		product_launch_button.text = "Mettre à jour prix / capacité" if status == "LAUNCHED" else "Lancer sur le marché"
+	if product_discontinue_button != null:
+		product_discontinue_button.visible = status == "LAUNCHED"
+		var blocker := ProductManager.discontinuation_blocker(str(product.get("id", "")))
+		product_discontinue_button.disabled = not blocker.is_empty()
+		product_discontinue_button.tooltip_text = blocker
 	var has_capacity_limit := product.has("max_monthly_capacity")
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
@@ -2972,6 +2993,13 @@ func _refresh_launch_financials():
 	if product.is_empty():
 		return
 	var margin := int(product_price.value) - int(product.get("unit_cost", 0))
+	if str(product.get("status", "")) == "DISCONTINUED":
+		product_industrialization_label.text = "Fin de vente • %s mois commercialisés • %s unités vendues au total.\nLa ligne de production est arrêtée et ne génère plus de frais fixes." % [
+			int(product.get("months_on_market", 0)),
+			_money(int(product.get("units_sold_total", 0)))
+		]
+		product_industrialization_label.add_theme_color_override("font_color", APP_MUTED)
+		return
 	if str(product.get("status", "")) == "LAUNCHED":
 		var update := ProductManager.offer_update_financials(str(product.get("id", "")), int(product_capacity.value))
 		var forecast := ProductManager.launch_forecast(str(product.get("id", "")), int(product_price.value), int(product_capacity.value))
@@ -3036,6 +3064,33 @@ func _refresh_launch_financials():
 	]
 	var healthy := affordable and margin > 0 and monthly_result >= 0
 	product_industrialization_label.add_theme_color_override("font_color", APP_GREEN if healthy else (APP_AMBER if affordable and monthly_result >= 0 else APP_RED))
+
+func _request_product_discontinuation():
+	if product_select == null or product_select.item_count == 0:
+		return
+	var product_id := _meta(product_select)
+	var product := ProductManager.get_product(product_id)
+	if product.is_empty():
+		return
+	var blocker := ProductManager.discontinuation_blocker(product_id)
+	if not blocker.is_empty():
+		status_label.text = blocker
+		return
+	pending_discontinue_product_id = product_id
+	product_discontinue_dialog.dialog_text = "Arrêter la commercialisation de %s ?\n\nLa production cessera immédiatement et les frais fixes de ligne tomberont à 0 €. Cette décision ne peut pas être annulée dans cette preview." % str(product.get("name", "ce produit"))
+	product_discontinue_dialog.popup_centered()
+
+func _confirm_product_discontinuation():
+	if pending_discontinue_product_id.is_empty():
+		return
+	var product := ProductManager.get_product(pending_discontinue_product_id)
+	var product_name := str(product.get("name", "Produit"))
+	if ProductManager.discontinue_product(pending_discontinue_product_id):
+		status_label.text = "%s : commercialisation arrêtée." % product_name
+	else:
+		status_label.text = ProductManager.discontinuation_blocker(pending_discontinue_product_id)
+	pending_discontinue_product_id = ""
+	_refresh_all()
 
 func _launch_product():
 	if product_select.item_count==0:
