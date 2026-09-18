@@ -71,6 +71,80 @@ func solvency_status() -> String:
 		return "TENSE"
 	return "STABLE"
 
+func _largest_breakdown_entry(data: Dictionary) -> Dictionary:
+	var best_category := ""
+	var best_amount := 0
+	for category_value in data.keys():
+		var category := str(category_value)
+		var amount := int(data.get(category, 0))
+		if amount > best_amount:
+			best_amount = amount
+			best_category = category
+	return {"category": best_category, "amount": best_amount}
+
+func financial_snapshot() -> Dictionary:
+	var recent_results: Array[int] = []
+	var start_index := maxi(history.size() - 3, 0)
+	for i in range(start_index, history.size()):
+		recent_results.append(int(history[i].get("result", 0)))
+
+	var average_result := 0.0
+	if not recent_results.is_empty():
+		for result_value in recent_results:
+			average_result += float(result_value)
+		average_result /= float(recent_results.size())
+
+	var latest: Dictionary = {}
+	var previous: Dictionary = {}
+	if history.size() > 0:
+		latest = history[history.size() - 1]
+	if history.size() > 1:
+		previous = history[history.size() - 2]
+
+	var trend := "NO_DATA"
+	if not latest.is_empty():
+		trend = "STABLE"
+		if not previous.is_empty():
+			var delta := int(latest.get("result", 0)) - int(previous.get("result", 0))
+			if delta >= 10_000:
+				trend = "IMPROVING"
+			elif delta <= -10_000:
+				trend = "WORSENING"
+
+	var runway_months := -1.0
+	if average_result < 0.0:
+		runway_months = maxf(float(money), 0.0) / maxf(absf(average_result), 1.0)
+
+	var expense_source: Dictionary = latest.get("expense_breakdown", {}) if not latest.is_empty() else expense_breakdown
+	var income_source: Dictionary = latest.get("income_breakdown", {}) if not latest.is_empty() else income_breakdown
+	var top_expense := _largest_breakdown_entry(expense_source)
+	var top_income := _largest_breakdown_entry(income_source)
+	var projected_interest := maxi(0, int(round(float(debt) * MONTHLY_INTEREST_RATE)))
+
+	var recommendation := "Continuez à investir sans dépasser votre capacité de financement."
+	var status := solvency_status()
+	if status == "BANKRUPT":
+		recommendation = "La partie est terminée : l'entreprise est insolvable."
+	elif status == "CRITICAL":
+		recommendation = "Réduisez le principal poste de dépense ou sécurisez rapidement du financement."
+	elif status == "TENSE":
+		recommendation = "Priorisez le prochain lancement rentable et évitez une nouvelle hausse des charges fixes."
+	elif average_result < 0.0 and runway_months >= 0.0 and runway_months < 4.0:
+		recommendation = "Moins de 4 mois de trésorerie au rythme récent : réduisez les dépenses ou accélérez un lancement."
+	elif average_result > 0.0:
+		recommendation = "Les trois derniers mois sont globalement positifs : gardez une réserve avant d'augmenter les charges fixes."
+
+	return {
+		"average_result_3m": average_result,
+		"trend": trend,
+		"runway_months": runway_months,
+		"top_expense": top_expense,
+		"top_income": top_income,
+		"projected_interest": projected_interest,
+		"debt_capacity_remaining": maxi(MAX_DEBT - debt, 0),
+		"recommendation": recommendation
+	}
+
 func add_income(amount: int, category: String = "Autres revenus"):
 	if amount <= 0:
 		return
