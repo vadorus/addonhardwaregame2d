@@ -283,6 +283,7 @@ func launch_forecast(product_id: String, price: int, production_capacity: int, o
 	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
 	var effective_capacity := maxi(1, int(floor(float(capacity) * production_execution * industrial_capacity)))
 	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
+	var effective_cost_per_unit := maxi(1, int(round(float(preview.get("unit_cost", 1)) * production_cost_modifier)))
 	preview["production_capacity"] = capacity
 	var demand := MarketManager.estimate_consumer_demand(preview)
 	var requested_units := maxi(int(demand.get("units", 0)), 0)
@@ -302,6 +303,7 @@ func launch_forecast(product_id: String, price: int, production_capacity: int, o
 		"effective_capacity": effective_capacity,
 		"production_execution": production_execution,
 		"production_cost_modifier": production_cost_modifier,
+		"effective_unit_cost": effective_cost_per_unit,
 		"industrial_capacity_factor": industrial_capacity,
 		"return_rate": return_rate,
 		"industrialization": financials.get("industrialization", {}),
