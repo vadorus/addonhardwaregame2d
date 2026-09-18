@@ -128,14 +128,30 @@ const APPROACHES := {
 	"EXTERNAL": {"label":"Composants / technologie externe", "speed":1.26, "knowledge":0.48, "quality":0.98, "cost":0.82, "internal_ratio":0.22}
 }
 
-func get_active_sector_keys() -> Array:
+# Terminologie canonique à partir de la preview 0.2.12 :
+# "gamme produit" = CPU, GPU, smartphone, etc.
+# Les anciens noms "sector" restent disponibles pour la compatibilité des sauvegardes.
+func get_active_product_family_keys() -> Array:
 	return ACTIVE_SECTORS.duplicate()
 
+func is_product_family_active(family: String) -> bool:
+	return ACTIVE_SECTORS.has(family)
+
+func get_product_family_keys() -> Array:
+	return SECTORS.keys()
+
+func get_product_family(family: String) -> Dictionary:
+	return SECTORS.get(family, {})
+
+# API legacy. Ne pas supprimer tant que les anciennes sauvegardes utilisent encore "sector".
+func get_active_sector_keys() -> Array:
+	return get_active_product_family_keys()
+
 func is_sector_active(sector: String) -> bool:
-	return ACTIVE_SECTORS.has(sector)
+	return is_product_family_active(sector)
 
 func get_sector_keys() -> Array:
-	return SECTORS.keys()
+	return get_product_family_keys()
 
 func get_segment_keys() -> Array:
 	return SEGMENTS.keys()
