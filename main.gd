@@ -88,6 +88,9 @@ var product_card_grid: GridContainer
 var quality_incident_card: PanelContainer
 var quality_incident_label: Label
 var quality_incident_buttons: Dictionary = {}
+var software_issue_card: PanelContainer
+var software_issue_label: Label
+var software_fix_buttons: Dictionary = {}
 var product_price: SpinBox
 var product_capacity: SpinBox
 var product_contract_select: OptionButton
@@ -1260,6 +1263,27 @@ func _create_products_tab():
 		quality_actions.add_child(action_button)
 		quality_incident_buttons[action_id] = action_button
 
+	box.add_child(_section("Microcode / compatibilité"))
+	software_issue_card = _card(APP_CYAN_DARK, 12, 12)
+	software_issue_card.visible = false
+	box.add_child(software_issue_card)
+	var software_box := VBoxContainer.new()
+	software_box.add_theme_constant_override("separation", 9)
+	software_issue_card.add_child(software_box)
+	software_issue_label = _label("", 13)
+	software_issue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	software_box.add_child(software_issue_label)
+	var software_actions := HFlowContainer.new()
+	software_actions.add_theme_constant_override("h_separation", 8)
+	software_actions.add_theme_constant_override("v_separation", 8)
+	software_box.add_child(software_actions)
+	for action_id in ["HOTFIX", "VALIDATED_PATCH", "COMPATIBILITY_PROGRAM"]:
+		var action_button := Button.new()
+		action_button.custom_minimum_size.y = 44
+		action_button.pressed.connect(_start_software_fix.bind(action_id))
+		software_actions.add_child(action_button)
+		software_fix_buttons[action_id] = action_button
+
 	box.add_child(_section("Industrialiser / lancer"))
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
@@ -2283,6 +2307,12 @@ func _refresh_dashboard():
 	var launched_product: Dictionary = {}
 	var discontinued_product: Dictionary = {}
 	var quality_incident := ProductManager.get_pending_quality_incident()
+	var software_issue := ProductManager.get_pending_software_issue()
+	var actionable_software_issue := software_issue
+	if not software_issue.is_empty():
+		var software_product := ProductManager.get_product(str(software_issue.get("product_id", "")))
+		if not software_product.is_empty() and not software_product.get("cpu_support", {}).get("active_fix", {}).is_empty():
+			actionable_software_issue = {}
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "READY" and ready_product.is_empty():
 			ready_product = product
@@ -2323,6 +2353,12 @@ func _refresh_dashboard():
 			dashboard_action_button.text = "Traiter l'incident qualité"
 			dashboard_next_step_label.text = "Un produit commercialisé demande une décision SAV."
 			dashboard_target_tab = 4
+		elif not actionable_software_issue.is_empty():
+			dashboard_cto_label.text = "« Incident logiciel sur %s : microcode ou compatibilité nécessitent un correctif. »" % str(actionable_software_issue.get("product_name", "un CPU"))
+			dashboard_cto_button.text = "Gérer le correctif"
+			dashboard_action_button.text = "Choisir un correctif logiciel"
+			dashboard_next_step_label.text = "Un CPU commercialisé demande une décision microcode / compatibilité."
+			dashboard_target_tab = 4
 		elif not active_project.get("reports", []).is_empty():
 			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
 			dashboard_cto_button.text = "Voir le rapport complet"
@@ -2352,6 +2388,26 @@ func _refresh_dashboard():
 		dashboard_next_step_label.text = "Choisissez une réponse SAV avant que le problème ne dégrade davantage la marque."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design") and not incident_product.is_empty():
 			dashboard_chip.call("set_design", incident_product.get("cpu_design", {}), 100.0, false)
+	elif not actionable_software_issue.is_empty():
+		var software_product := ProductManager.get_product(str(actionable_software_issue.get("product_id", "")))
+		var support: Dictionary = software_product.get("cpu_support", {})
+		dashboard_cto_button.text = "Gérer le correctif"
+		dashboard_label.text = str(actionable_software_issue.get("product_name", "Incident logiciel"))
+		dashboard_project_meta_label.text = "Microcode %.0f/100 • compatibilité %.0f/100 • décision requise" % [
+			float(support.get("microcode_quality", 0.0)),
+			float(support.get("compatibility", 0.0))
+		]
+		dashboard_project_phase_label.text = "INCIDENT LOGICIEL"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%.0f" % float(support.get("microcode_quality", 0.0))
+		dashboard_metric_b.text = "%.0f" % float(support.get("compatibility", 0.0))
+		dashboard_metric_c.text = str(actionable_software_issue.get("severity", "WARNING"))
+		dashboard_cto_label.text = "« Nous devons choisir entre rapidité, validation complète et compatibilité à long terme. »"
+		dashboard_action_button.text = "Choisir un correctif"
+		dashboard_target_tab = 4
+		dashboard_next_step_label.text = "Traitez l'incident microcode / compatibilité avant qu'il ne pénalise davantage le marché."
+		if dashboard_chip != null and dashboard_chip.has_method("set_design") and not software_product.is_empty():
+			dashboard_chip.call("set_design", software_product.get("cpu_design", {}), 100.0, false)
 	elif not ready_product.is_empty():
 		dashboard_cto_button.text = "Voir le rapport complet"
 		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
@@ -2951,6 +3007,7 @@ func _refresh_products():
 		_select_meta(product_select, current_id)
 	_refresh_product_details()
 	_refresh_quality_incident()
+	_refresh_software_support()
 	_refresh_market_product_options()
 
 func _refresh_product_cards():
@@ -3034,6 +3091,67 @@ func _resolve_quality_incident(action_id: String):
 		status_label.text = "Action impossible : vérifiez la trésorerie disponible."
 	_refresh_all()
 
+func _refresh_software_support():
+	if software_issue_card == null or software_issue_label == null:
+		return
+	var issue := ProductManager.get_pending_software_issue()
+	software_issue_card.visible = not issue.is_empty()
+	for button_value in software_fix_buttons.values():
+		var button: Button = button_value
+		button.visible = false
+	if issue.is_empty():
+		return
+	var product_id := str(issue.get("product_id", ""))
+	var product := ProductManager.get_product(product_id)
+	if product.is_empty():
+		return
+	var support: Dictionary = product.get("cpu_support", {})
+	var active_fix: Dictionary = support.get("active_fix", {})
+	var severity := str(issue.get("severity", "WARNING"))
+	if not active_fix.is_empty():
+		software_issue_label.text = "%s • %s\nMicrocode %.0f/100 • compatibilité %.0f/100\nCorrectif en cours : %s • encore %d mois." % [
+			"INCIDENT LOGICIEL CRITIQUE" if severity == "CRITICAL" else "INCIDENT LOGICIEL",
+			str(issue.get("product_name", "CPU")),
+			float(support.get("microcode_quality", 0.0)),
+			float(support.get("compatibility", 0.0)),
+			str(active_fix.get("label", "Correctif")),
+			int(active_fix.get("remaining_months", 0))
+		]
+	else:
+		software_issue_label.text = "%s • %s\nMicrocode %.0f/100 • compatibilité %.0f/100\nChoisissez un correctif. Les solutions rapides peuvent sacrifier un peu de performance ; les solutions validées coûtent plus cher et prennent plus de temps." % [
+			"INCIDENT LOGICIEL CRITIQUE" if severity == "CRITICAL" else "INCIDENT LOGICIEL",
+			str(issue.get("product_name", "CPU")),
+			float(support.get("microcode_quality", 0.0)),
+			float(support.get("compatibility", 0.0))
+		]
+		for option in ProductManager.software_fix_options(product_id):
+			var action_id := str(option.get("id", ""))
+			if not software_fix_buttons.has(action_id):
+				continue
+			var button: Button = software_fix_buttons[action_id]
+			var cost := int(option.get("cost", 0))
+			button.visible = true
+			button.disabled = cost > Economy.money
+			button.text = "%s • %s € • %d mois\n%s" % [
+				str(option.get("label", action_id)),
+				_money(cost),
+				int(option.get("months", 1)),
+				str(option.get("summary", ""))
+			]
+	_select_meta(product_select, product_id)
+
+func _start_software_fix(action_id: String):
+	var issue := ProductManager.get_pending_software_issue()
+	if issue.is_empty():
+		status_label.text = "Aucun incident logiciel en attente."
+		return
+	var product_id := str(issue.get("product_id", ""))
+	if ProductManager.start_software_fix(product_id, action_id):
+		status_label.text = "Correctif logiciel lancé."
+	else:
+		status_label.text = "Impossible de lancer ce correctif : vérifiez la trésorerie ou l'état du produit."
+	_refresh_all()
+
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
 		product_details_label.text = "Aucun produit sélectionné."
@@ -3049,10 +3167,18 @@ func _refresh_product_details():
 		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 		var target_label := str(GameData.SEGMENTS.get(str(product.get("target_segment", "MAINSTREAM")), {}).get("label", "Grand public"))
 		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
+		var support: Dictionary = product.get("cpu_support", {})
+		var support_line := "Microcode %.0f/100 • compatibilité %.0f/100 • patch %d • dette support %.1f" % [
+			float(support.get("microcode_quality", 0.0)),
+			float(support.get("compatibility", 0.0)),
+			int(support.get("patch_level", 0)),
+			float(support.get("support_debt", 0.0))
+		]
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n%s\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
 			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+			support_line,
 			float(product.get("yield_rate", 0.0)) * 100.0, int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin),
 			" • ".join(metric_lines)
