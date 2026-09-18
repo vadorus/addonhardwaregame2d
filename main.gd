@@ -737,7 +737,10 @@ func _create_personnel_tab():
 	staff_card_grid.add_theme_constant_override("v_separation", 10)
 	box.add_child(staff_card_grid)
 	box.add_child(_section("Recrutement"))
-	recruit_department = OptionButton.new(); _fill_text(recruit_department,["R&D","Production","Marketing","Support","Finance"]); box.add_child(recruit_department)
+	recruit_department = OptionButton.new()
+	_fill_text(recruit_department,["R&D","Production","Marketing","Support","Finance"])
+	recruit_department.item_selected.connect(func(_index): _refresh_recruitment_context())
+	box.add_child(recruit_department)
 	var gen := Button.new(); gen.text="Chercher un candidat"; gen.pressed.connect(_generate_candidate); box.add_child(gen)
 	candidate_label = _rich_label(); box.add_child(candidate_label)
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
@@ -2092,6 +2095,33 @@ func _company_visual_stage() -> int:
 func _company_stage_name(stage: int) -> String:
 	return ["Garage fondateur", "Petit bureau", "Startup reconnue", "Groupe technologique", "Campus mondial"][clampi(stage, 0, 4)]
 
+func _operational_hiring_recommendation(include_market_roles: bool = false) -> Dictionary:
+	if PersonnelManager.department_staff_count("Production") <= 0:
+		return {
+			"department":"Production",
+			"title":"Renforcer la Production",
+			"message":"La production est externalisée : capacité utile réduite et coût réel plus élevé. Un recrutement Production améliorera directement vos lancements."
+		}
+	if include_market_roles and PersonnelManager.department_staff_count("Marketing") <= 0:
+		return {
+			"department":"Marketing",
+			"title":"Recruter en Marketing",
+			"message":"Vos campagnes reposent encore sur des prestataires. Un spécialiste Marketing augmente directement la notoriété obtenue pour le même budget."
+		}
+	if include_market_roles and PersonnelManager.department_staff_count("Support") <= 0:
+		return {
+			"department":"Support",
+			"title":"Recruter au Support",
+			"message":"Le SAV est encore externalisé. Un spécialiste Support réduit les retours effectifs et protège mieux la satisfaction client."
+		}
+	return {}
+
+func _select_recruitment_department(department: String):
+	if recruit_department != null:
+		_select_meta(recruit_department, department)
+		PersonnelManager.generate_candidate(department)
+	_show_tab(2)
+
 func _refresh_dashboard():
 	if dashboard_label == null:
 		return
@@ -2207,10 +2237,13 @@ func _refresh_dashboard():
 		dashboard_metric_a.text = "%s €" % _money(int(ready_product.get("unit_cost", 0)))
 		dashboard_metric_b.text = "Validation OK"
 		dashboard_metric_c.text = str(ready_product.get("target_segment", "MAINSTREAM")).capitalize()
+		var production_hire := _operational_hiring_recommendation(false)
 		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
 		dashboard_action_button.text = "Préparer le lancement"
 		dashboard_target_tab = 4
 		dashboard_next_step_label.text = "Fixez le prix et la capacité, puis lancez votre CPU sur le marché."
+		if not production_hire.is_empty():
+			dashboard_cto_label.text += "\n\nConseil facultatif : %s" % str(production_hire.get("message", ""))
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	elif not launched_product.is_empty():
@@ -2226,8 +2259,15 @@ func _refresh_dashboard():
 		dashboard_action_button.text = "Analyser le marché"
 		dashboard_target_tab = 5
 		var market_relevance := MarketManager.product_market_relevance(launched_product)
+		var operations_hire := _operational_hiring_recommendation(true)
 		if market_relevance < 0.72:
 			dashboard_next_step_label.text = "Votre CPU vieillit face aux nouvelles générations. Préparez son successeur."
+		elif not operations_hire.is_empty() and int(launched_product.get("months_on_market", 0)) >= 1:
+			var hire_department := str(operations_hire.get("department", ""))
+			dashboard_cto_label.text = "« %s »" % str(operations_hire.get("message", "Renforcez l'équipe."))
+			dashboard_action_button.text = str(operations_hire.get("title", "Renforcer l'équipe"))
+			dashboard_target_tab = 2
+			dashboard_next_step_label.text = "%s Ouvrez l'équipe pour recruter en %s." % [str(operations_hire.get("message", "")), hire_department]
 		else:
 			dashboard_next_step_label.text = "Analysez les ventes et préparez la génération suivante quand vous êtes prêt."
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
@@ -2447,6 +2487,27 @@ func _create_subsidiary():
 	else: status_label.text="Capital insuffisant ou montant trop faible."
 	_refresh_all()
 
+func _recruitment_department_context(department: String) -> String:
+	match department:
+		"R&D":
+			return "R&D : accélère et fiabilise les projets CPU."
+		"Production":
+			return "Production : augmente la capacité réellement utilisable et réduit le surcoût industriel."
+		"Marketing":
+			return "Marketing : augmente l'effet réel de chaque campagne."
+		"Support":
+			return "Support : réduit les retours effectifs et améliore la satisfaction."
+		"Finance":
+			return "Finance : utile pour le management et les futures mécaniques financières."
+	return ""
+
+func _refresh_recruitment_context():
+	if candidate_label == null or recruit_department == null:
+		return
+	var department := _meta(recruit_department)
+	if PersonnelManager.candidate.is_empty() or str(PersonnelManager.candidate.get("department", "")) != department:
+		candidate_label.text = _recruitment_department_context(department)
+
 func _refresh_personnel():
 	if staff_label==null:
 		return
@@ -2459,7 +2520,7 @@ func _refresh_personnel():
 		candidate_label.text="Aucun candidat sélectionné."
 	else:
 		var c:=PersonnelManager.candidate
-		candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | salaire : %s €/mois | prime d'embauche : %s €" % [str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),_money(int(c.salary)),_money(int(c.salary)*2)]
+		candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | salaire : %s €/mois | prime d'embauche : %s €\n%s" % [str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),_money(int(c.salary)),_money(int(c.salary)*2),_recruitment_department_context(str(c.department))]
 
 func _refresh_staff_cards():
 	if staff_card_grid == null:
