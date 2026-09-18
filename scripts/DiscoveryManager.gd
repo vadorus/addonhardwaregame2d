@@ -124,35 +124,25 @@ func _on_phase_report(project: Dictionary, report: Dictionary):
 		return
 	if str(report.get("phase", "")) != "Prototype":
 		return
-	var key := "PROJECT:%s" % str(project.get("id", ""))
-	if seen_keys.has(key):
-		return
+	var project_id := str(project.get("id", ""))
 	var template_id := _template_for_weakness(str(report.get("weakness", "performance")))
-	_create_discovery(template_id, "PROJECT", str(project.get("id", "")), str(project.get("id", "")), "")
+	_create_discovery(template_id, "PROJECT", project_id, project_id, "")
 
 func _on_product_launched(product: Dictionary):
 	var choices: Dictionary = product.get("industrialization", {})
 	if str(choices.get("contract", "")) != "PARTNER":
 		return
-	var key := "FOUNDRY:%s" % str(product.get("generation_id", product.get("id", "")))
-	if seen_keys.has(key):
-		return
-	_create_discovery("FOUNDRY_RULES", "INDUSTRIALIZATION", key, "", str(product.get("id", "")))
+	var generation_id := str(product.get("generation_id", product.get("id", "")))
+	_create_discovery("FOUNDRY_RULES", "INDUSTRIALIZATION", generation_id, "", str(product.get("id", "")))
 
 func _on_quality_incident_resolved(incident: Dictionary, action_id: String):
 	if action_id == "MINIMAL_SUPPORT":
 		return
 	var product_id := str(incident.get("product_id", ""))
-	var key := "SAV:%s" % product_id
-	if seen_keys.has(key):
-		return
-	_create_discovery("SAV_RELIABILITY", "SAV", key, "", product_id)
+	_create_discovery("SAV_RELIABILITY", "SAV", product_id, "", product_id)
 
 func _on_software_fix_completed(product_id: String, _fix: Dictionary):
-	var key := "SOFTWARE:%s" % product_id
-	if seen_keys.has(key):
-		return
-	_create_discovery("MICROCODE_TOOLING", "SOFTWARE", key, "", product_id)
+	_create_discovery("MICROCODE_TOOLING", "SOFTWARE", product_id, "", product_id)
 
 func _create_discovery(template_id: String, source_type: String, source_id: String, project_id: String, product_id: String) -> Dictionary:
 	if not TEMPLATES.has(template_id):
