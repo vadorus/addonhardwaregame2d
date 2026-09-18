@@ -37,7 +37,7 @@ Objectif : prouver une boucle de jeu complète, pas seulement un écran de conce
 - [x] Marché CPU de départ.
 - [x] Première équipe technique.
 - [x] R&D CPU.
-- [ ] Étendre les paramètres avancés de conception, notamment IPC/compatibilité explicites.
+- [x] Étendre les paramètres avancés de conception avec IPC et compatibilité de plateforme explicites.
 - [x] Paramètres essentiels : architecture, cœurs, fréquence, cache, TDP et gravure.
 - [x] Phases de développement simplifiées avec arbitrages.
 - [x] Rapport du chef d'équipe avec forces, faiblesses et risques.
