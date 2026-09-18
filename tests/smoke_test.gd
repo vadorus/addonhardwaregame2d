@@ -49,6 +49,17 @@ func _ready() -> void:
 		_fail("Economy financing state did not restore correctly")
 		return
 
+	Economy.money = -1_100_000
+	Economy.negative_months = 2
+	var bankruptcy_report := Economy.close_month()
+	if not Economy.bankrupt or str(bankruptcy_report.get("solvency_status", "")) != "BANKRUPT":
+		_fail("Durable insolvency did not trigger bankruptcy")
+		return
+	Economy.load_state(initial_economy_state)
+	if Economy.bankrupt:
+		_fail("Bankruptcy state did not reset after loading a healthy economy")
+		return
+
 	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"))
 	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"))
 	if float(performance.get("performance", 0.0)) <= float(efficient.get("performance", 0.0)):
