@@ -29,6 +29,7 @@ var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
 var division_label: Label
+var company_finance_label: Label
 var staff_label: Label
 var candidate_label: Label
 var tech_label: Label
@@ -138,6 +139,8 @@ func _process(_delta):
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
+	Economy.financing_changed.connect(func(_debt): _refresh_all())
+	Economy.solvency_warning.connect(_on_solvency_warning)
 	CompanyManager.company_changed.connect(_refresh_all)
 	CompanyManager.reputation_changed.connect(_refresh_all)
 	DivisionManager.divisions_changed.connect(_refresh_all)
@@ -496,6 +499,30 @@ func _create_company_tab():
 	grid.add_child(_label("Environnement",14)); policy_environment = _spin(0,200000,500,2500); grid.add_child(policy_environment)
 	grid.add_child(_label("Politique SAV",14)); policy_support_level = OptionButton.new(); _fill_simple(policy_support_level, {"MINIMAL":"Minimal","STANDARD":"Standard","PREMIUM":"Premium"}); grid.add_child(policy_support_level)
 	var apply := Button.new(); apply.text = "Appliquer les politiques"; apply.pressed.connect(_apply_policies); box.add_child(apply)
+
+	box.add_child(_section("Trésorerie & financement"))
+	var finance_card := _card(APP_SHELL, 12, 12)
+	var finance_box := VBoxContainer.new()
+	finance_box.add_theme_constant_override("separation", 8)
+	finance_card.add_child(finance_box)
+	company_finance_label = _rich_label()
+	finance_box.add_child(company_finance_label)
+	var finance_actions := HFlowContainer.new()
+	finance_actions.add_theme_constant_override("h_separation", 8)
+	finance_actions.add_theme_constant_override("v_separation", 8)
+	finance_box.add_child(finance_actions)
+	var borrow_button := Button.new()
+	borrow_button.text = "Financer +250 000 €"
+	borrow_button.custom_minimum_size.y = 44
+	borrow_button.pressed.connect(_request_financing)
+	finance_actions.add_child(borrow_button)
+	var repay_button := Button.new()
+	repay_button.text = "Rembourser 100 000 €"
+	repay_button.custom_minimum_size.y = 44
+	repay_button.pressed.connect(_repay_financing)
+	finance_actions.add_child(repay_button)
+	box.add_child(finance_card)
+
 	box.add_child(_section("Délégation des départements"))
 	var dgrid := GridContainer.new(); dgrid.columns = 2; box.add_child(dgrid)
 	dgrid.add_child(_label("Département",14)); department_select = OptionButton.new(); _fill_text(department_select, ["R&D","Production","Marketing","Support","Finance"]); department_select.item_selected.connect(func(_i): _refresh_leader_choices()); dgrid.add_child(department_select)
@@ -1305,6 +1332,10 @@ func _load_game():
 func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
 
+func _on_solvency_warning(message: String):
+	status_label.text = "⚠ " + message
+	CompanyManager.add_alert(message)
+
 func _on_month_closed(report: Dictionary):
 	var inc_lines:=_breakdown(report.income_breakdown)
 	var exp_lines:=_breakdown(report.expense_breakdown)
@@ -1488,6 +1519,8 @@ func _refresh_dashboard():
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
 
 	dashboard_cash_value.text = "%s €" % _money(Economy.money)
+	if Economy.debt > 0:
+		dashboard_cash_value.text += "\nDette : %s €" % _money(Economy.debt)
 	if Economy.history.is_empty():
 		dashboard_result_value.text = "Mois en cours"
 	else:
@@ -1527,6 +1560,9 @@ func _refresh_company():
 	for sub in CompanyManager.subsidiaries:
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
 	company_rep_label.text = "\n".join(lines)
+	if company_finance_label != null:
+		var status_text := {"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique"}.get(Economy.solvency_status(), "Stable")
+		company_finance_label.text = "Trésorerie : %s €\nDette : %s € / %s €\nIntérêts : 1,2%% / mois\nSituation : %s" % [_money(Economy.money), _money(Economy.debt), _money(Economy.MAX_DEBT), status_text]
 
 	var division_lines: Array[String] = []
 	for sector_value in DivisionManager.get_active_division_keys():
@@ -1545,6 +1581,23 @@ func _refresh_company():
 
 func _apply_policies():
 	CompanyManager.policies.marketing_budget=int(policy_marketing.value); CompanyManager.policies.support_budget=int(policy_support.value); CompanyManager.policies.environment_budget=int(policy_environment.value); CompanyManager.policies.support_level=_meta(policy_support_level); CompanyManager.company_changed.emit(); status_label.text="Politiques mises à jour."
+
+func _request_financing():
+	if Economy.request_financing(250_000):
+		CompanyManager.change_reputation({"prestige":-1.0, "professional":-0.5})
+		CompanyManager.add_alert("Financement obtenu : +250 000 €. La dette augmente et générera des intérêts.")
+		status_label.text = "Financement obtenu : +250 000 €."
+	else:
+		status_label.text = "Financement refusé : plafond de dette atteint."
+	_refresh_all()
+
+func _repay_financing():
+	if Economy.repay_financing(100_000):
+		CompanyManager.change_reputation({"professional":0.4})
+		status_label.text = "100 000 € de financement remboursés."
+	else:
+		status_label.text = "Remboursement impossible : dette ou trésorerie insuffisante."
+	_refresh_all()
 
 func _refresh_leader_choices():
 	if leader_select==null or department_select==null: return

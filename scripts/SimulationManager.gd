@@ -25,6 +25,7 @@ func process_month_end() -> Dictionary:
 	ProductManager.process_month()
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()
+	Economy.process_financing_month()
 	var report := Economy.close_month()
 	month_processed.emit(report)
 	return report

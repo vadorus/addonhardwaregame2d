@@ -27,6 +27,21 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
+	var initial_economy_state := Economy.get_state().duplicate(true)
+	if not Economy.request_financing(250_000):
+		_fail("Could not obtain initial financing")
+		return
+	if Economy.debt != 250_000 or Economy.money != 750_000:
+		_fail("Financing did not update debt and cash correctly")
+		return
+	Economy.process_financing_month()
+	if int(Economy.expense_breakdown.get("Intérêts financement", 0)) != 3000:
+		_fail("Monthly financing interest was not charged")
+		return
+	Economy.load_state(initial_economy_state)
+	if Economy.debt != 0 or Economy.money != 500_000:
+		_fail("Economy financing state did not restore correctly")
+		return
 
 	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"))
 	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"))
