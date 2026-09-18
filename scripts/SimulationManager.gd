@@ -11,6 +11,7 @@ func reset_all(company_name: String, starting_sector: String):
 	ResearchManager.reset(active_sector)
 	PatentManager.reset()
 	ProductManager.reset()
+	TechnologyManager.reset()
 	DiscoveryManager.reset()
 	MarketManager.reset()
 	MediaManager.reset()
