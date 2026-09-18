@@ -439,19 +439,40 @@ func launch_forecast(product_id: String, price: int, production_capacity: int, o
 	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
 	var effective_cost_per_unit := maxi(1, int(round(float(preview.get("unit_cost", 1)) * production_cost_modifier)))
 	preview["production_capacity"] = capacity
+
 	var demand := MarketManager.estimate_consumer_demand(preview)
-	var requested_units := maxi(int(demand.get("units", 0)), 0)
-	var expected_units := mini(requested_units, effective_capacity)
-	var revenue := expected_units * int(preview.price)
-	var production_cost := int(round(float(expected_units * int(preview.get("unit_cost", 0))) * production_cost_modifier))
+	var requested_consumer := maxi(int(demand.get("units", 0)), 0)
+	var contract := MarketManager.active_contract_for(product_id)
+	var requested_b2b := 0
+	var b2b_price := 0
+	if not contract.is_empty():
+		requested_b2b = maxi(int(contract.get("units_per_month", 0)), 0)
+		b2b_price = maxi(int(contract.get("unit_price", 0)), 0)
+	var requested_units := requested_consumer + requested_b2b
+
+	var inventory_start := maxi(int(product.get("inventory_units", 0)), 0)
+	var target_inventory := stock_target_units(product, effective_capacity)
+	var production_needed := maxi(requested_units + target_inventory - inventory_start, 0)
+	var expected_produced := mini(production_needed, effective_capacity)
+	var available_units := inventory_start + expected_produced
+	var expected_b2b := mini(requested_b2b, available_units)
+	var after_b2b := maxi(available_units - expected_b2b, 0)
+	var expected_consumer := mini(requested_consumer, after_b2b)
+	var expected_units := expected_b2b + expected_consumer
+	var inventory_end := maxi(available_units - expected_units, 0)
+	var lost_sales := maxi(requested_units - expected_units, 0)
+
+	var revenue := expected_consumer * int(preview.price) + expected_b2b * b2b_price
+	var production_cost := expected_produced * effective_cost_per_unit
+	var holding_cost := int(round(float(inventory_end * effective_cost_per_unit) * STOCK_HOLDING_RATE))
 	var return_rate: float = clampf((100.0 - float(preview.get("metrics", {}).get("reliability", 50.0))) / 240.0, 0.005, 0.22)
 	return_rate *= float(profile.get("return_factor", 1.0))
 	return_rate /= CompanyManager.get_support_modifier()
 	var expected_returns := int(round(float(expected_units) * return_rate))
-	var warranty_cost := int(round(float(expected_returns * int(preview.get("unit_cost", 0)) * production_cost_modifier) * 0.72))
+	var warranty_cost := int(round(float(expected_returns * effective_cost_per_unit) * 0.72))
 	var monthly_overhead := int(financials.get("monthly_overhead", 0))
-	var monthly_result := revenue - production_cost - warranty_cost - monthly_overhead
-	var utilization := float(expected_units) / float(maxi(capacity, 1))
+	var monthly_result := revenue - production_cost - holding_cost - warranty_cost - monthly_overhead
+	var utilization := float(expected_produced) / float(maxi(effective_capacity, 1))
 	return {
 		"capacity": capacity,
 		"effective_capacity": effective_capacity,
@@ -461,14 +482,25 @@ func launch_forecast(product_id: String, price: int, production_capacity: int, o
 		"industrial_capacity_factor": industrial_capacity,
 		"return_rate": return_rate,
 		"industrialization": financials.get("industrialization", {}),
+		"stock_policy":str(product.get("stock_policy", "BALANCED")),
+		"inventory_start":inventory_start,
+		"inventory_target":target_inventory,
+		"inventory_end":inventory_end,
+		"expected_produced":expected_produced,
 		"requested_units": requested_units,
+		"requested_consumer":requested_consumer,
+		"requested_b2b":requested_b2b,
 		"expected_units": expected_units,
+		"expected_consumer":expected_consumer,
+		"expected_b2b":expected_b2b,
+		"lost_sales":lost_sales,
 		"utilization": clampf(utilization, 0.0, 1.0),
 		"share": float(demand.get("share", 0.0)),
 		"score": float(demand.get("score", 0.0)),
 		"price_factor": float(demand.get("price_factor", 1.0)),
 		"revenue": revenue,
 		"production_cost": production_cost,
+		"holding_cost":holding_cost,
 		"warranty_cost": warranty_cost,
 		"monthly_overhead": monthly_overhead,
 		"monthly_result": monthly_result,
