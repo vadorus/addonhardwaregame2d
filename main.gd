@@ -31,6 +31,10 @@ var company_rep_label: Label
 var company_reputation_grid: GridContainer
 var division_label: Label
 var company_finance_label: Label
+var company_finance_cash_value: Label
+var company_finance_debt_value: Label
+var company_finance_result_value: Label
+var company_finance_runway_value: Label
 var staff_label: Label
 var candidate_label: Label
 var staff_card_grid: GridContainer
@@ -637,7 +641,17 @@ func _create_company_tab():
 	var finance_box := VBoxContainer.new()
 	finance_box.add_theme_constant_override("separation", 8)
 	finance_card.add_child(finance_box)
-	company_finance_label = _rich_label()
+	var finance_metrics := GridContainer.new()
+	finance_metrics.columns = 4
+	finance_metrics.add_theme_constant_override("h_separation", 8)
+	finance_metrics.add_theme_constant_override("v_separation", 8)
+	finance_box.add_child(finance_metrics)
+	company_finance_cash_value = _add_inline_metric(finance_metrics, "Trésorerie", "—")
+	company_finance_debt_value = _add_inline_metric(finance_metrics, "Dette", "—")
+	company_finance_result_value = _add_inline_metric(finance_metrics, "Moyenne 3 mois", "—")
+	company_finance_runway_value = _add_inline_metric(finance_metrics, "Runway", "—")
+	company_finance_label = _muted_label("", 13)
+	company_finance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	finance_box.add_child(company_finance_label)
 	var finance_actions := HFlowContainer.new()
 	finance_actions.add_theme_constant_override("h_separation", 8)
@@ -2028,7 +2042,32 @@ func _refresh_company():
 	_refresh_company_reputation_cards(r)
 	if company_finance_label != null:
 		var status_text: String = str({"STABLE":"Stable", "TENSE":"Sous tension", "CRITICAL":"Critique", "BANKRUPT":"Faillite"}.get(Economy.solvency_status(), "Stable"))
-		company_finance_label.text = "Trésorerie : %s €\nDette : %s € / %s €\nIntérêts : 1,2%% / mois\nSituation : %s" % [_money(Economy.money), _money(Economy.debt), _money(Economy.MAX_DEBT), status_text]
+		var snapshot := Economy.financial_snapshot()
+		var average_result := int(round(float(snapshot.get("average_result_3m", 0.0))))
+		var runway := float(snapshot.get("runway_months", -1.0))
+		var runway_text := "Rentable" if runway < 0.0 else ("%.1f mois" % runway)
+		var trend_text := str({"IMPROVING":"en amélioration", "WORSENING":"en baisse", "STABLE":"stable", "NO_DATA":"sans historique"}.get(str(snapshot.get("trend", "NO_DATA")), "stable"))
+		var top_expense: Dictionary = snapshot.get("top_expense", {})
+		var expense_text := "Aucun poste dominant"
+		if int(top_expense.get("amount", 0)) > 0:
+			expense_text = "%s : %s €" % [str(top_expense.get("category", "Dépense")), _money(int(top_expense.get("amount", 0)))]
+		if company_finance_cash_value != null:
+			company_finance_cash_value.text = "%s €" % _money(Economy.money)
+		if company_finance_debt_value != null:
+			company_finance_debt_value.text = "%s / %s €" % [_money(Economy.debt), _money(Economy.MAX_DEBT)]
+		if company_finance_result_value != null:
+			company_finance_result_value.text = "%s €" % _money(average_result)
+			company_finance_result_value.add_theme_color_override("font_color", APP_GREEN if average_result >= 0 else APP_RED)
+		if company_finance_runway_value != null:
+			company_finance_runway_value.text = runway_text
+		company_finance_runway_value.add_theme_color_override("font_color", APP_GREEN if runway < 0.0 or runway >= 6.0 else (APP_AMBER if runway >= 3.0 else APP_RED))
+		company_finance_label.text = "Situation : %s • tendance %s • intérêts prévus %s €/mois\nPoste de dépense principal : %s\n%s" % [
+			status_text,
+			trend_text,
+			_money(int(snapshot.get("projected_interest", 0))),
+			expense_text,
+			str(snapshot.get("recommendation", ""))
+		]
 
 	var division_lines: Array[String] = []
 	for sector_value in DivisionManager.get_active_division_keys():
