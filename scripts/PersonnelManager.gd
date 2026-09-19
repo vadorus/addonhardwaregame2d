@@ -151,10 +151,15 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	var migrated_development_leader := ""
 	for emp in staff:
 		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
 			emp["department"] = "Développement"
 			emp["role"] = "Responsable développement CPU" if str(emp.get("name", "")) == "Samira Lefèvre" else str(emp.get("role", "Ingénieur produit"))
+			if migrated_development_leader == "":
+				migrated_development_leader = str(emp.get("id", ""))
+	if CompanyManager.departments.has("Développement") and str(CompanyManager.departments["Développement"].get("leader_id", "")) == "" and migrated_development_leader != "":
+		CompanyManager.departments["Développement"]["leader_id"] = migrated_development_leader
 	candidate = state.get("candidate", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 1947))
