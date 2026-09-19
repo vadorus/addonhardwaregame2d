@@ -246,6 +246,137 @@ func cpu_technical_advice(design_input: Dictionary) -> Array:
 		advice.append("Basse consommation : un Concept dédié peut améliorer placement, alimentation et gestion thermique.")
 	return advice.slice(0, 2)
 
+func cpu_remediation_options(design_input: Dictionary, monthly_budget: int, focus: String = "BALANCED") -> Array:
+	var design := CPU_DESIGN.normalize(design_input)
+	var evaluation := CPU_DESIGN.evaluate(design, cpu_capabilities)
+	var issue := _cpu_remediation_issue(design, evaluation)
+	if issue.is_empty():
+		return []
+	var capability_key := str(issue.get("capability", "ARCHITECTURE"))
+	var axis := str(issue.get("axis", "ARCHITECTURE"))
+	var issue_label := str(issue.get("label", "contrainte technique"))
+	var base_cost := int(round(6500.0 + float(evaluation.get("complexity", 50.0)) * 115.0 + float(evaluation.get("unit_cost", 30.0)) * 18.0))
+	var options: Array = []
+	var profiles := [
+		{"key":"QUICK","label":"Solution rapide","months":1,"cost_factor":0.70,"boost":3.0,"risk":3.0,"confidence":2.0,"transfer":0.7},
+		{"key":"RECOMMENDED","label":"Solution recommandée","months":3,"cost_factor":1.45,"boost":8.0,"risk":8.0,"confidence":6.0,"transfer":2.5},
+		{"key":"AMBITIOUS","label":"Solution ambitieuse","months":5,"cost_factor":2.35,"boost":14.0,"risk":14.0,"confidence":10.0,"transfer":5.0}
+	]
+	for profile_value in profiles:
+		var profile: Dictionary = profile_value
+		var extra_months := int(profile.months)
+		var upfront_cost := maxi(5000, int(round(float(base_cost) * float(profile.cost_factor) / 500.0)) * 500)
+		var capability_boost := float(profile.boost)
+		var manufacturing_boost := capability_boost * 0.70 if axis == "MINIATURIZATION" else 0.0
+		var temp_capabilities := cpu_capabilities.duplicate(true)
+		temp_capabilities[capability_key] = clampf(float(temp_capabilities.get(capability_key, 0.0)) + capability_boost, 0.0, 100.0)
+		if axis == "LOW_POWER":
+			temp_capabilities["LAYOUT"] = clampf(float(temp_capabilities.get("LAYOUT", 0.0)) + capability_boost * 0.45, 0.0, 100.0)
+		var improved := CPU_DESIGN.evaluate(design, temp_capabilities)
+		var risk_after := maxf(float(improved.get("risk", 50.0)) - float(profile.risk), 5.0)
+		var confidence := clampf(
+			research_confidence(str(CPU_CONCEPT_AXES.get(axis, {}).get("domain", research_domain_for_focus(focus)))) * 0.55
+			+ development_confidence() * 0.45
+			+ float(profile.confidence),
+			25.0, 96.0
+		)
+		var effect := "Risque estimé %.0f → %.0f • confiance +%.0f pts" % [
+			float(evaluation.get("risk", 50.0)), risk_after, float(profile.confidence)
+		]
+		if axis == "LOW_POWER":
+			effect += " • meilleure marge électrique/thermique"
+		elif axis == "MINIATURIZATION":
+			effect += " • rapproche le procédé de la zone industrialisable"
+		elif capability_key == "LAYOUT":
+			effect += " • layout plus prévisible"
+		else:
+			effect += " • architecture mieux maîtrisée"
+		options.append({
+			"id":"REMEDY-%s-%s" % [str(issue.get("key", "TECH")), str(profile.key)],
+			"profile":str(profile.key),
+			"label":str(profile.label),
+			"title":"%s — %s" % [str(profile.label), str(issue.get("solution", issue_label))],
+			"issue":str(issue.get("key", "TECH")),
+			"issue_label":issue_label,
+			"axis":axis,
+			"capability":capability_key,
+			"design":design.duplicate(true),
+			"extra_months":extra_months,
+			"upfront_cost":upfront_cost,
+			"estimated_extra_cost":upfront_cost + maxi(monthly_budget, 0) * extra_months,
+			"capability_boost":capability_boost,
+			"manufacturing_boost":manufacturing_boost,
+			"risk_reduction":float(profile.risk),
+			"confidence_gain":float(profile.confidence),
+			"transfer_gain":float(profile.transfer),
+			"confidence":confidence,
+			"expected_effect":effect,
+			"recommended":str(profile.key) == "RECOMMENDED"
+		})
+	return options
+
+func _cpu_remediation_issue(design: Dictionary, evaluation: Dictionary) -> Dictionary:
+	var node_profile := CPU_DESIGN.node_profile(int(design.node_nm))
+	var process_gap := float(node_profile.get("unlock", 0.0)) - minf(
+		float(technologies.get("manufacturing", 0.0)),
+		get_cpu_capability("MINIATURIZATION")
+	)
+	if process_gap > 0.001:
+		return {
+			"key":"PROCESS","label":"procédé trop avancé",
+			"axis":"MINIATURIZATION","capability":"MINIATURIZATION",
+			"solution":"programme de miniaturisation et validation procédé"
+		}
+	if float(evaluation.get("power_deficit_ratio", 0.0)) > 0.10:
+		return {
+			"key":"POWER","label":"marge électrique / thermique insuffisante",
+			"axis":"LOW_POWER","capability":"LAYOUT",
+			"solution":"optimisation alimentation, placement et dissipation"
+		}
+	if int(design.cores) > 1 and get_cpu_capability("ARCHITECTURE") < 52.0:
+		return {
+			"key":"MULTICORE","label":"organisation multicœur immature",
+			"axis":"ARCHITECTURE","capability":"ARCHITECTURE",
+			"solution":"validation d'une nouvelle organisation des unités de calcul"
+		}
+	if float(design.cache_mb) > 0.0 and get_cpu_capability("LAYOUT") < 32.0:
+		return {
+			"key":"CACHE","label":"cache difficile à intégrer",
+			"axis":"LAYOUT","capability":"LAYOUT",
+			"solution":"nouvelle cartographie du die et des interconnexions"
+		}
+	if float(evaluation.get("frequency_ratio", 1.0)) > 1.35:
+		return {
+			"key":"FREQUENCY","label":"fréquence agressive pour notre maîtrise actuelle",
+			"axis":"ARCHITECTURE","capability":"ARCHITECTURE",
+			"solution":"chemins critiques et architecture haute fréquence"
+		}
+	if float(evaluation.get("risk", 0.0)) >= 55.0:
+		return {
+			"key":"VALIDATION","label":"risque de développement élevé",
+			"axis":"RELIABILITY","capability":"LAYOUT",
+			"solution":"campagne de validation et robustesse renforcée"
+		}
+	return {}
+
+func cpu_remediation_preview(design_input: Dictionary, remediation: Dictionary) -> Dictionary:
+	var design := CPU_DESIGN.normalize(design_input)
+	if remediation.is_empty() or CPU_DESIGN.normalize(remediation.get("design", {})) != design:
+		return CPU_DESIGN.evaluate(design, cpu_capabilities)
+	var effective_capabilities := cpu_capabilities.duplicate(true)
+	var capability_key := str(remediation.get("capability", "ARCHITECTURE"))
+	effective_capabilities[capability_key] = clampf(
+		float(effective_capabilities.get(capability_key, 0.0)) + float(remediation.get("capability_boost", 0.0)),
+		0.0, 100.0
+	)
+	var result := CPU_DESIGN.evaluate(design, effective_capabilities)
+	result["risk"] = maxf(float(result.get("risk", 50.0)) - float(remediation.get("risk_reduction", 0.0)), 5.0)
+	result["complexity"] = maxf(float(result.get("complexity", 50.0)) - float(remediation.get("risk_reduction", 0.0)) * 0.35, 10.0)
+	result["reliability"] = clampf(float(result.get("reliability", 50.0)) + float(remediation.get("risk_reduction", 0.0)) * 0.30, 0.0, 98.0)
+	if str(remediation.get("axis", "")) == "LOW_POWER":
+		result["efficiency"] = clampf(float(result.get("efficiency", 50.0)) + float(remediation.get("capability_boost", 0.0)) * 0.22, 0.0, 98.0)
+	return result
+
 func get_cpu_research_domain_keys() -> Array:
 	return CPU_RESEARCH_DOMAIN_ORDER.duplicate()
 
@@ -526,10 +657,11 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}) -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}) -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
-	if Economy.money < maxi(monthly_budget, 10000):
+	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
+	if Economy.money < maxi(monthly_budget, 10000) + remediation_upfront:
 		return false
 	if sector == "CPU" and get_development_team_size() <= 0:
 		return false
@@ -549,15 +681,31 @@ func start_project(project_name: String, sector: String, segment: String, approa
 
 	var normalized_design: Dictionary = {}
 	var design_estimate: Dictionary = {}
+	var stored_remediation: Dictionary = {}
+	var effective_capabilities := cpu_capabilities.duplicate(true)
+	var effective_manufacturing := float(technologies.get("manufacturing", 0.0))
 	if sector == "CPU":
 		normalized_design = CPU_DESIGN.normalize(cpu_design)
+		if not technical_remediation.is_empty():
+			var remediation_design := CPU_DESIGN.normalize(technical_remediation.get("design", {}))
+			if remediation_design != normalized_design:
+				return false
+			stored_remediation = technical_remediation.duplicate(true)
+			var capability_key := str(stored_remediation.get("capability", "ARCHITECTURE"))
+			effective_capabilities[capability_key] = clampf(
+				float(effective_capabilities.get(capability_key, 0.0)) + float(stored_remediation.get("capability_boost", 0.0)),
+				0.0, 100.0
+			)
+			effective_manufacturing += float(stored_remediation.get("manufacturing_boost", 0.0))
 		var available_nodes := CPU_DESIGN.available_nodes_for_capabilities(
-			float(technologies.get("manufacturing", 0.0)),
-			get_cpu_capability("MINIATURIZATION")
+			effective_manufacturing,
+			float(effective_capabilities.get("MINIATURIZATION", get_cpu_capability("MINIATURIZATION")))
 		)
 		if not available_nodes.has(int(normalized_design.node_nm)):
 			return false
-		design_estimate = CPU_DESIGN.evaluate(normalized_design, cpu_capabilities)
+		design_estimate = CPU_DESIGN.evaluate(normalized_design, effective_capabilities)
+		if not stored_remediation.is_empty():
+			design_estimate = cpu_remediation_preview(normalized_design, stored_remediation)
 		for design_metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
 			desired[design_metric] = float(design_estimate.get(design_metric, desired.get(design_metric, 55.0)))
 
@@ -585,9 +733,13 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
-		"technical_capabilities_snapshot":cpu_capabilities.duplicate(true) if sector == "CPU" else {},
+		"technical_capabilities_snapshot":effective_capabilities.duplicate(true) if sector == "CPU" else {},
+		"technical_remediation":stored_remediation,
+		"remediation_months_remaining":int(stored_remediation.get("extra_months", 0)),
+		"remediation_total_months":int(stored_remediation.get("extra_months", 0)),
+		"remediation_transfer_applied":stored_remediation.is_empty(),
 		"field_experience_snapshot":AfterSalesManager.field_experience.duplicate(true) if sector == "CPU" else {},
-		"estimate_confidence":research_confidence_for_focus(focus) if sector == "CPU" else 50.0,
+		"estimate_confidence":clampf(research_confidence_for_focus(focus) + float(stored_remediation.get("confidence_gain", 0.0)), 20.0, 96.0) if sector == "CPU" else 50.0,
 		"development_snapshot":{
 			"team_size":get_development_team_size(),
 			"team_score":development_team_score(),
@@ -596,6 +748,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		} if sector == "CPU" else {},
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
+	if sector == "CPU" and not stored_remediation.is_empty():
+		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
 	_next_id += 1
 	projects.append(project)
 	if sector == "CPU":
@@ -629,6 +783,18 @@ func _process_project_month(project: Dictionary):
 	var expense := int(float(project.monthly_budget) * float(approach_data.cost))
 	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
+	if str(project.sector) == "CPU" and int(project.get("remediation_months_remaining", 0)) > 0:
+		project["remediation_months_remaining"] = int(project.get("remediation_months_remaining", 0)) - 1
+		var remediation: Dictionary = project.get("technical_remediation", {})
+		var capability_key := str(remediation.get("capability", "ARCHITECTURE"))
+		if CPU_CAPABILITIES.has(capability_key):
+			cpu_capabilities[capability_key] = clampf(get_cpu_capability(capability_key) + 0.08, 0.0, 100.0)
+		if int(project.remediation_months_remaining) <= 0:
+			_apply_project_remediation_transfer(project)
+			CompanyManager.add_alert("%s : la solution technique %s est validée, le développement produit reprend." % [
+				str(project.name), str(remediation.get("title", "sélectionnée"))
+			])
+		return
 	var tech := float(technologies.get(specialization, 5.0))
 	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * management
 	if str(project.sector) == "CPU":
@@ -643,6 +809,25 @@ func _process_project_month(project: Dictionary):
 	if float(project.phase_progress) >= 100.0:
 		project.phase_progress = float(project.phase_progress) - 100.0
 		_complete_phase(project, team, tech, budget_ratio)
+
+func _apply_project_remediation_transfer(project: Dictionary):
+	if bool(project.get("remediation_transfer_applied", false)):
+		return
+	var remediation: Dictionary = project.get("technical_remediation", {})
+	if remediation.is_empty():
+		project["remediation_transfer_applied"] = true
+		return
+	var capability_key := str(remediation.get("capability", "ARCHITECTURE"))
+	var transfer_gain := float(remediation.get("transfer_gain", 0.0))
+	if CPU_CAPABILITIES.has(capability_key):
+		cpu_capabilities[capability_key] = clampf(get_cpu_capability(capability_key) + transfer_gain, 0.0, 100.0)
+	if float(remediation.get("manufacturing_boost", 0.0)) > 0.0:
+		technologies["manufacturing"] = clampf(
+			float(technologies.get("manufacturing", 0.0)) + transfer_gain * 0.70,
+			0.0, 100.0
+		)
+	project["remediation_transfer_applied"] = true
+	research_changed.emit()
 
 func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	var phase_index := int(project.phase_index)
