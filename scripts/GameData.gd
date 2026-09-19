@@ -32,6 +32,26 @@ const SECTORS := {
 		"secondary_metric": "efficiency",
 		"specialization": "gpu"
 	},
+	"RAM": {
+		"label": "Mémoire vive",
+		"base_dev_cost": 34000,
+		"base_unit_cost": 48,
+		"reference_price": 140,
+		"market_units": 32000,
+		"primary_metric": "performance",
+		"secondary_metric": "reliability",
+		"specialization": "memory"
+	},
+	"MOTHERBOARD": {
+		"label": "Cartes mères",
+		"base_dev_cost": 39000,
+		"base_unit_cost": 92,
+		"reference_price": 230,
+		"market_units": 22000,
+		"primary_metric": "ecosystem",
+		"secondary_metric": "reliability",
+		"specialization": "motherboard"
+	},
 	"SMARTPHONE": {
 		"label": "Smartphones",
 		"base_dev_cost": 48000,
