@@ -12,7 +12,7 @@ const TEMPLATES := {
 		"summary":"L'équipe a identifié une méthode de gestion de puissance qui peut améliorer l'efficacité des futures conceptions.",
 		"metric":"efficiency",
 		"immediate_metric":3.0,
-		"tech_key":"cpu",
+		"tech_key":"$FAMILY",
 		"immediate_tech":1.0,
 		"research_tech":4.0,
 		"secondary_key":"integration",
@@ -26,7 +26,7 @@ const TEMPLATES := {
 		"summary":"Les mesures de prototype révèlent une politique de cache réutilisable pour augmenter les performances sans pousser uniquement la fréquence.",
 		"metric":"performance",
 		"immediate_metric":3.0,
-		"tech_key":"cpu",
+		"tech_key":"$FAMILY",
 		"immediate_tech":1.2,
 		"research_tech":4.5,
 		"secondary_key":"integration",
@@ -43,7 +43,7 @@ const TEMPLATES := {
 		"tech_key":"integration",
 		"immediate_tech":1.2,
 		"research_tech":4.0,
-		"secondary_key":"cpu",
+		"secondary_key":"$FAMILY",
 		"secondary_gain":1.2,
 		"research_cost":13_000,
 		"research_months":2
@@ -57,7 +57,7 @@ const TEMPLATES := {
 		"tech_key":"manufacturing",
 		"immediate_tech":1.5,
 		"research_tech":5.0,
-		"secondary_key":"cpu",
+		"secondary_key":"$FAMILY",
 		"secondary_gain":1.0,
 		"research_cost":16_000,
 		"research_months":2
@@ -68,7 +68,7 @@ const TEMPLATES := {
 		"summary":"L'analyse d'un défaut terrain a produit une règle de conception réutilisable pour améliorer la fiabilité des futures générations.",
 		"metric":"reliability",
 		"immediate_metric":0.0,
-		"tech_key":"cpu",
+		"tech_key":"$FAMILY",
 		"immediate_tech":1.5,
 		"research_tech":4.0,
 		"secondary_key":"manufacturing",
@@ -116,60 +116,91 @@ func reset():
 	_next_id = 1
 	discoveries_changed.emit()
 
-func _template_for_weakness(weakness: String) -> String:
+func _template_supports_family(template_id: String, family: String) -> bool:
+	if not TEMPLATES.has(template_id):
+		return false
+	var families = TEMPLATES[template_id].get("families", [])
+	if typeof(families) != TYPE_ARRAY or families.is_empty():
+		return true
+	return families.has(family)
+
+func _template_for_weakness(weakness: String, family: String) -> String:
+	var preferred := "CACHE_POLICY"
 	match weakness:
 		"efficiency", "sustainability":
-			return "POWER_MANAGEMENT"
+			preferred = "POWER_MANAGEMENT"
 		"reliability", "ecosystem":
-			return "VALIDATION_RULES"
+			preferred = "VALIDATION_RULES"
 		_:
-			return "CACHE_POLICY"
+			preferred = "CACHE_POLICY"
+	if _template_supports_family(preferred, family):
+		return preferred
+	return "VALIDATION_RULES"
+
+func _family_tech_key(family: String) -> String:
+	return GameData.get_product_family_specialization(family)
+
+func _resolve_tech_key(raw_key: String, family: String) -> String:
+	return _family_tech_key(family) if raw_key == "$FAMILY" else raw_key
 
 func _on_phase_report(project: Dictionary, report: Dictionary):
-	if str(project.get("sector", "")) != "CPU":
+	var family := str(project.get("sector", ""))
+	if family.is_empty() or not GameData.is_product_family_active(family):
 		return
 	if str(report.get("phase", "")) != "Prototype":
 		return
 	var project_id := str(project.get("id", ""))
-	var template_id := _template_for_weakness(str(report.get("weakness", "performance")))
-	_create_discovery(template_id, "PROJECT", project_id, project_id, "", _research_team_context())
+	var template_id := _template_for_weakness(str(report.get("weakness", "performance")), family)
+	_create_discovery(template_id, family, "PROJECT", project_id, project_id, "", _research_team_context(family))
 
-func _research_team_context() -> Dictionary:
+func _research_team_context(family: String) -> Dictionary:
+	var specialization := GameData.get_product_family_specialization(family)
 	var leader_id := str(CompanyManager.departments.get("R&D", {}).get("leader_id", ""))
 	var lead := PersonnelManager.get_employee(leader_id)
-	if str(lead.get("department", "")) != "R&D" or str(lead.get("specialization", "")) != "cpu":
+	if str(lead.get("department", "")) != "R&D" or str(lead.get("specialization", "")) != specialization:
 		lead = {}
 		for employee_value in PersonnelManager.staff:
 			var employee: Dictionary = employee_value
-			if str(employee.get("department", "")) == "R&D" and str(employee.get("specialization", "")) == "cpu":
+			if str(employee.get("department", "")) == "R&D" and str(employee.get("specialization", "")) == specialization:
 				lead = employee
 				break
 	if lead.is_empty():
-		return {}
+		return {"family":family, "specialization":specialization}
 	return {
+		"family":family,
+		"specialization":specialization,
 		"team_department":"R&D",
 		"team_lead":str(lead.get("name", "")),
-		"team_score":PersonnelManager.team_score("R&D", "cpu")
+		"team_score":PersonnelManager.team_score("R&D", specialization)
 	}
 
 func _on_product_launched(product: Dictionary):
 	var choices: Dictionary = product.get("industrialization", {})
 	if str(choices.get("contract", "")) != "PARTNER":
 		return
+	var family := str(product.get("sector", CompanyManager.starting_sector))
+	if not _template_supports_family("FOUNDRY_RULES", family):
+		return
 	var generation_id := str(product.get("generation_id", product.get("id", "")))
-	_create_discovery("FOUNDRY_RULES", "INDUSTRIALIZATION", generation_id, "", str(product.get("id", "")))
+	_create_discovery("FOUNDRY_RULES", family, "INDUSTRIALIZATION", generation_id, "", str(product.get("id", "")))
 
 func _on_quality_incident_resolved(incident: Dictionary, action_id: String):
 	if action_id == "MINIMAL_SUPPORT":
 		return
 	var product_id := str(incident.get("product_id", ""))
-	_create_discovery("SAV_RELIABILITY", "SAV", product_id, "", product_id)
+	var product := ProductManager.get_product(product_id)
+	var family := str(product.get("sector", CompanyManager.starting_sector))
+	if _template_supports_family("SAV_RELIABILITY", family):
+		_create_discovery("SAV_RELIABILITY", family, "SAV", product_id, "", product_id)
 
 func _on_software_fix_completed(product_id: String, _fix: Dictionary):
-	_create_discovery("MICROCODE_TOOLING", "SOFTWARE", product_id, "", product_id)
+	var product := ProductManager.get_product(product_id)
+	var family := str(product.get("sector", CompanyManager.starting_sector))
+	if _template_supports_family("MICROCODE_TOOLING", family):
+		_create_discovery("MICROCODE_TOOLING", family, "SOFTWARE", product_id, "", product_id)
 
-func _create_discovery(template_id: String, source_type: String, source_id: String, project_id: String, product_id: String, team_context: Dictionary = {}) -> Dictionary:
-	if not TEMPLATES.has(template_id):
+func _create_discovery(template_id: String, family: String, source_type: String, source_id: String, project_id: String, product_id: String, team_context: Dictionary = {}) -> Dictionary:
+	if not TEMPLATES.has(template_id) or not _template_supports_family(template_id, family):
 		return {}
 	var seen_key := "%s:%s" % [source_type, source_id]
 	if seen_keys.has(seen_key):
@@ -179,6 +210,8 @@ func _create_discovery(template_id: String, source_type: String, source_id: Stri
 	var discovery := {
 		"id":"DISC-%03d" % _next_id,
 		"template_id":template_id,
+		"family":family,
+		"family_label":GameData.get_product_family_label(family),
 		"title":str(template.get("title", template_id)),
 		"summary":str(template.get("summary", "")),
 		"source_type":source_type,
@@ -199,8 +232,8 @@ func _create_discovery(template_id: String, source_type: String, source_id: Stri
 	discoveries_changed.emit()
 	return discovery
 
-func create_test_discovery(template_id: String, source_id: String = "TEST") -> Dictionary:
-	return _create_discovery(template_id, "TEST", source_id, "", "")
+func create_test_discovery(template_id: String, source_id: String = "TEST", family: String = "CPU") -> Dictionary:
+	return _create_discovery(template_id, family, "TEST", source_id, "", "")
 
 func get_pending_discovery() -> Dictionary:
 	if pending.is_empty():
@@ -273,7 +306,8 @@ func resolve_discovery(discovery_id: String, action_id: String) -> bool:
 		var applied_to_project := false
 		if not project_id.is_empty() and not metric.is_empty() and metric_gain > 0.0:
 			applied_to_project = ResearchManager.apply_project_metric_bonus(project_id, metric, metric_gain)
-		ResearchManager.add_technology_bonus(str(template.get("tech_key", "cpu")), float(template.get("immediate_tech", 1.0)))
+		var family := str(discovery.get("family", CompanyManager.starting_sector))
+		ResearchManager.add_technology_bonus(_resolve_tech_key(str(template.get("tech_key", "$FAMILY")), family), float(template.get("immediate_tech", 1.0)))
 		discovery["resolution"] = "EXPLOIT_NOW"
 		discovery["applied_to_project"] = applied_to_project
 		discovery["status"] = "COMPLETED"
@@ -310,11 +344,12 @@ func process_month():
 			finished.append(research)
 	for research in finished:
 		var template: Dictionary = TEMPLATES.get(str(research.get("template_id", "")), {})
-		ResearchManager.add_technology_bonus(str(template.get("tech_key", "cpu")), float(template.get("research_tech", 4.0)))
+		var family := str(research.get("family", CompanyManager.starting_sector))
+		ResearchManager.add_technology_bonus(_resolve_tech_key(str(template.get("tech_key", "$FAMILY")), family), float(template.get("research_tech", 4.0)))
 		var reusable_technology := str(template.get("technology", ""))
 		if not reusable_technology.is_empty():
 			TechnologyManager.unlock(reusable_technology, str(research.get("title", "Recherche dérivée")))
-		var secondary_key := str(template.get("secondary_key", ""))
+		var secondary_key := _resolve_tech_key(str(template.get("secondary_key", "")), family)
 		if not secondary_key.is_empty():
 			ResearchManager.add_technology_bonus(secondary_key, float(template.get("secondary_gain", 1.0)))
 		research["status"] = "COMPLETED"
