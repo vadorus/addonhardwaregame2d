@@ -7,6 +7,7 @@ signal derived_research_completed(research)
 
 const TEMPLATES := {
 	"POWER_MANAGEMENT": {
+		"families":["CPU","GPU","RAM","MOTHERBOARD","SMARTPHONE","SATELLITE"],
 		"title":"Gestion de puissance adaptative",
 		"technology":"ADAPTIVE_POWER",
 		"summary":"L'équipe a identifié une méthode de gestion de puissance qui peut améliorer l'efficacité des futures conceptions.",
@@ -21,6 +22,7 @@ const TEMPLATES := {
 		"research_months":2
 	},
 	"CACHE_POLICY": {
+		"families":["CPU","GPU"],
 		"title":"Politique de cache optimisée",
 		"technology":"SMART_CACHE",
 		"summary":"Les mesures de prototype révèlent une politique de cache réutilisable pour augmenter les performances sans pousser uniquement la fréquence.",
@@ -35,6 +37,7 @@ const TEMPLATES := {
 		"research_months":2
 	},
 	"VALIDATION_RULES": {
+		"families":[],
 		"title":"Méthode de validation croisée",
 		"technology":"CROSS_VALIDATION",
 		"summary":"Une faiblesse du prototype a conduit l'équipe à formaliser une méthode de validation qui peut améliorer la fiabilité des générations suivantes.",
@@ -49,6 +52,7 @@ const TEMPLATES := {
 		"research_months":2
 	},
 	"FOUNDRY_RULES": {
+		"families":["CPU","GPU","RAM","MOTHERBOARD","SMARTPHONE","TV","SATELLITE"],
 		"title":"Règles de conception fonderie",
 		"technology":"FOUNDRY_DRC",
 		"summary":"Le partenariat industriel a permis d'identifier des règles de conception qui améliorent rendement et préparation industrielle.",
@@ -63,6 +67,7 @@ const TEMPLATES := {
 		"research_months":2
 	},
 	"SAV_RELIABILITY": {
+		"families":[],
 		"title":"Retour SAV transformé en savoir",
 		"technology":"FIELD_FAILURE_ANALYTICS",
 		"summary":"L'analyse d'un défaut terrain a produit une règle de conception réutilisable pour améliorer la fiabilité des futures générations.",
@@ -77,6 +82,7 @@ const TEMPLATES := {
 		"research_months":2
 	},
 	"MICROCODE_TOOLING": {
+		"families":["CPU","GPU","MOTHERBOARD","SMARTPHONE","TV","SATELLITE"],
 		"title":"Outillage microcode réutilisable",
 		"technology":"MICROCODE_TOOLING",
 		"summary":"Le correctif logiciel a permis de formaliser de nouveaux outils de validation firmware et compatibilité.",
