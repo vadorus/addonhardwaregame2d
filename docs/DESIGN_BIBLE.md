@@ -258,6 +258,22 @@ Les premiers axes jouables sont très basse consommation, architecture de ruptur
 
 L'accès à un procédé de fabrication dépend donc désormais de deux choses : **savoir le miniaturiser** et **savoir l'industrialiser**. Avoir seulement une bonne usine ou seulement une bonne idée de procédé ne suffit pas.
 
+### Solutions techniques proposées par l'équipe
+
+Lorsqu'un design CPU dépasse ce que l'entreprise maîtrise, l'interface ne doit pas se limiter à afficher du rouge. L'équipe peut proposer une voie concrète pour conserver l'objectif du joueur.
+
+La première implémentation fournit trois niveaux :
+
+- **solution rapide** : peu de retard et de coût, réduction limitée du risque ;
+- **solution recommandée** : compromis standard, actuellement environ trois mois supplémentaires ;
+- **solution ambitieuse** : investissement plus lourd, davantage de délai, mais apprentissage technique plus important.
+
+Chaque proposition expose explicitement le problème traité, le surcoût initial, le coût total estimé avec les mois supplémentaires, la confiance de l'équipe et l'effet attendu sur le risque. Les solutions sont générées à partir de la contrainte réellement rencontrée : fréquence agressive, marge électrique/thermique, cache/layout, multicœur, miniaturisation ou validation générale.
+
+Si le joueur accepte une solution, elle devient une **vraie phase de mise au point technique** avant le développement produit. Durant ces mois le CPU n'avance pas dans ses phases normales. Quand la mise au point est validée, une partie du savoir acquis devient une compétence réutilisable par l'entreprise pour les projets suivants.
+
+Le joueur conserve toujours les trois choix fondamentaux : modifier son CPU, accepter le détour technique proposé, ou conserver une conception plus risquée sans cette aide.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :

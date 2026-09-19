@@ -228,6 +228,33 @@ func _ready() -> void:
 		_fail("CPU guidance does not provide a team explanation")
 		return
 
+	var remediation_probe := CPU_DESIGN.preset("PERFORMANCE")
+	var remediation_baseline := CPU_DESIGN.evaluate(remediation_probe, ResearchManager.get_cpu_capabilities())
+	var remediation_options := ResearchManager.cpu_remediation_options(remediation_probe, 42_000, "PERFORMANCE")
+	if remediation_options.size() != 3:
+		_fail("Technical team did not return quick, recommended and ambitious remediation options")
+		return
+	var recommended_remediation: Dictionary = {}
+	var remediation_recommended_count := 0
+	for remediation_value in remediation_options:
+		var remediation_option: Dictionary = remediation_value
+		if int(remediation_option.get("extra_months", 0)) <= 0 or int(remediation_option.get("upfront_cost", 0)) <= 0:
+			_fail("Technical remediation does not expose real time and cost consequences")
+			return
+		if bool(remediation_option.get("recommended", false)):
+			remediation_recommended_count += 1
+			recommended_remediation = remediation_option
+	if remediation_recommended_count != 1:
+		_fail("Technical team must recommend exactly one remediation option")
+		return
+	var remediation_preview := ResearchManager.cpu_remediation_preview(remediation_probe, recommended_remediation)
+	if float(remediation_preview.get("risk", 100.0)) >= float(remediation_baseline.get("risk", 0.0)):
+		_fail("Recommended technical remediation did not reduce estimated CPU risk")
+		return
+	if int(recommended_remediation.get("extra_months", 0)) != 3:
+		_fail("Recommended remediation should currently represent the three-month balanced solution")
+		return
+
 	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
 	if proposals.size() != 3:
 		_fail("CPU generation council did not return three plans")
@@ -265,17 +292,39 @@ func _ready() -> void:
 		_fail("Exactly one CPU generation plan must be recommended")
 		return
 
-	var cpu_design: Dictionary = selected_plan.get("design", {})
-	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design, selected_plan)
+	var project_plan: Dictionary = bold_plan
+	var cpu_design: Dictionary = project_plan.get("design", {})
+	var project_remediation_options := ResearchManager.cpu_remediation_options(cpu_design, 42_000, "PERFORMANCE")
+	if project_remediation_options.is_empty():
+		_fail("Bold CPU plan should expose a technical remediation path")
+		return
+	var project_remediation: Dictionary = {}
+	for remediation_value in project_remediation_options:
+		var remediation_option: Dictionary = remediation_value
+		if bool(remediation_option.get("recommended", false)):
+			project_remediation = remediation_option
+			break
+	if project_remediation.is_empty():
+		_fail("Bold CPU remediation has no recommended option")
+		return
+	var capability_before_remediation := ResearchManager.get_cpu_capability(str(project_remediation.get("capability", "ARCHITECTURE")))
+	var cash_before_remediation := Economy.money
+	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design, project_plan, project_remediation)
 	if not started:
-		_fail("Could not start R&D project")
+		_fail("Could not start R&D project with the team's technical solution")
+		return
+	if Economy.money != cash_before_remediation - int(project_remediation.get("upfront_cost", 0)):
+		_fail("Technical remediation upfront cost was not charged when the project started")
 		return
 	var project: Dictionary = ResearchManager.projects[0]
 	if int(project.get("cpu_design", {}).get("cores", 0)) != int(cpu_design.get("cores", -1)):
 		_fail("Selected generation design was not stored on the R&D project")
 		return
-	if str(project.get("generation_plan", {}).get("id", "")) != str(selected_plan.get("id", "")):
+	if str(project.get("generation_plan", {}).get("id", "")) != str(project_plan.get("id", "")):
 		_fail("Generation plan was not attached to the R&D project")
+		return
+	if project.get("technical_remediation", {}).is_empty() or int(project.get("remediation_months_remaining", 0)) != int(project_remediation.get("extra_months", 0)):
+		_fail("Technical remediation was not attached as a real pre-development phase")
 		return
 	if not ResearchManager.get_cpu_generation_proposals().is_empty():
 		_fail("Generation proposals were not cleared after project launch")
@@ -299,12 +348,30 @@ func _ready() -> void:
 		_fail("Research and Development are not active independently")
 		return
 
+	var initial_remediation_months := int(project.get("remediation_months_remaining", 0))
 	var report: Dictionary = SimulationManager.process_month_end()
 	if report.is_empty():
 		_fail("Monthly report is empty")
 		return
 	if int(report.get("money", -1)) != Economy.money:
 		_fail("Monthly report balance does not match economy")
+		return
+	if initial_remediation_months > 0:
+		if int(project.get("phase_index", -1)) != 0 or float(project.get("phase_progress", -1.0)) != 0.0:
+			_fail("CPU product development advanced before the accepted technical solution was validated")
+			return
+		if int(project.get("remediation_months_remaining", initial_remediation_months)) != initial_remediation_months - 1:
+			_fail("Technical remediation did not consume exactly one extra month")
+			return
+	var remediation_guard := 0
+	while int(project.get("remediation_months_remaining", 0)) > 0 and remediation_guard < 8:
+		ResearchManager.process_month()
+		remediation_guard += 1
+	if int(project.get("remediation_months_remaining", 0)) != 0 or not bool(project.get("remediation_transfer_applied", false)):
+		_fail("Technical solution did not complete and transfer its learning")
+		return
+	if ResearchManager.get_cpu_capability(str(project_remediation.get("capability", "ARCHITECTURE"))) <= capability_before_remediation:
+		_fail("Validated project-specific technology did not improve reusable company know-how")
 		return
 
 	var range_project := project.duplicate(true)
@@ -533,6 +600,10 @@ func _ready() -> void:
 	legacy_project.erase("design_estimate")
 	legacy_project.erase("complexity")
 	legacy_project.erase("generation_plan")
+	legacy_project.erase("technical_remediation")
+	legacy_project.erase("remediation_months_remaining")
+	legacy_project.erase("remediation_total_months")
+	legacy_project.erase("remediation_transfer_applied")
 	legacy_state.erase("cpu_generation_proposals")
 	legacy_state.erase("cpu_generation_context")
 	ResearchManager.load_state(legacy_state)
@@ -542,6 +613,9 @@ func _ready() -> void:
 		return
 	if not migrated_project.get("generation_plan", {}).is_empty():
 		_fail("Legacy project received an invalid generation plan")
+		return
+	if not migrated_project.get("technical_remediation", {}).is_empty() or int(migrated_project.get("remediation_months_remaining", 0)) != 0:
+		_fail("Legacy project received an invalid technical remediation phase")
 		return
 
 	ResearchManager.prepare_cpu_generation_proposals("PRO", "HYBRID", "RELIABILITY", 50_000, CPU_DESIGN.preset("BALANCED"))

@@ -91,6 +91,11 @@ var lab_warning_label: Label
 var lab_guidance_bars: Dictionary = {}
 var lab_guidance_labels: Dictionary = {}
 var lab_team_guidance_label: Label
+var lab_remediation_select: OptionButton
+var lab_remediation_summary_label: Label
+var lab_remediation_accept_button: Button
+var lab_remediation_options: Array = []
+var active_cpu_remediation: Dictionary = {}
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
@@ -654,6 +659,26 @@ func _create_research_tab():
 	guidance_panel.add_child(lab_team_guidance_label)
 	configuration_box.add_child(guidance_panel)
 
+	configuration_box.add_child(_eyebrow("SOLUTIONS PROPOSÉES PAR L'ÉQUIPE"))
+	var remediation_intro := _muted_label("Si votre objectif dépasse notre zone maîtrisée, l'équipe peut proposer un travail technique supplémentaire plutôt que vous obliger à réduire le CPU.", 11)
+	remediation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(remediation_intro)
+	lab_remediation_select = OptionButton.new()
+	lab_remediation_select.item_selected.connect(func(_index): _refresh_cpu_remediation_summary())
+	_add_labeled_control(configuration_box, "Option technique", lab_remediation_select)
+	var remediation_panel := PanelContainer.new()
+	remediation_panel.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 10, 1, APP_LINE, 10))
+	lab_remediation_summary_label = _muted_label("Aucune intervention spéciale nécessaire pour cette configuration.", 12)
+	lab_remediation_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab_remediation_summary_label.custom_minimum_size.y = 78
+	remediation_panel.add_child(lab_remediation_summary_label)
+	configuration_box.add_child(remediation_panel)
+	lab_remediation_accept_button = Button.new()
+	lab_remediation_accept_button.text = "Intégrer cette solution au projet"
+	lab_remediation_accept_button.custom_minimum_size.y = 42
+	lab_remediation_accept_button.pressed.connect(_accept_cpu_remediation)
+	configuration_box.add_child(lab_remediation_accept_button)
+
 	var start := Button.new()
 	start.text = "Lancer ce CPU en développement"
 	start.custom_minimum_size.y = 50
@@ -902,6 +927,7 @@ func _apply_selected_generation_plan():
 		status_label.text = "Préparez d'abord les plans de génération."
 		return
 	active_cpu_generation_plan = proposal.duplicate(true)
+	active_cpu_remediation = {}
 	_set_cpu_design_controls(proposal.get("design", {}), "Plan %s" % str(proposal.get("title", "sélectionné")))
 	status_label.text = "Plan %s appliqué. Vous pouvez encore ajuster chaque paramètre." % str(proposal.get("title", "sélectionné"))
 
@@ -963,6 +989,7 @@ func _set_cpu_design_controls(input: Dictionary, reference_name: String = "Réf�
 
 func _apply_cpu_preset(key: String):
 	active_cpu_generation_plan = {}
+	active_cpu_remediation = {}
 	_set_cpu_design_controls(CPU_DESIGN.preset(key), "Préréglage %s" % key.to_lower())
 	status_label.text = "Préréglage %s appliqué. Vous pouvez encore tout ajuster." % key.to_lower()
 
@@ -970,15 +997,21 @@ func _refresh_cpu_preview():
 	if lab_profile_label == null or lab_chip == null:
 		return
 	var design := _current_cpu_design()
+	if not active_cpu_remediation.is_empty() and CPU_DESIGN.normalize(active_cpu_remediation.get("design", {})) != design:
+		active_cpu_remediation = {}
 	_refresh_cpu_control_limits(design)
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
+	if not active_cpu_remediation.is_empty():
+		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
 	var segment := _meta(rd_segment) if rd_segment != null else "MAINSTREAM"
 	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach_key, GameData.APPROACHES.INTERNAL)
-	var months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
+	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
+	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
+	var months := base_months + extra_months
 	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
-	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost))
+	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost)) + int(active_cpu_remediation.get("upfront_cost", 0))
 	var risk := float(evaluation.risk)
 	var risk_label := "faible"
 	if risk >= 60.0:
@@ -1003,9 +1036,12 @@ func _refresh_cpu_preview():
 	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence, ResearchManager.get_cpu_capabilities())
 
 	lab_profile_label.text = str(evaluation.profile)
-	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
+	var remediation_tag := ""
+	if not active_cpu_remediation.is_empty():
+		remediation_tag = " • solution équipe +%d mois" % extra_months
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s" % [
 		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
-		_money(estimated_program_cost), risk_label, risk
+		_money(estimated_program_cost), risk_label, risk, remediation_tag
 	]
 	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
 	lab_dev_time_value.text = "~%d mois" % months
@@ -1038,6 +1074,7 @@ func _refresh_cpu_preview():
 	]
 
 	_refresh_cpu_guidance(guidance, design)
+	_refresh_cpu_remediation_options(design)
 
 	if lab_chip.has_method("set_design"):
 		lab_chip.call("set_design", design, 16.0, false)
@@ -1100,7 +1137,104 @@ func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
 			(" " + detail) if detail != "" else "",
 			concept_hint
 		]
+		if not active_cpu_remediation.is_empty():
+			lab_team_guidance_label.text += "\n✓ Solution intégrée : %s (+%d mois, %s € de coût technique initial)." % [
+				str(active_cpu_remediation.get("title", "solution technique")),
+				int(active_cpu_remediation.get("extra_months", 0)),
+				_money(int(active_cpu_remediation.get("upfront_cost", 0)))
+			]
 		lab_team_guidance_label.add_theme_color_override("font_color", color)
+
+func _refresh_cpu_remediation_options(design: Dictionary):
+	if lab_remediation_select == null:
+		return
+	var previous_id := ""
+	if lab_remediation_select.item_count > 0 and lab_remediation_select.selected >= 0:
+		previous_id = str(lab_remediation_select.get_item_metadata(lab_remediation_select.selected))
+	lab_remediation_options = ResearchManager.cpu_remediation_options(
+		design,
+		int(rd_budget.value) if rd_budget != null else 45000,
+		_meta(rd_focus) if rd_focus != null else "BALANCED"
+	)
+	if not active_cpu_remediation.is_empty():
+		for refreshed_value in lab_remediation_options:
+			var refreshed: Dictionary = refreshed_value
+			if str(refreshed.get("id", "")) == str(active_cpu_remediation.get("id", "")):
+				active_cpu_remediation = refreshed.duplicate(true)
+				break
+	lab_remediation_select.clear()
+	if lab_remediation_options.is_empty():
+		lab_remediation_select.add_item("Aucune solution spéciale nécessaire")
+		lab_remediation_select.set_item_metadata(0, "")
+		lab_remediation_select.select(0)
+		if lab_remediation_accept_button != null:
+			lab_remediation_accept_button.disabled = true
+		_refresh_cpu_remediation_summary()
+		return
+	for option_value in lab_remediation_options:
+		var option: Dictionary = option_value
+		var marker := "★ " if bool(option.get("recommended", false)) else ""
+		lab_remediation_select.add_item("%s%s" % [marker, str(option.get("title", "Solution technique"))])
+		lab_remediation_select.set_item_metadata(lab_remediation_select.item_count - 1, str(option.get("id", "")))
+	if not active_cpu_remediation.is_empty():
+		previous_id = str(active_cpu_remediation.get("id", previous_id))
+	if previous_id != "":
+		_select_meta(lab_remediation_select, previous_id)
+	if lab_remediation_select.selected < 0:
+		for index in range(lab_remediation_options.size()):
+			if bool((lab_remediation_options[index] as Dictionary).get("recommended", false)):
+				lab_remediation_select.select(index)
+				break
+		if lab_remediation_select.selected < 0:
+			lab_remediation_select.select(0)
+	if lab_remediation_accept_button != null:
+		lab_remediation_accept_button.disabled = false
+	_refresh_cpu_remediation_summary()
+
+func _selected_cpu_remediation() -> Dictionary:
+	if lab_remediation_select == null or lab_remediation_select.item_count == 0:
+		return {}
+	var selected_id := str(lab_remediation_select.get_item_metadata(lab_remediation_select.selected))
+	for option_value in lab_remediation_options:
+		var option: Dictionary = option_value
+		if str(option.get("id", "")) == selected_id:
+			return option.duplicate(true)
+	return {}
+
+func _refresh_cpu_remediation_summary():
+	if lab_remediation_summary_label == null:
+		return
+	var option := _selected_cpu_remediation()
+	if option.is_empty():
+		lab_remediation_summary_label.text = "Aucune intervention spéciale nécessaire pour cette configuration."
+		lab_remediation_summary_label.add_theme_color_override("font_color", APP_GREEN)
+		return
+	var accepted := not active_cpu_remediation.is_empty() and str(active_cpu_remediation.get("id", "")) == str(option.get("id", ""))
+	var prefix := "✓ INTÉGRÉ AU PROJET\n" if accepted else ("★ RECOMMANDÉ PAR L'ÉQUIPE\n" if bool(option.get("recommended", false)) else "")
+	lab_remediation_summary_label.text = "%s%s\nProblème traité : %s\n+%d mois • coût technique %s € • surcoût total estimé %s €\nConfiance équipe %.0f%%\n%s" % [
+		prefix,
+		str(option.get("title", "Solution technique")),
+		str(option.get("issue_label", "contrainte technique")),
+		int(option.get("extra_months", 0)),
+		_money(int(option.get("upfront_cost", 0))),
+		_money(int(option.get("estimated_extra_cost", 0))),
+		float(option.get("confidence", 0.0)),
+		str(option.get("expected_effect", ""))
+	]
+	lab_remediation_summary_label.add_theme_color_override("font_color", APP_GREEN if accepted else (APP_CYAN if bool(option.get("recommended", false)) else APP_TEXT))
+
+func _accept_cpu_remediation():
+	var option := _selected_cpu_remediation()
+	if option.is_empty():
+		active_cpu_remediation = {}
+		status_label.text = "Aucune solution technique supplémentaire à intégrer."
+		return
+	active_cpu_remediation = option.duplicate(true)
+	status_label.text = "Solution intégrée : %s. Le développement prendra %d mois supplémentaires." % [
+		str(option.get("title", "solution technique")),
+		int(option.get("extra_months", 0))
+	]
+	_refresh_cpu_preview()
 
 func _format_guidance_value(key: String, value: float) -> String:
 	match key:
@@ -1640,21 +1774,30 @@ func _refresh_dashboard():
 	if not active_project.is_empty():
 		var phase_index: int = clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		var phase_progress: float = float(active_project.get("phase_progress", 0.0))
+		var remediation_remaining := int(active_project.get("remediation_months_remaining", 0))
+		var remediation_total := maxi(int(active_project.get("remediation_total_months", 0)), 1)
 		var overall_progress: float = (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		if remediation_remaining > 0:
+			overall_progress = (1.0 - float(remediation_remaining) / float(remediation_total)) * 10.0
 		var approach_key := str(active_project.get("approach", "INTERNAL"))
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
 		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
-		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+		if remediation_remaining > 0:
+			var remediation: Dictionary = active_project.get("technical_remediation", {})
+			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining
+			dashboard_cto_label.text = "« Nous développons %s avant de reprendre le CPU. Ce détour réduit le risque et transforme une limite actuelle en savoir-faire réutilisable. »" % str(remediation.get("title", "la solution validée"))
+		else:
+			dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+			if not active_project.get("reports", []).is_empty():
+				dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
+			else:
+				dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_project_progress.value = overall_progress
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
 		dashboard_metric_b.text = "%d mois" % int(active_project.get("months_spent", 0))
 		dashboard_metric_c.text = str(active_project.get("focus_label", "Équilibré"))
-		if not active_project.get("reports", []).is_empty():
-			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
-		else:
-			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
@@ -1901,7 +2044,10 @@ func _refresh_research():
 	for project in ResearchManager.projects:
 		var phase := "Terminé"
 		if str(project.status) == "DEVELOPMENT":
-			phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
+			if int(project.get("remediation_months_remaining", 0)) > 0:
+				phase = "Mise au point technique — %d mois restant(s)" % int(project.get("remediation_months_remaining", 0))
+			else:
+				phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 		var capability_value = project.get("technical_capabilities_snapshot", {})
 		var capability_snapshot: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
@@ -1925,6 +2071,14 @@ func _refresh_research():
 		var generation_plan: Dictionary = project.get("generation_plan", {})
 		if not generation_plan.is_empty():
 			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
+		var remediation: Dictionary = project.get("technical_remediation", {})
+		if not remediation.is_empty():
+			lines.append("  Solution équipe : %s • +%d mois • coût technique %s € • %s" % [
+				str(remediation.get("title", "solution technique")),
+				int(project.get("remediation_total_months", remediation.get("extra_months", 0))),
+				_money(int(remediation.get("upfront_cost", 0))),
+				"validée" if bool(project.get("remediation_transfer_applied", false)) else "en cours"
+			])
 		if not project.reports.is_empty():
 			lines.append("  Camille : %s" % str(project.reports[0].text))
 	projects_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
@@ -1941,13 +2095,18 @@ func _start_project():
 	if name.is_empty():
 		name = "Nova CPU %d" % (ResearchManager.projects.size() + 1)
 	var design := _current_cpu_design()
-	var evaluation := CPU_DESIGN.evaluate(design)
+	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
+	if not active_cpu_remediation.is_empty():
+		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
 	var generation_plan := active_cpu_generation_plan.duplicate(true)
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan):
+	var remediation := active_cpu_remediation.duplicate(true)
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
-		status_label.text = "%s entre en développement — profil %s%s." % [name, str(evaluation.profile), plan_text]
+		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
+		status_label.text = "%s entre en développement — profil %s%s%s." % [name, str(evaluation.profile), plan_text, remediation_text]
 		active_cpu_generation_plan = {}
+		active_cpu_remediation = {}
 	else:
 		status_label.text = "Impossible de lancer le projet : trésorerie ou capacité R&D insuffisante."
 	_refresh_all()
@@ -1967,7 +2126,10 @@ func _refresh_products():
 				ProductionManager.maintenance_knowledge
 			]
 		]
-		var visible_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+		var visible_nodes := CPU_DESIGN.available_nodes_for_capabilities(
+			float(ResearchManager.technologies.get("manufacturing", 0.0)),
+			ResearchManager.get_cpu_capability("MINIATURIZATION")
+		)
 		for node_value in visible_nodes:
 			var node_nm := int(node_value)
 			production_lines.append("• Maîtrise %s : %.1f/100" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
