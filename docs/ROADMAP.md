@@ -14,7 +14,7 @@ Cette roadmap fixe l'ordre de construction du jeu. La vision finale est très la
 - [x] Ajouter incidents qualité et réponses SAV.
 - [x] Ajouter découvertes d’équipe et recherches dérivées.
 - [x] Ajouter évolution visuelle du bureau.
-- [ ] Finaliser une taxonomie d’icônes cohérente.
+- [x] Finaliser une taxonomie d’icônes cohérente.
 
 Documents de référence : `DESIGN_BIBLE.md`, `CPU_VERTICAL_SLICE.md` et `UX_ART_DIRECTION.md`.
 
