@@ -441,7 +441,7 @@ func _create_company_tab():
 	var apply := Button.new(); apply.text = "Appliquer les politiques"; apply.pressed.connect(_apply_policies); box.add_child(apply)
 	box.add_child(_section("Délégation des départements"))
 	var dgrid := GridContainer.new(); dgrid.columns = 2; box.add_child(dgrid)
-	dgrid.add_child(_label("Département",14)); department_select = OptionButton.new(); _fill_text(department_select, ["R&D","Production","Marketing","Support","Finance"]); department_select.item_selected.connect(func(_i): _refresh_leader_choices()); dgrid.add_child(department_select)
+	dgrid.add_child(_label("Département",14)); department_select = OptionButton.new(); _fill_text(department_select, ["R&D","Développement","Production","Marketing","Support","Finance"]); department_select.item_selected.connect(func(_i): _refresh_leader_choices()); dgrid.add_child(department_select)
 	dgrid.add_child(_label("Autonomie",14)); autonomy_select = OptionButton.new(); _fill_simple(autonomy_select,{"DIRECT":"Direct","SUPERVISED":"Supervisé","AUTONOMOUS":"Autonome"}); dgrid.add_child(autonomy_select)
 	dgrid.add_child(_label("Responsable",14)); leader_select = OptionButton.new(); dgrid.add_child(leader_select)
 	var delegate_btn := Button.new(); delegate_btn.text = "Affecter responsable et autonomie"; delegate_btn.pressed.connect(_apply_department); box.add_child(delegate_btn)
@@ -457,7 +457,7 @@ func _create_personnel_tab():
 	var box: VBoxContainer = scroll.get_child(0)
 	staff_label = _rich_label(); box.add_child(staff_label)
 	box.add_child(_section("Recrutement"))
-	recruit_department = OptionButton.new(); _fill_text(recruit_department,["R&D","Production","Marketing","Support","Finance"]); box.add_child(recruit_department)
+	recruit_department = OptionButton.new(); _fill_text(recruit_department,["R&D","Développement","Production","Marketing","Support","Finance"]); box.add_child(recruit_department)
 	var gen := Button.new(); gen.text="Chercher un candidat"; gen.pressed.connect(_generate_candidate); box.add_child(gen)
 	candidate_label = _rich_label(); box.add_child(candidate_label)
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
@@ -514,7 +514,7 @@ func _create_research_tab():
 	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
 
 	configuration_box.add_child(_eyebrow("RECHERCHE CONTINUE CPU"))
-	var research_intro := _muted_label("Répartissez une partie de l'équipe sur les pistes qui prépareront les générations suivantes. Plus vous mobilisez de chercheurs, moins l'équipe de développement dispose de capacité immédiate.", 12)
+	var research_intro := _muted_label("L’équipe Recherche prépare les générations suivantes pendant que l’équipe Développement transforme les connaissances en produit. Les deux équipes sont désormais indépendantes.", 12)
 	research_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(research_intro)
 	research_overview_label = _muted_label("", 12)
@@ -809,12 +809,12 @@ func _refresh_generation_plan_summary():
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
-	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
 		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
 		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
-		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("target_fit", 0.0)),
+		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("development_confidence", 50.0)), float(proposal.get("target_fit", 0.0)),
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
 		" • ".join(strengths), " • ".join(risks), str(proposal.get("recommendation", ""))
 	]
@@ -1551,7 +1551,7 @@ func _apply_research_plan():
 		_refresh_research()
 		return
 	ResearchManager.set_continuous_research_budget(int(research_budget.value))
-	status_label.text = "Recherche mise à jour : %d chercheur(s) en recherche continue, %d disponible(s) pour le développement." % [ResearchManager.get_total_cpu_research_allocation(), ResearchManager.get_available_development_engineers()]
+	status_label.text = "Recherche mise à jour : %d chercheur(s) réparti(s) sur les pistes CPU. L’équipe Développement reste indépendante." % ResearchManager.get_total_cpu_research_allocation()
 	_refresh_all()
 
 func _refresh_research():
@@ -1561,9 +1561,14 @@ func _refresh_research():
 	_refresh_generation_plan_options()
 	var capacity := ResearchManager.get_cpu_research_capacity()
 	var allocated := ResearchManager.get_total_cpu_research_allocation()
-	var available := ResearchManager.get_available_development_engineers()
+	var dev_size := ResearchManager.get_development_team_size()
+	var active_dev_projects := ResearchManager.get_active_development_project_count()
 	if research_overview_label != null:
-		research_overview_label.text = "Équipe R&D : %d personnes • %d en recherche continue • %d disponibles pour le développement\nCapacité développement actuelle : %.0f%%" % [capacity, allocated, available, ResearchManager.development_capacity_factor() * 100.0]
+		research_overview_label.text = "Recherche : %d personne(s) • %d affectée(s) aux pistes CPU\nDéveloppement : %d personne(s) • %d projet(s) actif(s) • charge/capacité %.0f%% • confiance %.0f%%" % [
+			capacity, allocated, dev_size, active_dev_projects,
+			ResearchManager.development_capacity_factor() * 100.0,
+			ResearchManager.development_confidence()
+		]
 	if research_budget != null:
 		research_budget.value = ResearchManager.continuous_research_budget
 	for research_key in ResearchManager.get_cpu_research_domain_keys():
@@ -1573,7 +1578,17 @@ func _refresh_research():
 			var allocation: SpinBox = research_alloc_controls[key]
 			allocation.max_value = maxf(float(capacity), 0.0)
 			allocation.value = int(data.get("allocated", 0))
-	var tech_lines: Array[String] = ["Recherche CPU :"]
+	var tech_lines: Array[String] = [
+		"Recherche CPU :",
+		"",
+		"Équipe Développement — %d personne(s) • score %.0f/100 • confiance %.0f%% • capacité %.0f%%" % [
+			ResearchManager.get_development_team_size(),
+			ResearchManager.development_team_score(),
+			ResearchManager.development_confidence(),
+			ResearchManager.development_capacity_factor() * 100.0
+		],
+		""
+	]
 	for research_key in ResearchManager.get_cpu_research_domain_keys():
 		var key := str(research_key)
 		var data := ResearchManager.get_cpu_research_domain(key)
@@ -1595,6 +1610,13 @@ func _refresh_research():
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 		var estimate := CPU_DESIGN.evaluate(design)
 		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
+		var development_snapshot: Dictionary = project.get("development_snapshot", {})
+		if not development_snapshot.is_empty():
+			lines.append("  Équipe Développement au lancement : %d personne(s) • score %.0f/100 • confiance %.0f%%" % [
+				int(development_snapshot.get("team_size", 0)),
+				float(development_snapshot.get("team_score", 0.0)),
+				float(development_snapshot.get("confidence", 0.0))
+			])
 		lines.append("  %d cœurs • %.1f GHz • %d Mo • %d nm • %d W • coût cible %s €" % [
 			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w), _money(int(estimate.unit_cost))
 		])
