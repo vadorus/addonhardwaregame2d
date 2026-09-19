@@ -84,15 +84,37 @@ func get_total_cpu_research_allocation() -> int:
 		total += int(cpu_research_domains.get(key, {}).get("allocated", 0))
 	return total
 
+func get_development_team_size() -> int:
+	return PersonnelManager.count_department("Développement")
+
+func get_active_development_project_count() -> int:
+	var total := 0
+	for project in projects:
+		if str(project.get("status", "")) == "DEVELOPMENT":
+			total += 1
+	return total
+
 func get_available_development_engineers() -> int:
-	return maxi(get_cpu_research_capacity() - get_total_cpu_research_allocation(), 0)
+	return maxi(get_development_team_size() - get_active_development_project_count(), 0)
 
 func development_capacity_factor() -> float:
-	var capacity := get_cpu_research_capacity()
+	var capacity := get_development_team_size()
 	if capacity <= 0:
-		return 0.55
-	var available_ratio := float(get_available_development_engineers()) / float(capacity)
-	return clampf(0.55 + available_ratio * 0.45, 0.55, 1.0)
+		return 0.45
+	var active_projects := get_active_development_project_count()
+	if active_projects <= 0:
+		return clampf(0.78 + float(capacity) * 0.12, 0.65, 1.05)
+	var workload := float(active_projects) / float(capacity)
+	return clampf(1.04 - workload * 0.24, 0.55, 1.02)
+
+func development_team_score() -> float:
+	var product_score := PersonnelManager.team_score("Développement", "product")
+	var validation_score := PersonnelManager.team_score("Développement", "validation")
+	return clampf(product_score * 0.62 + validation_score * 0.38, 20.0, 100.0)
+
+func development_confidence() -> float:
+	var management := CompanyManager.department_management_modifier("Développement")
+	return clampf(24.0 + development_team_score() * 0.58 + development_capacity_factor() * 18.0 + (management - 0.8) * 18.0, 20.0, 96.0)
 
 func set_cpu_research_allocations(allocations: Dictionary) -> bool:
 	var capacity := get_cpu_research_capacity()
@@ -243,8 +265,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		return []
 	var division := DivisionManager.get_division("CPU")
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
-	var team_score := PersonnelManager.team_score("R&D", "cpu") * development_capacity_factor()
-	var management_modifier := CompanyManager.department_management_modifier("R&D")
+	var team_score := development_team_score() * development_capacity_factor()
+	var management_modifier := CompanyManager.department_management_modifier("Développement")
 	var research_score := research_score_for_focus(focus)
 	var research_confidence_score := research_confidence_for_focus(focus)
 	var technology_score := float(technologies.get("cpu", 0.0)) * 0.55 + research_score * 0.45
@@ -266,6 +288,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"research_score":research_score,
 		"research_confidence":research_confidence_score,
 		"development_capacity_factor":development_capacity_factor(),
+		"development_team_size":get_development_team_size(),
+		"development_confidence":development_confidence(),
 		"equipment_score":equipment_score,
 		"division_maturity":float(division.get("maturity", 0.0)),
 		"division_strategy":str(division.get("strategy", "BALANCED")),
@@ -289,6 +313,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	if Economy.money < maxi(monthly_budget, 10000):
+		return false
+	if sector == "CPU" and get_development_team_size() <= 0:
 		return false
 	var active_count := 0
 	for existing_project in projects:
@@ -337,6 +363,12 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
 		"estimate_confidence":research_confidence_for_focus(focus) if sector == "CPU" else 50.0,
+		"development_snapshot":{
+			"team_size":get_development_team_size(),
+			"team_score":development_team_score(),
+			"confidence":development_confidence(),
+			"capacity_factor":development_capacity_factor()
+		} if sector == "CPU" else {},
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
 	_next_id += 1
@@ -362,13 +394,14 @@ func _process_project_month(project: Dictionary):
 	var approach_data: Dictionary = GameData.APPROACHES[str(project.approach)]
 	var specialization := str(sector_data.specialization)
 	var team := PersonnelManager.team_score("R&D", specialization)
-	if str(project.sector) == "CPU":
-		team *= development_capacity_factor()
 	var management := CompanyManager.department_management_modifier("R&D")
+	if str(project.sector) == "CPU":
+		team = development_team_score() * development_capacity_factor()
+		management = CompanyManager.department_management_modifier("Développement")
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
 	var expense := int(float(project.monthly_budget) * float(approach_data.cost))
-	Economy.add_expense(expense, "R&D — %s" % str(project.name))
+	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
 	var tech := float(technologies.get(specialization, 5.0))
 	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * management
@@ -397,7 +430,8 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 			lowest_value = expected
 			lowest_metric = metric
 	var research_confidence_score := float(project.get("estimate_confidence", 50.0))
-	var confidence: float = clampf(30.0 + team * 0.28 + tech * 0.12 + budget_ratio * 8.0 + research_confidence_score * 0.22 + rng.randf_range(-6.0, 6.0), 20.0, 96.0)
+	var development_confidence_score := development_confidence()
+	var confidence: float = clampf(24.0 + team * 0.24 + tech * 0.10 + budget_ratio * 7.0 + research_confidence_score * 0.18 + development_confidence_score * 0.22 + rng.randf_range(-6.0, 6.0), 20.0, 96.0)
 	var sentiment := "prudente"
 	if confidence >= 78.0:
 		sentiment = "très satisfaite"
@@ -450,12 +484,15 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
 
 func active_departments() -> Array:
+	var active: Array = []
 	if get_total_cpu_research_allocation() > 0:
-		return ["R&D"]
+		active.append("R&D")
 	for p in projects:
 		if str(p.status) == "DEVELOPMENT":
-			return ["R&D"]
-	return []
+			if not active.has("Développement"):
+				active.append("Développement")
+			break
+	return active
 
 func get_state() -> Dictionary:
 	return {
