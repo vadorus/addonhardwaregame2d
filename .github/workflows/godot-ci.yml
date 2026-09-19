@@ -55,3 +55,10 @@ jobs:
           godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|ERROR: \[CI\]' /tmp/smoke.log; then exit 1; fi
 
+      - name: Department progression test
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . res://tests/department_progression_test.tscn 2>&1 | tee /tmp/departments.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|ERROR: \[CI\]' /tmp/departments.log; then exit 1; fi
+

@@ -2,7 +2,7 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
-## État d’implémentation — V0.2.8
+## État d’implémentation — V0.2.12-preview.8
 
 Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer.
 
@@ -13,6 +13,12 @@ Une architecture terminée produit désormais une gamme initiale de trois modèl
 - **Apex** réserve les meilleurs bins à la performance, à l’image et aux marges élevées.
 
 Le rendement dépend de la fiabilité finale, de la complexité, du procédé et de la maturité de la division. Il détermine la répartition des bins, les coûts et les capacités conseillées. Les trois références partagent la même génération, mais possèdent leur propre public, prix, coût, plafond de production et réception commerciale. La demande totale du portefeuille est plafonnée afin que plusieurs modèles ne puissent pas vendre plusieurs fois le même marché. Les propositions, générations et produits sont sauvegardés avec migration des anciennes parties.
+
+Depuis la preview.6, la chaîne industrielle est également jouable via contrat industriel, packaging et couverture de test. Après lancement, chaque CPU possède une qualité de microcode, une couverture de compatibilité et une dette de support. Des incidents logiciels peuvent apparaître et imposer un choix entre hotfix rapide, correctif validé et programme de compatibilité, avec coût, délai et éventuel compromis de performance.
+
+Depuis la preview.7, les phases R&D, l'analyse SAV, les partenariats industriels et les correctifs logiciels peuvent produire des découvertes d'équipe. Le joueur choisit entre exploiter immédiatement une piste pour un petit gain ou financer une recherche dérivée pour créer un savoir-faire durable réutilisable dans les générations suivantes. Une découverte issue d'un prototype CPU conserve l'identité et la maîtrise de l'équipe R&D qui l'a produite ; une équipe très expérimentée peut ramener cette recherche de deux mois à un mois.
+
+Depuis la preview.8, l'IPC cible et la stratégie de compatibilité de plateforme sont des choix explicites dès la conception. Un IPC plus ambitieux augmente performance, coût, complexité et risque. Préserver une plateforme améliore la compatibilité et la stabilité logicielle initiales ; une rupture de plateforme augmente le potentiel d'innovation mais crée davantage de travail microcode et firmware.
 
 ## 1. Ce que le joueur fabrique réellement
 
@@ -297,4 +303,3 @@ La fin de commercialisation n'est pas la fin du produit. Il reste des garanties,
 - UCIe Consortium, interconnexion die-to-die : https://www.uciexpress.org/specification
 - Intel, familles, niveaux et suffixes de processeurs : https://www.intel.com/content/www/us/en/processors/processor-numbers.html
 - Intel, exemple officiel d’une gamme partageant une plateforme avec cœurs, cache et puissance différenciés : https://www.intel.com/content/www/us/en/products/docs/processors/core-ultra/core-ultra-desktop-processors-series-2-brief.html
-

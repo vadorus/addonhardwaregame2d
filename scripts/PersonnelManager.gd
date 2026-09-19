@@ -8,6 +8,8 @@ var candidate: Dictionary = {}
 var _next_id := 1
 var rng := RandomNumberGenerator.new()
 
+const CANDIDATE_SEARCH_COST := 1_500
+
 const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
 const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon","Laurent","Michel","Leroy","Dubois","Robert"]
 
@@ -18,30 +20,37 @@ func reset(starting_sector: String):
 	staff = []
 	_next_id = 1
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
-	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
-	_add_employee("Samira Lefèvre", "Ingénieure produit", "R&D", 61, 3.5, "product", 42, 3900)
-	_add_employee("Thomas Girard", "Responsable production", "Production", 63, 7.0, "manufacturing", 72, 5100)
-	_add_employee("Julie Fontaine", "Responsable marketing", "Marketing", 58, 6.0, "marketing", 70, 4600)
-	_add_employee("Mehdi Colin", "Responsable support", "Support", 57, 5.0, "support", 65, 4100)
+	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200, true)
+	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700, true)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
-	CompanyManager.set_department_leader("Production", str(staff[3].id))
-	CompanyManager.set_department_leader("Marketing", str(staff[4].id))
-	CompanyManager.set_department_leader("Support", str(staff[5].id))
 	generate_candidate("R&D")
 	staff_changed.emit()
 
-func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int):
+func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, founder: bool = false):
 	var emp := {
 		"id":"EMP-%04d" % _next_id,
 		"name":full_name,"role":role,"department":department,
 		"skill":skill,"aptitude":clampi(skill + rng.randi_range(-8, 8), 35, 95),
 		"experience_years":experience,"specialization":specialization,
 		"domain_experience":{specialization: experience},"leadership":leadership,
-		"salary":salary,"morale":75.0
+		"salary":salary,"morale":75.0,"founder":founder
 	}
 	_next_id += 1
 	staff.append(emp)
+
+func _active_research_specializations() -> Array[String]:
+	var result: Array[String] = []
+	for family_value in GameData.get_active_product_family_keys():
+		var family := str(family_value)
+		var family_data := GameData.get_product_family(family)
+		var specialization := str(family_data.get("specialization", ""))
+		if not specialization.is_empty() and not result.has(specialization):
+			result.append(specialization)
+	if not result.has("product"):
+		result.append("product")
+	if result.is_empty():
+		result.append("cpu")
+	return result
 
 func generate_candidate(department: String) -> Dictionary:
 	var name := "%s %s" % [FIRST_NAMES[rng.randi_range(0, FIRST_NAMES.size()-1)], LAST_NAMES[rng.randi_range(0, LAST_NAMES.size()-1)]]
@@ -50,7 +59,9 @@ func generate_candidate(department: String) -> Dictionary:
 	var leadership := rng.randi_range(28, 82)
 	var specialization := "product"
 	match department:
-		"R&D": specialization = ["cpu","gpu","software","mobile","display","cloud","satellite","ai"][rng.randi_range(0,7)]
+		"R&D":
+			var active_specializations := _active_research_specializations()
+			specialization = active_specializations[rng.randi_range(0, active_specializations.size() - 1)]
 		"Production": specialization = "manufacturing"
 		"Marketing": specialization = "marketing"
 		"Support": specialization = "support"
@@ -65,6 +76,13 @@ func generate_candidate(department: String) -> Dictionary:
 	candidate_changed.emit(candidate)
 	return candidate
 
+func search_candidate(department: String) -> bool:
+	if Economy.money < CANDIDATE_SEARCH_COST:
+		return false
+	Economy.add_expense(CANDIDATE_SEARCH_COST, "Recherche de candidat")
+	generate_candidate(department)
+	return true
+
 func hire_candidate() -> bool:
 	if candidate.is_empty():
 		return false
@@ -74,6 +92,33 @@ func hire_candidate() -> bool:
 	Economy.add_expense(signing_cost, "Recrutement")
 	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary))
 	candidate = {}
+	staff_changed.emit()
+	return true
+
+func dismissal_cost(employee_id: String) -> int:
+	var employee := get_employee(employee_id)
+	if employee.is_empty() or bool(employee.get("founder", false)):
+		return -1
+	return maxi(int(employee.get("salary", 0)), 0)
+
+func dismiss_employee(employee_id: String) -> bool:
+	var employee := get_employee(employee_id)
+	if employee.is_empty() or bool(employee.get("founder", false)):
+		return false
+	var severance := dismissal_cost(employee_id)
+	if severance < 0:
+		return false
+	if severance > 0:
+		Economy.add_expense(severance, "Indemnité de départ")
+	for department_value in CompanyManager.departments.keys():
+		var department := str(department_value)
+		if str(CompanyManager.departments[department].get("leader_id", "")) == employee_id:
+			CompanyManager.set_department_leader(department, "")
+	for i in range(staff.size() - 1, -1, -1):
+		if str(staff[i].get("id", "")) == employee_id:
+			staff.remove_at(i)
+			break
+	CompanyManager.add_alert("%s quitte l'entreprise après une indemnité de %d €." % [str(employee.get("name", "Un salarié")), severance])
 	staff_changed.emit()
 	return true
 
@@ -95,6 +140,26 @@ func process_month(active_departments: Array):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
 	staff_changed.emit()
 
+func _employee_contribution(emp: Dictionary, specialization: String = "") -> float:
+	var exp_bonus: float = minf(float(emp.get("experience_years", 0.0)) * 2.0, 22.0)
+	var spec_bonus := 0.0
+	if specialization != "" and str(emp.get("specialization", "")) == specialization:
+		spec_bonus = 12.0 + minf(float(emp.get("domain_experience", {}).get(specialization, 0.0)), 10.0)
+	return (
+		float(emp.get("skill", 0)) * 0.63
+		+ float(emp.get("aptitude", 0)) * 0.18
+		+ exp_bonus
+		+ spec_bonus
+		+ float(emp.get("morale", 75.0)) * 0.05
+	)
+
+func department_staff_count(department: String) -> int:
+	var count := 0
+	for emp in staff:
+		if str(emp.get("department", "")) == department:
+			count += 1
+	return count
+
 func team_score(department: String, specialization: String = "") -> float:
 	var members: Array = []
 	for emp in staff:
@@ -102,16 +167,21 @@ func team_score(department: String, specialization: String = "") -> float:
 			members.append(emp)
 	if members.is_empty():
 		return 20.0
-	var total := 0.0
-	for emp in members:
-		var exp_bonus: float = minf(float(emp.experience_years) * 2.0, 22.0)
-		var spec_bonus := 0.0
-		if specialization != "" and str(emp.specialization) == specialization:
-			spec_bonus = 12.0 + minf(float(emp.domain_experience.get(specialization, 0.0)), 10.0)
-		total += float(emp.skill) * 0.63 + float(emp.aptitude) * 0.18 + exp_bonus + spec_bonus + float(emp.morale) * 0.05
-	var score := total / float(members.size())
+
+	var best_contribution := 0.0
+	var total_contribution := 0.0
+	for emp_value in members:
+		var emp: Dictionary = emp_value
+		var contribution := _employee_contribution(emp, specialization)
+		best_contribution = maxf(best_contribution, contribution)
+		total_contribution += contribution
+	var support_total := maxf(total_contribution - best_contribution, 0.0)
+
 	var cohesion := float(CompanyManager.departments.get(department, {}).get("cohesion", 30.0))
-	return clampf(score + cohesion * 0.12, 20.0, 100.0)
+	var depth_bonus := minf(float(members.size()) * 1.5, 9.0)
+	var support_bonus := minf(support_total * 0.045, 18.0)
+	var score := best_contribution * 0.82 + support_bonus + depth_bonus + cohesion * 0.12
+	return clampf(score, 20.0, 100.0)
 
 func get_leader_quality(employee_id: String, department: String) -> float:
 	if employee_id == "":
@@ -141,6 +211,10 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	for employee in staff:
+		if not employee.has("founder"):
+			var employee_name := str(employee.get("name", ""))
+			employee["founder"] = employee_name == "Camille Durand" or employee_name == "Alex Moreau"
 	candidate = state.get("candidate", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 1947))

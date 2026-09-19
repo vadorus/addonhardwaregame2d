@@ -1,138 +1,187 @@
 # Tech Empire / Tycoon Hardware
 
-> **Nom de travail.** Simulation de gestion d'entreprise technologique couvrant progressivement hardware, software, services, infrastructures, IA, télécoms, spatial et autres secteurs technologiques.
+> **Nom de travail.** Jeu de gestion d'entreprise technologique sous Godot 4.7.2. Le joueur part d'un petit QG, conçoit ses propres composants et fait évoluer progressivement l'entreprise, ses équipes, ses locaux, sa production et sa présence sur le marché.
 
 ## Statut
 
-**Projet actif — prototype V0.2.8 sous Godot 4.7.2.**
+**Projet actif — Tech Empire 0.2.12-preview.8.**
 
-La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
+La vertical slice jouable est volontairement centrée sur la **gamme CPU**. Les futures gammes (GPU, RAM, cartes mères et autres produits technologiques) restent hors périmètre tant que la boucle CPU n'est pas suffisamment profonde, lisible et équilibrée.
 
-État actuellement validé :
+Cibles actuelles :
 
-- Godot **4.7.2**, GDScript, 2D / interface de gestion ;
-- cible Windows / PC + Android ;
+- Windows x86_64 ;
+- Android arm64 ;
+- Godot **4.7.2**, GDScript, 2D.
+
+## Boucle jouable actuelle
+
+La boucle principale est désormais :
+
+**observer → choisir une architecture → financer la R&D → arbitrer les phases → industrialiser → fixer prix/capacité → lancer → observer le marché → préparer la génération suivante.**
+
+Fonctionnalités déjà intégrées :
+
 - temps avec pause et vitesses x1/x2/x3 ;
-- économie mensuelle et rapports de clôture ;
-- création d'entreprise avec division CPU active ;
-- socle générique de divisions, maturité et progression par génération ;
-- conseil d’architecture CPU : plans prudent, équilibré et audacieux calculés par l’équipe ;
-- prévisions de budget, délai, risque, confiance, durée de compétitivité et potentiel de gamme ;
-- déclinaison automatique d’une architecture terminée en gamme Essentiel, Signature et Apex ;
-- rendement de génération, binning, allocation des puces, capacités et coûts propres à chaque modèle ;
-- demande plafonnée à l’échelle du portefeuille pour éviter de vendre plusieurs fois le même marché ;
-- personnel, expérience, équipes, départements et délégation ;
-- laboratoire CPU interactif : cœurs, fréquence, cache, gravure et enveloppe thermique ;
-- R&D en plusieurs phases avec rapports techniques ;
-- développement interne / hybride / externe ;
-- technologies et savoir-faire ;
-- produits, prix, capacité de production, ventes et parts de marché ;
-- segments clients, benchmarks et satisfaction ;
-- SAV, garanties, réputation, marketing et environnement ;
-- presse / médias, contrats B2B, brevets, licences et premières filiales ;
-- sauvegarde / chargement ;
-- nouvelle identité visuelle, navigation dédiée et QG centré sur le projet CPU prioritaire ;
-- aperçu en direct des compromis performance, efficacité, fiabilité, coût, risque et durée.
+- économie mensuelle, dette, intérêts, financement et faillite durable ;
+- sauvegarde manuelle + autosave mensuel / pause / perte de focus ;
+- création d'entreprise et division CPU active ;
+- laboratoire CPU : cœurs, fréquence, cache, gravure et TDP ;
+- trois plans de génération proposés par l'équipe : prudent, équilibré et audacieux ;
+- estimation coût / délai / risque / confiance / durée de compétitivité ;
+- arbitrages R&D entre les phases avec effets réels sur le projet ;
+- gamme automatique **Essentiel / Signature / Apex** ;
+- rendement de génération, binning, coûts et capacités par modèle ;
+- investissement initial d'industrialisation et frais fixes de capacité ;
+- prévision avant lancement : demande, ventes, utilisation, part de marché et résultat mensuel ;
+- concurrents qui renouvellent leurs générations ;
+- obsolescence et perte progressive de pertinence des anciens produits ;
+- contrats B2B, retours SAV, garanties et satisfaction ;
+- réputation, marketing, support et environnement ;
+- personnel, recrutement, expérience, leadership et délégation ;
+- brevets, licences, presse et premières filiales.
 
-## Périmètre jouable actuel
+## UX et progression
 
-La vertical slice est volontairement limitée à la branche **CPU**. Les autres secteurs restent paramétrés dans les données afin de préparer les futures extensions, mais ils sont affichés comme « à venir », désactivés dans l’interface et refusés par le moteur de R&D. Ils ne doivent pas être développés avant que la boucle CPU soit profonde, équilibrée et amusante.
+Le jeu cherche une interface de gestion lisible et visuelle plutôt qu'un tableur.
 
-L’interface V0.2.8 propose un véritable laboratoire CPU : le joueur définit son brief, demande trois plans générationnels à l’équipe, choisit une recommandation puis peut encore régler les cœurs, la fréquence, le cache, la finesse de gravure et le TDP. Une architecture terminée devient ensuite une famille de trois références aux performances, coûts, rendements, capacités et clientèles distincts. Le QG réutilise le design choisi dans son aperçu graphique.
+Éléments actuels :
 
-## Vision
+- QG central avec prochaine décision ;
+- menu **Actions** contextuel avec une priorité dynamique ;
+- onboarding léger jusqu'au premier CPU lancé ;
+- progression persistante des quatre **pôles** :
+  - Laboratoire ;
+  - Production ;
+  - Marché ;
+  - Équipe ;
+- mini-scènes des pôles directement sur le QG ;
+- notification lorsqu'un pôle franchit un palier ;
+- salariés visibles dans le bureau ;
+- trophées des générations CPU lancées ;
+- cartes interactives pour Produits, Marché, Personnel, plans R&D, réputation et Presse ;
+- interface compacte et cibles tactiles renforcées sur mobile.
 
-Le joueur crée une entreprise technologique et la fait évoluer d'une petite société spécialisée vers un groupe mondial pouvant opérer dans de nombreux secteurs :
+### Terminologie canonique
 
-- semi-conducteurs et composants ;
-- PC, smartphones, TV, consoles et objets connectés ;
-- logiciels, systèmes d'exploitation et services ;
-- cloud, datacenters et réseaux ;
-- IA, robotique et automatisation ;
-- télécoms ;
-- mobilité ;
-- satellites et technologies spatiales ;
-- technologies futures.
+Pour éviter l'ancienne ambiguïté du mot « secteur » :
 
-Le cœur du jeu est la gestion d'une **entreprise complète** : stratégie, finances, R&D, recrutement, production, fournisseurs, marketing, distribution, SAV, réputation, concurrence, acquisitions, filiales, réglementation et intégration verticale.
+- **Gamme produit** = CPU, futures GPU, RAM, cartes mères, etc. ;
+- **Pôle** = Laboratoire, Production, Marché, Équipe ;
+- **Département** = unité de management/délégation interne (R&D, Production, Marketing, Support, Finance) ;
+- **Écran** = vue de l'interface.
 
-La boucle centrale visée est :
+Les anciennes clés internes utilisant `sector` restent temporairement disponibles pour conserver la compatibilité avec les sauvegardes existantes.
 
-**observer le marché → décider → investir → rechercher → concevoir → produire → vendre → analyser → réinvestir / pivoter / acquérir.**
+## Première session
 
-## Philosophie de gestion
+Le joueur démarre avec 500 000 € et une équipe initiale. Le jeu doit permettre de terminer une première génération CPU et de l'industrialiser en utilisant, si nécessaire, le financement disponible.
 
-Le jeu doit proposer **une seule simulation**, pas plusieurs jeux séparés selon la difficulté. La complexité ressentie dépendra surtout de la délégation : le joueur pourra gérer directement un département, le superviser ou confier davantage d'autonomie à un responsable.
+Un smoke test dédié joue désormais cette première génération automatiquement afin d'éviter qu'un changement d'équilibrage rende la partie impossible avant le premier lancement.
 
-L'expérience individuelle, l'expérience d'équipe, les spécialisations et la qualité du management devront influencer les résultats sans transformer l'interface en tableur illisible.
+## Android / PC
 
-## IA et immersion
+Android :
 
-La simulation reste calculée par Godot. L'IA générative pourra être ajoutée comme couche d'immersion pour :
+- layout compact forcé sur mobile ;
+- tailles tactiles minimales renforcées ;
+- bouton Retour géré par le jeu ;
+- mode immersif / edge-to-edge ;
+- APK arm64.
 
-- un assistant / conseiller du joueur ;
-- des rapports et réunions ;
-- des concurrents avec personnalités cohérentes ;
-- des négociations ;
-- des médias, analystes et réactions du marché.
+PC :
 
-Le jeu devra rester fonctionnel même sans LLM.
+- fenêtré / plein écran ;
+- résolutions sélectionnables ;
+- VSync ;
+- limitation FPS configurable.
+
+Les paramètres communs incluent le volume, l'échelle UI et la limite FPS.
+
+## Builds et version
+
+Version courante :
+
+- jeu : **0.2.12-preview.8** ;
+- Android : versionCode **33** ;
+- Windows : file version **0.2.12.2**.
+
+Les exports excluent les répertoires de développement `tests/`, `docs/` et `tools/`.
+
+Le workflow automatique `.github/workflows/preview-builds-v2.yml` produit :
+
+- `TechEmpire-Windows-v0.2.12-preview.8` ;
+- `TechEmpire-Android-v0.2.12-preview.8`.
+
+Le workflow de future signature Android permanente est conservé séparément en déclenchement manuel.
+
+## Bug reports et mises à jour
+
+`BugReporter.gd` :
+
+- collecte uniquement des diagnostics techniques minimaux ;
+- demande un consentement explicite ;
+- n'envoie ni sauvegarde, ni nom d'entreprise, ni IP ;
+- conserve les rapports localement tant que le collecteur VPS n'est pas configuré.
+
+`UpdateManager.gd` :
+
+- attend un manifeste HTTPS ;
+- compare la version installée ;
+- affiche la mise à jour disponible ;
+- ne fait aucune installation silencieuse.
+
+Les endpoints VPS sont volontairement vides tant que le service isolé Tech Empire n'est pas déployé.
 
 ## Validation automatique
 
-Le workflow `.github/workflows/godot-ci.yml` utilise Godot 4.7.2 et vérifie :
+La CI vérifie à chaque évolution importante :
 
-1. import et parsing du projet ;
-2. démarrage headless de la scène principale ;
-3. smoke test : verrou CPU/divisions → comparaison de trois plans générationnels → lancement d’une architecture → création d’une gamme de trois modèles → rendement/binning → demande portefeuille → migrations d’anciennes sauvegardes.
+1. import et parsing Godot 4.7.2 ;
+2. boot headless de la scène principale ;
+3. smoke test de la boucle CPU ;
+4. première génération financièrement survivable ;
+5. migrations de sauvegardes ;
+6. progression persistante des pôles ;
+7. Bug Reporter ;
+8. démarrage GitHub Actions ;
+9. exports Windows et Android.
 
-La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais elle évite de transmettre une version contenant une erreur GDScript évidente.
+La CI ne remplace pas les tests visuels et tactiles sur de vrais appareils.
+
+## Vision
+
+À long terme, Tech Empire doit permettre de faire évoluer une petite entreprise spécialisée vers un groupe technologique mondial : composants, PC, logiciels, cloud, IA, robotique, télécoms, spatial et autres technologies.
+
+Le cœur restera une seule simulation cohérente :
+
+**observer le marché → décider → investir → rechercher → concevoir → produire → vendre → analyser → réinvestir / pivoter / acquérir.**
+
+La complexité doit pouvoir être réduite par la délégation plutôt que par la suppression des systèmes.
+
+Une éventuelle IA générative pourra renforcer l'immersion (conseiller, concurrents, médias, négociations), mais le jeu doit rester entièrement fonctionnel sans API payante ni LLM.
 
 ## Documentation
 
 - [`docs/VISION.md`](docs/VISION.md) — vision globale ;
 - [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes ;
-- [`docs/DESIGN_BIBLE.md`](docs/DESIGN_BIBLE.md) — décisions canoniques issues de la conception ;
-- [`docs/CPU_VERTICAL_SLICE.md`](docs/CPU_VERTICAL_SLICE.md) — boucle CPU complète à implémenter ;
-- [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — interface chaleureuse et progression des bureaux ;
-- [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
+- [`docs/DESIGN_BIBLE.md`](docs/DESIGN_BIBLE.md) — décisions canoniques ;
+- [`docs/CPU_VERTICAL_SLICE.md`](docs/CPU_VERTICAL_SLICE.md) — boucle CPU ;
+- [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — direction UX / visuelle ;
+- [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — couche IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
-- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — contenu du prototype actuel ;
-- [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — historique / procédure d'import du projet local.
-
-## Organisation actuelle
-
-```text
-Tech-Empire/
-├─ project.godot
-├─ main.tscn
-├─ main.gd
-├─ scripts/
-├─ tests/
-├─ docs/
-└─ .github/workflows/
-```
-
-La structure sera raffinée progressivement sans réorganisations inutiles qui casseraient le prototype.
+- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — historique du prototype.
 
 ## Workflow de développement
 
-- dépôt GitHub = source de vérité ;
-- branche stable actuelle : `master` (normalisation vers `main` prévue plus tard) ;
-- branches courtes pour les évolutions importantes ;
-- Pull Requests quand utile ;
-- CI Godot obligatoire avant de considérer une modification comme techniquement validée ;
-- aucun secret, build, cache `.godot/` ou fichier `*.import` versionné ;
-- commits courts et explicites (`feat:`, `fix:`, `docs:`, `chore:`).
-- pilote Agents API optionnel documenté dans [`docs/AGENTS_API_PILOT.md`](docs/AGENTS_API_PILOT.md) ; il prépare des patchs isolés et ne peut jamais fusionner automatiquement.
-
-## Plateformes visées
-
-- Windows / PC ;
-- Android ;
-- autres plateformes éventuellement plus tard si l'architecture le permet.
+- GitHub est la source de vérité ;
+- branche stable : `master` ;
+- branche active actuelle : `feat/preview-builds-bug-reporter` ;
+- PR #11 porte la preview 0.2.12 ;
+- CI Godot obligatoire avant de considérer une modification validée ;
+- aucun merge vers `master` sans validation explicite ;
+- aucun secret, build, cache `.godot/`, keystore ou fichier sensible versionné.
 
 ## Licence
 
 Aucune licence publique définie pour le moment. Le dépôt reste privé pendant le développement.
-

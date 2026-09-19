@@ -14,10 +14,11 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Tech Empire Prototype V0.2.8 — CPU Product Family"
+config/name="Tech Empire Prototype V0.2.12 - Gameplay & UX"
 run/main_scene="uid://e28phl1nvy5i"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
+config/quit_on_go_back=false
 
 [autoload]
 
@@ -30,10 +31,30 @@ ResearchManager="*res://scripts/ResearchManager.gd"
 PatentManager="*res://scripts/PatentManager.gd"
 MarketManager="*res://scripts/MarketManager.gd"
 MediaManager="*res://scripts/MediaManager.gd"
+SupplierManager="*res://scripts/SupplierManager.gd"
 ProductManager="*res://scripts/ProductManager.gd"
+TechnologyManager="*res://scripts/TechnologyManager.gd"
+DiscoveryManager="*res://scripts/DiscoveryManager.gd"
 SimulationManager="*res://scripts/SimulationManager.gd"
 TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
+DepartmentProgression="*res://scripts/DepartmentProgression.gd"
+SettingsManager="*res://scripts/SettingsManager.gd"
+BugReporter="*res://scripts/BugReporter.gd"
+UpdateManager="*res://scripts/UpdateManager.gd"
+
+[bug_reporting]
+
+; Left empty until the isolated VPS collector is deployed.
+; Reports remain only in user://bug_reports_queue.json while this is empty.
+endpoint=""
+
+[updates]
+
+; HTTPS manifest hosted on the isolated Tech Empire VPS service.
+; Kept empty until that service is deployed.
+manifest_url=""
+channel="preview"
 
 [display]
 
@@ -41,3 +62,7 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

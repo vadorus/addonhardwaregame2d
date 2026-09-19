@@ -1,0 +1,17 @@
+name: Preview Probe
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: GitHub Actions startup probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm runner startup
+        run: echo "GitHub Actions runner started successfully"

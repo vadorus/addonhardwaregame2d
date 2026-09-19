@@ -2,17 +2,36 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
+const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
+const CPU_SUPPORT := preload("res://scripts/CpuSupportModel.gd")
 
 signal products_changed
 signal product_launched(product)
 signal cpu_range_created(generation)
 signal sales_report_created(report)
+signal quality_incident_created(incident)
+signal quality_incident_resolved(incident, action_id)
+signal product_discontinued(product)
+signal software_issue_created(issue)
+signal software_fix_started(product_id, fix)
+signal software_fix_completed(product_id, fix)
 
 var products: Array = []
 var cpu_generations: Array = []
 var _next_id := 1
 var _next_generation_id := 1
 var _reviewed_products: Dictionary = {}
+
+const INDUSTRIALIZATION_SETUP_RATE := 0.12
+const CAPACITY_OVERHEAD_RATE := 0.015
+const STOCK_HOLDING_RATE := 0.006
+const STOCK_POLICIES := {
+	"LEAN":{"label":"Flux tendu","target_ratio":0.10,"summary":"Peu de capital immobilisé, mais plus de risque de rupture."},
+	"BALANCED":{"label":"Stock équilibré","target_ratio":0.35,"summary":"Un tampon raisonnable entre coût de stockage et disponibilité."},
+	"SECURE":{"label":"Stock sécurisé","target_ratio":0.70,"summary":"Plus de disponibilité, mais davantage de cash immobilisé et de frais de stockage."}
+}
+const QUALITY_INCIDENT_RETURN_RATE := 0.09
+const QUALITY_INCIDENT_MIN_RETURNS := 20
 
 func _ready():
 	ResearchManager.project_completed.connect(_on_project_completed)
@@ -58,6 +77,7 @@ func _create_cpu_range(project: Dictionary) -> void:
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
+		product["cpu_support"] = _initial_cpu_support_state(product.get("metrics", {}), product.get("cpu_design", {}))
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
@@ -82,7 +102,8 @@ func _create_single_product(project: Dictionary) -> void:
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
-		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0
+		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0,
+		"cpu_support":_initial_cpu_support_state(metrics, project.get("cpu_design", {}))
 	}
 	_next_id += 1
 	products.append(product)
@@ -111,19 +132,504 @@ func _metric_average(metrics: Dictionary) -> float:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
 
-func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
+func _initial_cpu_support_state(metrics: Dictionary, design: Dictionary) -> Dictionary:
+	var support := CPU_SUPPORT.initial_state(metrics, design)
+	support["microcode_quality"] = clampf(float(support.get("microcode_quality", 60.0)) + TechnologyManager.initial_microcode_bonus("CPU"), 0.0, 100.0)
+	support["compatibility"] = clampf(float(support.get("compatibility", 60.0)) + TechnologyManager.initial_compatibility_bonus("CPU"), 0.0, 100.0)
+	return support
+
+func get_pending_software_issue() -> Dictionary:
+	for product in products:
+		var support: Dictionary = product.get("cpu_support", {})
+		var issue: Dictionary = support.get("pending_issue", {})
+		if not issue.is_empty():
+			return issue.duplicate(true)
+	return {}
+
+func software_fix_options(product_id: String) -> Array[Dictionary]:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return []
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
+	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
+		return []
+	return CPU_SUPPORT.fix_options()
+
+func start_software_fix(product_id: String, action_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
+	if support.get("pending_issue", {}).is_empty() or not support.get("active_fix", {}).is_empty():
+		return false
+	var option := CPU_SUPPORT.fix_option(action_id)
+	if option.is_empty():
+		return false
+	var cost := int(option.get("cost", 0))
+	if cost > Economy.money:
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, "Correctif microcode — %s" % str(product.get("name", "CPU")))
+	var fix := option.duplicate(true)
+	fix["id"] = action_id
+	fix["remaining_months"] = int(option.get("months", 1))
+	fix["started_month"] = TimeManager.month
+	fix["started_year"] = TimeManager.year
+	support["active_fix"] = fix
+	product["cpu_support"] = support
+	CompanyManager.add_alert("%s : %s lancé, délai estimé %d mois." % [
+		str(product.get("name", "CPU")),
+		str(option.get("label", action_id)),
+		int(option.get("months", 1))
+	])
+	software_fix_started.emit(product_id, fix.duplicate(true))
+	products_changed.emit()
+	return true
+
+func _process_cpu_support_month(product: Dictionary) -> void:
+	var support: Dictionary = CPU_SUPPORT.normalize_state(product.get("cpu_support", {}), product.get("metrics", {}), product.get("cpu_design", {}))
+	var active_fix: Dictionary = support.get("active_fix", {})
+	if not active_fix.is_empty():
+		var remaining := maxi(int(active_fix.get("remaining_months", 1)) - 1, 0)
+		active_fix["remaining_months"] = remaining
+		if remaining <= 0:
+			support["microcode_quality"] = clampf(
+				float(support.get("microcode_quality", 60.0)) + float(active_fix.get("microcode_gain", 0.0)),
+				0.0, 100.0
+			)
+			support["compatibility"] = clampf(
+				float(support.get("compatibility", 60.0)) + float(active_fix.get("compatibility_gain", 0.0)),
+				0.0, 100.0
+			)
+			support["support_debt"] = maxf(float(support.get("support_debt", 0.0)) - CPU_SUPPORT.ISSUE_THRESHOLD, 0.0)
+			support["patch_level"] = int(support.get("patch_level", 0)) + 1
+			support["pending_issue"] = {}
+			support["active_fix"] = {}
+			var metrics: Dictionary = product.get("metrics", {})
+			metrics["performance"] = clampf(
+				float(metrics.get("performance", 50.0)) + float(active_fix.get("performance_delta", 0.0)),
+				0.0, 100.0
+			)
+			product["metrics"] = metrics
+			product["customer_satisfaction"] = clampf(float(product.get("customer_satisfaction", 50.0)) + 4.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"support":0.7,"reliability":0.5,"professional":0.4})
+			CompanyManager.add_alert("%s : %s déployé avec succès." % [str(product.get("name", "CPU")), str(active_fix.get("label", "Correctif"))])
+			MediaManager.publish_business_event(
+				"%s reçoit un correctif logiciel" % str(product.get("name", "CPU")),
+				"%s améliore la stabilité et la compatibilité de cette génération." % CompanyManager.company_name
+			)
+			software_fix_completed.emit(str(product.get("id", "")), active_fix.duplicate(true))
+		else:
+			support["active_fix"] = active_fix
+		product["cpu_support"] = support
+		return
+
+	support["support_debt"] = float(support.get("support_debt", 0.0)) + CPU_SUPPORT.monthly_debt_gain(
+		support,
+		product.get("metrics", {}),
+		int(product.get("months_on_market", 0))
+	) * TechnologyManager.support_debt_modifier(str(product.get("sector", "CPU")))
+	var issue: Dictionary = support.get("pending_issue", {})
+	if issue.is_empty() and float(support.get("support_debt", 0.0)) >= CPU_SUPPORT.ISSUE_THRESHOLD:
+		issue = CPU_SUPPORT.issue_from_state(
+			str(product.get("id", "")),
+			str(product.get("name", "CPU")),
+			support,
+			TimeManager.month,
+			TimeManager.year
+		)
+		support["pending_issue"] = issue
+		product["customer_satisfaction"] = clampf(float(product.get("customer_satisfaction", 50.0)) - 4.0, 0.0, 100.0)
+		CompanyManager.change_reputation({"support":-0.6,"professional":-0.4})
+		CompanyManager.add_alert("Incident logiciel : %s demande un correctif %s." % [
+			str(product.get("name", "CPU")),
+			str(issue.get("type", "MICROCODE")).to_lower()
+		])
+		MediaManager.publish_business_event(
+			"Incident logiciel sur %s" % str(product.get("name", "CPU")),
+			"Des problèmes de microcode ou de compatibilité commencent à affecter certains utilisateurs."
+		)
+		software_issue_created.emit(issue.duplicate(true))
+	product["cpu_support"] = support
+
+func get_pending_quality_incident() -> Dictionary:
+	for product in products:
+		var incident: Dictionary = product.get("pending_quality_incident", {})
+		if not incident.is_empty():
+			return incident.duplicate(true)
+	return {}
+
+func quality_incident_options(product_id: String) -> Array[Dictionary]:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return []
+	var incident: Dictionary = product.get("pending_quality_incident", {})
+	if incident.is_empty():
+		return []
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var last_sales := maxi(int(product.get("last_month_sales", 0)), 1)
+	var targeted_cost := maxi(5_000, unit_cost * 120)
+	var recall_cost := maxi(15_000, int(round(float(unit_cost * last_sales) * 0.20)))
+	return [
+		{"id":"TARGETED_FIX", "label":"Correction ciblée", "cost":targeted_cost, "summary":"+5 fiabilité • +5 satisfaction • impact réputation positif"},
+		{"id":"RECALL", "label":"Rappel renforcé", "cost":recall_cost, "summary":"+9 fiabilité • +12 satisfaction • forte protection de la marque"},
+		{"id":"MINIMAL_SUPPORT", "label":"Service minimum", "cost":0, "summary":"Aucun coût immédiat • satisfaction et réputation en baisse"}
+	]
+
+func resolve_quality_incident(product_id: String, action_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return false
+	var incident: Dictionary = product.get("pending_quality_incident", {})
+	if incident.is_empty():
+		return false
+	var selected: Dictionary = {}
+	for option in quality_incident_options(product_id):
+		if str(option.get("id", "")) == action_id:
+			selected = option
+			break
+	if selected.is_empty():
+		return false
+	var cost := int(selected.get("cost", 0))
+	if cost > 0 and Economy.money < cost:
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, "Incident qualité — %s" % str(product.get("name", "Produit")))
+	var metrics: Dictionary = product.get("metrics", {})
+	var satisfaction := float(product.get("customer_satisfaction", 50.0))
+	match action_id:
+		"TARGETED_FIX":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 5.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction + 5.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":0.8, "support":0.5, "professional":0.3})
+		"RECALL":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 9.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction + 12.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":2.0, "support":2.0, "professional":0.8, "prestige":0.4})
+		"MINIMAL_SUPPORT":
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + 1.0, 0.0, 98.0)
+			product["customer_satisfaction"] = clampf(satisfaction - 5.0, 0.0, 100.0)
+			CompanyManager.change_reputation({"reliability":-1.0, "support":-2.0, "professional":-0.8, "prestige":-0.5})
+		_:
+			return false
+	product["metrics"] = metrics
+	product["pending_quality_incident"] = {}
+	product["quality_incident_cooldown"] = 6
+	CompanyManager.add_alert("%s : incident qualité traité — %s." % [str(product.get("name", "Produit")), str(selected.get("label", action_id))])
+	MediaManager.publish_business_event(
+		"%s répond à un incident qualité" % CompanyManager.company_name,
+		"%s : %s." % [str(product.get("name", "Produit")), str(selected.get("summary", ""))]
+	)
+	quality_incident_resolved.emit(incident.duplicate(true), action_id)
+	products_changed.emit()
+	return true
+
+func _maybe_create_quality_incident(product: Dictionary, total_units: int, returns: int, return_rate: float, warranty_cost: int) -> void:
+	var cooldown := maxi(int(product.get("quality_incident_cooldown", 0)), 0)
+	if cooldown > 0:
+		product["quality_incident_cooldown"] = cooldown - 1
+		return
+	var pending: Dictionary = product.get("pending_quality_incident", {})
+	if not pending.is_empty():
+		return
+	if total_units <= 0 or return_rate < QUALITY_INCIDENT_RETURN_RATE or returns < QUALITY_INCIDENT_MIN_RETURNS:
+		return
+	var severity := "CRITICAL" if return_rate >= 0.15 or returns >= 100 else "WARNING"
+	var incident := {
+		"id":"QI-%s-%d" % [str(product.get("id", "PRODUCT")), int(product.get("months_on_market", 0))],
+		"product_id":str(product.get("id", "")),
+		"product_name":str(product.get("name", "Produit")),
+		"severity":severity,
+		"returns":returns,
+		"return_rate":return_rate,
+		"warranty_cost":warranty_cost,
+		"month":TimeManager.month,
+		"year":TimeManager.year
+	}
+	product["pending_quality_incident"] = incident
+	CompanyManager.add_alert("Incident qualité : %s enregistre %d retours ce mois-ci." % [str(product.get("name", "Produit")), returns])
+	MediaManager.publish_business_event(
+		"Des retours touchent %s" % str(product.get("name", "Produit")),
+		"L'entreprise doit choisir entre correction ciblée, rappel renforcé ou service minimum."
+	)
+	quality_incident_created.emit(incident.duplicate(true))
+
+func get_stock_policy_keys() -> Array:
+	return STOCK_POLICIES.keys()
+
+func get_stock_policy(key: String) -> Dictionary:
+	return STOCK_POLICIES.get(key, STOCK_POLICIES.BALANCED)
+
+func set_stock_policy(product_id: String, key: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or not STOCK_POLICIES.has(key):
+		return false
+	product["stock_policy"] = key
+	products_changed.emit()
+	return true
+
+func stock_target_units(product: Dictionary, effective_capacity: int) -> int:
+	var policy := get_stock_policy(str(product.get("stock_policy", "BALANCED")))
+	return maxi(0, int(round(float(effective_capacity) * float(policy.get("target_ratio", 0.35)))))
+
+func get_industrialization_choices(product_id: String, options: Dictionary = {}) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return INDUSTRIALIZATION.default_choices()
+	var source := options
+	if source.is_empty():
+		source = product.get("industrialization", {})
+	return INDUSTRIALIZATION.normalize_choices(source)
+
+func industrialization_profile(product_id: String, options: Dictionary = {}) -> Dictionary:
+	var profile := INDUSTRIALIZATION.evaluate(get_industrialization_choices(product_id, options))
+	profile["setup_factor"] = clampf(float(profile.get("setup_factor", 1.0)) * TechnologyManager.industrial_modifier("setup", str(get_product(product_id).get("sector", "CPU"))), 0.45, 1.75)
+	profile["unit_cost_factor"] = clampf(float(profile.get("unit_cost_factor", 1.0)) * TechnologyManager.industrial_modifier("unit_cost", str(get_product(product_id).get("sector", "CPU"))), 0.75, 1.30)
+	profile["capacity_factor"] = clampf(float(profile.get("capacity_factor", 1.0)) * TechnologyManager.industrial_modifier("capacity", str(get_product(product_id).get("sector", "CPU"))), 0.65, 1.40)
+	return profile
+
+func effective_unit_cost(product_id: String, options: Dictionary = {}) -> int:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return 0
+	var profile := industrialization_profile(product_id, options)
+	var modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
+	return maxi(1, int(round(float(product.get("unit_cost", 1)) * modifier)))
+
+func launch_financials(product_id: String, production_capacity: int, options: Dictionary = {}) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
+	var capacity := clampi(production_capacity, 1, max_capacity)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var profile := industrialization_profile(product_id, options)
+	var investment := maxi(2500, int(round(
+		float(capacity * unit_cost)
+		* INDUSTRIALIZATION_SETUP_RATE
+		* float(profile.get("setup_factor", 1.0))
+	)))
+	var monthly_overhead := maxi(250, int(round(
+		float(capacity * unit_cost)
+		* CAPACITY_OVERHEAD_RATE
+		* float(profile.get("overhead_factor", 1.0))
+	)))
+	return {
+		"capacity": capacity,
+		"investment": investment,
+		"monthly_overhead": monthly_overhead,
+		"industrialization": get_industrialization_choices(product_id, options),
+		"profile": profile
+	}
+
+func launch_forecast(product_id: String, price: int, production_capacity: int, options: Dictionary = {}) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	var preview := product.duplicate(true)
+	preview["price"] = maxi(price, 1)
+	var financials := launch_financials(product_id, production_capacity, options)
+	if financials.is_empty():
+		return {}
+	var profile: Dictionary = financials.get("profile", {})
+	var capacity := int(financials.get("capacity", 1))
+	var production_execution := CompanyManager.get_production_execution_modifier()
+	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
+	var effective_capacity := maxi(1, int(floor(float(capacity) * production_execution * industrial_capacity)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
+	var effective_cost_per_unit := maxi(1, int(round(float(preview.get("unit_cost", 1)) * production_cost_modifier)))
+	preview["production_capacity"] = capacity
+
+	var demand := MarketManager.estimate_consumer_demand(preview)
+	var requested_consumer := maxi(int(demand.get("units", 0)), 0)
+	var contract := MarketManager.active_contract_for(product_id)
+	var requested_b2b := 0
+	var b2b_price := 0
+	if not contract.is_empty():
+		requested_b2b = maxi(int(contract.get("units_per_month", 0)), 0)
+		b2b_price = maxi(int(contract.get("unit_price", 0)), 0)
+	var requested_units := requested_consumer + requested_b2b
+
+	var inventory_start := maxi(int(product.get("inventory_units", 0)), 0)
+	var target_inventory := stock_target_units(product, effective_capacity)
+	var production_needed := maxi(requested_units + target_inventory - inventory_start, 0)
+	var expected_produced := mini(production_needed, effective_capacity)
+	var available_units := inventory_start + expected_produced
+	var expected_b2b := mini(requested_b2b, available_units)
+	var after_b2b := maxi(available_units - expected_b2b, 0)
+	var expected_consumer := mini(requested_consumer, after_b2b)
+	var expected_units := expected_b2b + expected_consumer
+	var inventory_end := maxi(available_units - expected_units, 0)
+	var lost_sales := maxi(requested_units - expected_units, 0)
+
+	var revenue := expected_consumer * int(preview.price) + expected_b2b * b2b_price
+	var production_cost := expected_produced * effective_cost_per_unit
+	var holding_cost := int(round(float(inventory_end * effective_cost_per_unit) * STOCK_HOLDING_RATE))
+	var return_rate: float = clampf((100.0 - float(preview.get("metrics", {}).get("reliability", 50.0))) / 240.0, 0.005, 0.22)
+	return_rate *= float(profile.get("return_factor", 1.0))
+	return_rate /= CompanyManager.get_support_modifier()
+	var expected_returns := int(round(float(expected_units) * return_rate))
+	var warranty_cost := int(round(float(expected_returns * effective_cost_per_unit) * 0.72))
+	var monthly_overhead := int(financials.get("monthly_overhead", 0))
+	var monthly_result := revenue - production_cost - holding_cost - warranty_cost - monthly_overhead
+	var utilization := float(expected_produced) / float(maxi(effective_capacity, 1))
+	return {
+		"capacity": capacity,
+		"effective_capacity": effective_capacity,
+		"production_execution": production_execution,
+		"production_cost_modifier": production_cost_modifier,
+		"effective_unit_cost": effective_cost_per_unit,
+		"industrial_capacity_factor": industrial_capacity,
+		"return_rate": return_rate,
+		"industrialization": financials.get("industrialization", {}),
+		"stock_policy":str(product.get("stock_policy", "BALANCED")),
+		"inventory_start":inventory_start,
+		"inventory_target":target_inventory,
+		"inventory_end":inventory_end,
+		"expected_produced":expected_produced,
+		"requested_units": requested_units,
+		"requested_consumer":requested_consumer,
+		"requested_b2b":requested_b2b,
+		"expected_units": expected_units,
+		"expected_consumer":expected_consumer,
+		"expected_b2b":expected_b2b,
+		"lost_sales":lost_sales,
+		"utilization": clampf(utilization, 0.0, 1.0),
+		"share": float(demand.get("share", 0.0)),
+		"score": float(demand.get("score", 0.0)),
+		"price_factor": float(demand.get("price_factor", 1.0)),
+		"revenue": revenue,
+		"production_cost": production_cost,
+		"holding_cost":holding_cost,
+		"warranty_cost": warranty_cost,
+		"monthly_overhead": monthly_overhead,
+		"monthly_result": monthly_result,
+		"investment": int(financials.get("investment", 0))
+	}
+
+func offer_update_financials(product_id: String, production_capacity: int) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return {}
+	var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
+	var target_capacity := clampi(production_capacity, 1, max_capacity)
+	var current_capacity := maxi(int(product.get("production_capacity", 1)), 1)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var profile := industrialization_profile(product_id)
+	var expansion_units := maxi(target_capacity - current_capacity, 0)
+	var expansion_cost := int(round(
+		float(expansion_units * unit_cost)
+		* INDUSTRIALIZATION_SETUP_RATE
+		* float(profile.get("setup_factor", 1.0))
+	))
+	var target_overhead := maxi(250, int(round(
+		float(target_capacity * unit_cost)
+		* CAPACITY_OVERHEAD_RATE
+		* float(profile.get("overhead_factor", 1.0))
+	)))
+	return {
+		"current_capacity":current_capacity,
+		"target_capacity":target_capacity,
+		"expansion_units":expansion_units,
+		"expansion_cost":expansion_cost,
+		"target_overhead":target_overhead
+	}
+
+func update_product_offer(product_id: String, price: int, production_capacity: int) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	var update := offer_update_financials(product_id, production_capacity)
+	if update.is_empty():
+		return false
+	var expansion_cost := int(update.get("expansion_cost", 0))
+	if expansion_cost > 0 and Economy.money < expansion_cost:
+		return false
+	var previous_price := int(product.get("price", price))
+	var previous_capacity := int(product.get("production_capacity", production_capacity))
+	if expansion_cost > 0:
+		Economy.add_expense(expansion_cost, "Extension industrielle — %s" % str(product.get("name", "Produit")))
+	product["price"] = maxi(price, 1)
+	product["production_capacity"] = int(update.get("target_capacity", previous_capacity))
+	product["monthly_capacity_overhead"] = int(update.get("target_overhead", product.get("monthly_capacity_overhead", 0)))
+	if previous_price != int(product.price) or previous_capacity != int(product.production_capacity):
+		CompanyManager.add_alert(
+			"%s : offre ajustée à %s € et capacité %s unités/mois." % [
+				str(product.get("name", "Produit")),
+				str(product.price),
+				str(product.production_capacity)
+			]
+		)
+	products_changed.emit()
+	return true
+
+func discontinuation_blocker(product_id: String) -> String:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return "Ce produit n'est pas actuellement commercialisé."
+	if not product.get("pending_quality_incident", {}).is_empty():
+		return "Résolvez d'abord l'incident qualité en cours."
+	var contract := MarketManager.active_contract_for(product_id)
+	if not contract.is_empty():
+		return "Un contrat B2B actif doit être honoré avant la fin de vente."
+	return ""
+
+func discontinue_product(product_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or not discontinuation_blocker(product_id).is_empty():
+		return false
+	product["status"] = "DISCONTINUED"
+	product["discontinued_market_month"] = MarketManager.market_months
+	product["monthly_capacity_overhead"] = 0
+	product["last_month_sales"] = 0
+	CompanyManager.add_alert("%s n'est plus commercialisé." % str(product.get("name", "Produit")))
+	MediaManager.publish_business_event(
+		"Fin de commercialisation pour %s" % str(product.get("name", "un produit")),
+		"%s arrête la production de cette génération pour concentrer ses ressources sur la suite." % CompanyManager.company_name
+	)
+	product_discontinued.emit(product)
+	products_changed.emit()
+	return true
+
+func launch_product(product_id: String, price: int, production_capacity: int, options: Dictionary = {}) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
+			var financials := launch_financials(product_id, production_capacity, options)
+			if financials.is_empty():
+				return false
+			var investment := int(financials.get("investment", 0))
+			if Economy.money < investment:
+				return false
 			product.price = maxi(price, 1)
-			var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
-			product.production_capacity = clampi(production_capacity, 1, max_capacity)
+			product.production_capacity = int(financials.get("capacity", 1))
+			product["launch_investment"] = investment
+			product["monthly_capacity_overhead"] = int(financials.get("monthly_overhead", 0))
+			product["industrialization"] = financials.get("industrialization", INDUSTRIALIZATION.default_choices()).duplicate(true)
+			product["stock_policy"] = str(product.get("stock_policy", "BALANCED"))
+			product["inventory_units"] = maxi(int(product.get("inventory_units", 0)), 0)
+			product["last_month_produced"] = 0
+			product["last_month_lost_sales"] = 0
+			Economy.add_expense(investment, "Industrialisation — %s" % str(product.name))
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
-			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
+			product["market_launch_month"] = MarketManager.market_months
+			product["renewal_alerted"] = false
+			CompanyManager.add_alert("%s est officiellement lancé après %s € d'investissement industriel." % [str(product.name), str(investment)])
 			product_launched.emit(product)
 			products_changed.emit()
 			return true
 	return false
+
+func _maybe_announce_renewal(product: Dictionary) -> bool:
+	if not MarketManager.should_renew_product(product) or bool(product.get("renewal_alerted", false)):
+		return false
+	product["renewal_alerted"] = true
+	CompanyManager.add_alert("%s arrive en fin de cycle. Préparez une nouvelle génération CPU." % str(product.get("name", "Votre CPU")))
+	MediaManager.publish_business_event(
+		"%s prépare sa relève" % str(product.get("name", "Un CPU")),
+		"La génération actuelle perd en pertinence face aux nouveaux processeurs du marché. Une nouvelle architecture devient prioritaire."
+	)
+	return true
 
 func process_month():
 	var launched: Array = []
@@ -133,38 +639,94 @@ func process_month():
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(launched)
 	for product in launched:
 		_sell_product_month(product, portfolio_demand.get(str(product.id), {}))
+		_process_cpu_support_month(product)
 	products_changed.emit()
 
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
-	var consumer_units := int(demand.get("units", 0))
+	var consumer_units := maxi(int(demand.get("units", 0)), 0)
 	var contract := MarketManager.active_contract_for(str(product.id))
 	var b2b_units := 0
 	var b2b_price := 0
 	if not contract.is_empty():
-		b2b_units = int(contract.units_per_month)
-		b2b_price = int(contract.unit_price)
-	var capacity := int(product.production_capacity)
-	var sold_b2b: int = mini(b2b_units, capacity)
-	var remaining_capacity: int = maxi(capacity - sold_b2b, 0)
-	var sold_consumer: int = mini(consumer_units, remaining_capacity)
+		b2b_units = maxi(int(contract.units_per_month), 0)
+		b2b_price = maxi(int(contract.unit_price), 0)
+
+	var nominal_capacity := maxi(int(product.production_capacity), 1)
+	var profile := industrialization_profile(str(product.id))
+	var production_execution := CompanyManager.get_production_execution_modifier()
+	var industrial_capacity := float(profile.get("capacity_factor", 1.0))
+	var capacity := maxi(1, int(floor(float(nominal_capacity) * production_execution * industrial_capacity)))
+	var production_cost_modifier := CompanyManager.get_production_cost_modifier() * float(profile.get("unit_cost_factor", 1.0))
+	var effective_unit_cost := maxi(1, int(round(float(product.unit_cost) * production_cost_modifier)))
+
+	var inventory_start := maxi(int(product.get("inventory_units", 0)), 0)
+	var target_inventory := stock_target_units(product, capacity)
+	var total_requested := b2b_units + consumer_units
+	var production_needed := maxi(total_requested + target_inventory - inventory_start, 0)
+	var produced_units := mini(production_needed, capacity)
+	var available_units := inventory_start + produced_units
+
+	var sold_b2b := mini(b2b_units, available_units)
+	var after_b2b := maxi(available_units - sold_b2b, 0)
+	var sold_consumer := mini(consumer_units, after_b2b)
 	var total_units := sold_b2b + sold_consumer
+	var lost_b2b := maxi(b2b_units - sold_b2b, 0)
+	var lost_consumer := maxi(consumer_units - sold_consumer, 0)
+	var lost_sales := lost_b2b + lost_consumer
+	var inventory_end := maxi(available_units - total_units, 0)
+
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
-	var production_cost := total_units * int(product.unit_cost)
+	var production_cost := produced_units * effective_unit_cost
+	var holding_cost := int(round(float(inventory_end * effective_unit_cost) * STOCK_HOLDING_RATE))
+	var capacity_overhead := int(product.get("monthly_capacity_overhead", 0))
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
-	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if production_cost > 0:
+		Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if holding_cost > 0:
+		Economy.add_expense(holding_cost, "Stockage — %s" % str(product.name))
+	if capacity_overhead > 0:
+		Economy.add_expense(capacity_overhead, "Capacité industrielle — %s" % str(product.name))
+
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
+	return_rate *= float(profile.get("return_factor", 1.0))
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)
-	var warranty_cost := int(returns * int(product.unit_cost) * 0.72)
+	var warranty_cost := int(round(float(returns * effective_unit_cost) * 0.72))
 	Economy.add_expense(warranty_cost, "SAV garanties — %s" % str(product.name))
+
+	var previous_lost_sales := maxi(int(product.get("last_month_lost_sales", 0)), 0)
+	product["inventory_units"] = inventory_end
+	product["last_month_produced"] = produced_units
+	product["last_month_lost_sales"] = lost_sales
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
+	_maybe_announce_renewal(product)
 	product.last_month_score = float(demand.get("score", 0.0))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
-	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
+	_maybe_create_quality_incident(product, total_units, returns, return_rate, warranty_cost)
+
+	if lost_sales > 0 and previous_lost_sales <= 0:
+		CompanyManager.add_alert("%s est en rupture partielle : %d vente(s) perdues ce mois-ci." % [str(product.name), lost_sales])
+	if lost_b2b > 0:
+		var b2b_shortfall_ratio := float(lost_b2b) / float(maxi(b2b_units, 1))
+		CompanyManager.change_reputation({
+			"professional":-minf(2.0, b2b_shortfall_ratio * 2.0),
+			"support":-minf(1.2, b2b_shortfall_ratio * 1.2)
+		})
+
+	var stockout_ratio := float(lost_sales) / float(maxi(total_requested, 1))
+	var satisfaction: float = clampf(
+		float(demand.get("score", 50.0))
+		+ float(demand.get("expectation_gap", 0.0)) * 0.22
+		+ (CompanyManager.get_support_modifier() - 1.0) * 18.0
+		- return_rate * 35.0
+		- stockout_ratio * 14.0,
+		0.0,
+		100.0
+	)
 	product.customer_satisfaction = satisfaction
 	var rep_delta := (satisfaction - 55.0) / 35.0
 	CompanyManager.change_reputation({
@@ -172,7 +734,36 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
+
+	var report := {
+		"product_id":product.id,
+		"units":total_units,
+		"consumer_units":sold_consumer,
+		"b2b_units":sold_b2b,
+		"produced_units":produced_units,
+		"inventory_start":inventory_start,
+		"inventory_end":inventory_end,
+		"inventory_target":target_inventory,
+		"lost_sales":lost_sales,
+		"lost_b2b":lost_b2b,
+		"lost_consumer":lost_consumer,
+		"revenue":revenue,
+		"production_cost":production_cost,
+		"holding_cost":holding_cost,
+		"capacity_overhead":capacity_overhead,
+		"warranty_cost":warranty_cost,
+		"satisfaction":satisfaction,
+		"share":demand.get("share", 0.0),
+		"nominal_capacity":nominal_capacity,
+		"effective_capacity":capacity,
+		"production_execution":production_execution,
+		"production_cost_modifier":production_cost_modifier,
+		"effective_unit_cost":effective_unit_cost,
+		"industrial_capacity_factor":industrial_capacity,
+		"return_rate":return_rate,
+		"stock_policy":str(product.get("stock_policy", "BALANCED")),
+		"industrialization":product.get("industrialization", {}).duplicate(true)
+	}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id))
@@ -235,6 +826,24 @@ func load_state(state: Dictionary):
 		product["yield_rate"] = float(product.get("yield_rate", 0.72))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
+		product["pending_quality_incident"] = product.get("pending_quality_incident", {}).duplicate(true)
+		product["quality_incident_cooldown"] = maxi(int(product.get("quality_incident_cooldown", 0)), 0)
+		product["renewal_alerted"] = bool(product.get("renewal_alerted", false))
+		product["industrialization"] = INDUSTRIALIZATION.normalize_choices(product.get("industrialization", {}))
+		var stock_policy := str(product.get("stock_policy", "BALANCED"))
+		product["stock_policy"] = stock_policy if STOCK_POLICIES.has(stock_policy) else "BALANCED"
+		product["inventory_units"] = maxi(int(product.get("inventory_units", 0)), 0)
+		product["last_month_produced"] = maxi(int(product.get("last_month_produced", 0)), 0)
+		product["last_month_lost_sales"] = maxi(int(product.get("last_month_lost_sales", 0)), 0)
+		var saved_support: Dictionary = product.get("cpu_support", {})
+		if saved_support.is_empty():
+			product["cpu_support"] = _initial_cpu_support_state(product.get("metrics", {}), product.get("cpu_design", {}))
+		else:
+			product["cpu_support"] = CPU_SUPPORT.normalize_state(saved_support, product.get("metrics", {}), product.get("cpu_design", {}))
+		if str(product.get("status", "")) == "LAUNCHED":
+			var financials := launch_financials(str(product.get("id", "")), int(product.get("production_capacity", product.recommended_capacity)))
+			product["launch_investment"] = int(product.get("launch_investment", financials.get("investment", 0)))
+			product["monthly_capacity_overhead"] = int(product.get("monthly_capacity_overhead", financials.get("monthly_overhead", 0)))
 
 	cpu_generations = []
 	var saved_generations_value = state.get("cpu_generations", [])

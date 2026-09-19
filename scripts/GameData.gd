@@ -32,6 +32,26 @@ const SECTORS := {
 		"secondary_metric": "efficiency",
 		"specialization": "gpu"
 	},
+	"RAM": {
+		"label": "Mémoire vive",
+		"base_dev_cost": 34000,
+		"base_unit_cost": 48,
+		"reference_price": 140,
+		"market_units": 32000,
+		"primary_metric": "performance",
+		"secondary_metric": "reliability",
+		"specialization": "memory"
+	},
+	"MOTHERBOARD": {
+		"label": "Cartes mères",
+		"base_dev_cost": 39000,
+		"base_unit_cost": 92,
+		"reference_price": 230,
+		"market_units": 22000,
+		"primary_metric": "ecosystem",
+		"secondary_metric": "reliability",
+		"specialization": "motherboard"
+	},
 	"SMARTPHONE": {
 		"label": "Smartphones",
 		"base_dev_cost": 48000,
@@ -128,14 +148,38 @@ const APPROACHES := {
 	"EXTERNAL": {"label":"Composants / technologie externe", "speed":1.26, "knowledge":0.48, "quality":0.98, "cost":0.82, "internal_ratio":0.22}
 }
 
-func get_active_sector_keys() -> Array:
+# Terminologie canonique à partir de la preview 0.2.12 :
+# "gamme produit" = CPU, GPU, smartphone, etc.
+# Les anciens noms "sector" restent disponibles pour la compatibilité des sauvegardes.
+func get_active_product_family_keys() -> Array:
 	return ACTIVE_SECTORS.duplicate()
 
+func is_product_family_active(family: String) -> bool:
+	return ACTIVE_SECTORS.has(family)
+
+func get_product_family_keys() -> Array:
+	return SECTORS.keys()
+
+func get_product_family(family: String) -> Dictionary:
+	return SECTORS.get(family, {})
+
+func get_product_family_specialization(family: String) -> String:
+	var data := get_product_family(family)
+	return str(data.get("specialization", family.to_lower()))
+
+func get_product_family_label(family: String) -> String:
+	var data := get_product_family(family)
+	return str(data.get("label", family))
+
+# API legacy. Ne pas supprimer tant que les anciennes sauvegardes utilisent encore "sector".
+func get_active_sector_keys() -> Array:
+	return get_active_product_family_keys()
+
 func is_sector_active(sector: String) -> bool:
-	return ACTIVE_SECTORS.has(sector)
+	return is_product_family_active(sector)
 
 func get_sector_keys() -> Array:
-	return SECTORS.keys()
+	return get_product_family_keys()
 
 func get_segment_keys() -> Array:
 	return SEGMENTS.keys()

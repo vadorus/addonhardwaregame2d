@@ -6,6 +6,8 @@ const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 signal projects_changed
 signal generation_proposals_changed(proposals)
 signal phase_report_created(project, report)
+signal phase_decision_created(project, decision)
+signal phase_decision_resolved(project, decision, choice)
 signal project_completed(project)
 
 var projects: Array = []
@@ -125,7 +127,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"generation_plan":stored_generation_plan,
-		"complexity":float(design_estimate.get("complexity", 50.0))
+		"complexity":float(design_estimate.get("complexity", 50.0)),
+		"pending_decision":{}
 	}
 	_next_id += 1
 	projects.append(project)
@@ -140,6 +143,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 func process_month():
 	for project in projects:
 		if str(project.status) != "DEVELOPMENT":
+			continue
+		if not project.get("pending_decision", {}).is_empty():
 			continue
 		_process_project_month(project)
 	projects_changed.emit()
@@ -196,10 +201,91 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 	if project.reports.size() > 8:
 		project.reports.pop_back()
 	phase_report_created.emit(project, report)
-	CompanyManager.add_alert("%s : rapport %s disponible." % [str(project.name), phase_name])
-	project.phase_index = phase_index + 1
-	if int(project.phase_index) >= GameData.PHASES.size():
-		_finalize_project(project, team, tech, budget_ratio)
+	var decision := _build_phase_decision(project, report, phase_index)
+	project["pending_decision"] = decision
+	phase_decision_created.emit(project, decision)
+	CompanyManager.add_alert("%s : décision requise après la phase %s." % [str(project.name), phase_name])
+
+func _build_phase_decision(project: Dictionary, report: Dictionary, phase_index: int) -> Dictionary:
+	var weakness := str(report.get("weakness", "reliability"))
+	var phase_name := str(report.get("phase", "R&D"))
+	return {
+		"id":"%s-PH%02d" % [str(project.get("id", "PRJ")), phase_index + 1],
+		"title":"Arbitrage — %s" % phase_name,
+		"prompt":"Camille signale %s comme principal point à surveiller. Quelle direction donnez-vous à l'équipe ?" % GameData.metric_label(weakness),
+		"phase_index":phase_index,
+		"weakness":weakness,
+		"choices":[
+			{"id":"STABILIZE", "label":"Sécuriser la conception", "effect":"+ fiabilité / efficacité • coût et délai supplémentaires"},
+			{"id":"FIX_WEAKNESS", "label":"Corriger le point faible", "effect":"renforce fortement %s • coût modéré" % GameData.metric_label(weakness)},
+			{"id":"PUSH_LIMITS", "label":"Pousser les performances", "effect":"+ performance / innovation • fiabilité plus risquée"}
+		]
+	}
+
+func get_pending_phase_decision() -> Dictionary:
+	for project in projects:
+		if str(project.get("status", "")) != "DEVELOPMENT":
+			continue
+		var decision: Dictionary = project.get("pending_decision", {})
+		if decision.is_empty():
+			continue
+		var result := decision.duplicate(true)
+		result["project_id"] = str(project.get("id", ""))
+		result["project_name"] = str(project.get("name", "Projet R&D"))
+		return result
+	return {}
+
+func resolve_phase_decision(project_id: String, choice_id: String) -> bool:
+	for project in projects:
+		if str(project.get("id", "")) != project_id or str(project.get("status", "")) != "DEVELOPMENT":
+			continue
+		var decision: Dictionary = project.get("pending_decision", {})
+		if decision.is_empty():
+			return false
+		var selected_choice: Dictionary = {}
+		for choice_value in decision.get("choices", []):
+			var choice: Dictionary = choice_value
+			if str(choice.get("id", "")) == choice_id:
+				selected_choice = choice
+				break
+		if selected_choice.is_empty():
+			return false
+		var desired: Dictionary = project.get("desired_metrics", {})
+		var weakness := str(decision.get("weakness", "reliability"))
+		match choice_id:
+			"STABILIZE":
+				desired["reliability"] = clampf(float(desired.get("reliability", 55.0)) + 5.0, 0.0, 100.0)
+				desired["efficiency"] = clampf(float(desired.get("efficiency", 55.0)) + 2.0, 0.0, 100.0)
+				project.quality_accumulator = float(project.get("quality_accumulator", 0.0)) + 10.0
+				project.months_spent = int(project.get("months_spent", 0)) + 1
+				Economy.add_expense(int(float(project.get("monthly_budget", 0)) * 0.50), "R&D — sécurisation")
+			"FIX_WEAKNESS":
+				desired[weakness] = clampf(float(desired.get(weakness, 55.0)) + 7.0, 0.0, 100.0)
+				project.quality_accumulator = float(project.get("quality_accumulator", 0.0)) + 6.0
+				Economy.add_expense(int(float(project.get("monthly_budget", 0)) * 0.20), "R&D — correction ciblée")
+			"PUSH_LIMITS":
+				desired["performance"] = clampf(float(desired.get("performance", 55.0)) + 6.0, 0.0, 100.0)
+				desired["innovation"] = clampf(float(desired.get("innovation", 55.0)) + 4.0, 0.0, 100.0)
+				desired["reliability"] = clampf(float(desired.get("reliability", 55.0)) - 4.0, 0.0, 100.0)
+				project.quality_accumulator = maxf(0.0, float(project.get("quality_accumulator", 0.0)) - 2.0)
+			_:
+				return false
+		project["desired_metrics"] = desired
+		project["pending_decision"] = {}
+		var completed_phase := int(decision.get("phase_index", int(project.get("phase_index", 0))))
+		project.phase_index = completed_phase + 1
+		if int(project.phase_index) >= GameData.PHASES.size():
+			var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
+			var specialization := str(sector_data.specialization)
+			var team := PersonnelManager.team_score("R&D", specialization)
+			var tech := float(technologies.get(specialization, 5.0))
+			var budget_ratio: float = clampf(float(project.monthly_budget) / float(sector_data.base_dev_cost), 0.25, 2.2)
+			_finalize_project(project, team, tech, budget_ratio)
+		phase_decision_resolved.emit(project, decision, selected_choice)
+		CompanyManager.add_alert("%s : arbitrage R&D appliqué — %s." % [str(project.name), str(selected_choice.get("label", choice_id))])
+		projects_changed.emit()
+		return true
+	return false
 
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	var approach_data: Dictionary = GameData.APPROACHES[str(project.approach)]
@@ -225,12 +311,42 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 		metrics.performance = clampf(float(metrics.performance) + 3.0, 0.0, 100.0)
 		metrics.reliability = clampf(float(metrics.reliability) + 3.0, 0.0, 100.0)
 		metrics.ecosystem = clampf(float(metrics.ecosystem) + 5.0, 0.0, 100.0)
+	var project_family := str(project.get("sector", ""))
+	if not project_family.is_empty():
+		for metric in GameData.METRICS:
+			var reusable_bonus := TechnologyManager.metric_bonus(str(metric), project_family)
+			if reusable_bonus > 0.0:
+				metrics[metric] = clampf(float(metrics.get(metric, 50.0)) + reusable_bonus, 0.0, 100.0)
 	project.final_metrics = metrics
 	project.status = "COMPLETED"
 	project.phase_progress = 100.0
 	project_completed.emit(project)
 	PatentManager.create_candidate(project)
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
+
+func get_project_by_id(project_id: String) -> Dictionary:
+	for project in projects:
+		if str(project.get("id", "")) == project_id:
+			return project
+	return {}
+
+func add_technology_bonus(key: String, amount: float) -> float:
+	var current := float(technologies.get(key, 0.0))
+	var updated := clampf(current + amount, 0.0, 100.0)
+	technologies[key] = updated
+	projects_changed.emit()
+	return updated
+
+func apply_project_metric_bonus(project_id: String, metric: String, amount: float) -> bool:
+	var project := get_project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	var desired: Dictionary = project.get("desired_metrics", {})
+	desired[metric] = clampf(float(desired.get(metric, 55.0)) + amount, 0.0, 100.0)
+	project["desired_metrics"] = desired
+	project["quality_accumulator"] = float(project.get("quality_accumulator", 0.0)) + maxf(amount, 0.0) * 0.8
+	projects_changed.emit()
+	return true
 
 func active_departments() -> Array:
 	for p in projects:
@@ -250,6 +366,7 @@ func load_state(state: Dictionary):
 			project["cpu_design"] = design
 			project["design_estimate"] = estimate
 			project["complexity"] = float(project.get("complexity", estimate.complexity))
+			project["pending_decision"] = project.get("pending_decision", {}).duplicate(true)
 			var generation_plan_value = project.get("generation_plan", {})
 			if typeof(generation_plan_value) == TYPE_DICTIONARY and not generation_plan_value.is_empty():
 				project["generation_plan"] = CPU_GENERATION_PLANNER.normalize_saved_proposal(generation_plan_value)

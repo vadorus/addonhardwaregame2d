@@ -1,15 +1,21 @@
 extends Node
 
 signal save_completed(ok, message)
+signal autosave_completed(ok)
 
 const SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 6
+const SAVE_VERSION := 10
 
-func save_game():
-	if not CompanyManager.created:
-		save_completed.emit(false, "Aucune partie à sauvegarder.")
-		return
-	var state := {
+func _ready():
+	if not TimeManager.month_changed.is_connected(_on_month_changed):
+		TimeManager.month_changed.connect(_on_month_changed)
+
+func _on_month_changed(_month: int, _year: int):
+	if CompanyManager.created:
+		autosave_game()
+
+func _build_state() -> Dictionary:
+	return {
 		"version":SAVE_VERSION,
 		"time":TimeManager.get_state(),
 		"economy":Economy.get_state(),
@@ -17,18 +23,37 @@ func save_game():
 		"divisions":DivisionManager.get_state(),
 		"personnel":PersonnelManager.get_state(),
 		"research":ResearchManager.get_state(),
+		"reusable_technologies":TechnologyManager.get_state(),
+		"discoveries":DiscoveryManager.get_state(),
 		"patents":PatentManager.get_state(),
+		"suppliers":SupplierManager.get_state(),
 		"products":ProductManager.get_state(),
 		"market":MarketManager.get_state(),
-		"media":MediaManager.get_state()
+		"media":MediaManager.get_state(),
+		"department_progression":DepartmentProgression.get_state()
 	}
+
+func _write_state() -> bool:
+	if not CompanyManager.created:
+		return false
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
-		save_completed.emit(false, "Impossible d'ouvrir le fichier de sauvegarde.")
-		return
-	file.store_string(JSON.stringify(state))
+		return false
+	file.store_string(JSON.stringify(_build_state()))
 	file.close()
-	save_completed.emit(true, "Partie sauvegardée.")
+	return true
+
+func save_game():
+	if not CompanyManager.created:
+		save_completed.emit(false, "Aucune partie à sauvegarder.")
+		return
+	var ok := _write_state()
+	save_completed.emit(ok, "Partie sauvegardée." if ok else "Impossible d'ouvrir le fichier de sauvegarde.")
+
+func autosave_game() -> bool:
+	var ok := _write_state()
+	autosave_completed.emit(ok)
+	return ok
 
 func load_game() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
@@ -49,10 +74,14 @@ func load_game() -> bool:
 	Economy.load_state(state.get("economy", {}))
 	PersonnelManager.load_state(state.get("personnel", {}))
 	ResearchManager.load_state(state.get("research", {}))
+	TechnologyManager.load_state(state.get("reusable_technologies", {}))
+	DiscoveryManager.load_state(state.get("discoveries", {}))
 	PatentManager.load_state(state.get("patents", {}))
+	SupplierManager.load_state(state.get("suppliers", {}))
 	ProductManager.load_state(state.get("products", {}))
 	MarketManager.load_state(state.get("market", {}))
 	MediaManager.load_state(state.get("media", {}))
+	DepartmentProgression.load_state(state.get("department_progression", {}))
 	TimeManager.load_state(state.get("time", {}))
 	save_completed.emit(true, "Partie chargée.")
 	return true
