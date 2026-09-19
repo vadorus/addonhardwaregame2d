@@ -38,13 +38,15 @@ La génération peut ensuite donner plusieurs références : entrée de gamme, g
 
 ### Couche essentielle — toujours visible
 
-- performance ;
-- efficacité énergétique ;
-- fiabilité ;
-- coût estimé ;
-- durée de développement ;
-- risque ;
-- adéquation au client cible.
+Le joueur lit d'abord **cinq arbitrages**, et non une fiche technique brute :
+
+- **performance** : puissance brute et capacité à tenir les charges exigeantes ;
+- **efficacité / thermique** : consommation, chauffe et marge énergétique ;
+- **maîtrise du coût** : capacité à garder un coût unitaire compatible avec le positionnement ;
+- **fiabilité** : stabilité, rendement attendu et risque de retours ;
+- **délai / risque** : probabilité de sortir à temps sans dérive majeure.
+
+L'adéquation au client cible reste affichée séparément, car elle répond à une autre question : « ce compromis correspond-il au marché choisi ? ». Ces cinq axes sont une **couche de lecture** calculée à partir de la simulation détaillée ; ils ne remplacent pas les paramètres techniques.
 
 ### Couche de conception — laboratoire standard
 

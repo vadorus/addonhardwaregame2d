@@ -129,6 +129,56 @@ static func evaluate(input: Dictionary) -> Dictionary:
 		"tradeoff": tradeoff
 	}
 
+static func decision_axes(evaluation: Dictionary, effective_months: int = -1) -> Dictionary:
+	var unit_cost := float(evaluation.get("unit_cost", 120.0))
+	var risk := float(evaluation.get("risk", 50.0))
+	var months := effective_months
+	if months < 0:
+		months = int(evaluation.get("estimated_months", 8))
+	var cost_control := clampf(100.0 - maxf(unit_cost - 70.0, 0.0) * 0.42, 10.0, 100.0)
+	var time_score := clampf(105.0 - maxf(float(months) - 5.0, 0.0) * 9.5, 10.0, 100.0)
+	var delivery_confidence := clampf(time_score * 0.58 + (100.0 - risk) * 0.42, 5.0, 100.0)
+	return {
+		"performance": float(evaluation.get("performance", 50.0)),
+		"efficiency": float(evaluation.get("efficiency", 50.0)),
+		"cost_control": cost_control,
+		"reliability": float(evaluation.get("reliability", 50.0)),
+		"delivery": delivery_confidence
+	}
+
+static func decision_axis_label(key: String) -> String:
+	match key:
+		"performance":
+			return "Performance"
+		"efficiency":
+			return "Efficacité / thermique"
+		"cost_control":
+			return "Maîtrise du coût"
+		"reliability":
+			return "Fiabilité"
+		"delivery":
+			return "Délai / risque"
+		_:
+			return key.capitalize()
+
+static func decision_summary(axes: Dictionary) -> String:
+	var strongest := ""
+	var weakest := ""
+	var strongest_score := -1.0
+	var weakest_score := 101.0
+	for key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
+		var score := float(axes.get(key, 0.0))
+		if score > strongest_score:
+			strongest_score = score
+			strongest = key
+		if score < weakest_score:
+			weakest_score = score
+			weakest = key
+	return "Point fort : %s (%.0f/100) • compromis principal : %s (%.0f/100)" % [
+		decision_axis_label(strongest), strongest_score,
+		decision_axis_label(weakest), weakest_score
+	]
+
 static func segment_fit(evaluation: Dictionary, segment: String) -> float:
 	var performance := float(evaluation.get("performance", 50.0))
 	var efficiency := float(evaluation.get("efficiency", 50.0))
