@@ -134,8 +134,8 @@ func _metric_average(metrics: Dictionary) -> float:
 
 func _initial_cpu_support_state(metrics: Dictionary, design: Dictionary) -> Dictionary:
 	var support := CPU_SUPPORT.initial_state(metrics, design)
-	support["microcode_quality"] = clampf(float(support.get("microcode_quality", 60.0)) + TechnologyManager.initial_microcode_bonus(), 0.0, 100.0)
-	support["compatibility"] = clampf(float(support.get("compatibility", 60.0)) + TechnologyManager.initial_compatibility_bonus(), 0.0, 100.0)
+	support["microcode_quality"] = clampf(float(support.get("microcode_quality", 60.0)) + TechnologyManager.initial_microcode_bonus("CPU"), 0.0, 100.0)
+	support["compatibility"] = clampf(float(support.get("compatibility", 60.0)) + TechnologyManager.initial_compatibility_bonus("CPU"), 0.0, 100.0)
 	return support
 
 func get_pending_software_issue() -> Dictionary:
@@ -228,7 +228,7 @@ func _process_cpu_support_month(product: Dictionary) -> void:
 		support,
 		product.get("metrics", {}),
 		int(product.get("months_on_market", 0))
-	) * TechnologyManager.support_debt_modifier()
+	) * TechnologyManager.support_debt_modifier(str(product.get("sector", "CPU")))
 	var issue: Dictionary = support.get("pending_issue", {})
 	if issue.is_empty() and float(support.get("support_debt", 0.0)) >= CPU_SUPPORT.ISSUE_THRESHOLD:
 		issue = CPU_SUPPORT.issue_from_state(
@@ -383,9 +383,9 @@ func get_industrialization_choices(product_id: String, options: Dictionary = {})
 
 func industrialization_profile(product_id: String, options: Dictionary = {}) -> Dictionary:
 	var profile := INDUSTRIALIZATION.evaluate(get_industrialization_choices(product_id, options))
-	profile["setup_factor"] = clampf(float(profile.get("setup_factor", 1.0)) * TechnologyManager.industrial_modifier("setup"), 0.45, 1.75)
-	profile["unit_cost_factor"] = clampf(float(profile.get("unit_cost_factor", 1.0)) * TechnologyManager.industrial_modifier("unit_cost"), 0.75, 1.30)
-	profile["capacity_factor"] = clampf(float(profile.get("capacity_factor", 1.0)) * TechnologyManager.industrial_modifier("capacity"), 0.65, 1.40)
+	profile["setup_factor"] = clampf(float(profile.get("setup_factor", 1.0)) * TechnologyManager.industrial_modifier("setup", str(get_product(product_id).get("sector", "CPU"))), 0.45, 1.75)
+	profile["unit_cost_factor"] = clampf(float(profile.get("unit_cost_factor", 1.0)) * TechnologyManager.industrial_modifier("unit_cost", str(get_product(product_id).get("sector", "CPU"))), 0.75, 1.30)
+	profile["capacity_factor"] = clampf(float(profile.get("capacity_factor", 1.0)) * TechnologyManager.industrial_modifier("capacity", str(get_product(product_id).get("sector", "CPU"))), 0.65, 1.40)
 	return profile
 
 func effective_unit_cost(product_id: String, options: Dictionary = {}) -> int:
