@@ -1000,7 +1000,7 @@ func _refresh_cpu_preview():
 	)
 	if not active_cpu_generation_plan.is_empty():
 		guidance_confidence = clampf(float(active_cpu_generation_plan.get("confidence", guidance_confidence)), 20.0, 96.0)
-	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence)
+	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence, ResearchManager.get_cpu_capabilities())
 
 	lab_profile_label.text = str(evaluation.profile)
 	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
