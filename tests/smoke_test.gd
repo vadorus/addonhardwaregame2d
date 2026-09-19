@@ -27,6 +27,26 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
+	if TimeManager.year != 1971:
+		_fail("New companies must start in the early microprocessor era")
+		return
+	var era_design := CPU_DESIGN.default_design()
+	if int(era_design.get("node_nm", 0)) != 10000 or int(era_design.get("cores", 0)) != 1:
+		_fail("Default CPU design is not an early-era single-core 10 µm design")
+		return
+	if not CPU_DESIGN.format_frequency(era_design).contains("MHz"):
+		_fail("Early CPU frequency is not presented in MHz")
+		return
+	if not CPU_DESIGN.format_cache(era_design).contains("sans cache"):
+		_fail("Early CPU design should start without integrated cache")
+		return
+	var starting_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+	if starting_nodes != [10000]:
+		_fail("Starting company should initially master only the 10 µm process")
+		return
+	if CPU_DESIGN.available_nodes_for_mastery(30.0).size() <= starting_nodes.size():
+		_fail("Manufacturing mastery does not unlock finer historical processes")
+		return
 
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("CPU research must start with three clear domains")
@@ -289,7 +309,11 @@ func _ready() -> void:
 	if int(apex_model.get("unit_cost", 0)) <= int(essential_model.get("unit_cost", 0)):
 		_fail("Apex bin must cost more than the Essential bin")
 		return
-	if int(apex_model.get("cpu_design", {}).get("cores", 0)) <= int(essential_model.get("cpu_design", {}).get("cores", 0)):
+	var apex_design: Dictionary = apex_model.get("cpu_design", {})
+	var essential_design: Dictionary = essential_model.get("cpu_design", {})
+	var apex_is_faster := float(apex_design.get("frequency_ghz", 0.0)) > float(essential_design.get("frequency_ghz", 0.0))
+	var apex_has_more_cores := int(apex_design.get("cores", 0)) > int(essential_design.get("cores", 0))
+	if not apex_is_faster and not apex_has_more_cores:
 		_fail("Product binning did not create distinct CPU configurations")
 		return
 	var bin_total := 0.0
