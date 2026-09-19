@@ -311,9 +311,10 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 		metrics.performance = clampf(float(metrics.performance) + 3.0, 0.0, 100.0)
 		metrics.reliability = clampf(float(metrics.reliability) + 3.0, 0.0, 100.0)
 		metrics.ecosystem = clampf(float(metrics.ecosystem) + 5.0, 0.0, 100.0)
-	if str(project.sector) == "CPU":
+	var project_family := str(project.get("sector", ""))
+	if not project_family.is_empty():
 		for metric in GameData.METRICS:
-			var reusable_bonus := TechnologyManager.metric_bonus(str(metric))
+			var reusable_bonus := TechnologyManager.metric_bonus(str(metric), project_family)
 			if reusable_bonus > 0.0:
 				metrics[metric] = clampf(float(metrics.get(metric, 50.0)) + reusable_bonus, 0.0, 100.0)
 	project.final_metrics = metrics
