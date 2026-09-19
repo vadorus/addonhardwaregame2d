@@ -15,7 +15,7 @@ var _next_generation_id := 1
 var _reviewed_products: Dictionary = {}
 
 func _ready():
-	ResearchManager.project_completed.connect(_on_project_completed)
+	pass
 
 func reset():
 	products = []
@@ -25,15 +25,15 @@ func reset():
 	_reviewed_products = {}
 	products_changed.emit()
 
-func _on_project_completed(project: Dictionary):
+func create_from_industrialization(project: Dictionary, industrialization: Dictionary = {}):
 	if str(project.get("sector", "")) == "CPU":
-		_create_cpu_range(project)
+		_create_cpu_range(project, industrialization)
 	else:
 		_create_single_product(project)
 	DivisionManager.record_completed_generation(str(project.get("sector", "")))
 	products_changed.emit()
 
-func _create_cpu_range(project: Dictionary) -> void:
+func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) -> void:
 	var sector_data: Dictionary = GameData.SECTORS.CPU
 	var division := DivisionManager.get_division("CPU")
 	var generation_plan: Dictionary = project.get("generation_plan", {})
@@ -50,7 +50,8 @@ func _create_cpu_range(project: Dictionary) -> void:
 		_base_unit_cost(project),
 		int(sector_data.reference_price),
 		maxi(300, int(float(sector_data.market_units) * 0.22)),
-		float(division.get("maturity", 0.0))
+		float(division.get("maturity", 0.0)),
+		industrialization
 	)
 	var generation: Dictionary = built.get("generation", {})
 	var model_ids: Array = []
@@ -156,6 +157,8 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
+	return_rate += float(product.get("defect_rate", 0.0)) * 0.42
+	return_rate = clampf(return_rate, 0.005, 0.28)
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)
 	var warranty_cost := int(returns * int(product.unit_cost) * 0.72)
@@ -237,6 +240,11 @@ func load_state(state: Dictionary):
 		product["bin_quality"] = int(product.get("bin_quality", 70))
 		product["bin_share"] = float(product.get("bin_share", 1.0))
 		product["yield_rate"] = float(product.get("yield_rate", 0.72))
+		product["manufacturing_quality"] = float(product.get("manufacturing_quality", 60.0))
+		product["defect_rate"] = float(product.get("defect_rate", 0.025))
+		product["process_mastery"] = float(product.get("process_mastery", 35.0))
+		product["industrialization_strategy"] = str(product.get("industrialization_strategy", "LEGACY"))
+		product["industrialization_months"] = int(product.get("industrialization_months", 0))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
 
@@ -281,6 +289,12 @@ func _legacy_generation_from_product(product: Dictionary) -> Dictionary:
 		"generation_plan":{},
 		"metrics":product.get("metrics", {}).duplicate(true),
 		"yield_rate":float(product.get("yield_rate", 0.72)),
+		"industrialization":{
+			"quality_score":float(product.get("manufacturing_quality", 60.0)),
+			"defect_rate":float(product.get("defect_rate", 0.025)),
+			"process_mastery":float(product.get("process_mastery", 35.0)),
+			"strategy":str(product.get("industrialization_strategy", "LEGACY"))
+		},
 		"bin_distribution":{"LEGACY":1.0},
 		"potential_models":1,
 		"initial_model_count":1,
