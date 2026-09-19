@@ -1608,7 +1608,7 @@ func _refresh_dashboard():
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
-		dashboard_project_meta_label.text = "%d cœurs • %.1f GHz • %d nm • %s • cible %s" % [int(active_design.cores), float(active_design.frequency_ghz), int(active_design.node_nm), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
+		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
 		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
 		dashboard_project_progress.value = overall_progress
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
@@ -1899,8 +1899,10 @@ func _refresh_products():
 				ProductionManager.maintenance_knowledge
 			]
 		]
-		for node_nm in [14, 10, 7, 5, 3]:
-			production_lines.append("• Maîtrise %d nm : %.1f/100" % [node_nm, ProductionManager.get_process_mastery(node_nm)])
+		var visible_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+		for node_value in visible_nodes:
+			var node_nm := int(node_value)
+			production_lines.append("• Maîtrise %s : %.1f/100" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
 		for job in ProductionManager.jobs:
 			var result: Dictionary = job.get("result", {})
 			if str(job.get("status", "")) == "INDUSTRIALIZATION":
@@ -1978,10 +1980,10 @@ func _refresh_product_details():
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
-			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 			float(product.get("yield_rate", 0.0)) * 100.0, float(product.get("manufacturing_quality", 60.0)),
 			float(product.get("defect_rate", 0.025)) * 100.0, float(product.get("process_mastery", 35.0)),
 			int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
