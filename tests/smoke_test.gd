@@ -151,6 +151,38 @@ func _ready() -> void:
 	if int(apex_model.production_capacity) != apex_max_capacity:
 		_fail("CPU launch ignored the binning capacity limit")
 		return
+
+	var fresh_probe := apex_model.duplicate(true)
+	fresh_probe["months_on_market"] = 6
+	var aged_probe := apex_model.duplicate(true)
+	aged_probe["months_on_market"] = 30
+	var fresh_demand := MarketManager.estimate_consumer_demand(fresh_probe)
+	var aged_demand := MarketManager.estimate_consumer_demand(aged_probe)
+	if float(fresh_demand.get("age_penalty", -1.0)) != 0.0:
+		_fail("Fresh CPU received an aging penalty")
+		return
+	if float(aged_demand.get("age_penalty", 0.0)) <= 0.0:
+		_fail("Old CPU did not receive a commercial aging penalty")
+		return
+	if float(aged_demand.get("score", 100.0)) >= float(fresh_demand.get("score", 0.0)):
+		_fail("CPU aging did not reduce commercial attractiveness")
+		return
+
+	var competitor_before: Dictionary = MarketManager.competitors.get("CPU", [])[0].duplicate(true)
+	var competitor_score_before := MarketManager.benchmark_score(competitor_before.merged({"sector":"CPU"}, true))
+	MarketManager.process_month([])
+	var competitor_after: Dictionary = MarketManager.competitors.get("CPU", [])[0].duplicate(true)
+	var competitor_score_after := MarketManager.benchmark_score(competitor_after.merged({"sector":"CPU"}, true))
+	if competitor_score_after <= competitor_score_before:
+		_fail("Scripted CPU competitor did not progress with the market")
+		return
+	var market_round_trip := MarketManager.get_state().duplicate(true)
+	var saved_market_age := MarketManager.market_age_months
+	MarketManager.reset()
+	MarketManager.load_state(market_round_trip)
+	if MarketManager.market_age_months != saved_market_age:
+		_fail("Market age did not survive a save round-trip")
+		return
 	var product_round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
 	ProductManager.load_state(product_round_trip)
@@ -204,6 +236,19 @@ func _ready() -> void:
 	DivisionManager.load_state({})
 	if DivisionManager.get_active_division_keys() != ["CPU"]:
 		_fail("Legacy V3 save was not migrated to the CPU division")
+		return
+
+	Economy.money = 1
+	SimulationManager.is_game_over = false
+	var bankruptcy_report := SimulationManager.process_month_end()
+	if not SimulationManager.is_game_over:
+		_fail("Empty treasury did not trigger bankruptcy")
+		return
+	if int(bankruptcy_report.get("money", 1)) > 0:
+		_fail("Bankruptcy test did not exhaust treasury")
+		return
+	if TimeManager.time_scale != 0.0:
+		_fail("Bankruptcy did not pause the simulation")
 		return
 
 	print("[CI] Smoke test passed")
