@@ -459,6 +459,13 @@ func _apply_development_learning(project: Dictionary):
 	var data: Dictionary = cpu_research_domains.get(domain, {})
 	data["experience"] = clampf(float(data.get("experience", 0.0)) + 0.10 * development_capacity_factor(), 0.0, 100.0)
 	data["knowledge"] = clampf(float(data.get("knowledge", 0.0)) + 0.04, 0.0, 100.0)
+	if domain == "ARCHITECTURE":
+		cpu_capabilities["ARCHITECTURE"] = clampf(get_cpu_capability("ARCHITECTURE") + 0.045, 0.0, 100.0)
+		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.015, 0.0, 100.0)
+	elif domain == "EFFICIENCY":
+		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.030, 0.0, 100.0)
+	elif domain == "RELIABILITY":
+		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.020, 0.0, 100.0)
 
 func prepare_cpu_generation_proposals(segment: String, approach: String, focus: String, monthly_budget: int, base_design: Dictionary) -> Array:
 	if not DivisionManager.is_operational("CPU"):
