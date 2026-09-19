@@ -24,6 +24,8 @@ var tabs: TabContainer
 var setup_layer: Control
 var month_layer: Control
 var month_report_label: Label
+var game_over_layer: Control
+var game_over_label: Label
 
 var dashboard_label: Label
 var alerts_label: Label
@@ -135,6 +137,7 @@ func _connect_signals():
 	MediaManager.news_changed.connect(_refresh_media)
 	PatentManager.patents_changed.connect(_refresh_all)
 	SaveManager.save_completed.connect(_on_save_message)
+	SimulationManager.game_over.connect(_on_game_over)
 
 func _build_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -252,6 +255,7 @@ func _build_ui():
 	_update_nav_state()
 	_build_setup_layer()
 	_build_month_layer()
+	_build_game_over_layer()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -876,6 +880,39 @@ func _build_month_layer():
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
+func _build_game_over_layer():
+	game_over_layer = ColorRect.new()
+	game_over_layer.color = Color(0.02, 0.025, 0.035, 0.96)
+	game_over_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_layer.visible = false
+	add_child(game_over_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_layer.add_child(center)
+	var panel := _card(APP_SHELL, 16, 20)
+	panel.custom_minimum_size = Vector2(560, 360)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	panel.add_child(box)
+	var title := _label("Entreprise en cessation de paiement", 25)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", APP_RED)
+	box.add_child(title)
+	game_over_label = _rich_label()
+	game_over_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(game_over_label)
+	var retry := Button.new()
+	retry.text = "Créer une nouvelle entreprise"
+	retry.custom_minimum_size.y = 46
+	retry.pressed.connect(_restart_from_game_over)
+	box.add_child(retry)
+	var load := Button.new()
+	load.text = "Charger une sauvegarde"
+	load.custom_minimum_size.y = 42
+	load.pressed.connect(_load_game)
+	box.add_child(load)
+
 func _tab_scroll(title: String) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
 	scroll.name = title
@@ -1101,12 +1138,18 @@ func _money(value: int) -> String:
 func _start_new_game():
 	SimulationManager.reset_all(setup_name.text,_meta(setup_sector))
 	setup_layer.visible=false
+	game_over_layer.visible=false
 	status_label.text="Entreprise créée. Votre première décision : lancer un projet R&D."
 	_refresh_all()
 
 func _load_game():
 	if SaveManager.load_game():
 		setup_layer.visible=false
+		SimulationManager.is_game_over = Economy.money <= 0
+		game_over_layer.visible=false
+		if SimulationManager.is_game_over:
+			TimeManager.time_scale = 0.0
+			_on_game_over("Faillite : la trésorerie est épuisée.", {"money": Economy.money})
 		_refresh_all()
 
 func _on_save_message(ok: bool, message: String):
@@ -1128,11 +1171,35 @@ func _breakdown(data: Dictionary) -> String:
 
 func _close_month_report():
 	month_layer.visible=false
-	TimeManager.time_scale=1.0
+	if not SimulationManager.is_game_over:
+		TimeManager.time_scale=1.0
+
+func _on_game_over(reason: String, report: Dictionary):
+	TimeManager.time_scale = 0.0
+	month_layer.visible = false
+	var cash := int(report.get("money", Economy.money))
+	game_over_label.text = "%s\n\nTrésorerie finale : %s €\n\nLa valeur potentielle de l'entreprise ou une future cotation en Bourse ne remplacent pas la trésorerie disponible. Une entreprise sans liquidités ne peut plus financer son activité." % [reason, _money(cash)]
+	game_over_layer.visible = true
+	_refresh_all()
+
+func _restart_from_game_over():
+	game_over_layer.visible = false
+	month_layer.visible = false
+	setup_layer.visible = true
+	TimeManager.time_scale = 0.0
+	status_label.text = "Créez une nouvelle entreprise pour recommencer."
 
 func _refresh_top():
 	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
 	money_label.text="%s €" % _money(Economy.money)
+	var cash_color := APP_GREEN
+	if Economy.money <= 0:
+		cash_color = APP_RED
+	elif Economy.money < 75000:
+		cash_color = APP_RED
+	elif Economy.money < 175000:
+		cash_color = APP_AMBER
+	money_label.add_theme_color_override("font_color", cash_color)
 
 func _refresh_all():
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
@@ -1212,8 +1279,9 @@ func _refresh_dashboard():
 			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	elif not launched_product.is_empty():
 		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
-		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées" % [int(launched_product.get("months_on_market", 0)), _money(int(launched_product.get("units_sold_total", 0)))]
-		dashboard_project_phase_label.text = "SUR LE MARCHÉ"
+		var lifecycle := MarketManager.product_lifecycle_label(launched_product)
+		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées • %s" % [int(launched_product.get("months_on_market", 0)), _money(int(launched_product.get("units_sold_total", 0))), lifecycle]
+		dashboard_project_phase_label.text = "SUR LE MARCHÉ • %s" % lifecycle.to_upper()
 		dashboard_project_progress.value = 100.0
 		dashboard_metric_a.text = "%s €" % _money(int(launched_product.get("price", 0)))
 		dashboard_metric_b.text = "%s ventes" % _money(int(launched_product.get("last_month_sales", 0)))
@@ -1255,7 +1323,8 @@ func _refresh_dashboard():
 	if not launched_product.is_empty():
 		var rows := MarketManager.benchmark_for(launched_product)
 		var rank := MarketManager.benchmark_rank(launched_product)
-		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0))]
+		var aging_penalty := float(launched_product.get("last_month_age_penalty", MarketManager.product_age_penalty(launched_product)))
+		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100\nCycle commercial : %s\nPression d\'âge : -%.1f pts\nMarché en évolution depuis %d mois" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0)), MarketManager.product_lifecycle_label(launched_product), aging_penalty, MarketManager.market_age_months]
 	else:
 		var competitors: Array = MarketManager.competitors.get("CPU", [])
 		if competitors.is_empty():
@@ -1409,8 +1478,9 @@ func _refresh_products():
 		])
 	for product in ProductManager.products:
 		var product_tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
-		lines.append("  • %s [%s] — %s | coût %s € | prix %s € | ventes %s | satisfaction %.1f" % [
-			str(product.name), product_tier, str(product.status), _money(int(product.unit_cost)), _money(int(product.price)),
+		var lifecycle := MarketManager.product_lifecycle_label(product) if str(product.status) == "LAUNCHED" else "Non lancé"
+		lines.append("  • %s [%s] — %s | %s | coût %s € | prix %s € | ventes %s | satisfaction %.1f" % [
+			str(product.name), product_tier, str(product.status), lifecycle, _money(int(product.unit_cost)), _money(int(product.price)),
 			_money(int(product.units_sold_total)), float(product.customer_satisfaction)
 		])
 	products_label.text = "\n".join(lines) if not lines.is_empty() else "Aucun produit. Terminez d'abord un projet R&D."
@@ -1439,12 +1509,15 @@ func _refresh_product_details():
 		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 		var target_label := str(GameData.SEGMENTS.get(str(product.get("target_segment", "MAINSTREAM")), {}).get("label", "Grand public"))
 		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité\n%s" % [
+		var lifecycle_info := ""
+		if str(product.get("status", "")) == "LAUNCHED":
+			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d\'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
 			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
 			float(product.get("yield_rate", 0.0)) * 100.0, int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
-			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin),
+			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
 			" • ".join(metric_lines)
 		]
 	else:
@@ -1479,6 +1552,9 @@ func _refresh_market():
 	for i in range(bench.size()): lines.append("%d. %s — %.1f pts — %s €%s" % [i+1,str(bench[i].name),float(bench[i].score),_money(int(bench[i].price))," ← vous" if bool(bench[i].player) else ""])
 	lines.append("\nÉvaluation par clientèle :")
 	for seg in GameData.SEGMENTS.keys(): lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
+	var age_penalty := float(p.get("last_month_age_penalty", MarketManager.product_age_penalty(p)))
+	lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d\'âge -%.1f pts" % [MarketManager.product_lifecycle_label(p), int(p.get("months_on_market", 0)), age_penalty])
+	lines.append("Marché global : %d mois d\'évolution depuis le début de la partie." % MarketManager.market_age_months)
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
 	market_label.text="\n".join(lines)
 	var c_lines:=[]
