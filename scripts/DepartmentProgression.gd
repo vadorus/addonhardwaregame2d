@@ -1,5 +1,7 @@
 extends Node
 
+const UI_ICONS := preload("res://ui/UiIcons.gd")
+
 signal stage_changed(sector_id, previous_stage, new_stage, state)
 
 var achieved_stages: Dictionary = {}
@@ -9,7 +11,7 @@ const SECTOR_ORDER := ["LAB", "PRODUCTION", "MARKET", "TEAM"]
 const DEFINITIONS := {
 	"LAB": {
 		"title": "Laboratoire CPU",
-		"icon": "⚗",
+		"icon_key": "LAB",
 		"subtitle": "Recherche, prototypage et innovation.",
 		"stages": [
 			{"name":"Coin prototype", "desc":"Vos premières idées testées sur un établi."},
@@ -21,7 +23,7 @@ const DEFINITIONS := {
 	},
 	"PRODUCTION": {
 		"title": "Production",
-		"icon": "▦",
+		"icon_key": "PRODUCTION",
 		"subtitle": "Transformez vos innovations en produits.",
 		"stages": [
 			{"name":"Atelier de montage", "desc":"Assemblage artisanal à petite échelle."},
@@ -32,7 +34,7 @@ const DEFINITIONS := {
 		]
 	},	"MARKET": {
 		"title": "Marché & Vente",
-		"icon": "↗",
+		"icon_key": "MARKET",
 		"subtitle": "Faites connaître vos produits au monde.",
 		"stages": [
 			{"name":"Coin commercial", "desc":"Vos premiers contacts et premiers clients."},
@@ -44,7 +46,7 @@ const DEFINITIONS := {
 	},
 	"TEAM": {
 		"title": "Équipe / RH",
-		"icon": "●",
+		"icon_key": "TEAM",
 		"subtitle": "Construisez une équipe qui grandit avec l'entreprise.",
 		"stages": [
 			{"name":"Noyau fondateur", "desc":"Une petite équipe porte tout le projet."},
@@ -119,7 +121,7 @@ func get_sector_state(sector_id: String) -> Dictionary:
 	return {
 		"id": sector_id,
 		"title": str(definition.get("title", sector_id)),
-		"icon": str(definition.get("icon", "•")),
+		"icon": UI_ICONS.domain(str(definition.get("icon_key", sector_id))),
 		"subtitle": str(definition.get("subtitle", "")),
 		"stage": stage,
 		"stage_name": str(stages[stage].get("name", "")),
