@@ -119,6 +119,8 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.production_capacity = clampi(production_capacity, 1, max_capacity)
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
+			product.last_month_age_penalty = 0.0
+			product.market_lifecycle = "Nouveau"
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
 			product_launched.emit(product)
 			products_changed.emit()
@@ -162,6 +164,8 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	product.months_on_market = int(product.months_on_market) + 1
 	product.last_month_score = float(demand.get("score", 0.0))
+	product.last_month_age_penalty = float(demand.get("age_penalty", 0.0))
+	product.market_lifecycle = str(demand.get("lifecycle", MarketManager.product_lifecycle_label(product)))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
 	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
