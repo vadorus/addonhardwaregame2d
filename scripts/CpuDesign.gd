@@ -291,7 +291,7 @@ static func guidance_ranges(reference_input: Dictionary, confidence: float) -> D
 		)
 	}
 
-static func guidance_report(input: Dictionary, reference_input: Dictionary, confidence: float) -> Dictionary:
+static func guidance_report(input: Dictionary, reference_input: Dictionary, confidence: float, capabilities: Dictionary = {}) -> Dictionary:
 	var design := normalize(input)
 	var reference := normalize(reference_input)
 	var ranges := guidance_ranges(reference, confidence)
@@ -358,7 +358,7 @@ static func guidance_report(input: Dictionary, reference_input: Dictionary, conf
 		else:
 			consequences.append("Le procédé choisi est plus conservateur : il peut être plus facile à maîtriser mais limite la densité.")
 
-	var evaluation := evaluate(design)
+	var evaluation := evaluate(design, capabilities)
 	if float(evaluation.power_deficit_ratio) >= 0.08:
 		consequences.append("Notre modèle estime que l'enveloppe électrique est insuffisante d'environ %.1f W pour exploiter pleinement ce design." % float(evaluation.power_deficit))
 
