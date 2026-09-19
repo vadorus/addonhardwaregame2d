@@ -26,14 +26,16 @@ const PLAN_PROFILES := [
 
 static func generate(base_input: Dictionary, context: Dictionary) -> Array:
 	var base_design := CPU_DESIGN.normalize(base_input)
-	var base_evaluation := CPU_DESIGN.evaluate(base_design)
+	var capabilities_value = context.get("cpu_capabilities", {})
+	var capabilities: Dictionary = capabilities_value if typeof(capabilities_value) == TYPE_DICTIONARY else {}
+	var base_evaluation := CPU_DESIGN.evaluate(base_design, capabilities)
 	var capability := _capability_score(context)
 	var generation_index := maxi(int(context.get("generation_index", 1)), 1)
 	var proposals: Array = []
 	for profile_value in PLAN_PROFILES:
 		var profile: Dictionary = profile_value
 		var design := _design_for(str(profile.key), base_design, context, capability)
-		var evaluation := CPU_DESIGN.evaluate(design)
+		var evaluation := CPU_DESIGN.evaluate(design, capabilities)
 		proposals.append(_build_proposal(profile, generation_index, design, evaluation, base_evaluation, context, capability))
 	_mark_recommendation(proposals, context, capability)
 	return proposals
@@ -56,11 +58,16 @@ static func _capability_score(context: Dictionary) -> float:
 	var equipment := clampf(float(context.get("equipment_score", 25.0)), 0.0, 100.0)
 	var management_modifier := clampf(float(context.get("management_modifier", 1.0)), 0.65, 1.15)
 	var management_score := remap(management_modifier, 0.65, 1.15, 0.0, 100.0)
-	return clampf(team * 0.45 + technology * 0.20 + maturity * 0.12 + equipment * 0.13 + management_score * 0.10, 0.0, 100.0)
+	var architecture := clampf(float(context.get("architecture_capability", 18.0)), 0.0, 100.0)
+	var layout := clampf(float(context.get("layout_score", 14.0)), 0.0, 100.0)
+	return clampf(team * 0.36 + technology * 0.16 + maturity * 0.10 + equipment * 0.11 + management_score * 0.08 + architecture * 0.12 + layout * 0.07, 0.0, 100.0)
 
 static func _design_for(archetype: String, base: Dictionary, context: Dictionary, capability: float) -> Dictionary:
 	var design := base.duplicate(true)
 	var manufacturing_score := float(context.get("manufacturing_score", 0.0))
+	var miniaturization_score := float(context.get("miniaturization_score", 0.0))
+	var architecture_capability := float(context.get("architecture_capability", 0.0))
+	var layout_score := float(context.get("layout_score", 0.0))
 	match archetype:
 		"SAFE":
 			design.frequency_ghz = float(base.frequency_ghz) * 1.08
@@ -68,19 +75,20 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 		"BOLD":
 			design.frequency_ghz = float(base.frequency_ghz) * 1.55
 			design.tdp_w = int(base.tdp_w) + maxi(2, int(round(float(base.tdp_w) * 0.35)))
-			if capability >= 58.0:
+			if capability >= 58.0 and architecture_capability >= 52.0:
 				design.cores = int(base.cores) + 1
+			if layout_score >= 30.0:
 				if float(base.cache_mb) <= 0.0:
 					design.cache_mb = 1.0 / 1024.0
 				else:
 					design.cache_mb = float(base.cache_mb) * 1.45
-			design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score)
+			design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
 		_:
 			design.frequency_ghz = float(base.frequency_ghz) * 1.24
 			design.tdp_w = int(base.tdp_w) + maxi(1, int(round(float(base.tdp_w) * 0.15)))
 			if capability >= 68.0:
-				design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score)
-			if capability >= 64.0 and int(base.cores) < 2:
+				design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
+			if capability >= 64.0 and architecture_capability >= 52.0 and int(base.cores) < 2:
 				design.cores = int(base.cores) + 1
 	_apply_segment(design, str(context.get("segment", "MAINSTREAM")), archetype)
 	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability)
@@ -124,8 +132,8 @@ static func _apply_focus(design: Dictionary, focus: String, archetype: String, c
 			elif float(design.cache_mb) > 0.0:
 				design.cache_mb = float(design.cache_mb) * 1.20
 
-static func _next_advanced_node(node_nm: int, manufacturing_score: float) -> int:
-	var nodes := CPU_DESIGN.available_nodes_for_mastery(manufacturing_score)
+static func _next_advanced_node(node_nm: int, manufacturing_score: float, miniaturization_score: float) -> int:
+	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
 	var index := nodes.find(node_nm)
 	if index < 0:
 		return node_nm
@@ -200,6 +208,9 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"capability":capability,
 		"team_score":float(context.get("team_score", 20.0)),
 		"technology_score":float(context.get("technology_score", 0.0)),
+		"architecture_capability":float(context.get("architecture_capability", 0.0)),
+		"layout_score":float(context.get("layout_score", 0.0)),
+		"miniaturization_score":float(context.get("miniaturization_score", 0.0)),
 		"research_score":float(context.get("research_score", 0.0)),
 		"research_confidence":float(context.get("research_confidence", 50.0)),
 		"field_experience":float(context.get("field_experience", 0.0)),
@@ -236,8 +247,13 @@ static func _risks_for(archetype: String, design: Dictionary, evaluation: Dictio
 	if float(evaluation.get("power_deficit_ratio", 0.0)) >= 0.12:
 		risks.append("Marge électrique / thermique insuffisante")
 	var node_profile: Dictionary = CPU_DESIGN.node_profile(int(design.node_nm))
-	if float(node_profile.get("unlock", 0.0)) > float(context.get("manufacturing_score", 0.0)) + 0.001:
-		risks.append("Procédé au-delà de notre maîtrise industrielle actuelle")
+	var process_capability := minf(float(context.get("manufacturing_score", 0.0)), float(context.get("miniaturization_score", 0.0)))
+	if float(node_profile.get("unlock", 0.0)) > process_capability + 0.001:
+		risks.append("Procédé au-delà de notre maîtrise miniaturisation / fabrication actuelle")
+	if int(design.cores) > 1 and float(context.get("architecture_capability", 0.0)) < 52.0:
+		risks.append("Architecture multicœur encore insuffisamment maîtrisée")
+	if float(design.cache_mb) > 0.0 and float(context.get("layout_score", 0.0)) < 30.0:
+		risks.append("Cartographie du circuit trop immature pour intégrer ce cache sereinement")
 	elif float(node_profile.get("difficulty", 0.65)) >= 1.10 and float(context.get("equipment_score", 25.0)) < 62.0:
 		risks.append("Procédé exigeant avec laboratoire encore limité")
 	if budget_ratio < 0.85:
