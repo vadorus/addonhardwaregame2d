@@ -146,6 +146,24 @@ static func decision_axes(evaluation: Dictionary, effective_months: int = -1) ->
 		"delivery": delivery_confidence
 	}
 
+static func decision_axis_delta(current_axes: Dictionary, reference_axes: Dictionary) -> Dictionary:
+	var result := {}
+	for key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
+		result[key] = float(current_axes.get(key, 0.0)) - float(reference_axes.get(key, 0.0))
+	return result
+
+static func decision_delta_summary(delta: Dictionary) -> String:
+	var changed: Array[String] = []
+	for key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
+		var value := float(delta.get(key, 0.0))
+		if absf(value) < 0.5:
+			continue
+		var sign := "+" if value > 0.0 else ""
+		changed.append("%s %s%.0f" % [decision_axis_label(key), sign, value])
+	if changed.is_empty():
+		return "Aucun écart par rapport à la référence."
+	return "Écart vs référence : " + " • ".join(changed)
+
 static func decision_axis_label(key: String) -> String:
 	match key:
 		"performance":
