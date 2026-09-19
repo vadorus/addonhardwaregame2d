@@ -276,9 +276,10 @@ func _learn_from_case(case_data: Dictionary, amount: float):
 	var issue_type := str(case_data.get("issue_type", "STABILITY"))
 	_add_field_experience(issue_type, amount)
 	if issue_type in ["STABILITY", "FIRMWARE", "THERMAL"]:
-		var reliability_data: Dictionary = ResearchManager.cpu_research_domains.get("RELIABILITY", {})
+		var reliability_data: Dictionary = ResearchManager.cpu_research_domains.get("RELIABILITY", {}).duplicate(true)
 		reliability_data["experience"] = clampf(float(reliability_data.get("experience", 0.0)) + amount * 0.32, 0.0, 100.0)
 		reliability_data["knowledge"] = clampf(float(reliability_data.get("knowledge", 0.0)) + amount * 0.12, 0.0, 100.0)
+		ResearchManager.cpu_research_domains["RELIABILITY"] = reliability_data
 	if issue_type == "MANUFACTURING":
 		ProductionManager.quality_knowledge = clampf(ProductionManager.quality_knowledge + amount * 0.22, 0.0, 100.0)
 	field_experience_changed.emit()
