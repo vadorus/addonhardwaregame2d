@@ -132,7 +132,25 @@ func _on_phase_report(project: Dictionary, report: Dictionary):
 		return
 	var project_id := str(project.get("id", ""))
 	var template_id := _template_for_weakness(str(report.get("weakness", "performance")))
-	_create_discovery(template_id, "PROJECT", project_id, project_id, "")
+	_create_discovery(template_id, "PROJECT", project_id, project_id, "", _research_team_context())
+
+func _research_team_context() -> Dictionary:
+	var leader_id := str(CompanyManager.departments.get("R&D", {}).get("leader_id", ""))
+	var lead := PersonnelManager.get_employee(leader_id)
+	if str(lead.get("department", "")) != "R&D" or str(lead.get("specialization", "")) != "cpu":
+		lead = {}
+		for employee_value in PersonnelManager.staff:
+			var employee: Dictionary = employee_value
+			if str(employee.get("department", "")) == "R&D" and str(employee.get("specialization", "")) == "cpu":
+				lead = employee
+				break
+	if lead.is_empty():
+		return {}
+	return {
+		"team_department":"R&D",
+		"team_lead":str(lead.get("name", "")),
+		"team_score":PersonnelManager.team_score("R&D", "cpu")
+	}
 
 func _on_product_launched(product: Dictionary):
 	var choices: Dictionary = product.get("industrialization", {})
@@ -150,7 +168,7 @@ func _on_quality_incident_resolved(incident: Dictionary, action_id: String):
 func _on_software_fix_completed(product_id: String, _fix: Dictionary):
 	_create_discovery("MICROCODE_TOOLING", "SOFTWARE", product_id, "", product_id)
 
-func _create_discovery(template_id: String, source_type: String, source_id: String, project_id: String, product_id: String) -> Dictionary:
+func _create_discovery(template_id: String, source_type: String, source_id: String, project_id: String, product_id: String, team_context: Dictionary = {}) -> Dictionary:
 	if not TEMPLATES.has(template_id):
 		return {}
 	var seen_key := "%s:%s" % [source_type, source_id]
@@ -169,6 +187,7 @@ func _create_discovery(template_id: String, source_type: String, source_id: Stri
 		"product_id":product_id,
 		"status":"PENDING"
 	}
+	discovery.merge(team_context, true)
 	_next_id += 1
 	pending.append(discovery)
 	CompanyManager.add_alert("Découverte : %s." % str(discovery.title))
@@ -198,6 +217,9 @@ func resolution_options(discovery_id: String) -> Array[Dictionary]:
 	var template: Dictionary = TEMPLATES.get(str(discovery.get("template_id", "")), {})
 	if template.is_empty():
 		return []
+	var research_months := int(template.get("research_months", 2))
+	if str(discovery.get("source_type", "")) == "PROJECT" and float(discovery.get("team_score", 0.0)) >= 95.0:
+		research_months = maxi(research_months - 1, 1)
 	return [
 		{
 			"id":"EXPLOIT_NOW",
@@ -210,8 +232,8 @@ func resolution_options(discovery_id: String) -> Array[Dictionary]:
 			"id":"DERIVED_RESEARCH",
 			"label":"Lancer une recherche dérivée",
 			"cost":int(template.get("research_cost", 12_000)),
-			"months":int(template.get("research_months", 2)),
-			"summary":"Plus cher et plus lent, mais bonus technologique durable nettement supérieur."
+			"months":research_months,
+			"summary":"Équipe experte : savoir-faire durable obtenu plus vite." if research_months < int(template.get("research_months", 2)) else "Plus cher et plus lent, mais bonus technologique durable nettement supérieur."
 		}
 	]
 
@@ -229,10 +251,16 @@ func resolve_discovery(discovery_id: String, action_id: String) -> bool:
 	if template.is_empty():
 		return false
 	var cost := 0
+	var months := 0
+	var valid_action := false
 	for option in resolution_options(discovery_id):
 		if str(option.get("id", "")) == action_id:
 			cost = int(option.get("cost", 0))
+			months = int(option.get("months", 0))
+			valid_action = true
 			break
+	if not valid_action:
+		return false
 	if cost > Economy.money:
 		return false
 	if cost > 0:
@@ -260,8 +288,8 @@ func resolve_discovery(discovery_id: String, action_id: String) -> bool:
 		var research := discovery.duplicate(true)
 		research["resolution"] = "DERIVED_RESEARCH"
 		research["status"] = "RESEARCH"
-		research["remaining_months"] = int(template.get("research_months", 2))
-		research["total_months"] = int(template.get("research_months", 2))
+		research["remaining_months"] = months
+		research["total_months"] = months
 		research["cost"] = cost
 		pending.erase(discovery)
 		active_research.append(research)

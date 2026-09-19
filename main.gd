@@ -2991,9 +2991,17 @@ func _refresh_discoveries():
 	var discovery := DiscoveryManager.get_pending_discovery()
 	discovery_card.visible = not discovery.is_empty()
 	if not discovery.is_empty():
-		discovery_label.text = "DÉCOUVERTE — %s\n%s\n\nChoisissez entre un gain immédiat limité et une recherche dérivée plus lente mais durable." % [
+		var team_line := ""
+		if discovery.has("team_score"):
+			team_line = "\nÉquipe %s • %s • maîtrise %.0f/100." % [
+				str(discovery.get("team_department", "R&D")),
+				str(discovery.get("team_lead", "responsable non désigné")),
+				float(discovery.get("team_score", 0.0))
+			]
+		discovery_label.text = "DÉCOUVERTE — %s\n%s%s\n\nChoisissez entre un gain immédiat limité et une recherche dérivée plus lente mais durable." % [
 			str(discovery.get("title", "Piste technique")),
-			str(discovery.get("summary", ""))
+			str(discovery.get("summary", "")),
+			team_line
 		]
 		for option in DiscoveryManager.resolution_options(str(discovery.get("id", ""))):
 			var action_id := str(option.get("id", ""))

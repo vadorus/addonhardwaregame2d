@@ -166,6 +166,7 @@ func _ready() -> void:
 	var discovery_economy_state := Economy.get_state().duplicate(true)
 	var discovery_research_state := ResearchManager.get_state().duplicate(true)
 	var discovery_manager_state := DiscoveryManager.get_state().duplicate(true)
+	var discovery_personnel_state := PersonnelManager.get_state().duplicate(true)
 	var reusable_technology_state := TechnologyManager.get_state().duplicate(true)
 	TechnologyManager.reset()
 	DiscoveryManager.reset()
@@ -179,6 +180,16 @@ func _ready() -> void:
 	var first_discovery := DiscoveryManager.get_pending_discovery()
 	if str(first_discovery.get("template_id", "")) != "POWER_MANAGEMENT":
 		_fail("Efficiency weakness did not create the expected power-management discovery")
+		return
+	if str(first_discovery.get("team_lead", "")) != "Camille Durand" or float(first_discovery.get("team_score", 0.0)) <= 0.0:
+		_fail("Prototype discovery did not retain its responsible CPU team")
+		return
+	var standard_research_months := 0
+	for option in DiscoveryManager.resolution_options(str(first_discovery.get("id", ""))):
+		if str(option.get("id", "")) == "DERIVED_RESEARCH":
+			standard_research_months = int(option.get("months", 0))
+	if standard_research_months != 2:
+		_fail("Founding team unexpectedly accelerated derived research")
 		return
 	var cpu_tech_before_exploit := float(ResearchManager.technologies.get("cpu", 0.0))
 	var money_before_discovery := Economy.money
@@ -197,6 +208,32 @@ func _ready() -> void:
 	if TechnologyManager.has_technology("ADAPTIVE_POWER"):
 		_fail("Immediate discovery exploitation incorrectly unlocked a reusable technology")
 		return
+	PersonnelManager.staff[0]["skill"] = 95
+	PersonnelManager.staff[0]["aptitude"] = 95
+	PersonnelManager.staff[0]["domain_experience"]["cpu"] = 10.0
+	var expert_project := {"id":"PRJ-EXPERT-DISCOVERY", "sector":"CPU"}
+	DiscoveryManager._on_phase_report(expert_project, {"phase":"Prototype", "weakness":"reliability"})
+	var expert_discovery := DiscoveryManager.get_pending_discovery()
+	if float(expert_discovery.get("team_score", 0.0)) < 95.0:
+		_fail("Expert CPU team did not produce a high-expertise discovery")
+		return
+	var expert_months := 0
+	for option in DiscoveryManager.resolution_options(str(expert_discovery.get("id", ""))):
+		if str(option.get("id", "")) == "DERIVED_RESEARCH":
+			expert_months = int(option.get("months", 0))
+	if expert_months != 1 or not DiscoveryManager.resolve_discovery(str(expert_discovery.get("id", "")), "DERIVED_RESEARCH"):
+		_fail("Expert CPU team did not accelerate derived research")
+		return
+	var expert_round_trip := DiscoveryManager.get_state().duplicate(true)
+	DiscoveryManager.load_state(expert_round_trip)
+	if DiscoveryManager.get_active_research().is_empty() or int(DiscoveryManager.get_active_research()[0].get("remaining_months", 0)) != 1:
+		_fail("Accelerated derived research did not survive state round-trip")
+		return
+	DiscoveryManager.process_month()
+	if not TechnologyManager.has_technology("CROSS_VALIDATION"):
+		_fail("Accelerated derived research did not unlock reusable validation methods")
+		return
+	PersonnelManager.load_state(discovery_personnel_state)
 
 	var derived_discovery := DiscoveryManager.create_test_discovery("CACHE_POLICY", "DERIVED-TEST")
 	if derived_discovery.is_empty():

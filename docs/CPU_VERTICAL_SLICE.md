@@ -16,7 +16,7 @@ Le rendement dépend de la fiabilité finale, de la complexité, du procédé et
 
 Depuis la preview.6, la chaîne industrielle est également jouable via contrat industriel, packaging et couverture de test. Après lancement, chaque CPU possède une qualité de microcode, une couverture de compatibilité et une dette de support. Des incidents logiciels peuvent apparaître et imposer un choix entre hotfix rapide, correctif validé et programme de compatibilité, avec coût, délai et éventuel compromis de performance.
 
-Depuis la preview.7, les phases R&D, l'analyse SAV, les partenariats industriels et les correctifs logiciels peuvent produire des découvertes d'équipe. Le joueur choisit entre exploiter immédiatement une piste pour un petit gain ou financer une recherche dérivée de deux mois pour créer un savoir-faire durable réutilisable dans les générations suivantes.
+Depuis la preview.7, les phases R&D, l'analyse SAV, les partenariats industriels et les correctifs logiciels peuvent produire des découvertes d'équipe. Le joueur choisit entre exploiter immédiatement une piste pour un petit gain ou financer une recherche dérivée pour créer un savoir-faire durable réutilisable dans les générations suivantes. Une découverte issue d'un prototype CPU conserve l'identité et la maîtrise de l'équipe R&D qui l'a produite ; une équipe très expérimentée peut ramener cette recherche de deux mois à un mois.
 
 Depuis la preview.8, l'IPC cible et la stratégie de compatibilité de plateforme sont des choix explicites dès la conception. Un IPC plus ambitieux augmente performance, coût, complexité et risque. Préserver une plateforme améliore la compatibilité et la stabilité logicielle initiales ; une rupture de plateforme augmente le potentiel d'innovation mais crée davantage de travail microcode et firmware.
 
@@ -303,4 +303,3 @@ La fin de commercialisation n'est pas la fin du produit. Il reste des garanties,
 - UCIe Consortium, interconnexion die-to-die : https://www.uciexpress.org/specification
 - Intel, familles, niveaux et suffixes de processeurs : https://www.intel.com/content/www/us/en/processors/processor-numbers.html
 - Intel, exemple officiel d’une gamme partageant une plateforme avec cœurs, cache et puissance différenciés : https://www.intel.com/content/www/us/en/products/docs/processors/core-ultra/core-ultra-desktop-processors-series-2-brief.html
-
