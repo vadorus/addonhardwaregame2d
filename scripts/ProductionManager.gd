@@ -175,6 +175,7 @@ func _process_learning(node_nm: int, complexity: float, team: float):
 	quality_knowledge = clampf(quality_knowledge + 0.30 + team / 420.0, 0.0, 100.0)
 	maintenance_knowledge = clampf(maintenance_knowledge + 0.18 + team / 600.0, 0.0, 100.0)
 	ResearchManager.technologies["manufacturing"] = clampf(float(ResearchManager.technologies.get("manufacturing", 12.0)) + mastery_gain * 0.20, 0.0, 100.0)
+	ResearchManager.add_cpu_capability_experience("MINIATURIZATION", mastery_gain * 0.055)
 
 func _complete_job(job: Dictionary):
 	var project: Dictionary = job.get("project", {})
