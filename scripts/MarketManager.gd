@@ -126,10 +126,42 @@ func _advance_competitors() -> void:
 			competitor["price"] = maxi(1, int(round(current_price * 1.0015)))
 		competitors[sector] = rows
 
+func product_age_penalty(product: Dictionary) -> float:
+	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 12:
+		return 0.0
+	var monthly_penalty := 0.50
+	match str(product.get("target_segment", "MAINSTREAM")):
+		"BUDGET":
+			monthly_penalty = 0.32
+		"ENTHUSIAST":
+			monthly_penalty = 0.72
+		"PRO":
+			monthly_penalty = 0.58
+		"ENTERPRISE":
+			monthly_penalty = 0.45
+		"PREMIUM":
+			monthly_penalty = 0.66
+		_:
+			monthly_penalty = 0.50
+	return minf(float(age_months - 12) * monthly_penalty, 24.0)
+
+func product_lifecycle_label(product: Dictionary) -> String:
+	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 6:
+		return "Nouveau"
+	if age_months <= 18:
+		return "Mature"
+	if age_months <= 30:
+		return "Vieillissant"
+	return "Ancienne génération"
+
 func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var sd: Dictionary = GameData.SECTORS[str(product.sector)]
 	var target := str(product.target_segment)
-	var score := evaluate_product(product, target)
+	var raw_score := evaluate_product(product, target)
+	var age_penalty := product_age_penalty(product)
+	var score := clampf(raw_score - age_penalty, 0.0, 100.0)
 	var competitor_avg := 0.0
 	var comps: Array = competitors.get(str(product.sector), [])
 	for comp in comps:
@@ -142,7 +174,7 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var units := int(float(sd.market_units) * share)
 	var expectation: float = 50.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
 	var gap := score - expectation
-	return {"units":units,"score":score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
+	return {"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
 
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}
