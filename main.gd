@@ -203,7 +203,7 @@ func _build_ui():
 	top.add_child(brand_box)
 	company_label = _label("Tech Empire", 18)
 	brand_box.add_child(company_label)
-	var era_label := _muted_label("Vertical slice • CPU", 12)
+	var era_label := _muted_label("Vertical slice • CPU • débuts du microprocesseur", 12)
 	brand_box.add_child(era_label)
 
 	var spacer := Control.new()
@@ -214,7 +214,7 @@ func _build_ui():
 	var date_box := VBoxContainer.new()
 	date_box.custom_minimum_size.x = 125
 	date_box.add_child(_eyebrow("CALENDRIER"))
-	date_label = _label("Jour 1 • Mois 1 • 2025", 14)
+	date_label = _label("Jour 1 • Mois 1 • 1971", 14)
 	date_box.add_child(date_label)
 	top.add_child(date_box)
 
@@ -603,19 +603,16 @@ func _create_research_tab():
 	red_legend.add_theme_color_override("font_color", APP_RED)
 	guidance_legend.add_child(red_legend)
 
-	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs", 0, "cores")
-	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1, "frequency_ghz")
-	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo", 0, "cache_mb")
+	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 1.0, 4.0, 1.0, 1.0, " cœur(s)", 0, "cores")
+	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 0.1, 10.0, 0.1, 0.8, " MHz", 1, "frequency_ghz")
+	rd_cache = _add_lab_slider(configuration_box, "Cache intégré", 0.0, 32.0, 1.0, 0.0, " Ko", 0, "cache_mb")
 
 	rd_node = OptionButton.new()
-	for node_nm in CPU_DESIGN.available_nodes():
-		rd_node.add_item(CPU_DESIGN.node_label(int(node_nm)))
-		rd_node.set_item_metadata(rd_node.item_count - 1, int(node_nm))
-	_select_meta(rd_node, "7")
+	_refresh_cpu_node_options()
 	rd_node.item_selected.connect(func(_index): _refresh_cpu_preview())
-	_add_labeled_control(configuration_box, "Procédé de gravure", rd_node)
+	_add_labeled_control(configuration_box, "Procédé de fabrication", rd_node)
 
-	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe thermique", 35.0, 250.0, 5.0, 95.0, " W", 0, "tdp_w")
+	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe électrique / thermique", 1.0, 25.0, 1.0, 2.0, " W", 0, "tdp_w")
 
 	configuration_box.add_child(_eyebrow("AVIS DE L'ÉQUIPE TECHNIQUE"))
 	var guidance_panel := PanelContainer.new()
@@ -795,12 +792,12 @@ func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 	cpu_metric_labels[key] = value_label
 
 func _current_cpu_design() -> Dictionary:
-	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null:
+	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null or rd_node.item_count == 0:
 		return CPU_DESIGN.default_design()
 	return CPU_DESIGN.normalize({
 		"cores": int(rd_cores.value),
-		"frequency_ghz": float(rd_frequency.value),
-		"cache_mb": int(rd_cache.value),
+		"frequency_ghz": float(rd_frequency.value) / 1000.0,
+		"cache_mb": float(rd_cache.value) / 1024.0,
 		"node_nm": int(rd_node.get_item_metadata(rd_node.selected)),
 		"tdp_w": int(rd_tdp.value)
 	})
@@ -854,10 +851,10 @@ func _refresh_generation_plan_summary():
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
-	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœur(s) • %s • %s • %s • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
-		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
+		int(design.get("cores", 0)), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.get("node_nm", 10000))), int(design.get("tdp_w", 0)),
 		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
 		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("development_confidence", 50.0)), float(proposal.get("field_experience", 0.0)), float(proposal.get("target_fit", 0.0)),
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
@@ -877,13 +874,57 @@ func _apply_selected_generation_plan():
 	_set_cpu_design_controls(proposal.get("design", {}), "Plan %s" % str(proposal.get("title", "sélectionné")))
 	status_label.text = "Plan %s appliqué. Vous pouvez encore ajuster chaque paramètre." % str(proposal.get("title", "sélectionné"))
 
+func _refresh_cpu_node_options():
+	if rd_node == null:
+		return
+	var current_node := int(CPU_DESIGN.default_design().node_nm)
+	if rd_node.item_count > 0 and rd_node.selected >= 0:
+		current_node = int(rd_node.get_item_metadata(rd_node.selected))
+	var mastery := float(ResearchManager.technologies.get("manufacturing", 0.0))
+	var nodes := CPU_DESIGN.available_nodes_for_mastery(mastery)
+	if not nodes.has(current_node):
+		nodes.append(current_node)
+	rd_node.clear()
+	for node_value in nodes:
+		var node_nm := int(node_value)
+		rd_node.add_item(CPU_DESIGN.node_label(node_nm))
+		rd_node.set_item_metadata(rd_node.item_count - 1, node_nm)
+	_select_meta(rd_node, str(current_node))
+	if rd_node.selected < 0 and rd_node.item_count > 0:
+		rd_node.select(0)
+
+func _ensure_cpu_node_option(node_nm: int):
+	if rd_node == null:
+		return
+	for index in range(rd_node.item_count):
+		if int(rd_node.get_item_metadata(index)) == node_nm:
+			return
+	rd_node.add_item(CPU_DESIGN.node_label(node_nm))
+	rd_node.set_item_metadata(rd_node.item_count - 1, node_nm)
+
+func _refresh_cpu_control_limits(design: Dictionary):
+	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_tdp == null:
+		return
+	var normalized := CPU_DESIGN.normalize(design)
+	var node: Dictionary = CPU_DESIGN.node_profile(int(normalized.node_nm))
+	var reference_mhz := maxf(float(node.get("reference_mhz", 1.0)), 0.1)
+	var reference_cores := maxf(float(node.get("core_reference", 1.0)), 1.0)
+	var reference_cache_kb := maxf(float(node.get("cache_reference_kb", 0.0)), 0.0)
+	var base_power := maxf(float(node.get("base_power", 2.0)), 1.0)
+	rd_cores.max_value = maxf(maxf(4.0, reference_cores * 2.0), float(normalized.cores))
+	rd_frequency.max_value = maxf(maxf(10.0, reference_mhz * 2.8), float(normalized.frequency_ghz) * 1000.0)
+	rd_cache.max_value = maxf(maxf(32.0, reference_cache_kb * 3.0), float(normalized.cache_mb) * 1024.0)
+	rd_tdp.max_value = maxf(maxf(25.0, base_power * 3.5), float(normalized.tdp_w))
+
 func _set_cpu_design_controls(input: Dictionary, reference_name: String = "Référence"):
 	var design := CPU_DESIGN.normalize(input)
+	_refresh_cpu_control_limits(design)
 	lab_reference_design = design.duplicate(true)
 	lab_reference_name = reference_name
 	rd_cores.value = int(design.cores)
-	rd_frequency.value = float(design.frequency_ghz)
-	rd_cache.value = int(design.cache_mb)
+	rd_frequency.value = float(design.frequency_ghz) * 1000.0
+	rd_cache.value = float(design.cache_mb) * 1024.0
+	_ensure_cpu_node_option(int(design.node_nm))
 	_select_meta(rd_node, str(design.node_nm))
 	rd_tdp.value = int(design.tdp_w)
 	_refresh_cpu_preview()
@@ -897,6 +938,7 @@ func _refresh_cpu_preview():
 	if lab_profile_label == null or lab_chip == null:
 		return
 	var design := _current_cpu_design()
+	_refresh_cpu_control_limits(design)
 	var evaluation := CPU_DESIGN.evaluate(design)
 	var segment := _meta(rd_segment) if rd_segment != null else "MAINSTREAM"
 	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
@@ -929,8 +971,8 @@ func _refresh_cpu_preview():
 	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence)
 
 	lab_profile_label.text = str(evaluation.profile)
-	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
-		int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
+		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 		_money(estimated_program_cost), risk_label, risk
 	]
 	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
@@ -955,10 +997,10 @@ func _refresh_cpu_preview():
 			metric_label.text = "%.0f%s" % [score, delta_text]
 			metric_label.add_theme_color_override("font_color", APP_GREEN if delta > 0.5 else (APP_RED if delta < -0.5 else APP_TEXT))
 
-	var thermal_text := "TDP cohérent"
-	if float(evaluation.power_deficit) > 0.1:
-		thermal_text = "déficit thermique %.0f W" % float(evaluation.power_deficit)
-	lab_technical_detail_label.text = "Innovation %.0f • durabilité %.0f • complexité %.0f/100 • risque %.0f/100\nTDP requis ~%.0f W • %s • coût unitaire %s €" % [
+	var thermal_text := "enveloppe cohérente"
+	if float(evaluation.power_deficit) > 0.05:
+		thermal_text = "déficit électrique/thermique %.1f W" % float(evaluation.power_deficit)
+	lab_technical_detail_label.text = "Innovation %.0f • durabilité %.0f • complexité %.0f/100 • risque %.0f/100\nBesoin estimé ~%.1f W • %s • coût unitaire %s €" % [
 		float(evaluation.innovation), float(evaluation.sustainability), float(evaluation.complexity), risk,
 		float(evaluation.required_tdp), thermal_text, _money(int(evaluation.unit_cost))
 	]
@@ -1026,11 +1068,13 @@ func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
 func _format_guidance_value(key: String, value: float) -> String:
 	match key:
 		"cores":
-			return "%d cœurs" % int(round(value))
+			return "%d cœur(s)" % int(round(value))
 		"frequency_ghz":
-			return "%.1f GHz" % value
+			var mhz := value * 1000.0
+			return "%.1f MHz" % mhz if mhz < 10.0 else "%.0f MHz" % mhz
 		"cache_mb":
-			return "%d Mo" % int(round(value))
+			var kb := value * 1024.0
+			return "aucun cache" if kb < 0.5 else "%d Ko" % int(round(kb))
 		"tdp_w":
 			return "%d W" % int(round(value))
 		_:
@@ -1116,7 +1160,7 @@ func _build_setup_layer():
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
 	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("La vertical slice actuelle commence par la branche CPU. Développez vos équipes, vos technologies et plusieurs générations de processeurs avant l’ouverture des autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var desc:=_label("1971. La vertical slice commence aux débuts du microprocesseur : votre petite équipe doit apprendre à concevoir, industrialiser et faire évoluer ses propres CPU avant d’ouvrir d’autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
 	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
 	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
@@ -1564,7 +1608,7 @@ func _refresh_dashboard():
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
-		dashboard_project_meta_label.text = "%d cœurs • %.1f GHz • %d nm • %s • cible %s" % [int(active_design.cores), float(active_design.frequency_ghz), int(active_design.node_nm), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
+		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
 		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
 		dashboard_project_progress.value = overall_progress
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
@@ -1735,6 +1779,7 @@ func _apply_research_plan():
 func _refresh_research():
 	if tech_label == null:
 		return
+	_refresh_cpu_node_options()
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
 	var capacity := ResearchManager.get_cpu_research_capacity()
@@ -1801,8 +1846,8 @@ func _refresh_research():
 				float(development_snapshot.get("team_score", 0.0)),
 				float(development_snapshot.get("confidence", 0.0))
 			])
-		lines.append("  %d cœurs • %.1f GHz • %d Mo • %d nm • %d W • coût cible %s €" % [
-			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w), _money(int(estimate.unit_cost))
+		lines.append("  %d cœur(s) • %s • %s • %s • %d W • coût cible %s €" % [
+			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w), _money(int(estimate.unit_cost))
 		])
 		lines.append("  Cible %s • %s • priorité %s" % [
 			str(GameData.SEGMENTS.get(str(project.segment), {}).get("label", str(project.segment))),
@@ -1854,8 +1899,10 @@ func _refresh_products():
 				ProductionManager.maintenance_knowledge
 			]
 		]
-		for node_nm in [14, 10, 7, 5, 3]:
-			production_lines.append("• Maîtrise %d nm : %.1f/100" % [node_nm, ProductionManager.get_process_mastery(node_nm)])
+		var visible_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+		for node_value in visible_nodes:
+			var node_nm := int(node_value)
+			production_lines.append("• Maîtrise %s : %.1f/100" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
 		for job in ProductionManager.jobs:
 			var result: Dictionary = job.get("result", {})
 			if str(job.get("status", "")) == "INDUSTRIALIZATION":
@@ -1933,10 +1980,10 @@ func _refresh_product_details():
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
-			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 			float(product.get("yield_rate", 0.0)) * 100.0, float(product.get("manufacturing_quality", 60.0)),
 			float(product.get("defect_rate", 0.025)) * 100.0, float(product.get("process_mastery", 35.0)),
 			int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,

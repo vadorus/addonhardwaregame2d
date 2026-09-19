@@ -2,9 +2,9 @@ extends Control
 
 var _progress := 0.0
 var _launched := false
-var _cores := 8
-var _node_nm := 7
-var _tdp_w := 95
+var _cores := 1
+var _node_nm := 10000
+var _tdp_w := 2
 
 const CHIP_CASE := Color(0.157, 0.220, 0.282, 1.0)
 const CHIP_SUBSTRATE_COOL := Color(0.055, 0.204, 0.176, 1.0)
@@ -27,9 +27,9 @@ func set_progress(value: float, launched: bool = false) -> void:
 	queue_redraw()
 
 func set_design(design: Dictionary, progress: float = 0.0, launched: bool = false) -> void:
-	_cores = clampi(int(design.get("cores", 8)), 2, 32)
-	_node_nm = clampi(int(design.get("node_nm", 7)), 3, 14)
-	_tdp_w = clampi(int(design.get("tdp_w", 95)), 35, 250)
+	_cores = clampi(int(design.get("cores", 1)), 1, 64)
+	_node_nm = clampi(int(design.get("node_nm", 10000)), 3, 10000)
+	_tdp_w = clampi(int(design.get("tdp_w", 2)), 1, 400)
 	set_progress(progress, launched)
 
 func _draw() -> void:
@@ -50,10 +50,10 @@ func _draw() -> void:
 		draw_line(Vector2(vertical_x, origin.y + side), Vector2(vertical_x, origin.y + side + 10.0), CHIP_GOLD, 3.0)
 
 	draw_rect(chip_rect, CHIP_CASE, true)
-	var border_color := CHIP_CYAN if _node_nm <= 5 else CHIP_GOLD
+	var border_color := CHIP_CYAN if _node_nm <= 180 else CHIP_GOLD
 	draw_rect(chip_rect, border_color, false, 4.0)
 	var substrate := chip_rect.grow(-12.0)
-	var heat := clampf(remap(float(_tdp_w), 35.0, 250.0, 0.0, 1.0), 0.0, 1.0)
+	var heat := clampf(remap(float(_tdp_w), 1.0, 220.0, 0.0, 1.0), 0.0, 1.0)
 	draw_rect(substrate, CHIP_SUBSTRATE_COOL.lerp(CHIP_SUBSTRATE_HOT, heat * 0.72), true)
 
 	var gap := 4.0
@@ -68,7 +68,7 @@ func _draw() -> void:
 			gap + float(column) * (core_width + gap),
 			gap + float(row) * (core_height + gap)
 		)
-		var core_color := CHIP_ADVANCED if _node_nm <= 5 else (CHIP_CORE if (row + column) % 2 == 0 else CHIP_CORE_ALT)
+		var core_color := CHIP_ADVANCED if _node_nm <= 180 else (CHIP_CORE if (row + column) % 2 == 0 else CHIP_CORE_ALT)
 		draw_rect(Rect2(core_origin, Vector2(core_width, core_height)), core_color, true)
 
 	var center := chip_rect.get_center()

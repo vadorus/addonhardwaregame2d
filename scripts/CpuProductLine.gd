@@ -133,7 +133,8 @@ static func _project_metrics(project: Dictionary, architecture_estimate: Diction
 	return result
 
 static func _estimate_yield(architecture: Dictionary, estimate: Dictionary, metrics: Dictionary, division_maturity: float) -> float:
-	var node_penalty: float = float({14:0.00, 10:0.02, 7:0.05, 5:0.10, 3:0.16}.get(int(architecture.node_nm), 0.06))
+	var node_profile: Dictionary = CPU_DESIGN.node_profile(int(architecture.node_nm))
+	var node_penalty := clampf((float(node_profile.get("difficulty", 0.65)) - 0.65) * 0.15, 0.0, 0.16)
 	var reliability := float(metrics.get("reliability", estimate.get("reliability", 60.0)))
 	var complexity := float(estimate.get("complexity", 50.0))
 	var yield_rate := 0.68 + (reliability - 60.0) * 0.003
@@ -151,18 +152,18 @@ static func _tier_design(architecture: Dictionary, tier: String) -> Dictionary:
 	var design := architecture.duplicate(true)
 	match tier:
 		"ESSENTIAL":
-			design.cores = _even_value(float(architecture.cores) * 0.62, 2)
-			design.frequency_ghz = float(architecture.frequency_ghz) - 0.45
-			design.cache_mb = _even_value(float(architecture.cache_mb) * 0.66, 4)
-			design.tdp_w = int(round(float(architecture.tdp_w) * 0.72))
+			design.cores = _scaled_core_value(float(architecture.cores) * 0.72)
+			design.frequency_ghz = float(architecture.frequency_ghz) * 0.82
+			design.cache_mb = maxf(float(architecture.cache_mb) * 0.70, 0.0)
+			design.tdp_w = maxi(1, int(round(float(architecture.tdp_w) * 0.78)))
 		"SIGNATURE":
-			design.cores = _even_value(float(architecture.cores) * 0.82, 2)
-			design.frequency_ghz = float(architecture.frequency_ghz) - 0.15
-			design.cache_mb = _even_value(float(architecture.cache_mb) * 0.84, 4)
-			design.tdp_w = int(round(float(architecture.tdp_w) * 0.88))
+			design.cores = _scaled_core_value(float(architecture.cores) * 0.90)
+			design.frequency_ghz = float(architecture.frequency_ghz) * 0.95
+			design.cache_mb = maxf(float(architecture.cache_mb) * 0.88, 0.0)
+			design.tdp_w = maxi(1, int(round(float(architecture.tdp_w) * 0.92)))
 		_:
-			design.frequency_ghz = float(architecture.frequency_ghz) + 0.20
-			design.tdp_w = int(architecture.tdp_w) + 15
+			design.frequency_ghz = float(architecture.frequency_ghz) * 1.10
+			design.tdp_w = int(architecture.tdp_w) + maxi(1, int(round(float(architecture.tdp_w) * 0.18)))
 	return CPU_DESIGN.normalize(design)
 
 static func _tier_metrics(project_metrics: Dictionary, design_estimate: Dictionary, tier: String) -> Dictionary:
@@ -195,8 +196,8 @@ static func _target_segment(project_segment: String, tier: String) -> String:
 				return "PRO"
 			return "MAINSTREAM"
 
-static func _even_value(value: float, minimum: int) -> int:
-	return maxi(int(round(value / 2.0)) * 2, minimum)
+static func _scaled_core_value(value: float) -> int:
+	return maxi(int(round(value)), 1)
 
 static func _round_price(value: float) -> int:
 	return int(round(value / 5.0) * 5.0)

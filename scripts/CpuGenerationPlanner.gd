@@ -60,25 +60,28 @@ static func _capability_score(context: Dictionary) -> float:
 
 static func _design_for(archetype: String, base: Dictionary, context: Dictionary, capability: float) -> Dictionary:
 	var design := base.duplicate(true)
+	var manufacturing_score := float(context.get("manufacturing_score", 0.0))
 	match archetype:
 		"SAFE":
-			design.cores = int(base.cores) + (2 if int(base.cores) < 12 else 0)
-			design.frequency_ghz = float(base.frequency_ghz) + 0.1
-			design.cache_mb = int(base.cache_mb) + 4
+			design.frequency_ghz = float(base.frequency_ghz) * 1.08
 			design.tdp_w = int(base.tdp_w)
 		"BOLD":
-			design.cores = int(base.cores) + 4 + int(floor(capability / 35.0)) * 2
-			design.frequency_ghz = float(base.frequency_ghz) + 0.6
-			design.cache_mb = int(base.cache_mb) + 16
-			design.node_nm = _next_advanced_node(int(base.node_nm))
-			design.tdp_w = int(base.tdp_w) + 30
+			design.frequency_ghz = float(base.frequency_ghz) * 1.55
+			design.tdp_w = int(base.tdp_w) + maxi(2, int(round(float(base.tdp_w) * 0.35)))
+			if capability >= 58.0:
+				design.cores = int(base.cores) + 1
+				if float(base.cache_mb) <= 0.0:
+					design.cache_mb = 1.0 / 1024.0
+				else:
+					design.cache_mb = float(base.cache_mb) * 1.45
+			design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score)
 		_:
-			design.cores = int(base.cores) + 4
-			design.frequency_ghz = float(base.frequency_ghz) + 0.3
-			design.cache_mb = int(base.cache_mb) + 8
-			if capability >= 66.0:
-				design.node_nm = _next_advanced_node(int(base.node_nm))
-			design.tdp_w = int(base.tdp_w) + 10
+			design.frequency_ghz = float(base.frequency_ghz) * 1.24
+			design.tdp_w = int(base.tdp_w) + maxi(1, int(round(float(base.tdp_w) * 0.15)))
+			if capability >= 68.0:
+				design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score)
+			if capability >= 64.0 and int(base.cores) < 2:
+				design.cores = int(base.cores) + 1
 	_apply_segment(design, str(context.get("segment", "MAINSTREAM")), archetype)
 	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability)
 	return CPU_DESIGN.normalize(design)
@@ -86,41 +89,43 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 static func _apply_segment(design: Dictionary, segment: String, archetype: String) -> void:
 	match segment:
 		"BUDGET":
-			design.cache_mb = maxi(int(design.cache_mb) - 4, 4)
-			design.tdp_w = maxi(int(design.tdp_w) - 10, 35)
+			design.frequency_ghz = float(design.frequency_ghz) * 0.92
+			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
 		"ENTHUSIAST":
-			design.frequency_ghz = float(design.frequency_ghz) + 0.2
-			design.tdp_w = int(design.tdp_w) + 10
+			design.frequency_ghz = float(design.frequency_ghz) * 1.10
+			design.tdp_w = int(design.tdp_w) + 1
 		"PRO":
-			design.cores = int(design.cores) + 2
-			design.cache_mb = int(design.cache_mb) + 4
+			design.frequency_ghz = float(design.frequency_ghz) * 1.04
+			if float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.18
 		"ENTERPRISE":
-			design.cores = int(design.cores) + 4
-			design.cache_mb = int(design.cache_mb) + 8
-			design.tdp_w = int(design.tdp_w) + (10 if archetype != "SAFE" else 0)
+			design.tdp_w = int(design.tdp_w) + (1 if archetype != "SAFE" else 0)
+			if float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.25
 		"PREMIUM":
-			design.frequency_ghz = float(design.frequency_ghz) + 0.1
-			design.cache_mb = int(design.cache_mb) + 4
+			design.frequency_ghz = float(design.frequency_ghz) * 1.06
 
 static func _apply_focus(design: Dictionary, focus: String, archetype: String, capability: float) -> void:
 	match focus:
 		"PERFORMANCE":
-			design.cores = int(design.cores) + 2
-			design.frequency_ghz = float(design.frequency_ghz) + 0.2
-			design.tdp_w = int(design.tdp_w) + 10
+			design.frequency_ghz = float(design.frequency_ghz) * 1.12
+			design.tdp_w = int(design.tdp_w) + 1
+			if capability >= 72.0:
+				design.cores = int(design.cores) + 1
 		"EFFICIENCY", "SUSTAINABILITY":
-			design.frequency_ghz = float(design.frequency_ghz) - 0.1
-			design.tdp_w = maxi(int(design.tdp_w) - 15, 35)
+			design.frequency_ghz = float(design.frequency_ghz) * 0.92
+			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
 		"RELIABILITY":
-			design.frequency_ghz = float(design.frequency_ghz) - 0.1
-			design.tdp_w = int(design.tdp_w) + 5
+			design.frequency_ghz = float(design.frequency_ghz) * 0.95
+			design.tdp_w = int(design.tdp_w) + 1
 		"INNOVATION":
-			design.cache_mb = int(design.cache_mb) + 4
-			if archetype != "SAFE" and capability >= 56.0:
-				design.node_nm = _next_advanced_node(int(design.node_nm))
+			if float(design.cache_mb) <= 0.0 and capability >= 55.0:
+				design.cache_mb = 1.0 / 1024.0
+			elif float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.20
 
-static func _next_advanced_node(node_nm: int) -> int:
-	var nodes := CPU_DESIGN.available_nodes()
+static func _next_advanced_node(node_nm: int, manufacturing_score: float) -> int:
+	var nodes := CPU_DESIGN.available_nodes_for_mastery(manufacturing_score)
 	var index := nodes.find(node_nm)
 	if index < 0:
 		return node_nm
@@ -228,10 +233,13 @@ static func _risks_for(archetype: String, design: Dictionary, evaluation: Dictio
 	var risks: Array = []
 	if capability_gap >= 8.0:
 		risks.append("Charge de validation supérieure aux capacités actuelles")
-	if float(evaluation.power_deficit) >= 6.0:
-		risks.append("Marge thermique insuffisante")
-	if int(design.node_nm) <= 5 and float(context.get("equipment_score", 25.0)) < 62.0:
-		risks.append("Procédé avancé avec laboratoire encore limité")
+	if float(evaluation.get("power_deficit_ratio", 0.0)) >= 0.12:
+		risks.append("Marge électrique / thermique insuffisante")
+	var node_profile: Dictionary = CPU_DESIGN.node_profile(int(design.node_nm))
+	if float(node_profile.get("unlock", 0.0)) > float(context.get("manufacturing_score", 0.0)) + 0.001:
+		risks.append("Procédé au-delà de notre maîtrise industrielle actuelle")
+	elif float(node_profile.get("difficulty", 0.65)) >= 1.10 and float(context.get("equipment_score", 25.0)) < 62.0:
+		risks.append("Procédé exigeant avec laboratoire encore limité")
 	if budget_ratio < 0.85:
 		risks.append("Budget mensuel serré")
 	var research_confidence := float(context.get("research_confidence", 50.0))
