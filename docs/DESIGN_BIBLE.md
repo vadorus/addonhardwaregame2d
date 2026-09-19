@@ -204,6 +204,46 @@ Pendant un projet, elles peuvent :
 
 Une découverte doit être liée au travail, à la spécialisation de l'équipe, à son équipement et à son niveau. Elle ne tombe pas au hasard sans explication.
 
+## 7A. R&D produit, R&D Concept et apprentissage technique
+
+La recherche CPU est séparée en deux intentions complémentaires.
+
+### R&D produit / publique
+
+Elle transforme les connaissances déjà suffisamment maîtrisées en produits commercialisables. Elle cherche un compromis viable entre performance, consommation, fiabilité, coût, délai et capacité industrielle.
+
+### R&D Concept CPU
+
+Elle sert de laboratoire avancé, comparable au rôle d'un programme de compétition dans l'automobile : le but n'est pas nécessairement de vendre immédiatement le prototype, mais de préparer des technologies qui pourront migrer vers les produits futurs.
+
+Un programme Concept choisit quelques axes prioritaires : très basse consommation, performance, miniaturisation, fiabilité, architecture des circuits, interconnexions, matériaux, packaging ou autres domaines débloqués. Les résultats progressent par étapes : compréhension, prototype, technologie transférable, puis industrialisation éventuelle.
+
+Une entreprise riche peut donc investir pendant plusieurs années dans un concept optimisé pour le mobile et obtenir plus tard un avantage majeur sur téléphones, portables ou systèmes embarqués. Ce n'est pas un bonus abstrait : la technologie découverte modifie ce que les équipes peuvent réellement recommander et construire.
+
+### Départ historique et évolution non scriptée
+
+La partie doit commencer au début de l'ère des microprocesseurs, avec des technologies cohérentes avec cette période. L'histoire réelle sert de point de départ physique et pédagogique, pas de calendrier obligatoire.
+
+Le joueur n'est pas forcé de reproduire exactement l'évolution historique. En investissant dans des domaines précis — architecture de circuits, cartographie/layout, procédés, matériaux, consommation ou autres — il peut accélérer certaines pistes, en délaisser d'autres et créer une trajectoire technologique propre à son entreprise.
+
+## 7B. Laboratoire guidé et pédagogie par les conséquences
+
+Le joueur règle lui-même quelques paramètres importants du CPU. L'équipe technique fournit une référence, mais ne verrouille jamais les choix.
+
+Chaque jauge possède trois zones permanentes et expliquées :
+
+- **vert — recommandé** : plage que l'équipe estime actuellement bien maîtrisée ;
+- **orange — ambitieux** : choix crédible qui demande davantage de validation ou de moyens ;
+- **rouge — hors zone maîtrisée** : choix possible à tenter, mais que l'équipe ne sait pas encore garantir.
+
+La recommandation possède un **niveau de confiance** distinct. Une équipe jeune peut donner une estimation large et incertaine ; une équipe expérimentée, nourrie par R&D, développement, production et retours terrain, prédit plus précisément les conséquences.
+
+Quand le joueur modifie une jauge, l'équipe explique immédiatement les effets causaux : davantage de TDP peut donner plus de marge de fréquence mais demander un refroidissement et une alimentation plus robustes ; davantage de cœurs augmente surface, consommation, coût et validation ; un procédé plus avancé offre un potentiel supérieur mais peut être moins maîtrisé.
+
+L'équipe peut aussi proposer une voie pour rendre un objectif viable : technologie supplémentaire, validation renforcée, changement de procédé, amélioration du refroidissement, nouvelle architecture ou autre programme R&D. Le joueur choisit alors entre modifier son design, accepter un délai/coût supplémentaire ou tenter malgré le risque.
+
+Le jeu doit enseigner les notions techniques par leur usage. Les termes réels peuvent être employés, mais ils sont traduits immédiatement en conséquences compréhensibles. Une base de connaissances peut se remplir progressivement lorsque le joueur rencontre pour la première fois rendement, binning, TDP, layout, microcode, stepping ou autres notions.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :
