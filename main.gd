@@ -2,6 +2,7 @@ extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
+const UI_ICONS := preload("res://ui/UiIcons.gd")
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
 const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
@@ -333,7 +334,7 @@ func _build_ui():
 	nav_context_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nav_bar.add_child(nav_context_label)
 	var qg_button := Button.new()
-	qg_button.text = "⌂ QG"
+	qg_button.text = UI_ICONS.with_domain("HQ", "QG")
 	qg_button.custom_minimum_size = Vector2(90, 44)
 	qg_button.pressed.connect(func(): _show_tab(0))
 	nav_bar.add_child(qg_button)
@@ -1135,7 +1136,7 @@ func _refresh_generation_plan_options():
 		previous_id = str(cpu_generation_select.get_item_metadata(cpu_generation_select.selected))
 	cpu_generation_select.clear()
 	for proposal in ResearchManager.get_cpu_generation_proposals():
-		var marker := "★ " if bool(proposal.get("recommended", false)) else ""
+		var marker := "%s " % UI_ICONS.state("RECOMMENDED") if bool(proposal.get("recommended", false)) else ""
 		cpu_generation_select.add_item("%s%s — %s" % [marker, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture"))])
 		cpu_generation_select.set_item_metadata(cpu_generation_select.item_count - 1, str(proposal.get("id", "")))
 	if previous_id != "":
@@ -1197,7 +1198,7 @@ func _refresh_generation_plan_summary():
 	var deltas: Dictionary = proposal.get("metric_deltas", {})
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
-	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
+	var recommendation_prefix := "%s RECOMMANDÉ PAR CAMILLE\n" % UI_ICONS.state("RECOMMENDED") if bool(proposal.get("recommended", false)) else ""
 	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • IPC %.2f× • %d nm • %d W\nCompatibilité : %s\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
@@ -1732,18 +1733,18 @@ func _build_navigation_overlay():
 	navigation_grid.add_theme_constant_override("v_separation", 10)
 	box.add_child(navigation_grid)
 	var entries := [
-		["⌂", "QG", "Priorités et progression", 0],
-		["◆", "Entreprise", "Budgets et organisation", 1],
-		["●", "Équipe", "Recrutement et responsables", 2],
-		["◈", "Laboratoire CPU", "Concevoir la prochaine génération", 3],
-		["▣", "Produits", "Prix, capacité et lancement", 4],
-		["↗", "Marché", "Ventes et concurrence", 5],
-		["▤", "Presse", "Actualités et réputation", 6],
-		["◆", "Évolution", "Voir grandir chaque pôle", 7]
+		["HQ", "QG", "Priorités et progression", 0],
+		["COMPANY", "Entreprise", "Budgets et organisation", 1],
+		["TEAM", "Équipe", "Recrutement et responsables", 2],
+		["LAB", "Laboratoire CPU", "Concevoir la prochaine génération", 3],
+		["PRODUCT", "Produits", "Prix, capacité et lancement", 4],
+		["MARKET", "Marché", "Ventes et concurrence", 5],
+		["PRESS", "Presse", "Actualités et réputation", 6],
+		["EVOLUTION", "Évolution", "Voir grandir chaque pôle", 7]
 	]
 	for entry in entries:
 		var button := Button.new()
-		button.text = "%s  %s\n%s" % [str(entry[0]), str(entry[1]), str(entry[2])]
+		button.text = "%s  %s\n%s" % [UI_ICONS.domain(str(entry[0])), str(entry[1]), str(entry[2])]
 		button.custom_minimum_size = Vector2(245, 72)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var tab_index := int(entry[3])
@@ -1786,7 +1787,7 @@ func _refresh_navigation_priority():
 		context_text = "Donnez un nom à votre entreprise et ouvrez le laboratoire CPU."
 		target = 0
 	elif not pending_decision.is_empty():
-		action_text = "⚠ Résoudre l'arbitrage R&D"
+		action_text = UI_ICONS.with_state("WARNING", "Résoudre l'arbitrage R&D")
 		context_text = str(pending_decision.get("title", "Une décision R&D attend votre validation."))
 		target = 3
 	else:
@@ -1794,17 +1795,17 @@ func _refresh_navigation_priority():
 		if dashboard_next_step_label != null:
 			context_text = dashboard_next_step_label.text
 		match target:
-			1: action_text = "◆ Gérer l'entreprise"
-			2: action_text = "● Gérer l'équipe"
-			3: action_text = "◈ Ouvrir le laboratoire CPU"
-			4: action_text = "▣ Préparer le produit"
-			5: action_text = "↗ Analyser le marché"
-			6: action_text = "▤ Consulter la presse"
-			7: action_text = "◆ Voir l'évolution"
-			_: action_text = "⌂ Revenir au QG"
+			1: action_text = UI_ICONS.with_domain("COMPANY", "Gérer l'entreprise")
+			2: action_text = UI_ICONS.with_domain("TEAM", "Gérer l'équipe")
+			3: action_text = UI_ICONS.with_domain("LAB", "Ouvrir le laboratoire CPU")
+			4: action_text = UI_ICONS.with_domain("PRODUCT", "Préparer le produit")
+			5: action_text = UI_ICONS.with_domain("MARKET", "Analyser le marché")
+			6: action_text = UI_ICONS.with_domain("PRESS", "Consulter la presse")
+			7: action_text = UI_ICONS.with_domain("EVOLUTION", "Voir l'évolution")
+			_: action_text = UI_ICONS.with_domain("HQ", "Revenir au QG")
 	var solvency := Economy.solvency_status() if CompanyManager.created else "STABLE"
 	if solvency != "STABLE" and pending_decision.is_empty():
-		action_text = "◆ Sécuriser la trésorerie"
+		action_text = UI_ICONS.with_domain("FINANCE", "Sécuriser la trésorerie")
 		context_text = "La trésorerie est sous tension. Vérifiez dette, dépenses et financement avant d'accélérer."
 		target = 1
 	dashboard_target_tab = target
@@ -1916,7 +1917,7 @@ func _refresh_dashboard_onboarding():
 	for i in range(states.size()):
 		if bool(states[i]):
 			completed += 1
-		lines.append("%s  %s" % ["✓" if bool(states[i]) else "○", labels[i]])
+		lines.append("%s  %s" % [UI_ICONS.state("DONE") if bool(states[i]) else UI_ICONS.state("PENDING"), labels[i]])
 	dashboard_onboarding_progress.value = completed
 	dashboard_onboarding_label.text = "\n".join(lines)
 	dashboard_onboarding_card.visible = not launch_done
@@ -2177,10 +2178,10 @@ func _load_game():
 		_refresh_all()
 
 func _on_save_message(ok: bool, message: String):
-	status_label.text=("✓ " if ok else "⚠ ")+message
+	status_label.text = UI_ICONS.with_state("SUCCESS" if ok else "WARNING", message)
 
 func _on_solvency_warning(message: String):
-	status_label.text = "⚠ " + message
+	status_label.text = UI_ICONS.with_state("WARNING", message)
 	CompanyManager.add_alert(message)
 
 func _on_bankruptcy_triggered(report: Dictionary):
@@ -2209,7 +2210,7 @@ func _on_department_stage_changed(_sector_id: String, previous_stage: int, new_s
 	var title := str(state.get("title", "Un pôle"))
 	var stage_name := str(state.get("stage_name", "Nouveau palier"))
 	var message := "%s évolue : %s" % [title, stage_name]
-	status_label.text = "★ " + message
+	status_label.text = UI_ICONS.with_state("RECOMMENDED", message)
 	CompanyManager.add_alert(message)
 	MediaManager.publish_business_event(
 		"%s franchit un nouveau cap" % title,
@@ -2945,7 +2946,7 @@ func _refresh_research():
 		tech_lines.append("TECHNOLOGIES RÉUTILISABLES")
 		for technology_value in reusable_technologies:
 			var technology: Dictionary = technology_value
-			tech_lines.append("★ %s — %s" % [
+			tech_lines.append("%s %s — %s" % [UI_ICONS.domain("DISCOVERY"),
 				str(technology.get("label", technology.get("id", "Technologie"))),
 				str(technology.get("summary", ""))
 			])
@@ -3067,13 +3068,13 @@ func _on_phase_decision_created(_project: Dictionary, decision: Dictionary):
 	if TimeManager.time_scale > 0.0:
 		decision_previous_time_scale = TimeManager.time_scale
 	TimeManager.time_scale = 0.0
-	status_label.text = "⚠ Décision R&D requise : %s" % str(decision.get("title", "arbitrage"))
+	status_label.text = UI_ICONS.with_state("WARNING", "Décision R&D requise : %s" % str(decision.get("title", "arbitrage")))
 	_refresh_all()
 
 func _on_phase_decision_resolved(_project: Dictionary, _decision: Dictionary, choice: Dictionary):
 	if TimeManager.time_scale <= 0.0:
 		TimeManager.time_scale = maxf(decision_previous_time_scale, 1.0)
-	status_label.text = "✓ Arbitrage R&D : %s" % str(choice.get("label", "choix appliqué"))
+	status_label.text = UI_ICONS.with_state("SUCCESS", "Arbitrage R&D : %s" % str(choice.get("label", "choix appliqué")))
 	_refresh_all()
 
 func _start_project():
