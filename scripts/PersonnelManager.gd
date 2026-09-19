@@ -33,14 +33,17 @@ func reset(starting_sector: String):
 	generate_candidate("R&D")
 	staff_changed.emit()
 
-func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int):
+func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}):
+	var resolved_profile := profile.duplicate(true)
+	if resolved_profile.is_empty():
+		resolved_profile = _generate_profile(department, specialization, skill, experience)
 	var emp := {
 		"id":"EMP-%04d" % _next_id,
 		"name":full_name,"role":role,"department":department,
 		"skill":skill,"aptitude":clampi(skill + rng.randi_range(-8, 8), 35, 95),
 		"experience_years":experience,"specialization":specialization,
 		"domain_experience":{specialization: experience},"leadership":leadership,
-		"salary":salary,"morale":75.0
+		"salary":salary,"morale":75.0,"profile":resolved_profile
 	}
 	_next_id += 1
 	staff.append(emp)
@@ -54,16 +57,18 @@ func generate_candidate(department: String) -> Dictionary:
 	match department:
 		"R&D": specialization = ["cpu","gpu","software","mobile","display","cloud","satellite","ai"][rng.randi_range(0,7)]
 		"Développement": specialization = ["product","validation","firmware","integration"][rng.randi_range(0,3)]
-		"Production": specialization = "manufacturing"
+		"Production": specialization = ["manufacturing","quality","maintenance","process"][rng.randi_range(0,3)]
 		"Marketing": specialization = "marketing"
 		"Support": specialization = "support"
 		"Finance": specialization = "finance"
+	var profile := _generate_profile(department, specialization, skill, exp)
 	var salary := int(2600 + skill * 30 + exp * 130 + leadership * 8)
+	salary += int((float(profile.get("rigor", 50.0)) + float(profile.get("problem_solving", 50.0)) - 100.0) * 6.0)
 	candidate = {
 		"name":name,"role":"Candidat %s" % department,"department":department,
 		"skill":skill,"aptitude":clampi(skill+rng.randi_range(-10,10),35,96),
 		"experience_years":exp,"specialization":specialization,
-		"leadership":leadership,"salary":salary
+		"leadership":leadership,"salary":salary,"profile":profile
 	}
 	candidate_changed.emit(candidate)
 	return candidate
@@ -75,10 +80,67 @@ func hire_candidate() -> bool:
 	if Economy.money < signing_cost:
 		return false
 	Economy.add_expense(signing_cost, "Recrutement")
-	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary))
+	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary), candidate.get("profile", {}))
 	candidate = {}
 	staff_changed.emit()
 	return true
+
+func _generate_profile(department: String, specialization: String, skill: int, experience: float) -> Dictionary:
+	var base := clampf(float(skill) * 0.72 + minf(experience * 1.8, 18.0), 30.0, 88.0)
+	var profile := {
+		"rigor":clampf(base + rng.randf_range(-14.0, 14.0), 20.0, 96.0),
+		"problem_solving":clampf(base + rng.randf_range(-16.0, 16.0), 20.0, 96.0),
+		"teamwork":clampf(58.0 + rng.randf_range(-20.0, 22.0), 20.0, 96.0),
+		"stress_tolerance":clampf(55.0 + experience * 1.4 + rng.randf_range(-18.0, 18.0), 20.0, 96.0),
+		"creativity":clampf(52.0 + rng.randf_range(-18.0, 22.0), 20.0, 96.0),
+		"process_quality":clampf(base + rng.randf_range(-15.0, 15.0), 20.0, 96.0)
+	}
+	match specialization:
+		"quality":
+			profile.rigor = clampf(float(profile.rigor) + 12.0, 20.0, 98.0)
+			profile.process_quality = clampf(float(profile.process_quality) + 15.0, 20.0, 98.0)
+		"maintenance":
+			profile.problem_solving = clampf(float(profile.problem_solving) + 14.0, 20.0, 98.0)
+			profile.stress_tolerance = clampf(float(profile.stress_tolerance) + 8.0, 20.0, 98.0)
+		"process", "manufacturing":
+			profile.process_quality = clampf(float(profile.process_quality) + 9.0, 20.0, 98.0)
+			profile.teamwork = clampf(float(profile.teamwork) + 5.0, 20.0, 98.0)
+		"validation":
+			profile.rigor = clampf(float(profile.rigor) + 10.0, 20.0, 98.0)
+			profile.problem_solving = clampf(float(profile.problem_solving) + 8.0, 20.0, 98.0)
+		"cpu", "product", "integration":
+			profile.problem_solving = clampf(float(profile.problem_solving) + 7.0, 20.0, 98.0)
+		_:
+			pass
+	if department == "R&D":
+		profile.creativity = clampf(float(profile.creativity) + 8.0, 20.0, 98.0)
+	return profile
+
+func _legacy_profile(emp: Dictionary) -> Dictionary:
+	var skill := float(emp.get("skill", 55))
+	var experience := float(emp.get("experience_years", 2.0))
+	var base := clampf(skill * 0.72 + minf(experience * 1.8, 18.0), 30.0, 88.0)
+	return {
+		"rigor":clampf(base + 2.0, 20.0, 96.0),
+		"problem_solving":clampf(base + 1.0, 20.0, 96.0),
+		"teamwork":60.0,
+		"stress_tolerance":clampf(52.0 + experience * 1.4, 20.0, 96.0),
+		"creativity":55.0,
+		"process_quality":clampf(base, 20.0, 96.0)
+	}
+
+func team_attribute(department: String, attribute: String) -> float:
+	var total := 0.0
+	var count := 0
+	for emp in staff:
+		if str(emp.get("department", "")) != department:
+			continue
+		var profile: Dictionary = emp.get("profile", {})
+		total += float(profile.get(attribute, 50.0))
+		count += 1
+	if count <= 0:
+		return 35.0
+	return clampf(total / float(count), 0.0, 100.0)
 
 func process_month(active_departments: Array):
 	var payroll := 0
@@ -153,6 +215,8 @@ func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
 	var migrated_development_leader := ""
 	for emp in staff:
+		if not emp.has("profile") or typeof(emp.get("profile", {})) != TYPE_DICTIONARY:
+			emp["profile"] = _legacy_profile(emp)
 		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
 			emp["department"] = "Développement"
 			emp["role"] = "Responsable développement CPU" if str(emp.get("name", "")) == "Samira Lefèvre" else str(emp.get("role", "Ingénieur produit"))
