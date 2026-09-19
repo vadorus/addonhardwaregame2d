@@ -26,6 +26,7 @@ func _build_state() -> Dictionary:
 		"reusable_technologies":TechnologyManager.get_state(),
 		"discoveries":DiscoveryManager.get_state(),
 		"patents":PatentManager.get_state(),
+		"suppliers":SupplierManager.get_state(),
 		"products":ProductManager.get_state(),
 		"market":MarketManager.get_state(),
 		"media":MediaManager.get_state(),
@@ -76,6 +77,7 @@ func load_game() -> bool:
 	TechnologyManager.load_state(state.get("reusable_technologies", {}))
 	DiscoveryManager.load_state(state.get("discoveries", {}))
 	PatentManager.load_state(state.get("patents", {}))
+	SupplierManager.load_state(state.get("suppliers", {}))
 	ProductManager.load_state(state.get("products", {}))
 	MarketManager.load_state(state.get("market", {}))
 	MediaManager.load_state(state.get("media", {}))
