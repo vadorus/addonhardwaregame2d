@@ -73,19 +73,22 @@ Décor : bois chaud, textile, plantes, métal noir, verre légèrement fumé et 
 
 Les icônes simplifient le balayage, mais ne remplacent pas les mots importants. Chaque domaine conserve le même symbole partout.
 
-| Domaine | Symbole conceptuel | Couleur principale |
-|---|---|---|
-| Entreprise/QG | bâtiment | ambre doux |
-| Équipe | personnes | bleu clair |
-| R&D | fiole/circuit | cyan |
-| CPU | puce | cyan |
-| Production | usine/engrenage | orange |
-| Marché | courbe/panier | vert |
-| Presse | mégaphone/article | violet doux |
-| SAV | bouclier/clé | vert-bleu |
-| Finance | coffre/pièce | ambre |
-| Risque | triangle | corail |
-| Temps | calendrier/horloge | gris clair |
+La source de vérité du prototype est `ui/UiIcons.gd`. Les glyphes actuels sont monochromes et simples pour rester stables sur Windows et Android ; ils pourront être remplacés plus tard par des SVG sans changer leur sens.
+
+| Domaine | Glyphe actuel | Symbole conceptuel | Couleur principale |
+|---|---:|---|---|
+| Entreprise/QG | ⌂ / ◆ | bâtiment | ambre doux |
+| Équipe | ● | personnes | bleu clair |
+| R&D | ⚗ | fiole/circuit | cyan |
+| CPU / produit | ▣ | puce | cyan |
+| Production | ⚙ | usine/engrenage | orange |
+| Marché | ↗ | courbe/panier | vert |
+| Presse | ▤ | article | violet doux |
+| SAV | ◇ | bouclier/clé | vert-bleu |
+| Finance | € | coffre/pièce | ambre |
+| Risque critique | ▲ | triangle | corail |
+| Temps | ◷ | calendrier/horloge | gris clair |
+| Découverte | ✦ | étincelle/recherche | cyan/ambre |
 
 Règles :
 
