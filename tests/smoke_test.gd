@@ -138,6 +138,22 @@ func _ready() -> void:
 		_fail("Unchanged CPU design should report no reference delta")
 		return
 
+	var balanced_design := CPU_DESIGN.preset("BALANCED")
+	var balanced_guidance := CPU_DESIGN.guidance_report(balanced_design, balanced_design, 82.0)
+	if str(balanced_guidance.get("overall", "")) != "RECOMMENDED":
+		_fail("Reference CPU design should remain inside the team's recommended zone")
+		return
+	if balanced_guidance.get("ranges", {}).size() != 4:
+		_fail("CPU guidance must expose four readable parameter ranges")
+		return
+	var aggressive_guidance := CPU_DESIGN.guidance_report(CPU_DESIGN.preset("PERFORMANCE"), balanced_design, 82.0)
+	if str(aggressive_guidance.get("overall", "")) == "RECOMMENDED":
+		_fail("Aggressive CPU design was incorrectly presented as fully recommended")
+		return
+	if not str(aggressive_guidance.get("summary", "")).contains("équipe"):
+		_fail("CPU guidance does not provide a team explanation")
+		return
+
 	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
 	if proposals.size() != 3:
 		_fail("CPU generation council did not return three plans")
