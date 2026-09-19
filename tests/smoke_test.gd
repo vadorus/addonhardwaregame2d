@@ -2,6 +2,7 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_SUPPORT := preload("res://scripts/CpuSupportModel.gd")
+const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
