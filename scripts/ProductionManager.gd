@@ -125,10 +125,12 @@ func set_strategy(job_id: String, strategy: String) -> bool:
 	return true
 
 func production_team_score() -> float:
-	var manufacturing := PersonnelManager.team_score("Production", "manufacturing")
-	var quality := PersonnelManager.team_score("Production", "quality")
-	var maintenance := PersonnelManager.team_score("Production", "maintenance")
-	return clampf(manufacturing * 0.56 + quality * 0.26 + maintenance * 0.18, 20.0, 100.0)
+	var base := PersonnelManager.team_score("Production", "manufacturing")
+	var rigor := PersonnelManager.team_attribute("Production", "rigor")
+	var problem_solving := PersonnelManager.team_attribute("Production", "problem_solving")
+	var process_quality := PersonnelManager.team_attribute("Production", "process_quality")
+	var teamwork := PersonnelManager.team_attribute("Production", "teamwork")
+	return clampf(base * 0.52 + rigor * 0.13 + problem_solving * 0.11 + process_quality * 0.17 + teamwork * 0.07, 20.0, 100.0)
 
 func production_confidence(node_nm: int) -> float:
 	var mastery := get_process_mastery(node_nm)
@@ -152,12 +154,13 @@ func _process_job_month(job: Dictionary):
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
 	var management := CompanyManager.department_management_modifier("Production")
+	var stress_tolerance := PersonnelManager.team_attribute("Production", "stress_tolerance")
 	var base_cost := int(job.get("monthly_cost", _base_monthly_cost(node_nm, complexity)))
 	var expense := int(round(float(base_cost) * float(strategy.cost)))
 	Economy.add_expense(expense, "Industrialisation — %s" % str(job.get("name", "CPU")))
 	job["months_spent"] = int(job.get("months_spent", 0)) + 1
 	var complexity_factor := lerpf(0.86, 1.30, clampf(complexity / 100.0, 0.0, 1.0))
-	var progress := (14.0 + team * 0.34 + mastery * 0.16 + quality_knowledge * 0.08) * management
+	var progress := (14.0 + team * 0.31 + mastery * 0.16 + quality_knowledge * 0.08 + stress_tolerance * 0.035) * management
 	progress *= float(strategy.speed)
 	progress /= complexity_factor
 	progress = clampf(progress, 12.0, 72.0)
