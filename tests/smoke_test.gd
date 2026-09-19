@@ -32,8 +32,15 @@ func _ready() -> void:
 		_fail("CPU research must start with three clear domains")
 		return
 	var research_capacity := ResearchManager.get_cpu_research_capacity()
-	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 3:
+	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 2:
 		_fail("CPU research capacity does not match the R&D staff")
+		return
+	var development_size := ResearchManager.get_development_team_size()
+	if development_size != PersonnelManager.count_department("Développement") or development_size < 2:
+		_fail("CPU Development team was not created separately from R&D")
+		return
+	if not CompanyManager.departments.has("Développement"):
+		_fail("Company organization is missing the Development department")
 		return
 	if ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":research_capacity + 1, "EFFICIENCY":0, "RELIABILITY":0}):
 		_fail("CPU research accepted more researchers than available")
@@ -41,11 +48,15 @@ func _ready() -> void:
 	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":1, "RELIABILITY":0}):
 		_fail("CPU research rejected a valid team split")
 		return
-	if ResearchManager.get_available_development_engineers() != research_capacity - 2:
-		_fail("Research allocation did not reduce immediate development capacity")
+	if ResearchManager.get_development_team_size() != development_size:
+		_fail("Research allocation incorrectly changed the Development team size")
 		return
-	if ResearchManager.development_capacity_factor() >= 1.0 or ResearchManager.development_capacity_factor() < 0.55:
-		_fail("Development capacity factor escaped its expected range")
+	var idle_development_factor := ResearchManager.development_capacity_factor()
+	if idle_development_factor < 0.65 or idle_development_factor > 1.05:
+		_fail("Idle Development capacity factor escaped its expected range")
+		return
+	if ResearchManager.development_team_score() <= 20.0 or ResearchManager.development_confidence() <= 20.0:
+		_fail("Development team quality was not initialized")
 		return
 	ResearchManager.set_continuous_research_budget(18000)
 	var architecture_before := float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0))
@@ -130,8 +141,8 @@ func _ready() -> void:
 		if not research_proposal.has("research_confidence"):
 			_fail("CPU proposal does not expose research confidence")
 			return
-		if float(research_proposal.get("development_capacity_factor", 1.0)) >= 1.0:
-			_fail("CPU proposal ignored researchers assigned away from development")
+		if not research_proposal.has("development_confidence") or int(research_proposal.get("development_team_size", 0)) != development_size:
+			_fail("CPU proposal does not expose the dedicated Development team")
 			return
 	var safe_plan: Dictionary = proposals[0]
 	var bold_plan: Dictionary = proposals[2]
@@ -178,6 +189,18 @@ func _ready() -> void:
 		return
 	if not project.has("research_snapshot") or float(project.get("estimate_confidence", 0.0)) <= 0.0:
 		_fail("CPU project did not store its research context")
+		return
+	var development_snapshot: Dictionary = project.get("development_snapshot", {})
+	if int(development_snapshot.get("team_size", 0)) != development_size or float(development_snapshot.get("team_score", 0.0)) <= 20.0:
+		_fail("CPU project did not store its Development team context")
+		return
+	var loaded_development_factor := ResearchManager.development_capacity_factor()
+	if loaded_development_factor >= idle_development_factor:
+		_fail("Starting a CPU project did not increase Development workload")
+		return
+	var active_departments := ResearchManager.active_departments()
+	if not active_departments.has("R&D") or not active_departments.has("Développement"):
+		_fail("Research and Development are not active independently")
 		return
 
 	var report: Dictionary = SimulationManager.process_month_end()
@@ -333,6 +356,30 @@ func _ready() -> void:
 	ResearchManager.load_state(legacy_research_state)
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("Legacy research save did not receive default CPU research domains")
+		return
+
+	var legacy_company_state := CompanyManager.get_state().duplicate(true)
+	legacy_company_state["departments"].erase("Développement")
+	CompanyManager.load_state(legacy_company_state)
+	if not CompanyManager.departments.has("Développement"):
+		_fail("Legacy company save did not receive the Development department")
+		return
+	var legacy_personnel_state := PersonnelManager.get_state().duplicate(true)
+	for legacy_emp in legacy_personnel_state.get("staff", []):
+		if str(legacy_emp.get("name", "")) == "Samira Lefèvre":
+			legacy_emp["department"] = "R&D"
+			legacy_emp["specialization"] = "product"
+	CompanyManager.departments["Développement"]["leader_id"] = ""
+	PersonnelManager.load_state(legacy_personnel_state)
+	var migrated_samira_department := ""
+	for migrated_emp in PersonnelManager.staff:
+		if str(migrated_emp.get("name", "")) == "Samira Lefèvre":
+			migrated_samira_department = str(migrated_emp.get("department", ""))
+	if migrated_samira_department != "Développement":
+		_fail("Legacy product engineer was not migrated to Development")
+		return
+	if str(CompanyManager.departments["Développement"].get("leader_id", "")) == "":
+		_fail("Legacy Development department did not recover a leader")
 		return
 
 	var division_state := DivisionManager.get_state()
