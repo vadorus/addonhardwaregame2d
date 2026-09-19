@@ -244,6 +244,20 @@ L'équipe peut aussi proposer une voie pour rendre un objectif viable : technolo
 
 Le jeu doit enseigner les notions techniques par leur usage. Les termes réels peuvent être employés, mais ils sont traduits immédiatement en conséquences compréhensibles. Une base de connaissances peut se remplir progressivement lorsque le joueur rencontre pour la première fois rendement, binning, TDP, layout, microcode, stepping ou autres notions.
 
+### Fondation jouable de la R&D Concept
+
+La première implémentation conserve une interface volontairement compacte. Trois compétences techniques persistantes résument actuellement ce que l'entreprise sait réellement faire :
+
+- **Architecture des circuits** : capacité à organiser des conceptions plus ambitieuses, à monter en fréquence et, plus tard, à rendre crédibles des organisations multicœurs ;
+- **Cartographie / layout** : qualité du placement et du routage, qui réduit la complexité, améliore la robustesse électrique et rend progressivement l'intégration de cache plus réaliste ;
+- **Miniaturisation & procédés** : savoir-faire nécessaire, avec la maîtrise de fabrication, pour accéder à des procédés plus fins.
+
+Ces compétences progressent lentement par la recherche produit et l'expérience réelle, mais les bonds importants viennent des **programmes Concept CPU**. Un programme Concept possède un axe, un budget, un niveau d'ambition, une progression étude → prototype → validation → technologie transférable, un niveau de confiance et un résultat persistant.
+
+Les premiers axes jouables sont très basse consommation, architecture de rupture, cartographie/densité, miniaturisation/procédé et fiabilité extrême. Une technologie Concept achevée ne donne pas un bonus magique au produit en cours : elle augmente les capacités techniques disponibles pour les générations futures, modifie les recommandations de l'équipe et peut ouvrir de nouveaux procédés.
+
+L'accès à un procédé de fabrication dépend donc désormais de deux choses : **savoir le miniaturiser** et **savoir l'industrialiser**. Avoir seulement une bonne usine ou seulement une bonne idée de procédé ne suffit pas.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :

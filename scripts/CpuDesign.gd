@@ -49,11 +49,15 @@ static func available_nodes() -> Array:
 	return NODE_ORDER.duplicate()
 
 static func available_nodes_for_mastery(manufacturing_mastery: float) -> Array:
+	return available_nodes_for_capabilities(manufacturing_mastery, manufacturing_mastery)
+
+static func available_nodes_for_capabilities(manufacturing_mastery: float, miniaturization_knowledge: float) -> Array:
+	var effective_mastery := minf(manufacturing_mastery, miniaturization_knowledge)
 	var result: Array = []
 	for node_value in NODE_ORDER:
 		var node_nm := int(node_value)
 		var profile: Dictionary = NODE_PROFILES[node_nm]
-		if manufacturing_mastery + 0.001 >= float(profile.get("unlock", 0.0)):
+		if effective_mastery + 0.001 >= float(profile.get("unlock", 0.0)):
 			result.append(node_nm)
 	if result.is_empty():
 		result.append(10000)
@@ -122,7 +126,7 @@ static func normalize(input: Dictionary) -> Dictionary:
 		"tdp_w": tdp
 	}
 
-static func evaluate(input: Dictionary) -> Dictionary:
+static func evaluate(input: Dictionary, capabilities: Dictionary = {}) -> Dictionary:
 	var design := normalize(input)
 	var cores := int(design.cores)
 	var frequency_ghz := float(design.frequency_ghz)
@@ -132,6 +136,10 @@ static func evaluate(input: Dictionary) -> Dictionary:
 	var node_nm := int(design.node_nm)
 	var tdp := int(design.tdp_w)
 	var node: Dictionary = NODE_PROFILES[node_nm]
+	var architecture_skill := float(capabilities.get("ARCHITECTURE", 18.0))
+	var layout_skill := float(capabilities.get("LAYOUT", 14.0))
+	var architecture_delta := architecture_skill - 18.0
+	var layout_delta := layout_skill - 14.0
 
 	var reference_mhz := maxf(float(node.reference_mhz), 0.1)
 	var reference_cores := maxf(float(node.core_reference), 1.0)
@@ -158,6 +166,7 @@ static func evaluate(input: Dictionary) -> Dictionary:
 		+ pow(frequency_ratio, 1.35) * 0.45
 		+ minf(maxf(cache_ratio - 1.0, 0.0), 4.0) * 0.07
 	) * float(node.power_factor)
+	required_tdp *= clampf(1.0 - layout_delta * 0.0022, 0.82, 1.08)
 	required_tdp = maxf(required_tdp, 0.5)
 	var power_deficit := maxf(required_tdp - float(tdp), 0.0)
 	var power_deficit_ratio := power_deficit / required_tdp
@@ -166,11 +175,13 @@ static func evaluate(input: Dictionary) -> Dictionary:
 	var cache_pressure := maxf(cache_ratio - 1.0, 0.0)
 
 	var performance := 18.0 + core_score * 0.38 + frequency_score * 0.42 + cache_score * 0.08 + float(node.score) * 0.12
+	performance += architecture_delta * 0.075
 	performance -= power_deficit_ratio * 20.0
 	var efficiency := 79.0 - frequency_pressure * 12.0 - core_pressure * 8.0 - cache_pressure * 2.5
 	efficiency += (1.0 - float(node.power_factor)) * 18.0
 	efficiency -= power_deficit_ratio * 18.0
 	var reliability := 82.0 + float(node.maturity) - frequency_pressure * 17.0 - core_pressure * 9.0
+	reliability += layout_delta * 0.065
 	reliability -= cache_pressure * 3.0 + power_deficit_ratio * 24.0
 	var innovation := 24.0 + float(node.score) * 0.34 + core_score * 0.15 + frequency_score * 0.16 + cache_score * 0.08
 	var sustainability := efficiency * 0.70 + reliability * 0.20 + (100.0 - float(node.score)) * 0.10
@@ -193,6 +204,7 @@ static func evaluate(input: Dictionary) -> Dictionary:
 	var complexity := 16.0 + float(node.difficulty) * 18.0
 	complexity += maxf(frequency_ratio - 0.80, 0.0) * 13.0
 	complexity += core_pressure * 12.0 + cache_pressure * 4.0 + cache_novelty
+	complexity -= maxf(layout_delta, 0.0) * 0.10 + maxf(architecture_delta, 0.0) * 0.045
 	complexity = clampf(complexity, 10.0, 100.0)
 	var risk := clampf((100.0 - reliability) * 0.55 + complexity * 0.45, 5.0, 94.0)
 	var estimated_months := int(round(4.0 + complexity * 0.085))
@@ -239,7 +251,9 @@ static func evaluate(input: Dictionary) -> Dictionary:
 		"frequency_mhz": frequency_mhz_value,
 		"cache_kb": cache_kb_value,
 		"frequency_ratio": frequency_ratio,
-		"core_ratio": core_ratio
+		"core_ratio": core_ratio,
+		"architecture_skill": architecture_skill,
+		"layout_skill": layout_skill
 	}
 
 static func guidance_ranges(reference_input: Dictionary, confidence: float) -> Dictionary:
@@ -277,7 +291,7 @@ static func guidance_ranges(reference_input: Dictionary, confidence: float) -> D
 		)
 	}
 
-static func guidance_report(input: Dictionary, reference_input: Dictionary, confidence: float) -> Dictionary:
+static func guidance_report(input: Dictionary, reference_input: Dictionary, confidence: float, capabilities: Dictionary = {}) -> Dictionary:
 	var design := normalize(input)
 	var reference := normalize(reference_input)
 	var ranges := guidance_ranges(reference, confidence)
@@ -344,7 +358,7 @@ static func guidance_report(input: Dictionary, reference_input: Dictionary, conf
 		else:
 			consequences.append("Le procédé choisi est plus conservateur : il peut être plus facile à maîtriser mais limite la densité.")
 
-	var evaluation := evaluate(design)
+	var evaluation := evaluate(design, capabilities)
 	if float(evaluation.power_deficit_ratio) >= 0.08:
 		consequences.append("Notre modèle estime que l'enveloppe électrique est insuffisante d'environ %.1f W pour exploiter pleinement ce design." % float(evaluation.power_deficit))
 
