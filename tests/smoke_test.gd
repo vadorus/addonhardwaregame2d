@@ -238,6 +238,7 @@ func _ready() -> void:
 		_fail("Legacy V3 save was not migrated to the CPU division")
 		return
 
+	ProductManager.reset()
 	Economy.money = 1
 	SimulationManager.is_game_over = false
 	var bankruptcy_report := SimulationManager.process_month_end()
