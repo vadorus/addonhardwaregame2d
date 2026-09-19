@@ -348,7 +348,11 @@ func process_month():
 		ResearchManager.add_technology_bonus(_resolve_tech_key(str(template.get("tech_key", "$FAMILY")), family), float(template.get("research_tech", 4.0)))
 		var reusable_technology := str(template.get("technology", ""))
 		if not reusable_technology.is_empty():
-			TechnologyManager.unlock(reusable_technology, str(research.get("title", "Recherche dérivée")))
+			TechnologyManager.unlock(
+				reusable_technology,
+				str(research.get("title", "Recherche dérivée")),
+				family
+			)
 		var secondary_key := _resolve_tech_key(str(template.get("secondary_key", "")), family)
 		if not secondary_key.is_empty():
 			ResearchManager.add_technology_bonus(secondary_key, float(template.get("secondary_gain", 1.0)))
