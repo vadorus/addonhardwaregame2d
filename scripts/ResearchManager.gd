@@ -7,11 +7,25 @@ signal projects_changed
 signal generation_proposals_changed(proposals)
 signal phase_report_created(project, report)
 signal project_completed(project)
+signal research_changed
+signal research_event_created(event)
+
+const CPU_RESEARCH_DOMAIN_ORDER := ["ARCHITECTURE", "EFFICIENCY", "RELIABILITY"]
+const CPU_RESEARCH_DOMAINS := {
+	"ARCHITECTURE": {"label":"Architecture & performance", "metric":"performance", "initial_knowledge":18.0},
+	"EFFICIENCY": {"label":"Énergie & thermique", "metric":"efficiency", "initial_knowledge":16.0},
+	"RELIABILITY": {"label":"Fiabilité & stabilité", "metric":"reliability", "initial_knowledge":20.0}
+}
+const RESEARCH_MILESTONES := [25.0, 40.0, 60.0, 80.0]
 
 var projects: Array = []
 var cpu_generation_proposals: Array = []
 var cpu_generation_context: Dictionary = {}
 var technologies: Dictionary = {}
+var cpu_research_domains: Dictionary = {}
+var continuous_research_budget := 12000
+var research_events: Array = []
+var _next_research_event_id := 1
 var _next_id := 1
 var rng := RandomNumberGenerator.new()
 
@@ -30,17 +44,210 @@ func reset(starting_sector: String):
 	technologies["manufacturing"] = 12.0
 	technologies["software"] = maxf(float(technologies.get("software", 0.0)), 8.0)
 	technologies["integration"] = 10.0
+	cpu_research_domains = _default_cpu_research_domains()
+	continuous_research_budget = 12000
+	research_events = []
+	_next_research_event_id = 1
 	generation_proposals_changed.emit([])
+	research_changed.emit()
 	projects_changed.emit()
+
+func _default_cpu_research_domains() -> Dictionary:
+	var result := {}
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		var data: Dictionary = CPU_RESEARCH_DOMAINS[key]
+		result[key] = {
+			"knowledge":float(data.initial_knowledge),
+			"experience":0.0,
+			"allocated":0,
+			"months":0,
+			"milestones":0,
+			"momentum_months":0
+		}
+	return result
+
+func get_cpu_research_domain_keys() -> Array:
+	return CPU_RESEARCH_DOMAIN_ORDER.duplicate()
+
+func get_cpu_research_label(domain: String) -> String:
+	return str(CPU_RESEARCH_DOMAINS.get(domain, {}).get("label", domain.capitalize()))
+
+func get_cpu_research_domain(domain: String) -> Dictionary:
+	return cpu_research_domains.get(domain, {}).duplicate(true)
+
+func get_cpu_research_capacity() -> int:
+	return PersonnelManager.count_department("R&D")
+
+func get_total_cpu_research_allocation() -> int:
+	var total := 0
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		total += int(cpu_research_domains.get(key, {}).get("allocated", 0))
+	return total
+
+func get_available_development_engineers() -> int:
+	return maxi(get_cpu_research_capacity() - get_total_cpu_research_allocation(), 0)
+
+func development_capacity_factor() -> float:
+	var capacity := get_cpu_research_capacity()
+	if capacity <= 0:
+		return 0.55
+	var available_ratio := float(get_available_development_engineers()) / float(capacity)
+	return clampf(0.55 + available_ratio * 0.45, 0.55, 1.0)
+
+func set_cpu_research_allocations(allocations: Dictionary) -> bool:
+	var capacity := get_cpu_research_capacity()
+	var requested_total := 0
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		requested_total += maxi(int(allocations.get(key, 0)), 0)
+	if requested_total > capacity:
+		return false
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		if not cpu_research_domains.has(key):
+			cpu_research_domains[key] = _default_cpu_research_domains()[key]
+		cpu_research_domains[key]["allocated"] = maxi(int(allocations.get(key, 0)), 0)
+	research_changed.emit()
+	return true
+
+func set_continuous_research_budget(amount: int):
+	continuous_research_budget = clampi(amount, 0, 100000)
+	research_changed.emit()
+
+func research_confidence(domain: String) -> float:
+	var data: Dictionary = cpu_research_domains.get(domain, {})
+	var knowledge := float(data.get("knowledge", 0.0))
+	var experience := float(data.get("experience", 0.0))
+	var team := PersonnelManager.team_score("R&D", "cpu")
+	return clampf(24.0 + knowledge * 0.42 + minf(experience * 1.8, 20.0) + team * 0.13, 20.0, 96.0)
+
+func research_domain_for_focus(focus: String) -> String:
+	match focus:
+		"PERFORMANCE", "INNOVATION":
+			return "ARCHITECTURE"
+		"EFFICIENCY", "SUSTAINABILITY":
+			return "EFFICIENCY"
+		"RELIABILITY", "ECOSYSTEM":
+			return "RELIABILITY"
+		_:
+			return ""
+
+func research_score_for_focus(focus: String) -> float:
+	var domain := research_domain_for_focus(focus)
+	if domain != "":
+		return float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
+	var total := 0.0
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		total += float(cpu_research_domains.get(key, {}).get("knowledge", 0.0))
+	return total / float(CPU_RESEARCH_DOMAIN_ORDER.size())
+
+func research_confidence_for_focus(focus: String) -> float:
+	var domain := research_domain_for_focus(focus)
+	if domain != "":
+		return research_confidence(domain)
+	var total := 0.0
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		total += research_confidence(key)
+	return total / float(CPU_RESEARCH_DOMAIN_ORDER.size())
+
+func get_pending_research_events() -> Array:
+	var pending: Array = []
+	for event in research_events:
+		if not bool(event.get("resolved", false)):
+			pending.append(event.duplicate(true))
+	return pending
+
+func resolve_research_event(event_id: String, pursue: bool) -> bool:
+	for event in research_events:
+		if str(event.get("id", "")) != event_id or bool(event.get("resolved", false)):
+			continue
+		event["resolved"] = true
+		event["decision"] = "PURSUE" if pursue else "ARCHIVE"
+		var domain := str(event.get("domain", ""))
+		if pursue and cpu_research_domains.has(domain):
+			cpu_research_domains[domain]["experience"] = clampf(float(cpu_research_domains[domain].get("experience", 0.0)) + 1.5, 0.0, 100.0)
+			cpu_research_domains[domain]["momentum_months"] = maxi(int(cpu_research_domains[domain].get("momentum_months", 0)), 3)
+			CompanyManager.add_alert("R&D : la piste %s devient prioritaire pour 3 mois." % get_cpu_research_label(domain))
+		else:
+			CompanyManager.add_alert("R&D : piste %s archivée pour plus tard." % get_cpu_research_label(domain))
+		research_changed.emit()
+		return true
+	return false
+
+func _create_research_event(domain: String, threshold: float):
+	var title := "Nouvelle piste exploitable"
+	if threshold >= 80.0:
+		title = "Expertise de pointe"
+	elif threshold >= 60.0:
+		title = "Approche avancée"
+	elif threshold >= 40.0:
+		title = "Méthodes consolidées"
+	var event := {
+		"id":"RND-%03d" % _next_research_event_id,
+		"domain":domain,
+		"title":title,
+		"threshold":threshold,
+		"resolved":false,
+		"decision":"",
+		"text":"L'équipe %s atteint %.0f/100 de connaissance. Une piste peut être approfondie pour accélérer l'apprentissage pendant quelques mois." % [get_cpu_research_label(domain), threshold]
+	}
+	_next_research_event_id += 1
+	research_events.push_front(event)
+	if research_events.size() > 20:
+		research_events.pop_back()
+	CompanyManager.add_alert("R&D : %s — %s." % [title, get_cpu_research_label(domain)])
+	research_event_created.emit(event.duplicate(true))
+
+func _process_continuous_research():
+	var total_allocation := get_total_cpu_research_allocation()
+	if total_allocation <= 0:
+		return
+	Economy.add_expense(continuous_research_budget, "Recherche fondamentale CPU")
+	var team := PersonnelManager.team_score("R&D", "cpu")
+	var management := CompanyManager.department_management_modifier("R&D")
+	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
+	var budget_factor := clampf(float(continuous_research_budget) / expected_budget, 0.25, 1.80)
+	var total_gain := 0.0
+	for key in CPU_RESEARCH_DOMAIN_ORDER:
+		var data: Dictionary = cpu_research_domains[key]
+		var allocated := int(data.get("allocated", 0))
+		if allocated <= 0:
+			continue
+		var before := float(data.get("knowledge", 0.0))
+		var diminishing := lerpf(1.0, 0.34, clampf(before / 100.0, 0.0, 1.0))
+		var momentum := 1.15 if int(data.get("momentum_months", 0)) > 0 else 1.0
+		var gain := float(allocated) * (0.48 + team / 260.0) * budget_factor * management * diminishing * momentum
+		data["knowledge"] = clampf(before + gain, 0.0, 100.0)
+		data["experience"] = clampf(float(data.get("experience", 0.0)) + float(allocated) * 0.16 * management, 0.0, 100.0)
+		data["months"] = int(data.get("months", 0)) + 1
+		data["momentum_months"] = maxi(int(data.get("momentum_months", 0)) - 1, 0)
+		total_gain += gain
+		var milestone_index := int(data.get("milestones", 0))
+		while milestone_index < RESEARCH_MILESTONES.size() and float(data.knowledge) >= float(RESEARCH_MILESTONES[milestone_index]):
+			_create_research_event(key, float(RESEARCH_MILESTONES[milestone_index]))
+			milestone_index += 1
+		data["milestones"] = milestone_index
+	technologies["cpu"] = clampf(float(technologies.get("cpu", 18.0)) + total_gain * 0.16, 0.0, 100.0)
+	research_changed.emit()
+
+func _apply_development_learning(project: Dictionary):
+	if str(project.get("sector", "")) != "CPU":
+		return
+	var domain := research_domain_for_focus(str(project.get("focus", "BALANCED")))
+	if domain == "":
+		return
+	var data: Dictionary = cpu_research_domains.get(domain, {})
+	data["experience"] = clampf(float(data.get("experience", 0.0)) + 0.10 * development_capacity_factor(), 0.0, 100.0)
+	data["knowledge"] = clampf(float(data.get("knowledge", 0.0)) + 0.04, 0.0, 100.0)
 
 func prepare_cpu_generation_proposals(segment: String, approach: String, focus: String, monthly_budget: int, base_design: Dictionary) -> Array:
 	if not DivisionManager.is_operational("CPU"):
 		return []
 	var division := DivisionManager.get_division("CPU")
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
-	var team_score := PersonnelManager.team_score("R&D", "cpu")
+	var team_score := PersonnelManager.team_score("R&D", "cpu") * development_capacity_factor()
 	var management_modifier := CompanyManager.department_management_modifier("R&D")
-	var technology_score := float(technologies.get("cpu", 0.0))
+	var research_score := research_score_for_focus(focus)
+	var research_confidence_score := research_confidence_for_focus(focus)
+	var technology_score := float(technologies.get("cpu", 0.0)) * 0.55 + research_score * 0.45
 	var manufacturing_score := float(technologies.get("manufacturing", 0.0))
 	var integration_score := float(technologies.get("integration", 0.0))
 	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
@@ -56,6 +263,9 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"team_score":team_score,
 		"management_modifier":management_modifier,
 		"technology_score":technology_score,
+		"research_score":research_score,
+		"research_confidence":research_confidence_score,
+		"development_capacity_factor":development_capacity_factor(),
 		"equipment_score":equipment_score,
 		"division_maturity":float(division.get("maturity", 0.0)),
 		"division_strategy":str(division.get("strategy", "BALANCED")),
@@ -125,6 +335,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"generation_plan":stored_generation_plan,
+		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
+		"estimate_confidence":research_confidence_for_focus(focus) if sector == "CPU" else 50.0,
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
 	_next_id += 1
@@ -138,6 +350,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	return true
 
 func process_month():
+	_process_continuous_research()
 	for project in projects:
 		if str(project.status) != "DEVELOPMENT":
 			continue
@@ -149,6 +362,8 @@ func _process_project_month(project: Dictionary):
 	var approach_data: Dictionary = GameData.APPROACHES[str(project.approach)]
 	var specialization := str(sector_data.specialization)
 	var team := PersonnelManager.team_score("R&D", specialization)
+	if str(project.sector) == "CPU":
+		team *= development_capacity_factor()
 	var management := CompanyManager.department_management_modifier("R&D")
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
@@ -165,6 +380,7 @@ func _process_project_month(project: Dictionary):
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge)
 	technologies[specialization] = clampf(tech + knowledge_gain, 0.0, 100.0)
 	technologies["integration"] = clampf(float(technologies.get("integration", 10.0)) + knowledge_gain * 0.18, 0.0, 100.0)
+	_apply_development_learning(project)
 	if float(project.phase_progress) >= 100.0:
 		project.phase_progress = float(project.phase_progress) - 100.0
 		_complete_phase(project, team, tech, budget_ratio)
@@ -180,7 +396,8 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 		if expected < lowest_value:
 			lowest_value = expected
 			lowest_metric = metric
-	var confidence: float = clampf(42.0 + team * 0.35 + tech * 0.18 + budget_ratio * 9.0 + rng.randf_range(-6.0, 6.0), 20.0, 96.0)
+	var research_confidence_score := float(project.get("estimate_confidence", 50.0))
+	var confidence: float = clampf(30.0 + team * 0.28 + tech * 0.12 + budget_ratio * 8.0 + research_confidence_score * 0.22 + rng.randf_range(-6.0, 6.0), 20.0, 96.0)
 	var sentiment := "prudente"
 	if confidence >= 78.0:
 		sentiment = "très satisfaite"
@@ -233,13 +450,27 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
 
 func active_departments() -> Array:
+	if get_total_cpu_research_allocation() > 0:
+		return ["R&D"]
 	for p in projects:
 		if str(p.status) == "DEVELOPMENT":
 			return ["R&D"]
 	return []
 
 func get_state() -> Dictionary:
-	return {"projects":projects,"cpu_generation_proposals":cpu_generation_proposals,"cpu_generation_context":cpu_generation_context,"technologies":technologies,"next_id":_next_id,"rng_seed":rng.seed,"rng_state":rng.state}
+	return {
+		"projects":projects,
+		"cpu_generation_proposals":cpu_generation_proposals,
+		"cpu_generation_context":cpu_generation_context,
+		"technologies":technologies,
+		"cpu_research_domains":cpu_research_domains,
+		"continuous_research_budget":continuous_research_budget,
+		"research_events":research_events,
+		"next_research_event_id":_next_research_event_id,
+		"next_id":_next_id,
+		"rng_seed":rng.seed,
+		"rng_state":rng.state
+	}
 
 func load_state(state: Dictionary):
 	projects = state.get("projects", []).duplicate(true)
@@ -264,8 +495,19 @@ func load_state(state: Dictionary):
 	var saved_context_value = state.get("cpu_generation_context", {})
 	cpu_generation_context = saved_context_value.duplicate(true) if typeof(saved_context_value) == TYPE_DICTIONARY else {}
 	technologies = state.get("technologies", {}).duplicate(true)
+	var saved_domains = state.get("cpu_research_domains", {})
+	cpu_research_domains = _default_cpu_research_domains()
+	if typeof(saved_domains) == TYPE_DICTIONARY:
+		for key in CPU_RESEARCH_DOMAIN_ORDER:
+			if saved_domains.has(key) and typeof(saved_domains[key]) == TYPE_DICTIONARY:
+				for field in saved_domains[key].keys():
+					cpu_research_domains[key][field] = saved_domains[key][field]
+	continuous_research_budget = int(state.get("continuous_research_budget", 12000))
+	research_events = state.get("research_events", []).duplicate(true)
+	_next_research_event_id = int(state.get("next_research_event_id", research_events.size() + 1))
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 8282))
 	rng.state = int(state.get("rng_state", rng.state))
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
+	research_changed.emit()
 	projects_changed.emit()
