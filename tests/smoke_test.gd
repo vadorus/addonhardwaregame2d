@@ -40,12 +40,23 @@ func _ready() -> void:
 	if not CPU_DESIGN.format_cache(era_design).contains("sans cache"):
 		_fail("Early CPU design should start without integrated cache")
 		return
-	var starting_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+	var starting_nodes := CPU_DESIGN.available_nodes_for_capabilities(
+		float(ResearchManager.technologies.get("manufacturing", 0.0)),
+		ResearchManager.get_cpu_capability("MINIATURIZATION")
+	)
 	if starting_nodes != [10000]:
 		_fail("Starting company should initially master only the 10 µm process")
 		return
-	if CPU_DESIGN.available_nodes_for_mastery(30.0).size() <= starting_nodes.size():
-		_fail("Manufacturing mastery does not unlock finer historical processes")
+	if ResearchManager.get_cpu_capability("ARCHITECTURE") <= 0.0 or ResearchManager.get_cpu_capability("LAYOUT") <= 0.0:
+		_fail("CPU technical capabilities were not initialized")
+		return
+	if CPU_DESIGN.available_nodes_for_capabilities(30.0, 30.0).size() <= starting_nodes.size():
+		_fail("Manufacturing plus miniaturization mastery does not unlock finer historical processes")
+		return
+	var forbidden_8um := CPU_DESIGN.default_design()
+	forbidden_8um["node_nm"] = 8000
+	if ResearchManager.start_project("Too Early 8um", "CPU", "MAINSTREAM", "INTERNAL", "INNOVATION", 20_000, forbidden_8um):
+		_fail("CPU development accepted a process that miniaturization cannot yet support")
 		return
 
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
@@ -110,8 +121,51 @@ func _ready() -> void:
 		_fail("Pursued research discovery did not create momentum")
 		return
 
-	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"))
-	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"))
+	var concept_money_before := Economy.money
+	var mini_before := ResearchManager.get_cpu_capability("MINIATURIZATION")
+	var manufacturing_before := float(ResearchManager.technologies.get("manufacturing", 0.0))
+	if not ResearchManager.start_cpu_concept_program("MINIATURIZATION", 10000, 2):
+		_fail("Could not launch a CPU miniaturization concept program")
+		return
+	var concept_loops := 0
+	while not ResearchManager.get_active_cpu_concept_programs().is_empty() and concept_loops < 12:
+		ResearchManager.process_month()
+		concept_loops += 1
+	if not ResearchManager.get_active_cpu_concept_programs().is_empty():
+		_fail("CPU concept program did not reach transferable technology")
+		return
+	if ResearchManager.get_cpu_capability("MINIATURIZATION") <= mini_before:
+		_fail("Completed concept program did not increase miniaturization capability")
+		return
+	if float(ResearchManager.technologies.get("manufacturing", 0.0)) <= manufacturing_before:
+		_fail("Miniaturization concept did not teach manufacturing")
+		return
+	var nodes_after_concept := CPU_DESIGN.available_nodes_for_capabilities(
+		float(ResearchManager.technologies.get("manufacturing", 0.0)),
+		ResearchManager.get_cpu_capability("MINIATURIZATION")
+	)
+	if not nodes_after_concept.has(8000):
+		_fail("Transferred miniaturization technology did not unlock the 8 µm process")
+		return
+	var completed_concepts := ResearchManager.get_cpu_concept_programs()
+	if completed_concepts.is_empty() or str(completed_concepts[0].get("stage", "")) != "TRANSFÉRABLE":
+		_fail("Concept program did not preserve its transferable result")
+		return
+	Economy.money = concept_money_before
+
+	var baseline_capabilities := ResearchManager.get_cpu_capabilities()
+	var improved_capabilities := baseline_capabilities.duplicate(true)
+	improved_capabilities["LAYOUT"] = 70.0
+	improved_capabilities["ARCHITECTURE"] = 70.0
+	var demanding_design := CPU_DESIGN.preset("PERFORMANCE")
+	var baseline_estimate := CPU_DESIGN.evaluate(demanding_design, baseline_capabilities)
+	var improved_estimate := CPU_DESIGN.evaluate(demanding_design, improved_capabilities)
+	if float(improved_estimate.get("complexity", 100.0)) >= float(baseline_estimate.get("complexity", 0.0)):
+		_fail("Better architecture/layout capability did not reduce CPU design complexity")
+		return
+
+	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"), ResearchManager.get_cpu_capabilities())
+	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"), ResearchManager.get_cpu_capabilities())
 	if float(performance.get("performance", 0.0)) <= float(efficient.get("performance", 0.0)):
 		_fail("Performance preset is not faster than efficient preset")
 		return
@@ -494,6 +548,8 @@ func _ready() -> void:
 	var research_round_trip := ResearchManager.get_state().duplicate(true)
 	var saved_architecture_knowledge := float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0))
 	var saved_research_budget := ResearchManager.continuous_research_budget
+	var saved_miniaturization := ResearchManager.get_cpu_capability("MINIATURIZATION")
+	var saved_concept_count := ResearchManager.get_cpu_concept_programs().size()
 	ResearchManager.load_state(research_round_trip)
 	if ResearchManager.get_cpu_generation_proposals().size() != 3:
 		_fail("Generation proposals did not survive a save round-trip")
@@ -504,14 +560,26 @@ func _ready() -> void:
 	if ResearchManager.continuous_research_budget != saved_research_budget:
 		_fail("CPU research budget did not survive a save round-trip")
 		return
+	if absf(ResearchManager.get_cpu_capability("MINIATURIZATION") - saved_miniaturization) > 0.001:
+		_fail("CPU technical capabilities did not survive a save round-trip")
+		return
+	if ResearchManager.get_cpu_concept_programs().size() != saved_concept_count:
+		_fail("CPU concept programs did not survive a save round-trip")
+		return
 	var legacy_research_state := research_round_trip.duplicate(true)
 	legacy_research_state.erase("cpu_research_domains")
 	legacy_research_state.erase("continuous_research_budget")
 	legacy_research_state.erase("research_events")
+	legacy_research_state.erase("cpu_capabilities")
+	legacy_research_state.erase("concept_programs")
+	legacy_research_state.erase("next_concept_id")
 	legacy_research_state.erase("next_research_event_id")
 	ResearchManager.load_state(legacy_research_state)
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("Legacy research save did not receive default CPU research domains")
+		return
+	if ResearchManager.get_cpu_capability("MINIATURIZATION") <= 0.0 or not ResearchManager.get_cpu_concept_programs().is_empty():
+		_fail("Legacy research save did not receive clean CPU capability / concept defaults")
 		return
 
 	var legacy_company_state := CompanyManager.get_state().duplicate(true)
