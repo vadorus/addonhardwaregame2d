@@ -95,7 +95,11 @@ func _on_sales_report(report: Dictionary):
 		active_case["severity"] = clampf(maxf(float(active_case.get("severity", 0.0)), _severity_for(product, return_rate)), 0.0, 100.0)
 		cases_changed.emit()
 		return
-	if returns < 2 or return_rate < 0.025:
+	var metrics: Dictionary = product.get("metrics", {})
+	var reliability := float(metrics.get("reliability", 55.0))
+	var defect_rate := float(product.get("defect_rate", 0.025))
+	var case_pressure := return_rate + defect_rate * 0.80 + maxf(65.0 - reliability, 0.0) * 0.002
+	if returns < 3 or case_pressure < 0.12:
 		return
 	_create_case(product, units, returns, return_rate)
 
@@ -258,6 +262,7 @@ func _apply_fix_to_product(product: Dictionary, issue_type: String, severity: fl
 		"MANUFACTURING":
 			product["defect_rate"] = clampf(float(product.get("defect_rate", 0.025)) * (0.36 if strong else 0.58), 0.003, 0.16)
 			product["manufacturing_quality"] = clampf(float(product.get("manufacturing_quality", 60.0)) + 4.0 * strength, 0.0, 100.0)
+			metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + 1.4 * strength, 0.0, 100.0)
 			ProductionManager.quality_knowledge = clampf(ProductionManager.quality_knowledge + 1.6 * strength, 0.0, 100.0)
 		"THERMAL":
 			metrics["efficiency"] = clampf(float(metrics.get("efficiency", 55.0)) + 1.4 * strength, 0.0, 100.0)
