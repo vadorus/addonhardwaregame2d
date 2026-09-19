@@ -49,6 +49,22 @@ Le moteur doit distinguer les objets suivants :
 
 Cette séparation autorise les synergies sans confondre les métiers. Une architecture CPU peut devenir un composant, alimenter un serveur, accélérer une branche IA et être licenciée à un partenaire.
 
+### Trésorerie, propriété et maturité financière
+
+La simulation distingue strictement **la trésorerie** de **la valeur de l'entreprise**. La trésorerie est l'argent immédiatement disponible pour payer R&D, salaires, production, support et autres charges. Une valorisation élevée, une réputation forte ou une future capitalisation boursière ne remplacent jamais des liquidités disponibles.
+
+La Bourse n'est pas accessible au démarrage. Une jeune entreprise commence avec son capital et ses financements privés. Les possibilités financières se débloquent avec la maturité du groupe :
+
+- capital initial et trésorerie ;
+- emprunts et investisseurs privés ;
+- levées de fonds plus importantes lorsque l'entreprise est établie ;
+- introduction en Bourse seulement lorsqu'un niveau suffisant de taille, historique, réputation et gouvernance est atteint ;
+- après cotation : capitalisation, cours de l'action, dilution, dividendes, rachats d'actions et pression des investisseurs deviennent des systèmes distincts.
+
+La propriété des sociétés doit également pouvoir évoluer à long terme. Le joueur pourra créer des filiales ou entreprises, céder une participation ou vendre une société, conserver ou perdre le contrôle selon la transaction, puis tenter un rachat ultérieur lorsque les conditions le permettent.
+
+Un futur système **Groupe & Succession** permettra la transmission à un héritier, la direction d'une filiale par un descendant, la création d'entreprises familiales distinctes et l'évolution de ces entités en partenaires ou concurrents. Ce système appartient au moyen/long terme et ne doit pas alourdir la vertical slice CPU.
+
 ## 5. Divisions et diversification
 
 Une entreprise peut posséder plusieurs divisions : CPU, serveurs, logiciel, cloud, IA, robotique ou autres branches futures. Une division comprend au minimum :

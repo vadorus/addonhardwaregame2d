@@ -6,6 +6,7 @@ signal opportunity_created(contract)
 var competitors: Dictionary = {}
 var contracts: Array = []
 var _next_contract_id := 1
+var market_age_months := 0
 var rng := RandomNumberGenerator.new()
 
 func _ready():
@@ -14,6 +15,7 @@ func _ready():
 func reset():
 	contracts = []
 	_next_contract_id = 1
+	market_age_months = 0
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
@@ -77,10 +79,89 @@ func benchmark_rank(product: Dictionary) -> int:
 			return i + 1
 	return rows.size()
 
+func _segment_expectation_drift(segment: String) -> float:
+	var base := 0.11
+	match segment:
+		"ENTHUSIAST":
+			base = 0.20
+		"PRO":
+			base = 0.17
+		"ENTERPRISE":
+			base = 0.15
+		"PREMIUM":
+			base = 0.18
+		"BUDGET":
+			base = 0.08
+		_:
+			base = 0.12
+	return minf(float(market_age_months) * base, 18.0)
+
+func _advance_competitors() -> void:
+	for sector in competitors.keys():
+		var rows: Array = competitors[sector]
+		for competitor in rows:
+			var company := str(competitor.get("company", ""))
+			var growth := 0.0
+			if company == "Aster Systems":
+				growth = 0.10
+			elif company == "Helix Global":
+				growth = 0.16
+			elif company == "Quantum Works":
+				growth = 0.13
+			else:
+				growth = 0.11
+			var metrics: Dictionary = competitor.get("metrics", {})
+			for metric in GameData.METRICS:
+				var specialty := 1.0
+				if company == "Aster Systems" and metric in ["efficiency", "reliability", "sustainability"]:
+					specialty = 1.18
+				elif company == "Helix Global" and metric in ["performance", "innovation", "ecosystem"]:
+					specialty = 1.22
+				elif company == "Quantum Works" and metric in ["performance", "efficiency", "reliability"]:
+					specialty = 1.14
+				var variation := rng.randf_range(-0.025, 0.045)
+				metrics[metric] = clampf(float(metrics.get(metric, 50.0)) + growth * specialty + variation, 20.0, 98.0)
+			competitor["metrics"] = metrics
+			var current_price := float(competitor.get("price", 1))
+			competitor["price"] = maxi(1, int(round(current_price * 1.0015)))
+		competitors[sector] = rows
+
+func product_age_penalty(product: Dictionary) -> float:
+	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 12:
+		return 0.0
+	var monthly_penalty := 0.50
+	match str(product.get("target_segment", "MAINSTREAM")):
+		"BUDGET":
+			monthly_penalty = 0.32
+		"ENTHUSIAST":
+			monthly_penalty = 0.72
+		"PRO":
+			monthly_penalty = 0.58
+		"ENTERPRISE":
+			monthly_penalty = 0.45
+		"PREMIUM":
+			monthly_penalty = 0.66
+		_:
+			monthly_penalty = 0.50
+	return minf(float(age_months - 12) * monthly_penalty, 24.0)
+
+func product_lifecycle_label(product: Dictionary) -> String:
+	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 6:
+		return "Nouveau"
+	if age_months <= 18:
+		return "Mature"
+	if age_months <= 30:
+		return "Vieillissant"
+	return "Ancienne génération"
+
 func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var sd: Dictionary = GameData.SECTORS[str(product.sector)]
 	var target := str(product.target_segment)
-	var score := evaluate_product(product, target)
+	var raw_score := evaluate_product(product, target)
+	var age_penalty := product_age_penalty(product)
+	var score := clampf(raw_score - age_penalty, 0.0, 100.0)
 	var competitor_avg := 0.0
 	var comps: Array = competitors.get(str(product.sector), [])
 	for comp in comps:
@@ -91,9 +172,9 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var awareness := CompanyManager.get_awareness_bonus()
 	var share: float = clampf(0.08 + (score - competitor_avg) * 0.009 + awareness * 0.42, 0.01, 0.52)
 	var units := int(float(sd.market_units) * share)
-	var expectation: float = 50.0 + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
+	var expectation: float = 50.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
 	var gap := score - expectation
-	return {"units":units,"score":score,"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
+	return {"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
 
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}
@@ -194,17 +275,20 @@ func advance_contract(product_id: String):
 	market_changed.emit()
 
 func process_month(products: Array):
+	market_age_months += 1
+	_advance_competitors()
 	for product in products:
 		if str(product.status) == "LAUNCHED":
 			maybe_generate_b2b(product)
 
 func get_state() -> Dictionary:
-	return {"competitors":competitors,"contracts":contracts,"next_contract_id":_next_contract_id,"rng_seed":rng.seed,"rng_state":rng.state}
+	return {"competitors":competitors,"contracts":contracts,"next_contract_id":_next_contract_id,"market_age_months":market_age_months,"rng_seed":rng.seed,"rng_state":rng.state}
 
 func load_state(state: Dictionary):
 	competitors = state.get("competitors", {}).duplicate(true)
 	contracts = state.get("contracts", []).duplicate(true)
 	_next_contract_id = int(state.get("next_contract_id", 1))
+	market_age_months = int(state.get("market_age_months", 0))
 	rng.seed = int(state.get("rng_seed", 43021))
 	rng.state = int(state.get("rng_state", rng.state))
 	market_changed.emit()
