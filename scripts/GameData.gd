@@ -143,6 +143,14 @@ func get_product_family_keys() -> Array:
 func get_product_family(family: String) -> Dictionary:
 	return SECTORS.get(family, {})
 
+func get_product_family_specialization(family: String) -> String:
+	var data := get_product_family(family)
+	return str(data.get("specialization", family.to_lower()))
+
+func get_product_family_label(family: String) -> String:
+	var data := get_product_family(family)
+	return str(data.get("label", family))
+
 # API legacy. Ne pas supprimer tant que les anciennes sauvegardes utilisent encore "sector".
 func get_active_sector_keys() -> Array:
 	return get_active_product_family_keys()
