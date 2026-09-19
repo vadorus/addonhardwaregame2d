@@ -69,7 +69,7 @@ Objectif : prouver une boucle de jeu complète, pas seulement un écran de conce
 - [x] Capacité de production.
 - [x] Rendement de fabrication.
 - [x] Qualité et taux de panne simplifiés.
-- [ ] Stocks.
+- [x] Stocks.
 - [x] SAV / retours / garanties.
 - [ ] Pièces détachées et capacité de réparation.
 - [ ] Logistique.
