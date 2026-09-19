@@ -911,10 +911,10 @@ func _refresh_cpu_control_limits(design: Dictionary):
 	var reference_cores := maxf(float(node.get("core_reference", 1.0)), 1.0)
 	var reference_cache_kb := maxf(float(node.get("cache_reference_kb", 0.0)), 0.0)
 	var base_power := maxf(float(node.get("base_power", 2.0)), 1.0)
-	rd_cores.max_value = maxf(4.0, reference_cores * 2.0, float(normalized.cores))
-	rd_frequency.max_value = maxf(10.0, reference_mhz * 2.8, float(normalized.frequency_ghz) * 1000.0)
-	rd_cache.max_value = maxf(32.0, reference_cache_kb * 3.0, float(normalized.cache_mb) * 1024.0)
-	rd_tdp.max_value = maxf(25.0, base_power * 3.5, float(normalized.tdp_w))
+	rd_cores.max_value = maxf(maxf(4.0, reference_cores * 2.0), float(normalized.cores))
+	rd_frequency.max_value = maxf(maxf(10.0, reference_mhz * 2.8), float(normalized.frequency_ghz) * 1000.0)
+	rd_cache.max_value = maxf(maxf(32.0, reference_cache_kb * 3.0), float(normalized.cache_mb) * 1024.0)
+	rd_tdp.max_value = maxf(maxf(25.0, base_power * 3.5), float(normalized.tdp_w))
 
 func _set_cpu_design_controls(input: Dictionary, reference_name: String = "Référence"):
 	var design := CPU_DESIGN.normalize(input)
