@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Tech Empire Prototype V0.3 — CPU Research & Development"
+config/name="Tech Empire Prototype V0.3 — CPU Industrialization"
 run/main_scene="uid://e28phl1nvy5i"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
@@ -27,6 +27,7 @@ CompanyManager="*res://scripts/CompanyManager.gd"
 DivisionManager="*res://scripts/DivisionManager.gd"
 PersonnelManager="*res://scripts/PersonnelManager.gd"
 ResearchManager="*res://scripts/ResearchManager.gd"
+ProductionManager="*res://scripts/ProductionManager.gd"
 PatentManager="*res://scripts/PatentManager.gd"
 MarketManager="*res://scripts/MarketManager.gd"
 MediaManager="*res://scripts/MediaManager.gd"
