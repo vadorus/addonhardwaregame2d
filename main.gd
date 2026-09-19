@@ -203,7 +203,7 @@ func _build_ui():
 	top.add_child(brand_box)
 	company_label = _label("Tech Empire", 18)
 	brand_box.add_child(company_label)
-	var era_label := _muted_label("Vertical slice • CPU", 12)
+	var era_label := _muted_label("Vertical slice • CPU • débuts du microprocesseur", 12)
 	brand_box.add_child(era_label)
 
 	var spacer := Control.new()
@@ -214,7 +214,7 @@ func _build_ui():
 	var date_box := VBoxContainer.new()
 	date_box.custom_minimum_size.x = 125
 	date_box.add_child(_eyebrow("CALENDRIER"))
-	date_label = _label("Jour 1 • Mois 1 • 2025", 14)
+	date_label = _label("Jour 1 • Mois 1 • 1971", 14)
 	date_box.add_child(date_label)
 	top.add_child(date_box)
 
@@ -603,19 +603,16 @@ func _create_research_tab():
 	red_legend.add_theme_color_override("font_color", APP_RED)
 	guidance_legend.add_child(red_legend)
 
-	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs", 0, "cores")
-	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1, "frequency_ghz")
-	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo", 0, "cache_mb")
+	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 1.0, 4.0, 1.0, 1.0, " cœur(s)", 0, "cores")
+	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 0.1, 10.0, 0.1, 0.8, " MHz", 1, "frequency_ghz")
+	rd_cache = _add_lab_slider(configuration_box, "Cache intégré", 0.0, 32.0, 1.0, 0.0, " Ko", 0, "cache_mb")
 
 	rd_node = OptionButton.new()
-	for node_nm in CPU_DESIGN.available_nodes():
-		rd_node.add_item(CPU_DESIGN.node_label(int(node_nm)))
-		rd_node.set_item_metadata(rd_node.item_count - 1, int(node_nm))
-	_select_meta(rd_node, "7")
+	_refresh_cpu_node_options()
 	rd_node.item_selected.connect(func(_index): _refresh_cpu_preview())
-	_add_labeled_control(configuration_box, "Procédé de gravure", rd_node)
+	_add_labeled_control(configuration_box, "Procédé de fabrication", rd_node)
 
-	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe thermique", 35.0, 250.0, 5.0, 95.0, " W", 0, "tdp_w")
+	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe électrique / thermique", 1.0, 25.0, 1.0, 2.0, " W", 0, "tdp_w")
 
 	configuration_box.add_child(_eyebrow("AVIS DE L'ÉQUIPE TECHNIQUE"))
 	var guidance_panel := PanelContainer.new()
@@ -795,12 +792,12 @@ func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 	cpu_metric_labels[key] = value_label
 
 func _current_cpu_design() -> Dictionary:
-	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null:
+	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null or rd_node.item_count == 0:
 		return CPU_DESIGN.default_design()
 	return CPU_DESIGN.normalize({
 		"cores": int(rd_cores.value),
-		"frequency_ghz": float(rd_frequency.value),
-		"cache_mb": int(rd_cache.value),
+		"frequency_ghz": float(rd_frequency.value) / 1000.0,
+		"cache_mb": float(rd_cache.value) / 1024.0,
 		"node_nm": int(rd_node.get_item_metadata(rd_node.selected)),
 		"tdp_w": int(rd_tdp.value)
 	})
@@ -882,8 +879,9 @@ func _set_cpu_design_controls(input: Dictionary, reference_name: String = "Réf�
 	lab_reference_design = design.duplicate(true)
 	lab_reference_name = reference_name
 	rd_cores.value = int(design.cores)
-	rd_frequency.value = float(design.frequency_ghz)
-	rd_cache.value = int(design.cache_mb)
+	rd_frequency.value = float(design.frequency_ghz) * 1000.0
+	rd_cache.value = float(design.cache_mb) * 1024.0
+	_ensure_cpu_node_option(int(design.node_nm))
 	_select_meta(rd_node, str(design.node_nm))
 	rd_tdp.value = int(design.tdp_w)
 	_refresh_cpu_preview()
@@ -929,8 +927,8 @@ func _refresh_cpu_preview():
 	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence)
 
 	lab_profile_label.text = str(evaluation.profile)
-	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
-		int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
+		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 		_money(estimated_program_cost), risk_label, risk
 	]
 	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
@@ -955,10 +953,10 @@ func _refresh_cpu_preview():
 			metric_label.text = "%.0f%s" % [score, delta_text]
 			metric_label.add_theme_color_override("font_color", APP_GREEN if delta > 0.5 else (APP_RED if delta < -0.5 else APP_TEXT))
 
-	var thermal_text := "TDP cohérent"
-	if float(evaluation.power_deficit) > 0.1:
-		thermal_text = "déficit thermique %.0f W" % float(evaluation.power_deficit)
-	lab_technical_detail_label.text = "Innovation %.0f • durabilité %.0f • complexité %.0f/100 • risque %.0f/100\nTDP requis ~%.0f W • %s • coût unitaire %s €" % [
+	var thermal_text := "enveloppe cohérente"
+	if float(evaluation.power_deficit) > 0.05:
+		thermal_text = "déficit électrique/thermique %.1f W" % float(evaluation.power_deficit)
+	lab_technical_detail_label.text = "Innovation %.0f • durabilité %.0f • complexité %.0f/100 • risque %.0f/100\nBesoin estimé ~%.1f W • %s • coût unitaire %s €" % [
 		float(evaluation.innovation), float(evaluation.sustainability), float(evaluation.complexity), risk,
 		float(evaluation.required_tdp), thermal_text, _money(int(evaluation.unit_cost))
 	]
@@ -1026,11 +1024,13 @@ func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
 func _format_guidance_value(key: String, value: float) -> String:
 	match key:
 		"cores":
-			return "%d cœurs" % int(round(value))
+			return "%d cœur(s)" % int(round(value))
 		"frequency_ghz":
-			return "%.1f GHz" % value
+			var mhz := value * 1000.0
+			return "%.1f MHz" % mhz if mhz < 10.0 else "%.0f MHz" % mhz
 		"cache_mb":
-			return "%d Mo" % int(round(value))
+			var kb := value * 1024.0
+			return "aucun cache" if kb < 0.5 else "%d Ko" % int(round(kb))
 		"tdp_w":
 			return "%d W" % int(round(value))
 		_:
