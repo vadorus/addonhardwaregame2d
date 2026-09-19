@@ -40,6 +40,26 @@ func _ready() -> void:
 		_fail("Efficient preset is not more efficient")
 		return
 
+	var efficient_axes := CPU_DESIGN.decision_axes(efficient)
+	var performance_axes := CPU_DESIGN.decision_axes(performance)
+	if efficient_axes.size() != 5 or performance_axes.size() != 5:
+		_fail("CPU decision layer must expose exactly five tradeoff axes")
+		return
+	for axis_key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
+		var axis_score := float(efficient_axes.get(axis_key, -1.0))
+		if axis_score < 0.0 or axis_score > 100.0:
+			_fail("CPU decision axis escaped the 0-100 range: %s" % axis_key)
+			return
+	if float(performance_axes.performance) <= float(efficient_axes.performance):
+		_fail("Performance preset did not improve the visible performance tradeoff")
+		return
+	if float(efficient_axes.cost_control) <= float(performance_axes.cost_control):
+		_fail("Efficient preset should control manufacturing cost better")
+		return
+	if CPU_DESIGN.decision_summary(efficient_axes).is_empty():
+		_fail("CPU decision summary is empty")
+		return
+
 	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
 	if proposals.size() != 3:
 		_fail("CPU generation council did not return three plans")
