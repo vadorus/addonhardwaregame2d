@@ -83,6 +83,10 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 				else:
 					design.cache_mb = float(base.cache_mb) * 1.45
 			design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
+			if int(design.node_nm) != int(base.node_nm):
+				var next_profile: Dictionary = CPU_DESIGN.node_profile(int(design.node_nm))
+				var next_reference_ghz := float(next_profile.get("reference_mhz", 1.0)) / 1000.0
+				design.frequency_ghz = maxf(float(design.frequency_ghz), next_reference_ghz * 1.30)
 		_:
 			design.frequency_ghz = float(base.frequency_ghz) * 1.24
 			design.tdp_w = int(base.tdp_w) + maxi(1, int(round(float(base.tdp_w) * 0.15)))
