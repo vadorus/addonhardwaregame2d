@@ -97,6 +97,14 @@ La connaissance progresse avec des rendements décroissants : atteindre un nivea
 
 Les propositions de génération tiennent compte de cette recherche. Une équipe peu expérimentée fournit des estimations moins fiables et Camille doit le signaler ; une équipe mature donne des prévisions plus précises sans supprimer complètement l'incertitude.
 
+### Équipe Développement distincte
+
+La Recherche et le Développement sont deux équipes différentes. La Recherche accumule connaissances, expérience scientifique et nouvelles pistes. Le Développement transforme ce savoir en architecture réellement intégrée, testée et validée.
+
+L'équipe Développement possède sa propre taille, son propre score, son management, son expérience et une charge liée au nombre de projets actifs. Une bonne R&D ne garantit donc pas à elle seule un bon produit : une équipe de développement trop petite ou surchargée ralentit l'intégration, réduit la qualité des validations et rend les prévisions moins fiables.
+
+À l'inverse, augmenter fortement la Recherche ne retire plus artificiellement des ingénieurs au Développement : le joueur doit recruter, organiser et financer les deux capacités séparément.
+
 ## 3. Demander une nouvelle génération
 
 Le joueur fournit un brief :

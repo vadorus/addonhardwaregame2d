@@ -20,14 +20,16 @@ func reset(starting_sector: String):
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
 	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
 	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
-	_add_employee("Samira Lefèvre", "Ingénieure produit", "R&D", 61, 3.5, "product", 42, 3900)
+	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 4400)
+	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 3700)
 	_add_employee("Thomas Girard", "Responsable production", "Production", 63, 7.0, "manufacturing", 72, 5100)
 	_add_employee("Julie Fontaine", "Responsable marketing", "Marketing", 58, 6.0, "marketing", 70, 4600)
 	_add_employee("Mehdi Colin", "Responsable support", "Support", 57, 5.0, "support", 65, 4100)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
-	CompanyManager.set_department_leader("Production", str(staff[3].id))
-	CompanyManager.set_department_leader("Marketing", str(staff[4].id))
-	CompanyManager.set_department_leader("Support", str(staff[5].id))
+	CompanyManager.set_department_leader("Développement", str(staff[2].id))
+	CompanyManager.set_department_leader("Production", str(staff[4].id))
+	CompanyManager.set_department_leader("Marketing", str(staff[5].id))
+	CompanyManager.set_department_leader("Support", str(staff[6].id))
 	generate_candidate("R&D")
 	staff_changed.emit()
 
@@ -51,6 +53,7 @@ func generate_candidate(department: String) -> Dictionary:
 	var specialization := "product"
 	match department:
 		"R&D": specialization = ["cpu","gpu","software","mobile","display","cloud","satellite","ai"][rng.randi_range(0,7)]
+		"Développement": specialization = ["product","validation","firmware","integration"][rng.randi_range(0,3)]
 		"Production": specialization = "manufacturing"
 		"Marketing": specialization = "marketing"
 		"Support": specialization = "support"
@@ -148,6 +151,15 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	var migrated_development_leader := ""
+	for emp in staff:
+		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
+			emp["department"] = "Développement"
+			emp["role"] = "Responsable développement CPU" if str(emp.get("name", "")) == "Samira Lefèvre" else str(emp.get("role", "Ingénieur produit"))
+			if migrated_development_leader == "":
+				migrated_development_leader = str(emp.get("id", ""))
+	if CompanyManager.departments.has("Développement") and str(CompanyManager.departments["Développement"].get("leader_id", "")) == "" and migrated_development_leader != "":
+		CompanyManager.departments["Développement"]["leader_id"] = migrated_development_leader
 	candidate = state.get("candidate", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 1947))

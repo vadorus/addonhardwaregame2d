@@ -193,6 +193,8 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"research_score":float(context.get("research_score", 0.0)),
 		"research_confidence":float(context.get("research_confidence", 50.0)),
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
+		"development_team_size":int(context.get("development_team_size", 0)),
+		"development_confidence":float(context.get("development_confidence", 50.0)),
 		"equipment_score":float(context.get("equipment_score", 25.0)),
 		"division_maturity":float(context.get("division_maturity", 0.0)),
 		"strengths":strengths,
@@ -229,8 +231,12 @@ static func _risks_for(archetype: String, design: Dictionary, evaluation: Dictio
 	var research_confidence := float(context.get("research_confidence", 50.0))
 	if research_confidence < 46.0:
 		risks.append("Estimations encore incertaines : l'équipe manque d'expérience sur cette piste")
-	if float(context.get("development_capacity_factor", 1.0)) < 0.72:
-		risks.append("Une grande partie de l'équipe R&D reste mobilisée par la recherche")
+	if int(context.get("development_team_size", 0)) <= 1:
+		risks.append("Équipe Développement très réduite : validation et intégration fragiles")
+	elif float(context.get("development_capacity_factor", 1.0)) < 0.78:
+		risks.append("Équipe Développement déjà fortement chargée")
+	if float(context.get("development_confidence", 50.0)) < 48.0:
+		risks.append("Équipe Développement encore peu expérimentée sur l'intégration produit")
 	var approach := str(context.get("approach", "INTERNAL"))
 	if approach == "INTERNAL" and float(context.get("technology_score", 0.0)) < 25.0:
 		risks.append("Savoir-faire interne encore jeune")

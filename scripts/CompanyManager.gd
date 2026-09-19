@@ -28,6 +28,7 @@ var policies := {
 
 var departments := {
 	"R&D": {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":35.0},
+	"Développement": {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":32.0},
 	"Production": {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":30.0},
 	"Marketing": {"leader_id":"", "autonomy":"AUTONOMOUS", "cohesion":30.0},
 	"Support": {"leader_id":"", "autonomy":"AUTONOMOUS", "cohesion":30.0},
@@ -50,6 +51,7 @@ func reset(name: String, sector: String, capital: int = 500_000):
 	policies = {"marketing_budget":6000,"support_budget":5000,"environment_budget":2500,"support_level":"STANDARD"}
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
+		"Développement":{"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0},
 		"Production":{"leader_id":"","autonomy":"SUPERVISED","cohesion":30.0},
 		"Marketing":{"leader_id":"","autonomy":"AUTONOMOUS","cohesion":30.0},
 		"Support":{"leader_id":"","autonomy":"AUTONOMOUS","cohesion":30.0},
@@ -141,6 +143,8 @@ func load_state(state: Dictionary):
 	reputation = state.get("reputation", reputation).duplicate(true)
 	policies = state.get("policies", policies).duplicate(true)
 	departments = state.get("departments", departments).duplicate(true)
+	if not departments.has("Développement"):
+		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
 	brands = state.get("brands", []).duplicate(true)
 	alerts = state.get("alerts", []).duplicate(true)
