@@ -118,6 +118,74 @@ Un responsable n'est pas un bouton magique. Sa compétence, son expérience, son
 
 Un chef très strict peut produire des rapports précis et tenir les délais, tout en épuisant son équipe si l'entreprise n'offre pas un bon cadre de travail.
 
+## 6A. Onboarding progressif, bras droit et comité de direction
+
+La complexité de Tech Empire doit grandir au même rythme que l'entreprise et que l'apprentissage du joueur. Le jeu ne présente jamais tous ses systèmes dès le départ.
+
+### Le garage comme phase d'apprentissage
+
+La partie commence dans un petit garage ou bureau improvisé avec très peu de fonctions visibles. Le joueur pilote directement son premier domaine — CPU dans la vertical slice — et n'a accès qu'aux informations nécessaires au problème courant.
+
+Les nouvelles fonctions apparaissent lorsqu'un événement concret les rend utiles : embauche d'une équipe → RH ; première industrialisation → Production ; premières ventes → Marché et SAV ; croissance de l'effectif → management ; seconde branche → Divisions et délégation. Les menus ne doivent pas être remplis dès le départ de boutons grisés annonçant des dizaines de systèmes futurs.
+
+### Le bras droit est présent dès le début
+
+Le bras droit / vice-président accompagne le joueur dès le garage. Il sert à la fois de guide contextuel, de filtre de complexité et de conseiller stratégique. Il doit :
+
+- expliquer une nouvelle mécanique au moment où elle devient utile ;
+- traduire les indicateurs techniques ou financiers en conséquences compréhensibles ;
+- rappeler les risques importants sans donner une « bonne réponse » automatique ;
+- résumer les décisions ouvertes et aider à les prioriser ;
+- présenter plusieurs options avec leurs compromis ;
+- signaler clairement l'incertitude lorsqu'il ne dispose pas d'assez d'information.
+
+Au début, son rôle est proche d'un mentor. À mesure que le joueur maîtrise le jeu, ses interventions deviennent plus synthétiques et plus stratégiques.
+
+### Une responsabilité directe obligatoire
+
+Le joueur doit toujours piloter directement au moins un domaine, une division ou un programme important. Il peut déléguer le reste, mais le jeu ne doit jamais devenir totalement passif.
+
+Le niveau de contrôle est défini séparément pour chaque domaine : direct, supervisé ou autonome. Le joueur peut donc gérer personnellement les CPU tout en confiant Mobile, IA, TV ou Spatial à des responsables.
+
+### Directeurs de division et chefs de projet
+
+Les divisions sont confiées à des directeurs qui reçoivent un mandat clair : budget, priorité, segment visé, niveau de risque, qualité attendue, politique de croissance et autonomie autorisée. Les chefs de projet pilotent ensuite des produits ou programmes précis.
+
+Leur profil influence réellement les résultats : expertise technique, finance, innovation, gestion humaine, prudence, vitesse d'exécution, maîtrise des coûts, communication et capacité à détecter un problème tôt. Un bon responsable n'est pas un bonus fixe ; il prend de meilleures décisions dans les limites de son mandat.
+
+### Comité de direction
+
+Lorsque l'entreprise grandit, le comité de direction devient l'interface principale de synthèse. Il réunit le joueur, le bras droit et les responsables transversaux ou de division. Il remonte surtout trois catégories de sujets :
+
+- information : aucun arbitrage nécessaire ;
+- recommandation : un responsable propose une action ;
+- arbitrage dirigeant : plusieurs options, budgets, équipes ou divisions sont en conflit et le joueur doit trancher.
+
+Le comité doit éviter d'obliger le joueur à ouvrir dix écrans pour comprendre la situation de l'entreprise.
+
+### Fonctions transversales
+
+À mesure que la société grandit, des responsables spécialisés peuvent rejoindre la direction :
+
+- RH : recrutement, conflits, départs, fatigue, satisfaction et avantages salariés ;
+- Finance / DAF : trésorerie, budget, réserve de sécurité, financement et faisabilité des investissements ;
+- Juridique / fiscal : contrats, implantation, propriété intellectuelle, réglementation, fiscalité et subventions ;
+- Opérations / immobilier : bureaux, laboratoires, ateliers, capacité et environnement de travail.
+
+Ils servent eux aussi de filtres pédagogiques. Par exemple, le DAF ne se contente pas de dire qu'un investissement est possible : il explique la trésorerie restante, les charges mensuelles et le risque associé.
+
+### Avantages salariés et environnement de travail
+
+La qualité de l'entreprise doit être visible et avoir des conséquences réelles. Le joueur peut améliorer les locaux, laboratoires et conditions de travail, ainsi que proposer des avantages adaptés au pays et à la taille de la société : mutuelle, primes, intéressement, formation, restauration, télétravail, espaces de repos, transport, crèche, activités d'équipe ou autres avantages.
+
+Ces choix influencent attractivité, fidélisation, fatigue, absentéisme, productivité, recrutement et réputation employeur. Ils ne doivent pas se réduire à des niveaux abstraits du type « mutuelle +5 bonheur ».
+
+### Principe d'interface
+
+Comme dans un jeu où les capacités se débloquent progressivement avec la progression du personnage, Tech Empire ne montre au joueur que ce qu'il peut raisonnablement apprendre et utiliser à ce stade. L'entreprise peut devenir gigantesque après des dizaines d'heures sans que les trente premières minutes soient intimidantes.
+
+La règle UX associée est : **simulation profonde derrière, décisions limitées et lisibles devant**.
+
 ## 7. Équipes, expérience et découvertes
 
 Les employés possèdent des compétences générales, des spécialisations, de l'expérience de domaine, du leadership, du moral et une aptitude d'apprentissage. Ils disposent aussi de profils semi-aléatoires cohérents avec leur métier : rigueur, résolution de problèmes, travail en équipe, résistance au stress, créativité et qualité de process. Ces valeurs doivent influencer les systèmes concernés et ne pas rester décoratives. Les équipes progressent en travaillant réellement sur un sujet.
