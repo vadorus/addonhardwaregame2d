@@ -217,6 +217,8 @@ Le responsable SAV ou qualité remonte un dossier comprenant : fréquence estim�
 
 Le bon choix dépend du contexte. Une réponse chère peut sauver la confiance ; une économie immédiate peut produire des pertes durables. La réparabilité, les stocks de pièces et la durée des mises à jour deviennent des éléments de marque.
 
+La première implémentation CPU suit déjà les retours terrain, classe les incidents en fabrication, thermique, stabilité ou firmware, permet surveillance/enquête/correctif/rappel et accumule une expérience terrain persistante. Cette expérience retourne ensuite vers la R&D et la Production afin qu'une génération difficile puisse améliorer les suivantes.
+
 ## 13. Clients, tests, créateurs et marketing
 
 Les clients sont divisés en segments dont les attentes diffèrent. Ils évaluent les caractéristiques objectives, le prix, la marque, les promesses, le support, la concurrence et leur expérience précédente.

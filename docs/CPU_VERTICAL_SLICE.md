@@ -124,6 +124,26 @@ Le joueur choisit une stratégie industrielle par projet :
 
 Le résultat d'industrialisation fixe ensuite le rendement final, le taux de défaut, la capacité réelle, le coût unitaire et une partie de la fiabilité commerciale. Les défauts de fabrication augmentent aussi les retours SAV après le lancement.
 
+### SAV, incidents terrain et apprentissage réel
+
+Les ventes produisent désormais de l'**expérience terrain** même lorsqu'aucune crise n'est ouverte. L'entreprise apprend progressivement comment ses CPU se comportent réellement chez les clients.
+
+Lorsque les retours, la faible fiabilité ou les défauts usine forment un signal suffisamment fort, le SAV ouvre un dossier dans l'une de quatre familles :
+- défaut de fabrication ;
+- comportement thermique ;
+- instabilité en charge ;
+- microcode / firmware.
+
+Le dossier possède une gravité, une confiance d'analyse, un volume observé et un historique. Le joueur peut :
+- **surveiller** sans dépense immédiate, avec un risque d'image si un problème sérieux persiste ;
+- **enquêter**, ce qui coûte de l'argent et mobilise l'équipe SAV jusqu'au diagnostic ;
+- **appliquer un correctif** une fois la cause suffisamment comprise ;
+- **rappeler le produit**, solution beaucoup plus coûteuse mais plus forte pour une crise importante.
+
+Les correctifs modifient réellement le produit : défauts, fiabilité, efficacité ou capacité selon la cause. Un rappel réduit fortement le risque technique mais peut coûter très cher.
+
+Surtout, les incidents ne sont pas seulement punitifs. Diagnostiquer et résoudre un problème augmente l'expérience terrain et alimente les connaissances R&D / qualité Production. Les futures propositions CPU utilisent donc l'historique réel des générations précédentes pour améliorer la confiance et signaler quand l'entreprise manque encore de retour terrain.
+
 ## 3. Demander une nouvelle génération
 
 Le joueur fournit un brief :

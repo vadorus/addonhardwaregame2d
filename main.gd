@@ -46,6 +46,8 @@ var industrialization_strategy: OptionButton
 var product_details_label: Label
 var market_label: Label
 var contract_label: Label
+var after_sales_label: Label
+var after_sales_case_select: OptionButton
 var media_label: Label
 
 var setup_name: LineEdit
@@ -150,6 +152,8 @@ func _connect_signals():
 	ResearchManager.research_event_created.connect(_on_research_event)
 	ProductionManager.jobs_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
+	AfterSalesManager.cases_changed.connect(_refresh_market)
+	AfterSalesManager.field_experience_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
 	PatentManager.patents_changed.connect(_refresh_all)
@@ -813,12 +817,12 @@ func _refresh_generation_plan_summary():
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
-	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
 		int(design.get("cores", 0)), float(design.get("frequency_ghz", 0.0)), int(design.get("cache_mb", 0)), int(design.get("node_nm", 0)), int(design.get("tdp_w", 0)),
 		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
-		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("development_confidence", 50.0)), float(proposal.get("target_fit", 0.0)),
+		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("development_confidence", 50.0)), float(proposal.get("field_experience", 0.0)), float(proposal.get("target_fit", 0.0)),
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
 		" • ".join(strengths), " • ".join(risks), str(proposal.get("recommendation", ""))
 	]
@@ -955,6 +959,31 @@ func _create_market_tab():
 	market_label=_rich_label(); box.add_child(market_label)
 	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
 	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
+	box.add_child(_section("SAV & expérience terrain"))
+	after_sales_label = _rich_label()
+	box.add_child(after_sales_label)
+	after_sales_case_select = OptionButton.new()
+	after_sales_case_select.item_selected.connect(func(_i): _refresh_after_sales())
+	box.add_child(after_sales_case_select)
+	var sav_actions := HFlowContainer.new()
+	sav_actions.add_theme_constant_override("h_separation", 8)
+	box.add_child(sav_actions)
+	var investigate := Button.new()
+	investigate.text = "Enquêter"
+	investigate.pressed.connect(_investigate_sav_case)
+	sav_actions.add_child(investigate)
+	var monitor := Button.new()
+	monitor.text = "Surveiller"
+	monitor.pressed.connect(_monitor_sav_case)
+	sav_actions.add_child(monitor)
+	var correct := Button.new()
+	correct.text = "Appliquer un correctif"
+	correct.pressed.connect(_correct_sav_case)
+	sav_actions.add_child(correct)
+	var recall := Button.new()
+	recall.text = "Rappeler le produit"
+	recall.pressed.connect(_recall_sav_case)
+	sav_actions.add_child(recall)
 
 func _create_media_tab():
 	var scroll := _tab_scroll("Presse & médias")
@@ -1629,6 +1658,12 @@ func _refresh_research():
 			float(data.get("knowledge", 0.0)), float(data.get("experience", 0.0)),
 			ResearchManager.research_confidence(key), int(data.get("allocated", 0))
 		])
+	tech_lines.append("\nExpérience terrain CPU : fabrication %.1f • thermique %.1f • stabilité %.1f • firmware %.1f" % [
+		AfterSalesManager.cpu_field_experience("MANUFACTURING"),
+		AfterSalesManager.cpu_field_experience("THERMAL"),
+		AfterSalesManager.cpu_field_experience("STABILITY"),
+		AfterSalesManager.cpu_field_experience("FIRMWARE")
+	])
 	tech_lines.append("\nSavoir-faire techniques hérités :")
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
@@ -1830,6 +1865,7 @@ func _refresh_market_product_options():
 func _refresh_market():
 	if market_label==null: return
 	_refresh_market_product_options()
+	_refresh_after_sales()
 	if market_product_select.item_count==0: market_label.text="Lancez un produit pour obtenir benchmarks, retours clients et parts de marché."; contract_label.text="Aucun contrat."; return
 	var p:=ProductManager.get_product(_meta(market_product_select)); if p.is_empty(): return
 	var bench:=MarketManager.benchmark_for(p); var lines:=["Benchmark %s :" % str(p.name)]
@@ -1847,6 +1883,71 @@ func _refresh_market():
 	contract_label.text="\n".join(c_lines) if not c_lines.is_empty() else "Aucune proposition. Les produits adaptés au calcul, à l'efficacité ou à la fiabilité peuvent attirer des entreprises."
 
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
+
+func _refresh_after_sales():
+	if after_sales_label == null or after_sales_case_select == null:
+		return
+	var current := _meta(after_sales_case_select) if after_sales_case_select.item_count > 0 else ""
+	after_sales_case_select.clear()
+	var open_cases := AfterSalesManager.get_open_cases()
+	for case_data in open_cases:
+		after_sales_case_select.add_item("%s — %s — %s" % [
+			str(case_data.get("product_name", "Produit")),
+			AfterSalesManager.issue_label(str(case_data.get("issue_type", ""))),
+			str(case_data.get("status", "OPEN"))
+		])
+		after_sales_case_select.set_item_metadata(after_sales_case_select.item_count - 1, str(case_data.get("id", "")))
+	if current != "":
+		_select_meta(after_sales_case_select, current)
+	var lines: Array[String] = [
+		"Équipe SAV : score %.0f/100 • dossiers ouverts %d" % [AfterSalesManager.support_team_score(), open_cases.size()],
+		"Expérience terrain — fabrication %.1f • thermique %.1f • stabilité %.1f • firmware %.1f" % [
+			AfterSalesManager.cpu_field_experience("MANUFACTURING"),
+			AfterSalesManager.cpu_field_experience("THERMAL"),
+			AfterSalesManager.cpu_field_experience("STABILITY"),
+			AfterSalesManager.cpu_field_experience("FIRMWARE")
+		]
+	]
+	if after_sales_case_select.item_count > 0:
+		var case_data := AfterSalesManager.get_case(_meta(after_sales_case_select))
+		lines.append("\n%s — %s" % [str(case_data.get("product_name", "Produit")), AfterSalesManager.issue_label(str(case_data.get("issue_type", "")))])
+		lines.append("Statut %s • gravité %.0f/100 • confiance %.0f%% • retours observés %d/%d (%.1f%%)" % [
+			str(case_data.get("status", "OPEN")), float(case_data.get("severity", 0.0)), float(case_data.get("confidence", 0.0)),
+			int(case_data.get("observed_returns", 0)), int(case_data.get("observed_units", 0)), float(case_data.get("last_return_rate", 0.0)) * 100.0
+		])
+		if str(case_data.get("status", "")) == "INVESTIGATING":
+			lines.append("Enquête technique : %.0f%%" % float(case_data.get("investigation_progress", 0.0)))
+		var history: Array = case_data.get("history", [])
+		if not history.is_empty():
+			lines.append("Dernière note : %s" % str(history[0]))
+	else:
+		lines.append("\nAucun dossier critique ouvert. Les ventes et retours continuent néanmoins d'alimenter l'expérience terrain.")
+	after_sales_label.text = "\n".join(lines)
+
+func _selected_sav_case_id() -> String:
+	if after_sales_case_select == null or after_sales_case_select.item_count == 0:
+		return ""
+	return _meta(after_sales_case_select)
+
+func _investigate_sav_case():
+	var case_id := _selected_sav_case_id()
+	status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête : dossier absent ou trésorerie insuffisante."
+	_refresh_all()
+
+func _monitor_sav_case():
+	var case_id := _selected_sav_case_id()
+	status_label.text = "Dossier placé sous surveillance." if case_id != "" and AfterSalesManager.monitor_case(case_id) else "Aucun dossier SAV disponible."
+	_refresh_all()
+
+func _correct_sav_case():
+	var case_id := _selected_sav_case_id()
+	status_label.text = "Correctif SAV appliqué." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et la trésorerie doit permettre le correctif."
+	_refresh_all()
+
+func _recall_sav_case():
+	var case_id := _selected_sav_case_id()
+	status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."
+	_refresh_all()
 
 func _refresh_media():
 	if media_label==null: return

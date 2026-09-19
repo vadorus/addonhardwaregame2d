@@ -308,6 +308,51 @@ func _ready() -> void:
 		_fail("CPU launch ignored the binning capacity limit")
 		return
 
+	var field_before := AfterSalesManager.cpu_field_experience()
+	apex_model["defect_rate"] = 0.085
+	apex_model["manufacturing_quality"] = 42.0
+	var apex_metrics: Dictionary = apex_model.get("metrics", {})
+	apex_metrics["reliability"] = 46.0
+	apex_model["metrics"] = apex_metrics
+	apex_model["last_month_returns"] = 18
+	AfterSalesManager._on_sales_report({"product_id":str(apex_model.id), "units":240})
+	if AfterSalesManager.get_open_cases().size() != 1:
+		_fail("Field returns did not create an after-sales case")
+		return
+	if AfterSalesManager.cpu_field_experience() <= field_before:
+		_fail("Real-world sales and returns did not increase field experience")
+		return
+	var sav_case: Dictionary = AfterSalesManager.get_open_cases()[0]
+	var sav_case_id := str(sav_case.get("id", ""))
+	if not AfterSalesManager.start_investigation(sav_case_id):
+		_fail("Could not start an after-sales investigation")
+		return
+	var investigation_loops := 0
+	while str(AfterSalesManager.get_case(sav_case_id).get("status", "")) == "INVESTIGATING" and investigation_loops < 12:
+		AfterSalesManager.process_month()
+		investigation_loops += 1
+	if str(AfterSalesManager.get_case(sav_case_id).get("status", "")) != "DIAGNOSED":
+		_fail("After-sales investigation did not reach a diagnosis")
+		return
+	var fix_count_before := int(apex_model.get("field_fix_count", 0))
+	var field_after_diagnosis := AfterSalesManager.cpu_field_experience()
+	if not AfterSalesManager.apply_corrective_action(sav_case_id):
+		_fail("Diagnosed after-sales case could not be corrected")
+		return
+	if str(AfterSalesManager.get_case(sav_case_id).get("status", "")) != "RESOLVED":
+		_fail("Corrective action did not resolve the after-sales case")
+		return
+	if int(apex_model.get("field_fix_count", 0)) <= fix_count_before:
+		_fail("Corrective action did not modify the affected product")
+		return
+	if AfterSalesManager.cpu_field_experience() <= field_after_diagnosis:
+		_fail("Resolved field case did not teach the company")
+		return
+	var learned_proposals := ResearchManager.prepare_cpu_generation_proposals("PRO", "INTERNAL", "RELIABILITY", 50_000, CPU_DESIGN.preset("BALANCED"))
+	if learned_proposals.is_empty() or float(learned_proposals[0].get("field_experience", 0.0)) <= 0.0:
+		_fail("Future CPU proposals ignored accumulated field experience")
+		return
+
 	var fresh_probe := apex_model.duplicate(true)
 	fresh_probe["months_on_market"] = 6
 	var aged_probe := apex_model.duplicate(true)
@@ -339,6 +384,17 @@ func _ready() -> void:
 	if MarketManager.market_age_months != saved_market_age:
 		_fail("Market age did not survive a save round-trip")
 		return
+	var after_sales_round_trip := AfterSalesManager.get_state().duplicate(true)
+	var saved_field_experience := AfterSalesManager.cpu_field_experience()
+	AfterSalesManager.reset()
+	AfterSalesManager.load_state(after_sales_round_trip)
+	if absf(AfterSalesManager.cpu_field_experience() - saved_field_experience) > 0.001:
+		_fail("Field experience did not survive a save round-trip")
+		return
+	if AfterSalesManager.cases.is_empty() or str(AfterSalesManager.cases[0].get("status", "")) != "RESOLVED":
+		_fail("After-sales cases did not survive a save round-trip")
+		return
+
 	var production_round_trip := ProductionManager.get_state().duplicate(true)
 	var saved_process_mastery := ProductionManager.get_process_mastery(int(completed_industrial_job.get("node_nm", 7)))
 	ProductionManager.reset()
@@ -370,6 +426,10 @@ func _ready() -> void:
 	ProductionManager.load_state({})
 	if not ProductionManager.jobs.is_empty() or ProductionManager.get_process_mastery(7) <= 0.0:
 		_fail("Legacy save without Production state did not receive production defaults")
+		return
+	AfterSalesManager.load_state({})
+	if not AfterSalesManager.cases.is_empty() or AfterSalesManager.cpu_field_experience() != 0.0:
+		_fail("Legacy save without after-sales state did not receive clean defaults")
 		return
 
 	var legacy_state := ResearchManager.get_state().duplicate(true)
