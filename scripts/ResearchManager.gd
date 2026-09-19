@@ -139,7 +139,12 @@ func research_confidence(domain: String) -> float:
 	var knowledge := float(data.get("knowledge", 0.0))
 	var experience := float(data.get("experience", 0.0))
 	var team := PersonnelManager.team_score("R&D", "cpu")
-	return clampf(24.0 + knowledge * 0.42 + minf(experience * 1.8, 20.0) + team * 0.13, 20.0, 96.0)
+	var field_bonus := 0.0
+	if domain == "RELIABILITY":
+		field_bonus = minf(AfterSalesManager.cpu_field_experience("STABILITY") * 0.10 + AfterSalesManager.cpu_field_experience("FIRMWARE") * 0.06, 12.0)
+	elif domain == "EFFICIENCY":
+		field_bonus = minf(AfterSalesManager.cpu_field_experience("THERMAL") * 0.08, 8.0)
+	return clampf(24.0 + knowledge * 0.42 + minf(experience * 1.8, 20.0) + team * 0.13 + field_bonus, 20.0, 96.0)
 
 func research_domain_for_focus(focus: String) -> String:
 	match focus:
@@ -152,14 +157,24 @@ func research_domain_for_focus(focus: String) -> String:
 		_:
 			return ""
 
+func field_experience_for_focus(focus: String) -> float:
+	match focus:
+		"RELIABILITY", "ECOSYSTEM":
+			return clampf(AfterSalesManager.cpu_field_experience("STABILITY") * 0.52 + AfterSalesManager.cpu_field_experience("FIRMWARE") * 0.28 + AfterSalesManager.cpu_field_experience("MANUFACTURING") * 0.20, 0.0, 100.0)
+		"EFFICIENCY", "SUSTAINABILITY":
+			return clampf(AfterSalesManager.cpu_field_experience("THERMAL") * 0.72 + AfterSalesManager.cpu_field_experience("MANUFACTURING") * 0.28, 0.0, 100.0)
+		_:
+			return AfterSalesManager.cpu_field_experience()
+
 func research_score_for_focus(focus: String) -> float:
 	var domain := research_domain_for_focus(focus)
+	var field_score := field_experience_for_focus(focus)
 	if domain != "":
-		return float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
+		return clampf(float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0)) + field_score * 0.10, 0.0, 100.0)
 	var total := 0.0
 	for key in CPU_RESEARCH_DOMAIN_ORDER:
 		total += float(cpu_research_domains.get(key, {}).get("knowledge", 0.0))
-	return total / float(CPU_RESEARCH_DOMAIN_ORDER.size())
+	return clampf(total / float(CPU_RESEARCH_DOMAIN_ORDER.size()) + field_score * 0.06, 0.0, 100.0)
 
 func research_confidence_for_focus(focus: String) -> float:
 	var domain := research_domain_for_focus(focus)
@@ -269,6 +284,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	var management_modifier := CompanyManager.department_management_modifier("Développement")
 	var research_score := research_score_for_focus(focus)
 	var research_confidence_score := research_confidence_for_focus(focus)
+	var field_experience_score := field_experience_for_focus(focus)
 	var technology_score := float(technologies.get("cpu", 0.0)) * 0.55 + research_score * 0.45
 	var manufacturing_score := float(technologies.get("manufacturing", 0.0))
 	var integration_score := float(technologies.get("integration", 0.0))
@@ -287,6 +303,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"technology_score":technology_score,
 		"research_score":research_score,
 		"research_confidence":research_confidence_score,
+		"field_experience":field_experience_score,
 		"development_capacity_factor":development_capacity_factor(),
 		"development_team_size":get_development_team_size(),
 		"development_confidence":development_confidence(),
@@ -362,6 +379,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
+		"field_experience_snapshot":AfterSalesManager.field_experience.duplicate(true) if sector == "CPU" else {},
 		"estimate_confidence":research_confidence_for_focus(focus) if sector == "CPU" else 50.0,
 		"development_snapshot":{
 			"team_size":get_development_team_size(),
