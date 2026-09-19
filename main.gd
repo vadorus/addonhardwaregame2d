@@ -62,6 +62,10 @@ var rd_budget: SpinBox
 var research_overview_label: Label
 var research_budget: SpinBox
 var research_alloc_controls: Dictionary = {}
+var concept_axis: OptionButton
+var concept_budget: SpinBox
+var concept_ambition: OptionButton
+var concept_status_label: Label
 var cpu_generation_select: OptionButton
 var cpu_generation_summary_label: Label
 var active_cpu_generation_plan: Dictionary = {}
@@ -550,6 +554,33 @@ func _create_research_tab():
 	apply_research.pressed.connect(_apply_research_plan)
 	configuration_box.add_child(apply_research)
 
+	configuration_box.add_child(_eyebrow("R&D CONCEPT CPU"))
+	var concept_intro := _muted_label("Ces programmes ne visent pas forcément un produit immédiat. Ils servent de laboratoire avancé pour créer des technologies transférables aux générations futures.", 12)
+	concept_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(concept_intro)
+	concept_axis = OptionButton.new()
+	for axis_value in ResearchManager.get_cpu_concept_axis_keys():
+		var axis := str(axis_value)
+		concept_axis.add_item(ResearchManager.get_cpu_concept_axis_label(axis))
+		concept_axis.set_item_metadata(concept_axis.item_count - 1, axis)
+	_add_labeled_control(configuration_box, "Axe expérimental", concept_axis)
+	concept_budget = _spin(5000, 150000, 2500, 15000)
+	_add_labeled_control(configuration_box, "Budget mensuel du programme", concept_budget)
+	concept_ambition = OptionButton.new()
+	for data in [["Prudent",1],["Ambitieux",2],["Rupture",3]]:
+		concept_ambition.add_item(str(data[0]))
+		concept_ambition.set_item_metadata(concept_ambition.item_count - 1, int(data[1]))
+	concept_ambition.select(1)
+	_add_labeled_control(configuration_box, "Ambition", concept_ambition)
+	var concept_start := Button.new()
+	concept_start.text = "Lancer un programme Concept"
+	concept_start.custom_minimum_size.y = 42
+	concept_start.pressed.connect(_start_cpu_concept_program)
+	configuration_box.add_child(concept_start)
+	concept_status_label = _muted_label("Aucun programme Concept actif.", 12)
+	concept_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(concept_status_label)
+
 	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
 	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
 	generation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -881,7 +912,8 @@ func _refresh_cpu_node_options():
 	if rd_node.item_count > 0 and rd_node.selected >= 0:
 		current_node = int(rd_node.get_item_metadata(rd_node.selected))
 	var mastery := float(ResearchManager.technologies.get("manufacturing", 0.0))
-	var nodes := CPU_DESIGN.available_nodes_for_mastery(mastery)
+	var miniaturization := ResearchManager.get_cpu_capability("MINIATURIZATION")
+	var nodes := CPU_DESIGN.available_nodes_for_capabilities(mastery, miniaturization)
 	if not nodes.has(current_node):
 		nodes.append(current_node)
 	rd_node.clear()
@@ -939,7 +971,7 @@ func _refresh_cpu_preview():
 		return
 	var design := _current_cpu_design()
 	_refresh_cpu_control_limits(design)
-	var evaluation := CPU_DESIGN.evaluate(design)
+	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
 	var segment := _meta(rd_segment) if rd_segment != null else "MAINSTREAM"
 	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
@@ -955,7 +987,7 @@ func _refresh_cpu_preview():
 		risk_label = "modéré"
 	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
 	var reference_design := lab_reference_design if not lab_reference_design.is_empty() else CPU_DESIGN.default_design()
-	var reference_evaluation := CPU_DESIGN.evaluate(reference_design)
+	var reference_evaluation := CPU_DESIGN.evaluate(reference_design, ResearchManager.get_cpu_capabilities())
 	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / float(approach_data.speed))))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
 	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
@@ -1057,11 +1089,16 @@ func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
 		elif overall == "OUTSIDE":
 			color = APP_RED
 		var detail := str(guidance.get("details", ""))
-		lab_team_guidance_label.text = "%s\n%s : %.0f%%.%s" % [
+		var advice := ResearchManager.cpu_technical_advice(design)
+		var concept_hint := ""
+		if not advice.is_empty():
+			concept_hint = "\nPiste R&D Concept : %s" % str(advice[0])
+		lab_team_guidance_label.text = "%s\n%s : %.0f%%.%s%s" % [
 			str(guidance.get("summary", "")),
 			str(guidance.get("confidence_text", "Confiance")),
 			float(guidance.get("confidence", 0.0)),
-			(" " + detail) if detail != "" else ""
+			(" " + detail) if detail != "" else "",
+			concept_hint
 		]
 		lab_team_guidance_label.add_theme_color_override("font_color", color)
 
@@ -1776,6 +1813,17 @@ func _apply_research_plan():
 	status_label.text = "Recherche mise à jour : %d chercheur(s) réparti(s) sur les pistes CPU. L’équipe Développement reste indépendante." % ResearchManager.get_total_cpu_research_allocation()
 	_refresh_all()
 
+func _start_cpu_concept_program():
+	if concept_axis == null or concept_axis.item_count == 0:
+		return
+	var axis := str(concept_axis.get_item_metadata(concept_axis.selected))
+	var ambition := int(concept_ambition.get_item_metadata(concept_ambition.selected)) if concept_ambition != null else 2
+	if ResearchManager.start_cpu_concept_program(axis, int(concept_budget.value), ambition):
+		status_label.text = "Programme Concept lancé : %s." % ResearchManager.get_cpu_concept_axis_label(axis)
+	else:
+		status_label.text = "Impossible de lancer ce programme Concept : vérifiez trésorerie, équipe R&D ou programmes déjà actifs."
+	_refresh_all()
+
 func _refresh_research():
 	if tech_label == null:
 		return
@@ -1820,6 +1868,10 @@ func _refresh_research():
 			float(data.get("knowledge", 0.0)), float(data.get("experience", 0.0)),
 			ResearchManager.research_confidence(key), int(data.get("allocated", 0))
 		])
+	tech_lines.append("\nCompétences techniques de l'entreprise :")
+	for capability_value in ResearchManager.get_cpu_capability_keys():
+		var capability_key := str(capability_value)
+		tech_lines.append("• %s : %.1f/100" % [ResearchManager.get_cpu_capability_label(capability_key), ResearchManager.get_cpu_capability(capability_key)])
 	tech_lines.append("\nExpérience terrain CPU : fabrication %.1f • thermique %.1f • stabilité %.1f • firmware %.1f" % [
 		AfterSalesManager.cpu_field_experience("MANUFACTURING"),
 		AfterSalesManager.cpu_field_experience("THERMAL"),
@@ -1831,13 +1883,29 @@ func _refresh_research():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
 	tech_label.text = "\n".join(tech_lines)
 
+	if concept_status_label != null:
+		var concept_lines: Array[String] = []
+		for program in ResearchManager.get_cpu_concept_programs():
+			var result: Dictionary = program.get("result", {})
+			var result_text := ""
+			if not result.is_empty():
+				result_text = " • %s" % str(result.get("summary", "technologie transférable"))
+			concept_lines.append("• %s — %s — %.0f%% • %d mois • confiance %.0f%%%s" % [
+				str(program.get("name", "Concept CPU")), str(program.get("stage", "ÉTUDE")),
+				float(program.get("progress", 0.0)), int(program.get("months_spent", 0)),
+				float(program.get("confidence", 0.0)), result_text
+			])
+		concept_status_label.text = "\n".join(concept_lines) if not concept_lines.is_empty() else "Aucun programme Concept actif ou terminé."
+
 	var lines: Array[String] = []
 	for project in ResearchManager.projects:
 		var phase := "Terminé"
 		if str(project.status) == "DEVELOPMENT":
 			phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
-		var estimate := CPU_DESIGN.evaluate(design)
+		var capability_value = project.get("technical_capabilities_snapshot", {})
+		var capability_snapshot: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
+		var estimate := CPU_DESIGN.evaluate(design, capability_snapshot)
 		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
 		var development_snapshot: Dictionary = project.get("development_snapshot", {})
 		if not development_snapshot.is_empty():
