@@ -1,8 +1,12 @@
 extends Node
 
 signal month_processed(report)
+signal game_over(reason, report)
+
+var is_game_over := false
 
 func reset_all(company_name: String, starting_sector: String):
+	is_game_over = false
 	var active_sector := starting_sector if GameData.is_sector_active(starting_sector) else "CPU"
 	TimeManager.reset()
 	CompanyManager.reset(company_name, active_sector, 500_000)
@@ -15,6 +19,8 @@ func reset_all(company_name: String, starting_sector: String):
 	MediaManager.reset()
 
 func process_month_end() -> Dictionary:
+	if is_game_over:
+		return {}
 	CompanyManager.process_month()
 	var active := ResearchManager.active_departments()
 	for dept in ProductManager.active_departments():
@@ -27,4 +33,10 @@ func process_month_end() -> Dictionary:
 	PatentManager.process_month()
 	var report := Economy.close_month()
 	month_processed.emit(report)
+	if Economy.money <= 0:
+		is_game_over = true
+		TimeManager.time_scale = 0.0
+		var reason := "Faillite : la trésorerie est épuisée."
+		CompanyManager.add_alert(reason)
+		game_over.emit(reason, report)
 	return report
