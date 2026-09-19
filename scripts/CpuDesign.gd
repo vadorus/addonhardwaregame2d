@@ -129,6 +129,146 @@ static func evaluate(input: Dictionary) -> Dictionary:
 		"tradeoff": tradeoff
 	}
 
+static func guidance_ranges(reference_input: Dictionary, confidence: float) -> Dictionary:
+	var reference := normalize(reference_input)
+	var confidence_clamped := clampf(confidence, 28.0, 96.0)
+	# Une équipe peu sûre donne une plage plus large : elle sait moins précisément où se trouve l'optimum.
+	var uncertainty_scale := remap(confidence_clamped, 28.0, 96.0, 1.35, 0.85)
+	return {
+		"cores": _guidance_range(float(reference.cores), 2.0 * uncertainty_scale, 4.0, 2.0, 2.0, 32.0),
+		"frequency_ghz": _guidance_range(float(reference.frequency_ghz), 0.30 * uncertainty_scale, 0.55, 0.1, 2.0, 6.0),
+		"cache_mb": _guidance_range(float(reference.cache_mb), 6.0 * uncertainty_scale, 12.0, 2.0, 4.0, 96.0),
+		"tdp_w": _guidance_range(float(reference.tdp_w), 15.0 * uncertainty_scale, 30.0, 5.0, 35.0, 250.0)
+	}
+
+static func guidance_report(input: Dictionary, reference_input: Dictionary, confidence: float) -> Dictionary:
+	var design := normalize(input)
+	var reference := normalize(reference_input)
+	var ranges := guidance_ranges(reference, confidence)
+	var states := {}
+	var worst_rank := 0
+	var strongest_deviation := ""
+	var strongest_ratio := 0.0
+	for key in ["cores", "frequency_ghz", "cache_mb", "tdp_w"]:
+		var zone: Dictionary = ranges[key]
+		var current := float(design.get(key, 0.0))
+		var state := _guidance_state(current, zone)
+		states[key] = state
+		var rank := 0
+		if state == "AMBITIOUS":
+			rank = 1
+		elif state == "OUTSIDE":
+			rank = 2
+		worst_rank = maxi(worst_rank, rank)
+		var center := (float(zone.recommended_min) + float(zone.recommended_max)) * 0.5
+		var green_half := maxf((float(zone.recommended_max) - float(zone.recommended_min)) * 0.5, 0.001)
+		var ratio := absf(current - center) / green_half
+		if ratio > strongest_ratio:
+			strongest_ratio = ratio
+			strongest_deviation = key
+
+	var node_changed := int(design.node_nm) != int(reference.node_nm)
+	if node_changed:
+		worst_rank = maxi(worst_rank, 1)
+
+	var overall := "RECOMMENDED"
+	var summary := "L'équipe valide cette configuration : elle reste dans la zone que nous savons actuellement bien maîtriser."
+	if worst_rank == 1:
+		overall = "AMBITIOUS"
+		summary = "L'équipe juge cette configuration ambitieuse : elle reste crédible, mais demande davantage de validation."
+	elif worst_rank >= 2:
+		overall = "OUTSIDE"
+		summary = "L'équipe ne valide pas encore totalement cette configuration : au moins un réglage sort de notre zone de maîtrise actuelle."
+
+	var consequences: Array[String] = []
+	if strongest_deviation == "frequency_ghz":
+		if float(design.frequency_ghz) > float(reference.frequency_ghz):
+			consequences.append("La fréquence vise plus de performance, mais augmente généralement tension, chaleur et charge de validation.")
+		else:
+			consequences.append("La fréquence plus basse réduit la pression thermique, au prix d'une partie des performances.")
+	elif strongest_deviation == "tdp_w":
+		if int(design.tdp_w) > int(reference.tdp_w):
+			consequences.append("Le TDP supérieur donne plus de marge au CPU, mais exige un refroidissement et une alimentation plus robustes.")
+		else:
+			consequences.append("Le TDP inférieur facilite le refroidissement, mais peut brider fréquence et nombre de cœurs.")
+	elif strongest_deviation == "cores":
+		if int(design.cores) > int(reference.cores):
+			consequences.append("Davantage de cœurs augmentent le potentiel multithread, mais aussi surface, consommation, coût et validation.")
+		else:
+			consequences.append("Moins de cœurs simplifient la puce et son coût, mais réduisent son potentiel multithread.")
+	elif strongest_deviation == "cache_mb":
+		if int(design.cache_mb) > int(reference.cache_mb):
+			consequences.append("Plus de cache peut réduire certains accès mémoire, mais agrandit le die et augmente le coût.")
+		else:
+			consequences.append("Moins de cache économise de la surface, avec un risque de pénaliser certains usages.")
+
+	if node_changed:
+		if int(design.node_nm) < int(reference.node_nm):
+			consequences.append("Le procédé choisi est plus ambitieux que la référence : potentiel de densité et d'efficacité supérieur, mais maîtrise industrielle plus incertaine.")
+		else:
+			consequences.append("Le procédé choisi est plus conservateur : il peut être plus facile à maîtriser mais limite certains gains de densité et d'efficacité.")
+
+	var evaluation := evaluate(design)
+	if float(evaluation.power_deficit) > 0.1:
+		consequences.append("Notre modèle estime qu'il manque environ %.0f W d'enveloppe thermique pour exploiter pleinement ce design." % float(evaluation.power_deficit))
+
+	var confidence_text := "Confiance limitée"
+	if confidence >= 80.0:
+		confidence_text = "Confiance élevée"
+	elif confidence >= 60.0:
+		confidence_text = "Confiance correcte"
+
+	return {
+		"overall": overall,
+		"summary": summary,
+		"details": " ".join(consequences.slice(0, 2)),
+		"confidence": clampf(confidence, 0.0, 100.0),
+		"confidence_text": confidence_text,
+		"ranges": ranges,
+		"states": states
+	}
+
+static func guidance_state(value: float, zone: Dictionary) -> String:
+	return _guidance_state(value, zone)
+
+static func guidance_parameter_label(key: String) -> String:
+	match key:
+		"cores":
+			return "cœurs"
+		"frequency_ghz":
+			return "fréquence"
+		"cache_mb":
+			return "cache"
+		"tdp_w":
+			return "TDP"
+		_:
+			return key
+
+static func _guidance_range(center: float, recommended_half: float, ambitious_extra: float, step: float, minimum: float, maximum: float) -> Dictionary:
+	var recommended_min := clampf(snappedf(center - recommended_half, step), minimum, maximum)
+	var recommended_max := clampf(snappedf(center + recommended_half, step), minimum, maximum)
+	if recommended_max < recommended_min:
+		var swap := recommended_min
+		recommended_min = recommended_max
+		recommended_max = swap
+	var ambitious_min := clampf(snappedf(recommended_min - ambitious_extra, step), minimum, maximum)
+	var ambitious_max := clampf(snappedf(recommended_max + ambitious_extra, step), minimum, maximum)
+	return {
+		"min": minimum,
+		"max": maximum,
+		"ambitious_min": ambitious_min,
+		"recommended_min": recommended_min,
+		"recommended_max": recommended_max,
+		"ambitious_max": ambitious_max
+	}
+
+static func _guidance_state(value: float, zone: Dictionary) -> String:
+	if value >= float(zone.recommended_min) and value <= float(zone.recommended_max):
+		return "RECOMMENDED"
+	if value >= float(zone.ambitious_min) and value <= float(zone.ambitious_max):
+		return "AMBITIOUS"
+	return "OUTSIDE"
+
 static func decision_axes(evaluation: Dictionary, effective_months: int = -1) -> Dictionary:
 	var unit_cost := float(evaluation.get("unit_cost", 120.0))
 	var risk := float(evaluation.get("risk", 50.0))
