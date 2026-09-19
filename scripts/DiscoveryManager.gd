@@ -385,10 +385,23 @@ func get_state() -> Dictionary:
 		"next_id":_next_id
 	}
 
+func _migrate_discovery_family(rows: Array) -> void:
+	for discovery_value in rows:
+		if typeof(discovery_value) != TYPE_DICTIONARY:
+			continue
+		var discovery: Dictionary = discovery_value
+		if str(discovery.get("family", "")).is_empty():
+			discovery["family"] = "CPU"
+		if str(discovery.get("family_label", "")).is_empty():
+			discovery["family_label"] = GameData.get_product_family_label(str(discovery.get("family", "CPU")))
+
 func load_state(state: Dictionary):
 	pending = state.get("pending", []).duplicate(true)
 	active_research = state.get("active_research", []).duplicate(true)
 	completed = state.get("completed", []).duplicate(true)
+	_migrate_discovery_family(pending)
+	_migrate_discovery_family(active_research)
+	_migrate_discovery_family(completed)
 	seen_keys = state.get("seen_keys", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	discoveries_changed.emit()
