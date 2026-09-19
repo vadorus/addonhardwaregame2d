@@ -280,9 +280,70 @@ func _ready() -> void:
 	if not TechnologyManager.unlock("FOUNDRY_DRC", "industrial test"):
 		_fail("Could not unlock foundry reusable technology")
 		return
-	if TechnologyManager.industrial_modifier("unit_cost") >= 1.0 or TechnologyManager.industrial_modifier("capacity") <= 1.0:
-		_fail("Foundry reusable technology did not improve industrial economics")
+	if TechnologyManager.industrial_modifier("unit_cost", "CPU") >= 1.0 or TechnologyManager.industrial_modifier("capacity", "CPU") <= 1.0:
+		_fail("Foundry reusable technology did not improve CPU industrial economics")
 		return
+	if TechnologyManager.metric_bonus("performance", "GPU") > 0.0:
+		_fail("CPU-scoped cache technology leaked into the GPU family")
+		return
+	if not TechnologyManager.unlock("SMART_CACHE", "future GPU test", "GPU"):
+		_fail("Reusable family technology could not be unlocked independently for GPU")
+		return
+	if TechnologyManager.metric_bonus("performance", "GPU") <= 0.0:
+		_fail("GPU-scoped cache technology did not affect the GPU family")
+		return
+	if TechnologyManager.unlock("SMART_CACHE", "invalid RAM test", "RAM"):
+		_fail("Cache technology was incorrectly allowed for incompatible RAM family")
+		return
+	if TechnologyManager.metric_bonus("reliability", "GPU") <= 0.0:
+		_fail("Company-wide validation technology did not benefit another product family")
+		return
+	var gpu_discovery := DiscoveryManager.create_test_discovery("CACHE_POLICY", "GPU-DISCOVERY", "GPU")
+	if gpu_discovery.is_empty() or str(gpu_discovery.get("family", "")) != "GPU":
+		_fail("Future GPU discovery did not retain its product family")
+		return
+	var cpu_knowhow_before_gpu := float(ResearchManager.technologies.get("cpu", 0.0))
+	var gpu_knowhow_before := float(ResearchManager.technologies.get("gpu", 0.0))
+	if not DiscoveryManager.resolve_discovery(str(gpu_discovery.get("id", "")), "EXPLOIT_NOW"):
+		_fail("Future GPU discovery could not resolve through the generic discovery engine")
+		return
+	if float(ResearchManager.technologies.get("gpu", 0.0)) <= gpu_knowhow_before:
+		_fail("GPU discovery did not improve GPU know-how")
+		return
+	if not is_equal_approx(float(ResearchManager.technologies.get("cpu", 0.0)), cpu_knowhow_before_gpu):
+		_fail("GPU discovery incorrectly changed CPU know-how")
+		return
+	var invalid_family_discovery := DiscoveryManager.create_test_discovery("CACHE_POLICY", "MB-DISCOVERY", "MOTHERBOARD")
+	if not invalid_family_discovery.is_empty():
+		_fail("Cache discovery was created for an incompatible motherboard family")
+		return
+
+	var legacy_technology_state := {
+		"unlocked":{
+			"SMART_CACHE":{"id":"SMART_CACHE","source":"legacy save"}
+		}
+	}
+	TechnologyManager.load_state(legacy_technology_state)
+	if not TechnologyManager.has_technology("SMART_CACHE", "CPU"):
+		_fail("Legacy reusable technology did not migrate to CPU scope")
+		return
+	if TechnologyManager.has_technology("SMART_CACHE", "GPU"):
+		_fail("Legacy CPU technology incorrectly migrated into GPU scope")
+		return
+
+	var legacy_discovery_state := {
+		"pending":[{"id":"DISC-LEGACY","template_id":"VALIDATION_RULES","title":"Legacy","status":"PENDING"}],
+		"active_research":[],
+		"completed":[],
+		"seen_keys":{},
+		"next_id":2
+	}
+	DiscoveryManager.load_state(legacy_discovery_state)
+	var migrated_discovery := DiscoveryManager.get_pending_discovery()
+	if str(migrated_discovery.get("family", "")) != "CPU":
+		_fail("Legacy discovery did not migrate to CPU family")
+		return
+
 	TechnologyManager.load_state(reusable_technology_state)
 	DiscoveryManager.load_state(discovery_manager_state)
 	ResearchManager.load_state(discovery_research_state)
