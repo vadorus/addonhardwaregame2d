@@ -42,6 +42,12 @@ func _ready() -> void:
 	if not CompanyManager.departments.has("Développement"):
 		_fail("Company organization is missing the Development department")
 		return
+	if PersonnelManager.count_department("Production") < 1:
+		_fail("Starting company has no Production team")
+		return
+	if PersonnelManager.team_attribute("Production", "process_quality") <= 0.0:
+		_fail("Production employee profiles were not initialized")
+		return
 	if ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":research_capacity + 1, "EFFICIENCY":0, "RELIABILITY":0}):
 		_fail("CPU research accepted more researchers than available")
 		return
@@ -218,9 +224,38 @@ func _ready() -> void:
 		completed_metrics[metric] = float(completed_evaluation.get(metric, 62.0))
 	range_project["final_metrics"] = completed_metrics
 	range_project["status"] = "COMPLETED"
-	ProductManager._on_project_completed(range_project)
+	ProductionManager._on_project_completed(range_project)
+	if ProductionManager.get_active_jobs().size() != 1:
+		_fail("Completed CPU development did not enter industrialization")
+		return
+	if not ProductManager.products.is_empty():
+		_fail("CPU became sellable before industrialization completed")
+		return
+	var industrial_job: Dictionary = ProductionManager.get_active_jobs()[0]
+	if not ProductionManager.set_strategy(str(industrial_job.get("id", "")), "QUALITY"):
+		_fail("Could not apply an industrialization strategy")
+		return
+	var production_mastery_before := ProductionManager.get_process_mastery(int(industrial_job.get("node_nm", 7)))
+	var production_iterations := 0
+	while not ProductionManager.get_active_jobs().is_empty() and production_iterations < 12:
+		ProductionManager.process_month()
+		production_iterations += 1
+	if not ProductionManager.get_active_jobs().is_empty():
+		_fail("CPU industrialization did not finish in a reasonable number of months")
+		return
 	if ProductManager.cpu_generations.size() != 1 or ProductManager.products.size() != 3:
-		_fail("A completed CPU architecture did not create one generation with three launch models")
+		_fail("Completed industrialization did not create one generation with three launch models")
+		return
+	if ProductionManager.get_process_mastery(int(industrial_job.get("node_nm", 7))) <= production_mastery_before:
+		_fail("Production team did not learn from industrialization")
+		return
+	var completed_industrial_job: Dictionary = ProductionManager.jobs[0]
+	var industrial_result: Dictionary = completed_industrial_job.get("result", {})
+	if float(industrial_result.get("quality_score", 0.0)) <= 0.0 or float(industrial_result.get("defect_rate", -1.0)) < 0.0:
+		_fail("Industrialization did not produce quality and defect results")
+		return
+	if str(industrial_result.get("strategy", "")) != "QUALITY":
+		_fail("Industrialization did not preserve the chosen strategy")
 		return
 	var cpu_generation: Dictionary = ProductManager.cpu_generations[0]
 	var essential_model: Dictionary = ProductManager.products[0]
@@ -247,8 +282,14 @@ func _ready() -> void:
 	if absf(bin_total - 1.0) > 0.001:
 		_fail("CPU bin allocation does not total 100 percent")
 		return
-	if float(cpu_generation.get("yield_rate", 0.0)) < 0.46 or float(cpu_generation.get("yield_rate", 0.0)) > 0.92:
+	if float(cpu_generation.get("yield_rate", 0.0)) < 0.40 or float(cpu_generation.get("yield_rate", 0.0)) > 0.94:
 		_fail("CPU generation yield escaped its supported range")
+		return
+	if float(cpu_generation.get("manufacturing_quality", 0.0)) <= 0.0 or float(cpu_generation.get("defect_rate", -1.0)) < 0.0:
+		_fail("CPU generation did not keep its industrialization quality")
+		return
+	if float(apex_model.get("manufacturing_quality", 0.0)) <= 0.0 or str(apex_model.get("industrialization_strategy", "")) != "QUALITY":
+		_fail("CPU products did not inherit industrialization data")
 		return
 
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(ProductManager.products)
@@ -298,6 +339,16 @@ func _ready() -> void:
 	if MarketManager.market_age_months != saved_market_age:
 		_fail("Market age did not survive a save round-trip")
 		return
+	var production_round_trip := ProductionManager.get_state().duplicate(true)
+	var saved_process_mastery := ProductionManager.get_process_mastery(int(completed_industrial_job.get("node_nm", 7)))
+	ProductionManager.reset()
+	ProductionManager.load_state(production_round_trip)
+	if absf(ProductionManager.get_process_mastery(int(completed_industrial_job.get("node_nm", 7))) - saved_process_mastery) > 0.001:
+		_fail("Production mastery did not survive a save round-trip")
+		return
+	if ProductionManager.jobs.size() != 1 or str(ProductionManager.jobs[0].get("status", "")) != "COMPLETED":
+		_fail("Industrialization job did not survive a save round-trip")
+		return
 	var product_round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
 	ProductManager.load_state(product_round_trip)
@@ -314,6 +365,11 @@ func _ready() -> void:
 	ProductManager.load_state(legacy_product_state)
 	if ProductManager.cpu_generations.is_empty() or str(ProductManager.products[0].get("generation_id", "")).is_empty():
 		_fail("Legacy V5 products were not migrated into a CPU generation")
+		return
+
+	ProductionManager.load_state({})
+	if not ProductionManager.jobs.is_empty() or ProductionManager.get_process_mastery(7) <= 0.0:
+		_fail("Legacy save without Production state did not receive production defaults")
 		return
 
 	var legacy_state := ResearchManager.get_state().duplicate(true)
