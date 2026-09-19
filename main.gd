@@ -1324,7 +1324,7 @@ func _refresh_dashboard():
 		var rows := MarketManager.benchmark_for(launched_product)
 		var rank := MarketManager.benchmark_rank(launched_product)
 		var aging_penalty := float(launched_product.get("last_month_age_penalty", MarketManager.product_age_penalty(launched_product)))
-		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100\nCycle commercial : %s\nPression d\'âge : -%.1f pts\nMarché en évolution depuis %d mois" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0)), MarketManager.product_lifecycle_label(launched_product), aging_penalty, MarketManager.market_age_months]
+		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100\nCycle commercial : %s\nPression d'âge : -%.1f pts\nMarché en évolution depuis %d mois" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0)), MarketManager.product_lifecycle_label(launched_product), aging_penalty, MarketManager.market_age_months]
 	else:
 		var competitors: Array = MarketManager.competitors.get("CPU", [])
 		if competitors.is_empty():
@@ -1511,7 +1511,7 @@ func _refresh_product_details():
 		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
-			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d\'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
+			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
 		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
@@ -1553,8 +1553,8 @@ func _refresh_market():
 	lines.append("\nÉvaluation par clientèle :")
 	for seg in GameData.SEGMENTS.keys(): lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
 	var age_penalty := float(p.get("last_month_age_penalty", MarketManager.product_age_penalty(p)))
-	lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d\'âge -%.1f pts" % [MarketManager.product_lifecycle_label(p), int(p.get("months_on_market", 0)), age_penalty])
-	lines.append("Marché global : %d mois d\'évolution depuis le début de la partie." % MarketManager.market_age_months)
+	lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d'âge -%.1f pts" % [MarketManager.product_lifecycle_label(p), int(p.get("months_on_market", 0)), age_penalty])
+	lines.append("Marché global : %d mois d'évolution depuis le début de la partie." % MarketManager.market_age_months)
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
 	market_label.text="\n".join(lines)
 	var c_lines:=[]
