@@ -16,6 +16,7 @@ func reset_all(company_name: String, starting_sector: String):
 	ProductionManager.reset()
 	PatentManager.reset()
 	ProductManager.reset()
+	AfterSalesManager.reset()
 	MarketManager.reset()
 	MediaManager.reset()
 
@@ -30,10 +31,14 @@ func process_month_end() -> Dictionary:
 	for dept in ProductManager.active_departments():
 		if not active.has(dept):
 			active.append(dept)
+	for dept in AfterSalesManager.active_departments():
+		if not active.has(dept):
+			active.append(dept)
 	PersonnelManager.process_month(active)
 	ResearchManager.process_month()
 	ProductionManager.process_month()
 	ProductManager.process_month()
+	AfterSalesManager.process_month()
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()
 	var report := Economy.close_month()
