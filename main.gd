@@ -26,6 +26,9 @@ var month_layer: Control
 var month_report_label: Label
 var game_over_layer: Control
 var game_over_label: Label
+var research_event_layer: Control
+var research_event_label: Label
+var active_research_event_id := ""
 
 var dashboard_label: Label
 var alerts_label: Label
@@ -51,6 +54,9 @@ var rd_segment: OptionButton
 var rd_approach: OptionButton
 var rd_focus: OptionButton
 var rd_budget: SpinBox
+var research_overview_label: Label
+var research_budget: SpinBox
+var research_alloc_controls: Dictionary = {}
 var cpu_generation_select: OptionButton
 var cpu_generation_summary_label: Label
 var active_cpu_generation_plan: Dictionary = {}
@@ -137,6 +143,8 @@ func _connect_signals():
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
+	ResearchManager.research_changed.connect(_refresh_research)
+	ResearchManager.research_event_created.connect(_on_research_event)
 	ProductManager.products_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
@@ -261,6 +269,7 @@ func _build_ui():
 	_build_setup_layer()
 	_build_month_layer()
 	_build_game_over_layer()
+	_build_research_event_layer()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -502,7 +511,33 @@ func _create_research_tab():
 
 	rd_budget = _spin(10000, 250000, 2500, 45000)
 	rd_budget.value_changed.connect(func(_value): _refresh_cpu_preview())
-	_add_labeled_control(configuration_box, "Budget mensuel R&D", rd_budget)
+	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
+
+	configuration_box.add_child(_eyebrow("RECHERCHE CONTINUE CPU"))
+	var research_intro := _muted_label("Répartissez une partie de l'équipe sur les pistes qui prépareront les générations suivantes. Plus vous mobilisez de chercheurs, moins l'équipe de développement dispose de capacité immédiate.", 12)
+	research_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(research_intro)
+	research_overview_label = _muted_label("", 12)
+	research_overview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(research_overview_label)
+	var research_grid := GridContainer.new()
+	research_grid.columns = 2
+	research_grid.add_theme_constant_override("h_separation", 8)
+	research_grid.add_theme_constant_override("v_separation", 6)
+	configuration_box.add_child(research_grid)
+	for research_key in ResearchManager.get_cpu_research_domain_keys():
+		research_grid.add_child(_muted_label(ResearchManager.get_cpu_research_label(str(research_key)), 12))
+		var allocation := _spin(0, 30, 1, 0)
+		allocation.allow_greater = false
+		research_grid.add_child(allocation)
+		research_alloc_controls[str(research_key)] = allocation
+	research_budget = _spin(0, 100000, 1000, 12000)
+	_add_labeled_control(configuration_box, "Budget mensuel recherche fondamentale", research_budget)
+	var apply_research := Button.new()
+	apply_research.text = "Appliquer cette répartition de recherche"
+	apply_research.custom_minimum_size.y = 42
+	apply_research.pressed.connect(_apply_research_plan)
+	configuration_box.add_child(apply_research)
 
 	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
 	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
@@ -957,6 +992,67 @@ func _build_game_over_layer():
 	load.pressed.connect(_load_game)
 	box.add_child(load)
 
+func _build_research_event_layer():
+	research_event_layer = ColorRect.new()
+	research_event_layer.color = Color(0.02, 0.03, 0.045, 0.93)
+	research_event_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	research_event_layer.visible = false
+	add_child(research_event_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	research_event_layer.add_child(center)
+	var panel := _card(APP_SHELL, 16, 20)
+	panel.custom_minimum_size = Vector2(600, 360)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	panel.add_child(box)
+	box.add_child(_eyebrow("DÉCOUVERTE R&D"))
+	var title := _label("L'équipe a trouvé une nouvelle piste", 24)
+	title.add_theme_color_override("font_color", APP_CYAN)
+	box.add_child(title)
+	research_event_label = _rich_label()
+	research_event_label.custom_minimum_size.y = 150
+	box.add_child(research_event_label)
+	var pursue := Button.new()
+	pursue.text = "Approfondir cette piste"
+	pursue.custom_minimum_size.y = 44
+	pursue.pressed.connect(func(): _resolve_research_event(true))
+	box.add_child(pursue)
+	var archive := Button.new()
+	archive.text = "Archiver pour plus tard"
+	archive.custom_minimum_size.y = 42
+	archive.pressed.connect(func(): _resolve_research_event(false))
+	box.add_child(archive)
+
+func _on_research_event(event: Dictionary):
+	if research_event_layer == null:
+		return
+	active_research_event_id = str(event.get("id", ""))
+	research_event_label.text = "%s\n\n%s\n\nApprofondir donne à cette équipe un élan de recherche pendant 3 mois et augmente immédiatement son expérience. Archiver conserve simplement le savoir acquis." % [str(event.get("title", "Nouvelle piste")), str(event.get("text", ""))]
+	TimeManager.time_scale = 0.0
+	research_event_layer.visible = true
+
+func _show_next_pending_research_event():
+	if research_event_layer == null or research_event_layer.visible:
+		return
+	var pending := ResearchManager.get_pending_research_events()
+	if not pending.is_empty():
+		_on_research_event(pending[0])
+
+func _resolve_research_event(pursue: bool):
+	if active_research_event_id == "":
+		return
+	ResearchManager.resolve_research_event(active_research_event_id, pursue)
+	active_research_event_id = ""
+	research_event_layer.visible = false
+	var pending := ResearchManager.get_pending_research_events()
+	if not pending.is_empty():
+		_on_research_event(pending[0])
+	elif not month_layer.visible and not SimulationManager.is_game_over:
+		TimeManager.time_scale = 1.0
+	_refresh_all()
+
 func _tab_scroll(title: String) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
 	scroll.name = title
@@ -1195,6 +1291,7 @@ func _load_game():
 			TimeManager.time_scale = 0.0
 			_on_game_over("Faillite : la trésorerie est épuisée.", {"money": Economy.money})
 		_refresh_all()
+		_show_next_pending_research_event()
 
 func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
@@ -1442,15 +1539,51 @@ func _hire_candidate():
 	if PersonnelManager.hire_candidate(): status_label.text="Candidat recruté."; PersonnelManager.generate_candidate(_meta(recruit_department))
 	else: status_label.text="Recrutement impossible."; _refresh_all()
 
+func _apply_research_plan():
+	var allocations := {}
+	for research_key in ResearchManager.get_cpu_research_domain_keys():
+		var key := str(research_key)
+		allocations[key] = int((research_alloc_controls[key] as SpinBox).value)
+	if not ResearchManager.set_cpu_research_allocations(allocations):
+		status_label.text = "Répartition impossible : vous avez affecté plus de chercheurs que l'effectif R&D disponible."
+		_refresh_research()
+		return
+	ResearchManager.set_continuous_research_budget(int(research_budget.value))
+	status_label.text = "Recherche mise à jour : %d chercheur(s) en recherche continue, %d disponible(s) pour le développement." % [ResearchManager.get_total_cpu_research_allocation(), ResearchManager.get_available_development_engineers()]
+	_refresh_all()
+
 func _refresh_research():
 	if tech_label == null:
 		return
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
-	var tech_lines: Array[String] = []
+	var capacity := ResearchManager.get_cpu_research_capacity()
+	var allocated := ResearchManager.get_total_cpu_research_allocation()
+	var available := ResearchManager.get_available_development_engineers()
+	if research_overview_label != null:
+		research_overview_label.text = "Équipe R&D : %d personnes • %d en recherche continue • %d disponibles pour le développement\nCapacité développement actuelle : %.0f%%" % [capacity, allocated, available, ResearchManager.development_capacity_factor() * 100.0]
+	if research_budget != null:
+		research_budget.value = ResearchManager.continuous_research_budget
+	for research_key in ResearchManager.get_cpu_research_domain_keys():
+		var key := str(research_key)
+		var data := ResearchManager.get_cpu_research_domain(key)
+		if research_alloc_controls.has(key):
+			var allocation: SpinBox = research_alloc_controls[key]
+			allocation.max_value = maxf(float(capacity), 0.0)
+			allocation.value = int(data.get("allocated", 0))
+	var tech_lines: Array[String] = ["Recherche CPU :"]
+	for research_key in ResearchManager.get_cpu_research_domain_keys():
+		var key := str(research_key)
+		var data := ResearchManager.get_cpu_research_domain(key)
+		tech_lines.append("• %s — connaissance %.1f/100 • expérience %.1f • confiance %.0f%% • %d chercheur(s)" % [
+			ResearchManager.get_cpu_research_label(key),
+			float(data.get("knowledge", 0.0)), float(data.get("experience", 0.0)),
+			ResearchManager.research_confidence(key), int(data.get("allocated", 0))
+		])
+	tech_lines.append("\nSavoir-faire techniques hérités :")
 	for key in ResearchManager.technologies.keys():
 		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
-	tech_label.text = "\n".join(tech_lines) if not tech_lines.is_empty() else "Aucun savoir-faire initialisé."
+	tech_label.text = "\n".join(tech_lines)
 
 	var lines: Array[String] = []
 	for project in ResearchManager.projects:
