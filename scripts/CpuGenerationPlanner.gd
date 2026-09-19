@@ -148,6 +148,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	confidence += float(context.get("division_maturity", 0.0)) * 0.08
 	confidence += float(context.get("equipment_score", 25.0)) * 0.08
 	confidence += (float(context.get("research_confidence", 50.0)) - 50.0) * 0.18
+	confidence += float(context.get("field_experience", 0.0)) * 0.045
 	confidence += (management_modifier - 0.8) * 25.0
 	confidence -= float(evaluation.complexity) * 0.10
 	confidence += float(profile.confidence_delta)
@@ -164,6 +165,10 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		metric_deltas[metric] = float(evaluation.get(metric, 0.0)) - float(base_evaluation.get(metric, 0.0))
 	var target_fit := CPU_DESIGN.segment_fit(evaluation, str(context.get("segment", "MAINSTREAM")))
 	var strengths := _strengths_for(str(profile.key), metric_deltas, target_fit, potential_models)
+	var field_experience := float(context.get("field_experience", 0.0))
+	if field_experience >= 28.0:
+		strengths.append("Retours terrain solides sur les générations précédentes")
+		strengths = strengths.slice(0, 3)
 	var risks := _risks_for(str(profile.key), design, evaluation, context, capability_gap, budget_ratio)
 
 	return {
@@ -192,6 +197,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"technology_score":float(context.get("technology_score", 0.0)),
 		"research_score":float(context.get("research_score", 0.0)),
 		"research_confidence":float(context.get("research_confidence", 50.0)),
+		"field_experience":float(context.get("field_experience", 0.0)),
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
 		"development_team_size":int(context.get("development_team_size", 0)),
 		"development_confidence":float(context.get("development_confidence", 50.0)),
@@ -237,6 +243,8 @@ static func _risks_for(archetype: String, design: Dictionary, evaluation: Dictio
 		risks.append("Équipe Développement déjà fortement chargée")
 	if float(context.get("development_confidence", 50.0)) < 48.0:
 		risks.append("Équipe Développement encore peu expérimentée sur l'intégration produit")
+	if int(context.get("generation_index", 1)) >= 2 and float(context.get("field_experience", 0.0)) < 6.0:
+		risks.append("Peu de retour terrain exploitable sur les générations précédentes")
 	var approach := str(context.get("approach", "INTERNAL"))
 	if approach == "INTERNAL" and float(context.get("technology_score", 0.0)) < 25.0:
 		risks.append("Savoir-faire interne encore jeune")
