@@ -370,9 +370,16 @@ func cpu_remediation_preview(design_input: Dictionary, remediation: Dictionary) 
 		0.0, 100.0
 	)
 	var result := CPU_DESIGN.evaluate(design, effective_capabilities)
-	result["risk"] = maxf(float(result.get("risk", 50.0)) - float(remediation.get("risk_reduction", 0.0)), 5.0)
-	result["complexity"] = maxf(float(result.get("complexity", 50.0)) - float(remediation.get("risk_reduction", 0.0)) * 0.35, 10.0)
-	result["reliability"] = clampf(float(result.get("reliability", 50.0)) + float(remediation.get("risk_reduction", 0.0)) * 0.30, 0.0, 98.0)
+	return _apply_remediation_estimate_modifiers(result, remediation)
+
+func _apply_remediation_estimate_modifiers(base_estimate: Dictionary, remediation: Dictionary) -> Dictionary:
+	var result := base_estimate.duplicate(true)
+	if remediation.is_empty():
+		return result
+	var reduction := float(remediation.get("risk_reduction", 0.0))
+	result["risk"] = maxf(float(result.get("risk", 50.0)) - reduction, 5.0)
+	result["complexity"] = maxf(float(result.get("complexity", 50.0)) - reduction * 0.35, 10.0)
+	result["reliability"] = clampf(float(result.get("reliability", 50.0)) + reduction * 0.30, 0.0, 98.0)
 	if str(remediation.get("axis", "")) == "LOW_POWER":
 		result["efficiency"] = clampf(float(result.get("efficiency", 50.0)) + float(remediation.get("capability_boost", 0.0)) * 0.22, 0.0, 98.0)
 	return result
@@ -934,7 +941,14 @@ func load_state(state: Dictionary):
 				project_capabilities = _default_cpu_capabilities()
 				project["technical_capabilities_snapshot"] = project_capabilities.duplicate(true)
 			var estimate := CPU_DESIGN.evaluate(design, project_capabilities)
+			var remediation_value = project.get("technical_remediation", {})
+			var remediation: Dictionary = remediation_value if typeof(remediation_value) == TYPE_DICTIONARY else {}
+			estimate = _apply_remediation_estimate_modifiers(estimate, remediation)
 			project["cpu_design"] = design
+			project["technical_remediation"] = remediation
+			project["remediation_months_remaining"] = maxi(int(project.get("remediation_months_remaining", 0)), 0)
+			project["remediation_total_months"] = maxi(int(project.get("remediation_total_months", remediation.get("extra_months", 0))), 0)
+			project["remediation_transfer_applied"] = bool(project.get("remediation_transfer_applied", remediation.is_empty()))
 			project["design_estimate"] = estimate
 			project["complexity"] = float(project.get("complexity", estimate.complexity))
 			var generation_plan_value = project.get("generation_plan", {})
