@@ -68,6 +68,9 @@ var lab_unit_cost_value: Label
 var lab_dev_time_value: Label
 var lab_fit_value: Label
 var lab_tradeoff_summary_label: Label
+var lab_delta_summary_label: Label
+var lab_reference_design: Dictionary = {}
+var lab_reference_name := "Design équilibré"
 var lab_technical_detail_label: Label
 var lab_warning_label: Label
 var cpu_metric_bars: Dictionary = {}
@@ -595,6 +598,9 @@ func _create_research_tab():
 	lab_tradeoff_summary_label = _muted_label("", 12)
 	lab_tradeoff_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_box.add_child(lab_tradeoff_summary_label)
+	lab_delta_summary_label = _muted_label("Aucun écart par rapport à la référence.", 12)
+	lab_delta_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_box.add_child(lab_delta_summary_label)
 
 	var metrics_box := VBoxContainer.new()
 	metrics_box.add_theme_constant_override("separation", 8)
@@ -647,6 +653,8 @@ func _create_research_tab():
 	patent_actions.add_child(license_pat)
 	box.add_child(patent_card)
 
+	lab_reference_design = CPU_DESIGN.default_design()
+	lab_reference_name = "Design équilibré"
 	_refresh_cpu_preview()
 
 func _add_labeled_control(parent: VBoxContainer, title: String, control: Control):
@@ -786,11 +794,13 @@ func _apply_selected_generation_plan():
 		status_label.text = "Préparez d'abord les plans de génération."
 		return
 	active_cpu_generation_plan = proposal.duplicate(true)
-	_set_cpu_design_controls(proposal.get("design", {}))
+	_set_cpu_design_controls(proposal.get("design", {}), "Plan %s" % str(proposal.get("title", "sélectionné")))
 	status_label.text = "Plan %s appliqué. Vous pouvez encore ajuster chaque paramètre." % str(proposal.get("title", "sélectionné"))
 
-func _set_cpu_design_controls(input: Dictionary):
+func _set_cpu_design_controls(input: Dictionary, reference_name: String = "Référence"):
 	var design := CPU_DESIGN.normalize(input)
+	lab_reference_design = design.duplicate(true)
+	lab_reference_name = reference_name
 	rd_cores.value = int(design.cores)
 	rd_frequency.value = float(design.frequency_ghz)
 	rd_cache.value = int(design.cache_mb)
@@ -800,7 +810,7 @@ func _set_cpu_design_controls(input: Dictionary):
 
 func _apply_cpu_preset(key: String):
 	active_cpu_generation_plan = {}
-	_set_cpu_design_controls(CPU_DESIGN.preset(key))
+	_set_cpu_design_controls(CPU_DESIGN.preset(key), "Préréglage %s" % key.to_lower())
 	status_label.text = "Préréglage %s appliqué. Vous pouvez encore tout ajuster." % key.to_lower()
 
 func _refresh_cpu_preview():
@@ -822,6 +832,11 @@ func _refresh_cpu_preview():
 	elif risk >= 40.0:
 		risk_label = "modéré"
 	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
+	var reference_design := lab_reference_design if not lab_reference_design.is_empty() else CPU_DESIGN.default_design()
+	var reference_evaluation := CPU_DESIGN.evaluate(reference_design)
+	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / float(approach_data.speed))))
+	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
+	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
 
 	lab_profile_label.text = str(evaluation.profile)
 	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
@@ -835,6 +850,7 @@ func _refresh_cpu_preview():
 	lab_warning_label.add_theme_color_override("font_color", APP_RED if risk >= 60.0 else (APP_AMBER if risk >= 40.0 else APP_GREEN))
 
 	lab_tradeoff_summary_label.text = CPU_DESIGN.decision_summary(decision_axes)
+	lab_delta_summary_label.text = "%s — %s" % [lab_reference_name, CPU_DESIGN.decision_delta_summary(axis_delta)]
 	for metric_key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
 		var score := float(decision_axes.get(metric_key, 0.0))
 		if cpu_metric_bars.has(metric_key):
@@ -842,7 +858,12 @@ func _refresh_cpu_preview():
 			bar.value = score
 		if cpu_metric_labels.has(metric_key):
 			var metric_label: Label = cpu_metric_labels[metric_key]
-			metric_label.text = "%.0f" % score
+			var delta := float(axis_delta.get(metric_key, 0.0))
+			var delta_text := ""
+			if absf(delta) >= 0.5:
+				delta_text = "  (%s%.0f)" % ["+" if delta > 0.0 else "", delta]
+			metric_label.text = "%.0f%s" % [score, delta_text]
+			metric_label.add_theme_color_override("font_color", APP_GREEN if delta > 0.5 else (APP_RED if delta < -0.5 else APP_TEXT))
 
 	var thermal_text := "TDP cohérent"
 	if float(evaluation.power_deficit) > 0.1:

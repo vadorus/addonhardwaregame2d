@@ -60,6 +60,22 @@ func _ready() -> void:
 		_fail("CPU decision summary is empty")
 		return
 
+	var preset_delta := CPU_DESIGN.decision_axis_delta(performance_axes, efficient_axes)
+	if float(preset_delta.get("performance", 0.0)) <= 0.0:
+		_fail("Live CPU delta must expose the performance gain")
+		return
+	if float(preset_delta.get("cost_control", 0.0)) >= 0.0:
+		_fail("Live CPU delta must expose the manufacturing cost tradeoff")
+		return
+	var delta_text := CPU_DESIGN.decision_delta_summary(preset_delta)
+	if not delta_text.contains("Performance +") or not delta_text.contains("Maîtrise du coût -"):
+		_fail("Live CPU delta summary does not describe gains and losses")
+		return
+	var zero_delta := CPU_DESIGN.decision_axis_delta(efficient_axes, efficient_axes)
+	if CPU_DESIGN.decision_delta_summary(zero_delta) != "Aucun écart par rapport à la référence.":
+		_fail("Unchanged CPU design should report no reference delta")
+		return
+
 	var proposals := ResearchManager.prepare_cpu_generation_proposals("MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, CPU_DESIGN.preset("BALANCED"))
 	if proposals.size() != 3:
 		_fail("CPU generation council did not return three plans")
