@@ -84,6 +84,9 @@ var lab_reference_design: Dictionary = {}
 var lab_reference_name := "Design équilibré"
 var lab_technical_detail_label: Label
 var lab_warning_label: Label
+var lab_guidance_bars: Dictionary = {}
+var lab_guidance_labels: Dictionary = {}
+var lab_team_guidance_label: Label
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
@@ -584,9 +587,25 @@ func _create_research_tab():
 		preset_button.pressed.connect(func(): _apply_cpu_preset(preset_key))
 		preset_row.add_child(preset_button)
 
-	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs")
-	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1)
-	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo")
+	var guidance_intro := _muted_label("Repères de l'équipe : la couleur indique à quel point votre réglage s'éloigne de ce que nous savons maîtriser aujourd'hui.", 11)
+	guidance_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(guidance_intro)
+	var guidance_legend := HFlowContainer.new()
+	guidance_legend.add_theme_constant_override("h_separation", 12)
+	configuration_box.add_child(guidance_legend)
+	var green_legend := _label("● Recommandé", 11)
+	green_legend.add_theme_color_override("font_color", APP_GREEN)
+	guidance_legend.add_child(green_legend)
+	var amber_legend := _label("● Ambitieux", 11)
+	amber_legend.add_theme_color_override("font_color", APP_AMBER)
+	guidance_legend.add_child(amber_legend)
+	var red_legend := _label("● Hors zone maîtrisée", 11)
+	red_legend.add_theme_color_override("font_color", APP_RED)
+	guidance_legend.add_child(red_legend)
+
+	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 2.0, 32.0, 2.0, 8.0, " cœurs", 0, "cores")
+	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 2.0, 6.0, 0.1, 3.8, " GHz", 1, "frequency_ghz")
+	rd_cache = _add_lab_slider(configuration_box, "Cache total", 4.0, 96.0, 2.0, 24.0, " Mo", 0, "cache_mb")
 
 	rd_node = OptionButton.new()
 	for node_nm in CPU_DESIGN.available_nodes():
@@ -596,7 +615,16 @@ func _create_research_tab():
 	rd_node.item_selected.connect(func(_index): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Procédé de gravure", rd_node)
 
-	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe thermique", 35.0, 250.0, 5.0, 95.0, " W")
+	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe thermique", 35.0, 250.0, 5.0, 95.0, " W", 0, "tdp_w")
+
+	configuration_box.add_child(_eyebrow("AVIS DE L'ÉQUIPE TECHNIQUE"))
+	var guidance_panel := PanelContainer.new()
+	guidance_panel.add_theme_stylebox_override("panel", _stylebox(APP_CYAN_DARK, 10, 1, APP_CYAN, 11))
+	lab_team_guidance_label = _muted_label("Ajustez le design pour obtenir l'avis de l'équipe.", 12)
+	lab_team_guidance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab_team_guidance_label.custom_minimum_size.y = 92
+	guidance_panel.add_child(lab_team_guidance_label)
+	configuration_box.add_child(guidance_panel)
 
 	var start := Button.new()
 	start.text = "Lancer ce CPU en développement"
@@ -708,7 +736,7 @@ func _add_labeled_control(parent: VBoxContainer, title: String, control: Control
 	field.add_child(control)
 	parent.add_child(field)
 
-func _add_lab_slider(parent: VBoxContainer, title: String, min_value: float, max_value: float, step: float, initial_value: float, suffix: String, decimals: int = 0) -> HSlider:
+func _add_lab_slider(parent: VBoxContainer, title: String, min_value: float, max_value: float, step: float, initial_value: float, suffix: String, decimals: int = 0, guidance_key: String = "") -> HSlider:
 	var field := VBoxContainer.new()
 	field.add_theme_constant_override("separation", 3)
 	parent.add_child(field)
@@ -732,6 +760,15 @@ func _add_lab_slider(parent: VBoxContainer, title: String, min_value: float, max
 		_refresh_cpu_preview()
 	)
 	field.add_child(slider)
+	if guidance_key != "":
+		var guidance_script: Script = load("res://ui/CpuGuidanceBar.gd")
+		var guidance_bar := guidance_script.new() as Control
+		field.add_child(guidance_bar)
+		lab_guidance_bars[guidance_key] = guidance_bar
+		var guidance_label := _muted_label("Zone équipe en calcul…", 11)
+		guidance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		field.add_child(guidance_label)
+		lab_guidance_labels[guidance_key] = guidance_label
 	return slider
 
 func _format_lab_value(value: float, suffix: String, decimals: int) -> String:
@@ -880,6 +917,16 @@ func _refresh_cpu_preview():
 	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / float(approach_data.speed))))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
 	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
+	var focus_key := _meta(rd_focus) if rd_focus != null else "BALANCED"
+	var guidance_confidence := clampf(
+		ResearchManager.development_confidence() * 0.55
+		+ ResearchManager.research_confidence_for_focus(focus_key) * 0.45,
+		20.0,
+		96.0
+	)
+	if not active_cpu_generation_plan.is_empty():
+		guidance_confidence = clampf(float(active_cpu_generation_plan.get("confidence", guidance_confidence)), 20.0, 96.0)
+	var guidance := CPU_DESIGN.guidance_report(design, reference_design, guidance_confidence)
 
 	lab_profile_label.text = str(evaluation.profile)
 	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
@@ -916,8 +963,78 @@ func _refresh_cpu_preview():
 		float(evaluation.required_tdp), thermal_text, _money(int(evaluation.unit_cost))
 	]
 
+	_refresh_cpu_guidance(guidance, design)
+
 	if lab_chip.has_method("set_design"):
 		lab_chip.call("set_design", design, 16.0, false)
+
+func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
+	var ranges: Dictionary = guidance.get("ranges", {})
+	var states: Dictionary = guidance.get("states", {})
+	for key in ["cores", "frequency_ghz", "cache_mb", "tdp_w"]:
+		if not ranges.has(key):
+			continue
+		var zone: Dictionary = ranges[key]
+		var current := float(design.get(key, 0.0))
+		if lab_guidance_bars.has(key):
+			var bar: Control = lab_guidance_bars[key]
+			if bar.has_method("configure"):
+				bar.call(
+					"configure",
+					float(zone.get("min", 0.0)),
+					float(zone.get("max", 1.0)),
+					float(zone.get("ambitious_min", 0.0)),
+					float(zone.get("recommended_min", 0.0)),
+					float(zone.get("recommended_max", 1.0)),
+					float(zone.get("ambitious_max", 1.0)),
+					current
+				)
+		if lab_guidance_labels.has(key):
+			var label: Label = lab_guidance_labels[key]
+			var state := str(states.get(key, "RECOMMENDED"))
+			var state_text := "recommandé"
+			var state_color := APP_GREEN
+			if state == "AMBITIOUS":
+				state_text = "ambitieux"
+				state_color = APP_AMBER
+			elif state == "OUTSIDE":
+				state_text = "hors zone maîtrisée"
+				state_color = APP_RED
+			label.text = "Équipe : %s à %s • votre choix : %s" % [
+				_format_guidance_value(key, float(zone.get("recommended_min", 0.0))),
+				_format_guidance_value(key, float(zone.get("recommended_max", 0.0))),
+				state_text
+			]
+			label.add_theme_color_override("font_color", state_color)
+
+	if lab_team_guidance_label != null:
+		var overall := str(guidance.get("overall", "RECOMMENDED"))
+		var color := APP_GREEN
+		if overall == "AMBITIOUS":
+			color = APP_AMBER
+		elif overall == "OUTSIDE":
+			color = APP_RED
+		var detail := str(guidance.get("details", ""))
+		lab_team_guidance_label.text = "%s\n%s : %.0f%%.%s" % [
+			str(guidance.get("summary", "")),
+			str(guidance.get("confidence_text", "Confiance")),
+			float(guidance.get("confidence", 0.0)),
+			(" " + detail) if detail != "" else ""
+		]
+		lab_team_guidance_label.add_theme_color_override("font_color", color)
+
+func _format_guidance_value(key: String, value: float) -> String:
+	match key:
+		"cores":
+			return "%d cœurs" % int(round(value))
+		"frequency_ghz":
+			return "%.1f GHz" % value
+		"cache_mb":
+			return "%d Mo" % int(round(value))
+		"tdp_w":
+			return "%d W" % int(round(value))
+		_:
+			return "%.1f" % value
 
 func _create_products_tab():
 	var scroll := _tab_scroll("Produits")
