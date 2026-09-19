@@ -2946,7 +2946,11 @@ func _refresh_research():
 		tech_lines.append("TECHNOLOGIES RÉUTILISABLES")
 		for technology_value in reusable_technologies:
 			var technology: Dictionary = technology_value
-			tech_lines.append("%s %s — %s" % [UI_ICONS.domain("DISCOVERY"),
+			var tech_family := str(technology.get("family", ""))
+			var scope_label := "ENTREPRISE" if tech_family.is_empty() else GameData.get_product_family_label(tech_family)
+			tech_lines.append("%s [%s] %s — %s" % [
+				UI_ICONS.domain("DISCOVERY"),
+				scope_label,
 				str(technology.get("label", technology.get("id", "Technologie"))),
 				str(technology.get("summary", ""))
 			])
@@ -2998,7 +3002,8 @@ func _refresh_discoveries():
 				str(discovery.get("team_lead", "responsable non désigné")),
 				float(discovery.get("team_score", 0.0))
 			]
-		discovery_label.text = "DÉCOUVERTE — %s\n%s%s\n\nChoisissez entre un gain immédiat limité et une recherche dérivée plus lente mais durable." % [
+		discovery_label.text = "DÉCOUVERTE [%s] — %s\n%s%s\n\nChoisissez entre un gain immédiat limité et une recherche dérivée plus lente mais durable." % [
+			str(discovery.get("family_label", GameData.get_product_family_label(str(discovery.get("family", "CPU"))))),
 			str(discovery.get("title", "Piste technique")),
 			str(discovery.get("summary", "")),
 			team_line
@@ -3021,7 +3026,8 @@ func _refresh_discoveries():
 	var research_lines: Array[String] = []
 	for research_value in DiscoveryManager.get_active_research():
 		var research: Dictionary = research_value
-		research_lines.append("• %s — encore %d/%d mois" % [
+		research_lines.append("• [%s] %s — encore %d/%d mois" % [
+			GameData.get_product_family_label(str(research.get("family", "CPU"))),
 			str(research.get("title", "Recherche dérivée")),
 			int(research.get("remaining_months", 0)),
 			int(research.get("total_months", 0))
