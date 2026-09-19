@@ -83,7 +83,7 @@ La recherche CPU fonctionne en parallèle du développement produit. La premièr
 - **Énergie & thermique** ;
 - **Fiabilité & stabilité**.
 
-Le joueur répartit les ingénieurs R&D entre ces axes et conserve le reste de l'équipe disponible pour le développement des produits. Affecter davantage de chercheurs accélère l'accumulation de connaissance et d'expérience, mais réduit temporairement la capacité de développement immédiate. Le budget de recherche fondamentale est distinct du budget du produit.
+Le joueur répartit les chercheurs R&D entre ces axes. La Recherche et le Développement étant désormais deux équipes distinctes, renforcer la Recherche ne retire plus artificiellement des ingénieurs au Développement. Le budget de recherche fondamentale est distinct du budget du produit.
 
 Chaque axe conserve trois notions différentes :
 
@@ -104,6 +104,25 @@ La Recherche et le Développement sont deux équipes différentes. La Recherche 
 L'équipe Développement possède sa propre taille, son propre score, son management, son expérience et une charge liée au nombre de projets actifs. Une bonne R&D ne garantit donc pas à elle seule un bon produit : une équipe de développement trop petite ou surchargée ralentit l'intégration, réduit la qualité des validations et rend les prévisions moins fiables.
 
 À l'inverse, augmenter fortement la Recherche ne retire plus artificiellement des ingénieurs au Développement : le joueur doit recruter, organiser et financer les deux capacités séparément.
+
+### Industrialisation et équipe Production
+
+Un CPU terminé en Développement n'est plus immédiatement vendable. Il entre dans une phase d'**industrialisation** prise en charge par l'équipe Production.
+
+La Production possède désormais :
+- un score d'équipe influencé par les profils réels des employés ;
+- une maîtrise propre à chaque procédé de gravure ;
+- une connaissance qualité ;
+- une connaissance maintenance ;
+- une expérience qui progresse en industrialisant réellement des générations.
+
+Le joueur choisit une stratégie industrielle par projet :
+- **Économie** : coût plus faible, mais rendement/qualité moins favorables ;
+- **Équilibrée** : compromis par défaut ;
+- **Qualité renforcée** : plus chère et légèrement plus lente, mais meilleur rendement et moins de défauts ;
+- **Cadence prioritaire** : industrialisation plus rapide et capacité plus forte, avec davantage de risque qualité.
+
+Le résultat d'industrialisation fixe ensuite le rendement final, le taux de défaut, la capacité réelle, le coût unitaire et une partie de la fiabilité commerciale. Les défauts de fabrication augmentent aussi les retours SAV après le lancement.
 
 ## 3. Demander une nouvelle génération
 

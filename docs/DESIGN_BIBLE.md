@@ -120,7 +120,7 @@ Un chef très strict peut produire des rapports précis et tenir les délais, to
 
 ## 7. Équipes, expérience et découvertes
 
-Les employés possèdent des compétences générales, des spécialisations, de l'expérience de domaine, du leadership, du moral et une aptitude d'apprentissage. Les équipes progressent en travaillant réellement sur un sujet.
+Les employés possèdent des compétences générales, des spécialisations, de l'expérience de domaine, du leadership, du moral et une aptitude d'apprentissage. Ils disposent aussi de profils semi-aléatoires cohérents avec leur métier : rigueur, résolution de problèmes, travail en équipe, résistance au stress, créativité et qualité de process. Ces valeurs doivent influencer les systèmes concernés et ne pas rester décoratives. Les équipes progressent en travaillant réellement sur un sujet.
 
 Pendant un projet, elles peuvent :
 
@@ -180,6 +180,8 @@ La fabrication doit avoir un impact réel sans demander au joueur de commander c
 - capacité, rendement, qualité et délai.
 
 Chaque bloc influence plusieurs conséquences : coût unitaire, volume, rendement, consommation, performance, fiabilité, délai, dépendance, impact environnemental et risque de pénurie.
+
+La première implémentation CPU impose déjà une industrialisation entre Développement et lancement. La maîtrise du procédé, la qualité, la maintenance et la stratégie de production déterminent rendement, défauts, capacité et coût. Cette base sera ensuite étendue aux fournisseurs, machines, packaging et contrats industriels.
 
 En mode accessible, le responsable choisit les fournisseurs selon une politique. En mode simulation, le joueur compare contrats, capacité, qualité, exclusivité, stocks et dépendances.
 

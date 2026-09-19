@@ -40,6 +40,9 @@ var tech_label: Label
 var projects_label: Label
 var patents_label: Label
 var products_label: Label
+var production_label: Label
+var industrialization_select: OptionButton
+var industrialization_strategy: OptionButton
 var product_details_label: Label
 var market_label: Label
 var contract_label: Label
@@ -145,6 +148,7 @@ func _connect_signals():
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
+	ProductionManager.jobs_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
 	MediaManager.news_changed.connect(_refresh_media)
@@ -914,8 +918,29 @@ func _refresh_cpu_preview():
 func _create_products_tab():
 	var scroll := _tab_scroll("Produits")
 	var box: VBoxContainer = scroll.get_child(0)
+	box.add_child(_section("Industrialisation CPU"))
+	production_label = _rich_label()
+	box.add_child(production_label)
+	var production_grid := GridContainer.new()
+	production_grid.columns = 2
+	box.add_child(production_grid)
+	production_grid.add_child(_label("Projet en industrialisation", 14))
+	industrialization_select = OptionButton.new()
+	production_grid.add_child(industrialization_select)
+	production_grid.add_child(_label("Stratégie", 14))
+	industrialization_strategy = OptionButton.new()
+	for strategy_key in ["ECONOMY", "BALANCED", "QUALITY", "SPEED"]:
+		industrialization_strategy.add_item(ProductionManager.strategy_label(strategy_key))
+		industrialization_strategy.set_item_metadata(industrialization_strategy.item_count - 1, strategy_key)
+	_select_meta(industrialization_strategy, "BALANCED")
+	production_grid.add_child(industrialization_strategy)
+	var apply_production := Button.new()
+	apply_production.text = "Appliquer la stratégie industrielle"
+	apply_production.pressed.connect(_apply_industrialization_strategy)
+	box.add_child(apply_production)
+
+	box.add_child(_section("Gamme CPU / lancer"))
 	products_label=_rich_label(); box.add_child(products_label)
-	box.add_child(_section("Gamme CPU / industrialiser / lancer"))
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
@@ -1534,7 +1559,14 @@ func _refresh_personnel():
 	staff_label.text="\n".join(lines)
 	if PersonnelManager.candidate.is_empty(): candidate_label.text="Aucun candidat sélectionné."
 	else:
-		var c:=PersonnelManager.candidate; candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | salaire : %s €/mois | prime d'embauche : %s €" % [str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),_money(int(c.salary)),_money(int(c.salary)*2)]
+		var c:=PersonnelManager.candidate
+		var profile: Dictionary = c.get("profile", {})
+		candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | rigueur %.0f | résolution %.0f | équipe %.0f | stress %.0f | process %.0f\nSalaire : %s €/mois | prime d'embauche : %s €" % [
+			str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),
+			float(profile.get("rigor", 50.0)), float(profile.get("problem_solving", 50.0)), float(profile.get("teamwork", 50.0)),
+			float(profile.get("stress_tolerance", 50.0)), float(profile.get("process_quality", 50.0)),
+			_money(int(c.salary)),_money(int(c.salary)*2)
+		]
 
 func _generate_candidate(): PersonnelManager.generate_candidate(_meta(recruit_department)); _refresh_personnel()
 func _hire_candidate():
@@ -1661,6 +1693,41 @@ func _toggle_patent_license(): PatentManager.toggle_license_first(); _refresh_al
 func _refresh_products():
 	if products_label == null:
 		return
+	if production_label != null:
+		var production_lines: Array[String] = [
+			"Équipe Production : %d personne(s) • score %.0f/100 • qualité %.1f • maintenance %.1f" % [
+				PersonnelManager.count_department("Production"),
+				ProductionManager.production_team_score(),
+				ProductionManager.quality_knowledge,
+				ProductionManager.maintenance_knowledge
+			]
+		]
+		for node_nm in [14, 10, 7, 5, 3]:
+			production_lines.append("• Maîtrise %d nm : %.1f/100" % [node_nm, ProductionManager.get_process_mastery(node_nm)])
+		for job in ProductionManager.jobs:
+			var result: Dictionary = job.get("result", {})
+			if str(job.get("status", "")) == "INDUSTRIALIZATION":
+				production_lines.append("\n%s — %s — %.0f%% • %d mois • coût mensuel base %s €" % [
+					str(job.get("name", "CPU")), ProductionManager.strategy_label(str(job.get("strategy", "BALANCED"))),
+					float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), _money(int(job.get("monthly_cost", 0)))
+				])
+			else:
+				production_lines.append("\n%s — industrialisation terminée : qualité %.0f/100 • défauts %.1f%% • maîtrise %.0f/100" % [
+					str(job.get("name", "CPU")), float(result.get("quality_score", 0.0)),
+					float(result.get("defect_rate", 0.0)) * 100.0, float(result.get("process_mastery", 0.0))
+				])
+		production_label.text = "\n".join(production_lines)
+	if industrialization_select != null:
+		var previous_job := _meta(industrialization_select) if industrialization_select.item_count > 0 else ""
+		industrialization_select.clear()
+		for job in ProductionManager.get_active_jobs():
+			industrialization_select.add_item("%s — %.0f%%" % [str(job.get("name", "CPU")), float(job.get("progress", 0.0))])
+			industrialization_select.set_item_metadata(industrialization_select.item_count - 1, str(job.get("id", "")))
+		if previous_job != "":
+			_select_meta(industrialization_select, previous_job)
+		if industrialization_select.item_count > 0:
+			var active_job := ProductionManager.get_job(_meta(industrialization_select))
+			_select_meta(industrialization_strategy, str(active_job.get("strategy", "BALANCED")))
 	var current_id := _meta(product_select) if product_select.item_count > 0 else ""
 	var lines: Array[String] = []
 	for generation in ProductManager.cpu_generations:
@@ -1672,9 +1739,10 @@ func _refresh_products():
 				ready_count += 1
 			elif str(model.get("status", "")) == "LAUNCHED":
 				launched_count += 1
-		lines.append("G%d • %s — rendement %.0f%% • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
+		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
 			int(generation.get("generation_index", 1)), str(generation.get("name", "Architecture CPU")),
-			float(generation.get("yield_rate", 0.0)) * 100.0, int(generation.get("model_ids", []).size()),
+			float(generation.get("yield_rate", 0.0)) * 100.0, float(generation.get("manufacturing_quality", 60.0)),
+			float(generation.get("defect_rate", 0.025)) * 100.0, int(generation.get("model_ids", []).size()),
 			ready_count, launched_count, int(generation.get("future_model_slots", 0))
 		])
 	for product in ProductManager.products:
@@ -1713,11 +1781,14 @@ func _refresh_product_details():
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • bin qualité %d/100 • allocation %.0f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
 			int(design.cores), float(design.frequency_ghz), int(design.cache_mb), int(design.node_nm), int(design.tdp_w),
-			float(product.get("yield_rate", 0.0)) * 100.0, int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
+			float(product.get("yield_rate", 0.0)) * 100.0, float(product.get("manufacturing_quality", 60.0)),
+			float(product.get("defect_rate", 0.025)) * 100.0, float(product.get("process_mastery", 35.0)),
+			int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
+			ProductionManager.strategy_label(str(product.get("industrialization_strategy", "BALANCED"))), int(product.get("industrialization_months", 0)),
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
 			" • ".join(metric_lines)
 		]
@@ -1731,6 +1802,18 @@ func _refresh_product_details():
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
+
+func _apply_industrialization_strategy():
+	if industrialization_select == null or industrialization_select.item_count == 0:
+		status_label.text = "Aucun CPU en industrialisation."
+		return
+	var job_id := _meta(industrialization_select)
+	var strategy := _meta(industrialization_strategy)
+	if ProductionManager.set_strategy(job_id, strategy):
+		status_label.text = "Stratégie Production appliquée : %s." % ProductionManager.strategy_label(strategy)
+	else:
+		status_label.text = "Impossible de modifier cette industrialisation."
+	_refresh_all()
 
 func _launch_product():
 	if product_select.item_count==0: return

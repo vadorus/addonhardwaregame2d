@@ -18,13 +18,16 @@ const TIERS := [
 	}
 ]
 
-static func build_range(project: Dictionary, generation_id: String, generation_index: int, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, division_maturity: float) -> Dictionary:
+static func build_range(project: Dictionary, generation_id: String, generation_index: int, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, division_maturity: float, industrialization: Dictionary = {}) -> Dictionary:
 	var architecture := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 	var architecture_estimate := CPU_DESIGN.evaluate(architecture)
 	var project_metrics := _project_metrics(project, architecture_estimate)
 	var generation_plan: Dictionary = project.get("generation_plan", {}).duplicate(true)
 	var potential_models := clampi(maxi(int(generation_plan.get("potential_models", 3)), 3), 3, 6)
-	var yield_rate := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
+	var base_yield := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
+	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
+	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 1.35)
+	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * capacity_factor)))
 	var bin_distribution := _bin_distribution(yield_rate)
 	var products: Array = []
 	for tier_index in range(TIERS.size()):
@@ -32,7 +35,7 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		products.append(_build_product(
 			project, tier, tier_index, generation_id, generation_index, architecture,
 			project_metrics, yield_rate, float(bin_distribution[str(tier.key)]),
-			base_unit_cost, reference_price, total_monthly_capacity
+			base_unit_cost, reference_price, effective_monthly_capacity, industrialization
 		))
 	var generation := {
 		"id":generation_id,
@@ -44,6 +47,11 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"generation_plan":generation_plan,
 		"metrics":project_metrics,
 		"yield_rate":yield_rate,
+		"base_yield_rate":base_yield,
+		"industrialization":industrialization.duplicate(true),
+		"manufacturing_quality":float(industrialization.get("quality_score", 60.0)),
+		"defect_rate":float(industrialization.get("defect_rate", 0.025)),
+		"process_mastery":float(industrialization.get("process_mastery", 35.0)),
 		"bin_distribution":bin_distribution,
 		"potential_models":potential_models,
 		"initial_model_count":products.size(),
@@ -53,13 +61,17 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	}
 	return {"generation":generation, "products":products}
 
-static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int) -> Dictionary:
+static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary) -> Dictionary:
 	var tier_key := str(tier.key)
 	var design := _tier_design(architecture, tier_key)
 	var design_estimate := CPU_DESIGN.evaluate(design)
 	var metrics := _tier_metrics(project_metrics, design_estimate, tier_key)
+	var manufacturing_quality := float(industrialization.get("quality_score", 60.0))
+	var defect_rate := float(industrialization.get("defect_rate", 0.025))
+	metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + (manufacturing_quality - 60.0) * 0.075 - defect_rate * 22.0, 0.0, 100.0)
 	var yield_cost_factor := 1.0 + (1.0 - yield_rate) * 0.55
-	var unit_cost := maxi(1, int(round(float(base_unit_cost) * yield_cost_factor * float(tier.cost_factor))))
+	var industrial_cost_factor := clampf(float(industrialization.get("cost_factor", 1.0)), 0.90, 1.30)
+	var unit_cost := maxi(1, int(round(float(base_unit_cost) * yield_cost_factor * industrial_cost_factor * float(tier.cost_factor))))
 	var price_from_position := float(reference_price) * float(tier.price_factor)
 	var price_from_margin := float(unit_cost) * float(tier.margin_floor)
 	var suggested_price := maxi(unit_cost + 5, _round_price(maxf(price_from_position, price_from_margin)))
@@ -88,6 +100,11 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"bin_quality":int(tier.bin_quality),
 		"bin_share":bin_share,
 		"yield_rate":yield_rate,
+		"manufacturing_quality":manufacturing_quality,
+		"defect_rate":defect_rate,
+		"process_mastery":float(industrialization.get("process_mastery", 35.0)),
+		"industrialization_strategy":str(industrialization.get("strategy", "BALANCED")),
+		"industrialization_months":int(industrialization.get("months", 0)),
 		"cpu_design":design,
 		"design_estimate":design_estimate,
 		"metrics":metrics,
