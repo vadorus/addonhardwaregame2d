@@ -1,5 +1,7 @@
 extends Node
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 signal jobs_changed
 signal industrialization_completed(project, result)
 
@@ -55,13 +57,7 @@ func _ready():
 
 func reset():
 	jobs = []
-	process_mastery = {
-		"14":30.0,
-		"10":24.0,
-		"7":18.0,
-		"5":10.0,
-		"3":5.0
-	}
+	process_mastery = _default_process_mastery()
 	quality_knowledge = 18.0
 	maintenance_knowledge = 16.0
 	_next_job_id = 1
@@ -72,7 +68,7 @@ func _on_project_completed(project: Dictionary):
 		ProductManager.create_from_industrialization(project, {})
 		return
 	var design: Dictionary = project.get("cpu_design", {})
-	var node_nm := int(design.get("node_nm", 7))
+	var node_nm := int(design.get("node_nm", 10000))
 	var estimate: Dictionary = project.get("design_estimate", {})
 	var complexity := float(project.get("complexity", estimate.get("complexity", 50.0)))
 	var job := {
@@ -149,7 +145,7 @@ func process_month():
 
 func _process_job_month(job: Dictionary):
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
-	var node_nm := int(job.get("node_nm", 7))
+	var node_nm := int(job.get("node_nm", 10000))
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
@@ -183,13 +179,14 @@ func _process_learning(node_nm: int, complexity: float, team: float):
 func _complete_job(job: Dictionary):
 	var project: Dictionary = job.get("project", {})
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
-	var node_nm := int(job.get("node_nm", 7))
+	var node_nm := int(job.get("node_nm", 10000))
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
 	var project_metrics: Dictionary = project.get("final_metrics", {})
 	var reliability := float(project_metrics.get("reliability", 55.0))
-	var advanced_penalty := float({14:0.000, 10:0.006, 7:0.014, 5:0.026, 3:0.044}.get(node_nm, 0.018))
+	var node_profile: Dictionary = CPU_DESIGN.node_profile(node_nm)
+	var advanced_penalty := clampf((float(node_profile.get("difficulty", 0.65)) - 0.65) * 0.055, 0.0, 0.055)
 	var quality_score := 24.0 + team * 0.46 + mastery * 0.22 + quality_knowledge * 0.16 - complexity * 0.10
 	quality_score += float(strategy.quality) + rng.randf_range(-2.0, 2.0)
 	quality_score = clampf(quality_score, 20.0, 98.0)
@@ -226,8 +223,17 @@ func _complete_job(job: Dictionary):
 	industrialization_completed.emit(project, result)
 
 func _base_monthly_cost(node_nm: int, complexity: float) -> int:
-	var node_factor := float({14:0.82, 10:0.90, 7:1.00, 5:1.14, 3:1.32}.get(node_nm, 1.0))
+	var node_profile: Dictionary = CPU_DESIGN.node_profile(node_nm)
+	var node_factor := clampf(0.78 + (float(node_profile.get("difficulty", 0.65)) - 0.65) * 0.72, 0.78, 1.35)
 	return maxi(9000, int(round((12000.0 + complexity * 165.0) * node_factor)))
+
+func _default_process_mastery() -> Dictionary:
+	var result := {}
+	for node_value in CPU_DESIGN.available_nodes():
+		var node_nm := int(node_value)
+		var unlock := float(CPU_DESIGN.node_profile(node_nm).get("unlock", 100.0))
+		result[str(node_nm)] = clampf(28.0 - unlock * 0.80, 5.0, 30.0)
+	return result
 
 func active_departments() -> Array:
 	if not get_active_jobs().is_empty():
@@ -248,13 +254,7 @@ func get_state() -> Dictionary:
 func load_state(state: Dictionary):
 	jobs = state.get("jobs", []).duplicate(true)
 	var saved_mastery = state.get("process_mastery", {})
-	process_mastery = {
-		"14":30.0,
-		"10":24.0,
-		"7":18.0,
-		"5":10.0,
-		"3":5.0
-	}
+	process_mastery = _default_process_mastery()
 	if typeof(saved_mastery) == TYPE_DICTIONARY:
 		for key in saved_mastery.keys():
 			process_mastery[str(key)] = float(saved_mastery[key])
