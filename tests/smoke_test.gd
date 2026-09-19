@@ -3,10 +3,37 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_SUPPORT := preload("res://scripts/CpuSupportModel.gd")
 const INDUSTRIALIZATION := preload("res://scripts/IndustrializationModel.gd")
+const UI_ICONS := preload("res://ui/UiIcons.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	SimulationManager.reset_all("CI Test", "GPU")
+	var expected_domain_icons := {
+		"HQ":"⌂",
+		"COMPANY":"◆",
+		"TEAM":"●",
+		"LAB":"⚗",
+		"CPU":"▣",
+		"PRODUCTION":"⚙",
+		"MARKET":"↗",
+		"PRESS":"▤",
+		"FINANCE":"€",
+		"DISCOVERY":"✦"
+	}
+	for icon_key_value in expected_domain_icons.keys():
+		var icon_key := str(icon_key_value)
+		if UI_ICONS.domain(icon_key) != str(expected_domain_icons[icon_key]):
+			_fail("UI icon taxonomy changed unexpectedly for %s" % icon_key)
+			return
+	if UI_ICONS.state("SUCCESS") == UI_ICONS.state("WARNING"):
+		_fail("Success and warning states must have distinct visual symbols")
+		return
+	for pole_id in ["LAB", "PRODUCTION", "MARKET", "TEAM"]:
+		var pole_state := DepartmentProgression.get_pole_state(pole_id)
+		if str(pole_state.get("icon", "")) != UI_ICONS.domain(pole_id):
+			_fail("Department progression does not use the shared icon taxonomy for %s" % pole_id)
+			return
+
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
 		return
