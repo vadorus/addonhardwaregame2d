@@ -2,7 +2,7 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
-## État d’implémentation — V0.2.8
+## État d’implémentation — V0.3
 
 Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer.
 
@@ -74,6 +74,28 @@ L'adéquation au client cible reste affichée séparément, car elle répond à 
 - couverture de validation et dette microcode.
 
 La couche avancée explique les résultats mais ne doit pas être obligatoire pour lancer un premier CPU.
+
+### Recherche continue, expérience et confiance
+
+La recherche CPU fonctionne en parallèle du développement produit. La première version expose volontairement trois axes simples :
+
+- **Architecture & performance** ;
+- **Énergie & thermique** ;
+- **Fiabilité & stabilité**.
+
+Le joueur répartit les ingénieurs R&D entre ces axes et conserve le reste de l'équipe disponible pour le développement des produits. Affecter davantage de chercheurs accélère l'accumulation de connaissance et d'expérience, mais réduit temporairement la capacité de développement immédiate. Le budget de recherche fondamentale est distinct du budget du produit.
+
+Chaque axe conserve trois notions différentes :
+
+- **connaissance** : ce que l'entreprise comprend et sait théoriquement exploiter ;
+- **expérience** : ce que l'équipe a réellement pratiqué au fil de ses recherches et développements ;
+- **confiance** : qualité des estimations que l'équipe peut fournir au joueur.
+
+La connaissance progresse avec des rendements décroissants : atteindre un niveau correct est relativement rapide, devenir expert demande un investissement durable. Le développement de produits apporte aussi un peu d'expérience dans l'axe travaillé, afin qu'une génération imparfaite reste utile pour la suivante.
+
+À certains paliers, l'équipe peut faire remonter une **découverte R&D**. Le joueur peut approfondir la piste, ce qui crée un élan temporaire et de l'expérience supplémentaire, ou l'archiver. Ces événements servent de base aux futures découvertes technologiques plus spécifiques sans imposer un arbre de recherche gigantesque.
+
+Les propositions de génération tiennent compte de cette recherche. Une équipe peu expérimentée fournit des estimations moins fiables et Camille doit le signaler ; une équipe mature donne des prévisions plus précises sans supprimer complètement l'incertitude.
 
 ## 3. Demander une nouvelle génération
 

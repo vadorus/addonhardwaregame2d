@@ -28,6 +28,51 @@ func _ready() -> void:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
 
+	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
+		_fail("CPU research must start with three clear domains")
+		return
+	var research_capacity := ResearchManager.get_cpu_research_capacity()
+	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 3:
+		_fail("CPU research capacity does not match the R&D staff")
+		return
+	if ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":research_capacity + 1, "EFFICIENCY":0, "RELIABILITY":0}):
+		_fail("CPU research accepted more researchers than available")
+		return
+	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":1, "RELIABILITY":0}):
+		_fail("CPU research rejected a valid team split")
+		return
+	if ResearchManager.get_available_development_engineers() != research_capacity - 2:
+		_fail("Research allocation did not reduce immediate development capacity")
+		return
+	if ResearchManager.development_capacity_factor() >= 1.0 or ResearchManager.development_capacity_factor() < 0.55:
+		_fail("Development capacity factor escaped its expected range")
+		return
+	ResearchManager.set_continuous_research_budget(18000)
+	var architecture_before := float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0))
+	ResearchManager.process_month()
+	var architecture_after := float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0))
+	if architecture_after <= architecture_before:
+		_fail("Allocated CPU research did not increase knowledge")
+		return
+	var confidence := ResearchManager.research_confidence("ARCHITECTURE")
+	if confidence < 20.0 or confidence > 96.0:
+		_fail("Research confidence escaped its supported range")
+		return
+	ResearchManager.cpu_research_domains["ARCHITECTURE"]["knowledge"] = 24.9
+	ResearchManager.cpu_research_domains["ARCHITECTURE"]["milestones"] = 0
+	ResearchManager.process_month()
+	var pending_research_events := ResearchManager.get_pending_research_events()
+	if pending_research_events.is_empty():
+		_fail("Research milestone did not create a discovery event")
+		return
+	var research_event: Dictionary = pending_research_events[0]
+	if not ResearchManager.resolve_research_event(str(research_event.get("id", "")), true):
+		_fail("Research discovery could not be pursued")
+		return
+	if int(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("momentum_months", 0)) < 3:
+		_fail("Pursued research discovery did not create momentum")
+		return
+
 	var efficient := CPU_DESIGN.evaluate(CPU_DESIGN.preset("EFFICIENT"))
 	var performance := CPU_DESIGN.evaluate(CPU_DESIGN.preset("PERFORMANCE"))
 	if float(performance.get("performance", 0.0)) <= float(efficient.get("performance", 0.0)):
@@ -80,6 +125,14 @@ func _ready() -> void:
 	if proposals.size() != 3:
 		_fail("CPU generation council did not return three plans")
 		return
+	for research_proposal_value in proposals:
+		var research_proposal: Dictionary = research_proposal_value
+		if not research_proposal.has("research_confidence"):
+			_fail("CPU proposal does not expose research confidence")
+			return
+		if float(research_proposal.get("development_capacity_factor", 1.0)) >= 1.0:
+			_fail("CPU proposal ignored researchers assigned away from development")
+			return
 	var safe_plan: Dictionary = proposals[0]
 	var bold_plan: Dictionary = proposals[2]
 	if float(bold_plan.get("evaluation", {}).get("performance", 0.0)) <= float(safe_plan.get("evaluation", {}).get("performance", 0.0)):
@@ -122,6 +175,9 @@ func _ready() -> void:
 		return
 	if float(project.get("complexity", 0.0)) <= float(efficient.get("complexity", 0.0)):
 		_fail("Complex CPU design did not increase development complexity")
+		return
+	if not project.has("research_snapshot") or float(project.get("estimate_confidence", 0.0)) <= 0.0:
+		_fail("CPU project did not store its research context")
 		return
 
 	var report: Dictionary = SimulationManager.process_month_end()
@@ -257,9 +313,26 @@ func _ready() -> void:
 
 	ResearchManager.prepare_cpu_generation_proposals("PRO", "HYBRID", "RELIABILITY", 50_000, CPU_DESIGN.preset("BALANCED"))
 	var research_round_trip := ResearchManager.get_state().duplicate(true)
+	var saved_architecture_knowledge := float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0))
+	var saved_research_budget := ResearchManager.continuous_research_budget
 	ResearchManager.load_state(research_round_trip)
 	if ResearchManager.get_cpu_generation_proposals().size() != 3:
 		_fail("Generation proposals did not survive a save round-trip")
+		return
+	if absf(float(ResearchManager.get_cpu_research_domain("ARCHITECTURE").get("knowledge", 0.0)) - saved_architecture_knowledge) > 0.001:
+		_fail("CPU research knowledge did not survive a save round-trip")
+		return
+	if ResearchManager.continuous_research_budget != saved_research_budget:
+		_fail("CPU research budget did not survive a save round-trip")
+		return
+	var legacy_research_state := research_round_trip.duplicate(true)
+	legacy_research_state.erase("cpu_research_domains")
+	legacy_research_state.erase("continuous_research_budget")
+	legacy_research_state.erase("research_events")
+	legacy_research_state.erase("next_research_event_id")
+	ResearchManager.load_state(legacy_research_state)
+	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
+		_fail("Legacy research save did not receive default CPU research domains")
 		return
 
 	var division_state := DivisionManager.get_state()
