@@ -67,6 +67,8 @@ var lab_summary_label: Label
 var lab_unit_cost_value: Label
 var lab_dev_time_value: Label
 var lab_fit_value: Label
+var lab_tradeoff_summary_label: Label
+var lab_technical_detail_label: Label
 var lab_warning_label: Label
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
@@ -589,13 +591,24 @@ func _create_research_tab():
 	lab_dev_time_value = _add_inline_metric(lab_stats_grid, "Développement", "—")
 	lab_fit_value = _add_inline_metric(lab_stats_grid, "Adéquation cible", "—")
 
+	preview_box.add_child(_eyebrow("5 ARBITRAGES CLÉS"))
+	lab_tradeoff_summary_label = _muted_label("", 12)
+	lab_tradeoff_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_box.add_child(lab_tradeoff_summary_label)
+
 	var metrics_box := VBoxContainer.new()
 	metrics_box.add_theme_constant_override("separation", 8)
 	preview_box.add_child(metrics_box)
 	_add_lab_metric(metrics_box, "performance", "Performance")
-	_add_lab_metric(metrics_box, "efficiency", "Efficacité")
+	_add_lab_metric(metrics_box, "efficiency", "Efficacité / thermique")
+	_add_lab_metric(metrics_box, "cost_control", "Maîtrise du coût")
 	_add_lab_metric(metrics_box, "reliability", "Fiabilité")
-	_add_lab_metric(metrics_box, "innovation", "Innovation")
+	_add_lab_metric(metrics_box, "delivery", "Délai / risque")
+
+	preview_box.add_child(_eyebrow("DÉTAILS TECHNIQUES"))
+	lab_technical_detail_label = _muted_label("", 12)
+	lab_technical_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_box.add_child(lab_technical_detail_label)
 
 	var warning_panel := PanelContainer.new()
 	warning_panel.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 10, 1, APP_AMBER, 11))
@@ -808,6 +821,7 @@ func _refresh_cpu_preview():
 		risk_label = "élevé"
 	elif risk >= 40.0:
 		risk_label = "modéré"
+	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
 
 	lab_profile_label.text = str(evaluation.profile)
 	lab_summary_label.text = "%d cœurs • %.1f GHz • %d Mo • %d nm • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)" % [
@@ -820,14 +834,23 @@ func _refresh_cpu_preview():
 	lab_warning_label.text = str(evaluation.tradeoff)
 	lab_warning_label.add_theme_color_override("font_color", APP_RED if risk >= 60.0 else (APP_AMBER if risk >= 40.0 else APP_GREEN))
 
-	for metric_key in ["performance", "efficiency", "reliability", "innovation"]:
-		var score := float(evaluation.get(metric_key, 0.0))
+	lab_tradeoff_summary_label.text = CPU_DESIGN.decision_summary(decision_axes)
+	for metric_key in ["performance", "efficiency", "cost_control", "reliability", "delivery"]:
+		var score := float(decision_axes.get(metric_key, 0.0))
 		if cpu_metric_bars.has(metric_key):
 			var bar: ProgressBar = cpu_metric_bars[metric_key]
 			bar.value = score
 		if cpu_metric_labels.has(metric_key):
 			var metric_label: Label = cpu_metric_labels[metric_key]
 			metric_label.text = "%.0f" % score
+
+	var thermal_text := "TDP cohérent"
+	if float(evaluation.power_deficit) > 0.1:
+		thermal_text = "déficit thermique %.0f W" % float(evaluation.power_deficit)
+	lab_technical_detail_label.text = "Innovation %.0f • durabilité %.0f • complexité %.0f/100 • risque %.0f/100\nTDP requis ~%.0f W • %s • coût unitaire %s €" % [
+		float(evaluation.innovation), float(evaluation.sustainability), float(evaluation.complexity), risk,
+		float(evaluation.required_tdp), thermal_text, _money(int(evaluation.unit_cost))
+	]
 
 	if lab_chip.has_method("set_design"):
 		lab_chip.call("set_design", design, 16.0, false)
