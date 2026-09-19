@@ -123,6 +123,13 @@ func get_leader_quality(employee_id: String, department: String) -> float:
 			return clampf(float(emp.leadership) * 0.55 + float(emp.skill) * 0.20 + exp + dept_bonus, 0.0, 100.0)
 	return 0.0
 
+func count_department(department: String) -> int:
+	var count := 0
+	for emp in staff:
+		if str(emp.get("department", "")) == department:
+			count += 1
+	return count
+
 func get_employee(employee_id: String) -> Dictionary:
 	for emp in staff:
 		if str(emp.id) == employee_id:
