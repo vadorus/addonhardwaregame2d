@@ -20,7 +20,9 @@ const TIERS := [
 
 static func build_range(project: Dictionary, generation_id: String, generation_index: int, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, division_maturity: float, industrialization: Dictionary = {}) -> Dictionary:
 	var architecture := CPU_DESIGN.normalize(project.get("cpu_design", {}))
-	var architecture_estimate := CPU_DESIGN.evaluate(architecture)
+	var capability_value = project.get("technical_capabilities_snapshot", {})
+	var capability_snapshot: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
+	var architecture_estimate := CPU_DESIGN.evaluate(architecture, capability_snapshot)
 	var project_metrics := _project_metrics(project, architecture_estimate)
 	var generation_plan: Dictionary = project.get("generation_plan", {}).duplicate(true)
 	var potential_models := clampi(maxi(int(generation_plan.get("potential_models", 3)), 3), 3, 6)
@@ -35,7 +37,7 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		products.append(_build_product(
 			project, tier, tier_index, generation_id, generation_index, architecture,
 			project_metrics, yield_rate, float(bin_distribution[str(tier.key)]),
-			base_unit_cost, reference_price, effective_monthly_capacity, industrialization
+			base_unit_cost, reference_price, effective_monthly_capacity, industrialization, capability_snapshot
 		))
 	var generation := {
 		"id":generation_id,
@@ -61,10 +63,10 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	}
 	return {"generation":generation, "products":products}
 
-static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary) -> Dictionary:
+static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary, capability_snapshot: Dictionary) -> Dictionary:
 	var tier_key := str(tier.key)
 	var design := _tier_design(architecture, tier_key)
-	var design_estimate := CPU_DESIGN.evaluate(design)
+	var design_estimate := CPU_DESIGN.evaluate(design, capability_snapshot)
 	var metrics := _tier_metrics(project_metrics, design_estimate, tier_key)
 	var manufacturing_quality := float(industrialization.get("quality_score", 60.0))
 	var defect_rate := float(industrialization.get("defect_rate", 0.025))
@@ -106,6 +108,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"industrialization_strategy":str(industrialization.get("strategy", "BALANCED")),
 		"industrialization_months":int(industrialization.get("months", 0)),
 		"cpu_design":design,
+		"technical_capabilities_snapshot":capability_snapshot.duplicate(true),
 		"design_estimate":design_estimate,
 		"metrics":metrics,
 		"unit_cost":unit_cost,
