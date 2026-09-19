@@ -7,7 +7,7 @@ const CATALOG := {
 	"ADAPTIVE_POWER": {
 		"label":"Gestion de puissance adaptative",
 		"scope":"FAMILY",
-		"families":["CPU","GPU","SMARTPHONE","SATELLITE"],
+		"families":["CPU","GPU","RAM","MOTHERBOARD","SMARTPHONE","SATELLITE"],
 		"summary":"Méthodes réutilisables de contrôle dynamique de puissance et de tension.",
 		"effects":{"efficiency":2.5,"sustainability":1.0}
 	},
@@ -27,7 +27,7 @@ const CATALOG := {
 	"FOUNDRY_DRC": {
 		"label":"Règles de conception fonderie",
 		"scope":"FAMILY",
-		"families":["CPU","GPU","SMARTPHONE","TV","SATELLITE"],
+		"families":["CPU","GPU","RAM","MOTHERBOARD","SMARTPHONE","TV","SATELLITE"],
 		"summary":"Optimisations de conception et de préparation industrielle issues du partenariat fonderie.",
 		"effects":{"industrial_setup":0.96,"industrial_unit_cost":0.97,"industrial_capacity":1.04}
 	},
@@ -40,7 +40,7 @@ const CATALOG := {
 	"MICROCODE_TOOLING": {
 		"label":"Outillage microcode avancé",
 		"scope":"FAMILY",
-		"families":["CPU","GPU","SMARTPHONE","TV","SATELLITE"],
+		"families":["CPU","GPU","MOTHERBOARD","SMARTPHONE","TV","SATELLITE"],
 		"summary":"Outils réutilisables de validation microcode, firmware et compatibilité plateforme.",
 		"effects":{"initial_microcode":6.0,"initial_compatibility":4.0,"support_debt":0.85}
 	}
