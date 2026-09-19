@@ -1156,6 +1156,12 @@ func _refresh_cpu_remediation_options(design: Dictionary):
 		int(rd_budget.value) if rd_budget != null else 45000,
 		_meta(rd_focus) if rd_focus != null else "BALANCED"
 	)
+	if not active_cpu_remediation.is_empty():
+		for refreshed_value in lab_remediation_options:
+			var refreshed: Dictionary = refreshed_value
+			if str(refreshed.get("id", "")) == str(active_cpu_remediation.get("id", "")):
+				active_cpu_remediation = refreshed.duplicate(true)
+				break
 	lab_remediation_select.clear()
 	if lab_remediation_options.is_empty():
 		lab_remediation_select.add_item("Aucune solution spéciale nécessaire")
@@ -1768,21 +1774,30 @@ func _refresh_dashboard():
 	if not active_project.is_empty():
 		var phase_index: int = clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		var phase_progress: float = float(active_project.get("phase_progress", 0.0))
+		var remediation_remaining := int(active_project.get("remediation_months_remaining", 0))
+		var remediation_total := maxi(int(active_project.get("remediation_total_months", 0)), 1)
 		var overall_progress: float = (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		if remediation_remaining > 0:
+			overall_progress = (1.0 - float(remediation_remaining) / float(remediation_total)) * 10.0
 		var approach_key := str(active_project.get("approach", "INTERNAL"))
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
 		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
-		dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+		if remediation_remaining > 0:
+			var remediation: Dictionary = active_project.get("technical_remediation", {})
+			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining
+			dashboard_cto_label.text = "« Nous développons %s avant de reprendre le CPU. Ce détour réduit le risque et transforme une limite actuelle en savoir-faire réutilisable. »" % str(remediation.get("title", "la solution validée"))
+		else:
+			dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+			if not active_project.get("reports", []).is_empty():
+				dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
+			else:
+				dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_project_progress.value = overall_progress
 		dashboard_metric_a.text = "%s €/mois" % _money(int(active_project.get("monthly_budget", 0)))
 		dashboard_metric_b.text = "%d mois" % int(active_project.get("months_spent", 0))
 		dashboard_metric_c.text = str(active_project.get("focus_label", "Équilibré"))
-		if not active_project.get("reports", []).is_empty():
-			dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
-		else:
-			dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
 		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
@@ -2029,7 +2044,10 @@ func _refresh_research():
 	for project in ResearchManager.projects:
 		var phase := "Terminé"
 		if str(project.status) == "DEVELOPMENT":
-			phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
+			if int(project.get("remediation_months_remaining", 0)) > 0:
+				phase = "Mise au point technique — %d mois restant(s)" % int(project.get("remediation_months_remaining", 0))
+			else:
+				phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
 		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 		var capability_value = project.get("technical_capabilities_snapshot", {})
 		var capability_snapshot: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
@@ -2053,6 +2071,14 @@ func _refresh_research():
 		var generation_plan: Dictionary = project.get("generation_plan", {})
 		if not generation_plan.is_empty():
 			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
+		var remediation: Dictionary = project.get("technical_remediation", {})
+		if not remediation.is_empty():
+			lines.append("  Solution équipe : %s • +%d mois • coût technique %s € • %s" % [
+				str(remediation.get("title", "solution technique")),
+				int(project.get("remediation_total_months", remediation.get("extra_months", 0))),
+				_money(int(remediation.get("upfront_cost", 0))),
+				"validée" if bool(project.get("remediation_transfer_applied", false)) else "en cours"
+			])
 		if not project.reports.is_empty():
 			lines.append("  Camille : %s" % str(project.reports[0].text))
 	projects_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
@@ -2100,7 +2126,10 @@ func _refresh_products():
 				ProductionManager.maintenance_knowledge
 			]
 		]
-		var visible_nodes := CPU_DESIGN.available_nodes_for_mastery(float(ResearchManager.technologies.get("manufacturing", 0.0)))
+		var visible_nodes := CPU_DESIGN.available_nodes_for_capabilities(
+			float(ResearchManager.technologies.get("manufacturing", 0.0)),
+			ResearchManager.get_cpu_capability("MINIATURIZATION")
+		)
 		for node_value in visible_nodes:
 			var node_nm := int(node_value)
 			production_lines.append("• Maîtrise %s : %.1f/100" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
