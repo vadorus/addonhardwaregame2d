@@ -442,6 +442,11 @@ func _process_continuous_research():
 			_create_research_event(key, float(RESEARCH_MILESTONES[milestone_index]))
 			milestone_index += 1
 		data["milestones"] = milestone_index
+		if key == "ARCHITECTURE":
+			cpu_capabilities["ARCHITECTURE"] = clampf(get_cpu_capability("ARCHITECTURE") + gain * 0.11, 0.0, 100.0)
+			cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + gain * 0.035, 0.0, 100.0)
+		elif key == "EFFICIENCY":
+			cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + gain * 0.065, 0.0, 100.0)
 	technologies["cpu"] = clampf(float(technologies.get("cpu", 18.0)) + total_gain * 0.16, 0.0, 100.0)
 	research_changed.emit()
 
@@ -465,7 +470,10 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	var research_score := research_score_for_focus(focus)
 	var research_confidence_score := research_confidence_for_focus(focus)
 	var field_experience_score := field_experience_for_focus(focus)
-	var technology_score := float(technologies.get("cpu", 0.0)) * 0.55 + research_score * 0.45
+	var architecture_capability := get_cpu_capability("ARCHITECTURE")
+	var layout_score := get_cpu_capability("LAYOUT")
+	var miniaturization_score := get_cpu_capability("MINIATURIZATION")
+	var technology_score := float(technologies.get("cpu", 0.0)) * 0.42 + research_score * 0.33 + architecture_capability * 0.15 + layout_score * 0.10
 	var manufacturing_score := float(technologies.get("manufacturing", 0.0))
 	var integration_score := float(technologies.get("integration", 0.0))
 	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
@@ -481,6 +489,11 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"team_score":team_score,
 		"management_modifier":management_modifier,
 		"technology_score":technology_score,
+		"architecture_capability":architecture_capability,
+		"layout_score":layout_score,
+		"miniaturization_score":miniaturization_score,
+		"manufacturing_score":manufacturing_score,
+		"cpu_capabilities":cpu_capabilities.duplicate(true),
 		"research_score":research_score,
 		"research_confidence":research_confidence_score,
 		"field_experience":field_experience_score,
@@ -531,7 +544,13 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	var design_estimate: Dictionary = {}
 	if sector == "CPU":
 		normalized_design = CPU_DESIGN.normalize(cpu_design)
-		design_estimate = CPU_DESIGN.evaluate(normalized_design)
+		var available_nodes := CPU_DESIGN.available_nodes_for_capabilities(
+			float(technologies.get("manufacturing", 0.0)),
+			get_cpu_capability("MINIATURIZATION")
+		)
+		if not available_nodes.has(int(normalized_design.node_nm)):
+			return false
+		design_estimate = CPU_DESIGN.evaluate(normalized_design, cpu_capabilities)
 		for design_metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
 			desired[design_metric] = float(design_estimate.get(design_metric, desired.get(design_metric, 55.0)))
 
@@ -559,6 +578,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
+		"technical_capabilities_snapshot":cpu_capabilities.duplicate(true) if sector == "CPU" else {},
 		"field_experience_snapshot":AfterSalesManager.field_experience.duplicate(true) if sector == "CPU" else {},
 		"estimate_confidence":research_confidence_for_focus(focus) if sector == "CPU" else 50.0,
 		"development_snapshot":{
@@ -581,6 +601,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 
 func process_month():
 	_process_continuous_research()
+	_process_concept_programs()
 	for project in projects:
 		if str(project.status) != "DEVELOPMENT":
 			continue
@@ -683,7 +704,7 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 
 func active_departments() -> Array:
 	var active: Array = []
-	if get_total_cpu_research_allocation() > 0:
+	if get_total_cpu_research_allocation() > 0 or not get_active_cpu_concept_programs().is_empty():
 		active.append("R&D")
 	for p in projects:
 		if str(p.status) == "DEVELOPMENT":
@@ -701,7 +722,10 @@ func get_state() -> Dictionary:
 		"cpu_research_domains":cpu_research_domains,
 		"continuous_research_budget":continuous_research_budget,
 		"research_events":research_events,
+		"cpu_capabilities":cpu_capabilities,
+		"concept_programs":concept_programs,
 		"next_research_event_id":_next_research_event_id,
+		"next_concept_id":_next_concept_id,
 		"next_id":_next_id,
 		"rng_seed":rng.seed,
 		"rng_state":rng.state
@@ -712,7 +736,12 @@ func load_state(state: Dictionary):
 	for project in projects:
 		if str(project.get("sector", "")) == "CPU":
 			var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
-			var estimate := CPU_DESIGN.evaluate(design)
+			var saved_capability_snapshot = project.get("technical_capabilities_snapshot", {})
+			var project_capabilities: Dictionary = saved_capability_snapshot if typeof(saved_capability_snapshot) == TYPE_DICTIONARY else {}
+			if project_capabilities.is_empty():
+				project_capabilities = _default_cpu_capabilities()
+				project["technical_capabilities_snapshot"] = project_capabilities.duplicate(true)
+			var estimate := CPU_DESIGN.evaluate(design, project_capabilities)
 			project["cpu_design"] = design
 			project["design_estimate"] = estimate
 			project["complexity"] = float(project.get("complexity", estimate.complexity))
@@ -730,6 +759,15 @@ func load_state(state: Dictionary):
 	var saved_context_value = state.get("cpu_generation_context", {})
 	cpu_generation_context = saved_context_value.duplicate(true) if typeof(saved_context_value) == TYPE_DICTIONARY else {}
 	technologies = state.get("technologies", {}).duplicate(true)
+	if technologies.is_empty():
+		technologies = {"cpu":18.0, "manufacturing":12.0, "software":8.0, "integration":10.0}
+	var saved_capabilities = state.get("cpu_capabilities", {})
+	cpu_capabilities = _default_cpu_capabilities()
+	if typeof(saved_capabilities) == TYPE_DICTIONARY:
+		for key in CPU_CAPABILITY_ORDER:
+			if saved_capabilities.has(key):
+				cpu_capabilities[key] = clampf(float(saved_capabilities[key]), 0.0, 100.0)
+	concept_programs = state.get("concept_programs", []).duplicate(true)
 	var saved_domains = state.get("cpu_research_domains", {})
 	cpu_research_domains = _default_cpu_research_domains()
 	if typeof(saved_domains) == TYPE_DICTIONARY:
@@ -740,6 +778,7 @@ func load_state(state: Dictionary):
 	continuous_research_budget = int(state.get("continuous_research_budget", 12000))
 	research_events = state.get("research_events", []).duplicate(true)
 	_next_research_event_id = int(state.get("next_research_event_id", research_events.size() + 1))
+	_next_concept_id = int(state.get("next_concept_id", concept_programs.size() + 1))
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = int(state.get("rng_seed", 8282))
 	rng.state = int(state.get("rng_state", rng.state))
