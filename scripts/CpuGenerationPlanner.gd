@@ -91,7 +91,7 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 			if capability >= 64.0 and architecture_capability >= 52.0 and int(base.cores) < 2:
 				design.cores = int(base.cores) + 1
 	_apply_segment(design, str(context.get("segment", "MAINSTREAM")), archetype)
-	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability)
+	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability, architecture_capability, layout_score)
 	return CPU_DESIGN.normalize(design)
 
 static func _apply_segment(design: Dictionary, segment: String, archetype: String) -> void:
@@ -113,12 +113,12 @@ static func _apply_segment(design: Dictionary, segment: String, archetype: Strin
 		"PREMIUM":
 			design.frequency_ghz = float(design.frequency_ghz) * 1.06
 
-static func _apply_focus(design: Dictionary, focus: String, archetype: String, capability: float) -> void:
+static func _apply_focus(design: Dictionary, focus: String, archetype: String, capability: float, architecture_capability: float, layout_score: float) -> void:
 	match focus:
 		"PERFORMANCE":
 			design.frequency_ghz = float(design.frequency_ghz) * 1.12
 			design.tdp_w = int(design.tdp_w) + 1
-			if capability >= 72.0:
+			if capability >= 72.0 and architecture_capability >= 52.0:
 				design.cores = int(design.cores) + 1
 		"EFFICIENCY", "SUSTAINABILITY":
 			design.frequency_ghz = float(design.frequency_ghz) * 0.92
@@ -127,10 +127,11 @@ static func _apply_focus(design: Dictionary, focus: String, archetype: String, c
 			design.frequency_ghz = float(design.frequency_ghz) * 0.95
 			design.tdp_w = int(design.tdp_w) + 1
 		"INNOVATION":
-			if float(design.cache_mb) <= 0.0 and capability >= 55.0:
-				design.cache_mb = 1.0 / 1024.0
-			elif float(design.cache_mb) > 0.0:
-				design.cache_mb = float(design.cache_mb) * 1.20
+			if layout_score >= 30.0:
+				if float(design.cache_mb) <= 0.0 and capability >= 55.0:
+					design.cache_mb = 1.0 / 1024.0
+				elif float(design.cache_mb) > 0.0:
+					design.cache_mb = float(design.cache_mb) * 1.20
 
 static func _next_advanced_node(node_nm: int, manufacturing_score: float, miniaturization_score: float) -> int:
 	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
