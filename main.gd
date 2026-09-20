@@ -172,6 +172,7 @@ func _connect_signals():
 	DivisionManager.divisions_changed.connect(_refresh_all)
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
+	ExecutiveManager.executive_changed.connect(_refresh_all)
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
@@ -2134,7 +2135,7 @@ func _refresh_financial_advice():
 		color = APP_AMBER
 	elif str(advice.get("level", "")) in ["DANGEREUX","IMPOSSIBLE"]:
 		color = APP_RED
-	finance_advice_label.add_theme_color_override("default_color", color)
+	finance_advice_label.add_theme_color_override("font_color", color)
 
 func _refresh_hr_cases():
 	if hr_case_select == null:
