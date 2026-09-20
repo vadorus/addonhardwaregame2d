@@ -118,6 +118,24 @@ Un responsable n'est pas un bouton magique. Sa compétence, son expérience, son
 
 Un chef très strict peut produire des rapports précis et tenir les délais, tout en épuisant son équipe si l'entreprise n'offre pas un bon cadre de travail.
 
+## 6B. Difficulté économique et équilibrage
+
+La difficulté économique est choisie à la création de l'entreprise puis sauvegardée avec la partie. Elle ne retire aucun système et ne transforme pas le mode facile en version simplifiée : elle change uniquement la **marge d'erreur économique** et la pression concurrentielle.
+
+Trois profils existent :
+
+- **Accessible** : capital de départ supérieur, charges plus légères, demande plus favorable et concurrents légèrement moins rapides ;
+- **Standard** : réglage de référence utilisé pour l'équilibrage principal ;
+- **Réaliste** : capital plus serré, salaires/R&D/industrie plus coûteux, marché moins permissif et concurrents plus rapides.
+
+Tous les débits de trésorerie passent par le même système de coût afin que salaires, R&D, développement, industrialisation, fonderie et frais de structure soient cohérents avec le profil choisi. Les transferts de capital purs, par exemple le capital affecté à une filiale, conservent leur montant exact afin de ne pas créer artificiellement ou détruire de valeur.
+
+La taille des marchés est également ajustée par le profil. La difficulté ne modifie pas arbitrairement la qualité des produits du joueur : elle agit sur le contexte économique dans lequel ces produits doivent survivre.
+
+Le point de départ Standard vise environ **7 à 8 mois de marge structurelle théorique** avant recettes si le joueur laisse tourner l'organisation de départ. Accessible doit donner sensiblement plus de marge ; Réaliste sensiblement moins. L'objectif est d'obliger à arbitrer sans provoquer une faillite automatique avant que le premier CPU puisse être développé et industrialisé.
+
+L'équilibrage doit rester mesurable par tests : capital initial, coût d'un même panier de dépenses, taille d'un même marché, vitesse concurrentielle et persistance du profil doivent être comparés automatiquement.
+
 ## 6A. Onboarding progressif, bras droit et comité de direction
 
 La complexité de Tech Empire doit grandir au même rythme que l'entreprise et que l'apprentissage du joueur. Le jeu ne présente jamais tous ses systèmes dès le départ.
