@@ -30,7 +30,7 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
 	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 1.35)
 	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * capacity_factor)))
-	var bin_distribution := _bin_distribution(yield_rate)
+	var bin_distribution := _bin_distribution(yield_rate, industrialization)
 	var products: Array = []
 	for tier_index in range(TIERS.size()):
 		var tier: Dictionary = TIERS[tier_index]
@@ -54,6 +54,12 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"manufacturing_quality":float(industrialization.get("quality_score", 60.0)),
 		"defect_rate":float(industrialization.get("defect_rate", 0.025)),
 		"process_mastery":float(industrialization.get("process_mastery", 35.0)),
+		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
+		"silicon_quality_mean":float(industrialization.get("silicon_quality_mean", industrialization.get("quality_score", 60.0))),
+		"silicon_variation":float(industrialization.get("silicon_variation", 10.0)),
+		"silicon_predictability":float(industrialization.get("silicon_predictability", 60.0)),
+		"oc_headroom_pct":float(industrialization.get("oc_headroom_pct", 4.0)),
+		"undervolt_headroom_pct":float(industrialization.get("undervolt_headroom_pct", 6.0)),
 		"bin_distribution":bin_distribution,
 		"potential_models":potential_models,
 		"initial_model_count":products.size(),
@@ -70,7 +76,34 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var metrics := _tier_metrics(project_metrics, design_estimate, tier_key)
 	var manufacturing_quality := float(industrialization.get("quality_score", 60.0))
 	var defect_rate := float(industrialization.get("defect_rate", 0.025))
-	metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + (manufacturing_quality - 60.0) * 0.075 - defect_rate * 22.0, 0.0, 100.0)
+	var silicon_mean := float(industrialization.get("silicon_quality_mean", manufacturing_quality))
+	var silicon_variation := float(industrialization.get("silicon_variation", 10.0))
+	var base_oc := float(industrialization.get("oc_headroom_pct", 4.0))
+	var base_uv := float(industrialization.get("undervolt_headroom_pct", 6.0))
+	var silicon_quality := silicon_mean
+	var oc_headroom := base_oc
+	var undervolt_headroom := base_uv
+	var consistency := float(industrialization.get("silicon_predictability", 60.0))
+	match tier_key:
+		"ESSENTIAL":
+			silicon_quality -= 11.0
+			oc_headroom -= 2.2
+			undervolt_headroom -= 0.8
+			consistency -= silicon_variation * 0.35
+		"SIGNATURE":
+			silicon_quality += 1.0
+			oc_headroom += 0.3
+			undervolt_headroom += 0.4
+		"APEX":
+			silicon_quality += 13.0
+			oc_headroom += 4.0
+			undervolt_headroom += 2.0
+			consistency += 5.0
+	silicon_quality = clampf(silicon_quality, 18.0, 99.0)
+	oc_headroom = clampf(oc_headroom, 0.0, 28.0)
+	undervolt_headroom = clampf(undervolt_headroom, 0.0, 24.0)
+	consistency = clampf(consistency, 20.0, 99.0)
+	metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + (manufacturing_quality - 60.0) * 0.075 - defect_rate * 22.0 + (consistency - 60.0) * 0.018, 0.0, 100.0)
 	var yield_cost_factor := 1.0 + (1.0 - yield_rate) * 0.55
 	var industrial_cost_factor := clampf(float(industrialization.get("cost_factor", 1.0)), 0.90, 1.30)
 	var unit_cost := maxi(1, int(round(float(base_unit_cost) * yield_cost_factor * industrial_cost_factor * float(tier.cost_factor))))
@@ -101,6 +134,14 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"range_role":str(tier.role),
 		"bin_quality":int(tier.bin_quality),
 		"bin_share":bin_share,
+		"silicon_quality":silicon_quality,
+		"silicon_variation":silicon_variation,
+		"silicon_consistency":consistency,
+		"oc_headroom_pct":oc_headroom,
+		"undervolt_headroom_pct":undervolt_headroom,
+		"typical_oc_frequency_ghz":float(design.frequency_ghz) * (1.0 + oc_headroom / 100.0),
+		"typical_undervolt_power_factor":clampf(1.0 - undervolt_headroom / 180.0, 0.78, 1.0),
+		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
 		"yield_rate":yield_rate,
 		"manufacturing_quality":manufacturing_quality,
 		"defect_rate":defect_rate,
@@ -145,11 +186,16 @@ static func _estimate_yield(architecture: Dictionary, estimate: Dictionary, metr
 	yield_rate -= complexity * 0.0015 + float(node_penalty)
 	return clampf(yield_rate, 0.46, 0.92)
 
-static func _bin_distribution(yield_rate: float) -> Dictionary:
+static func _bin_distribution(yield_rate: float, industrialization: Dictionary = {}) -> Dictionary:
 	var essential := clampf(0.42 + (0.70 - yield_rate) * 0.28, 0.34, 0.50)
 	var apex := clampf(0.15 + (yield_rate - 0.55) * 0.30, 0.12, 0.25)
-	var signature := 1.0 - essential - apex
-	return {"ESSENTIAL":essential, "SIGNATURE":signature, "APEX":apex}
+	essential += float(industrialization.get("binning_essential_shift", 0.0))
+	apex += float(industrialization.get("binning_apex_shift", 0.0))
+	essential = clampf(essential, 0.28, 0.56)
+	apex = clampf(apex, 0.08, 0.32)
+	var signature := maxf(1.0 - essential - apex, 0.10)
+	var total := essential + signature + apex
+	return {"ESSENTIAL":essential / total, "SIGNATURE":signature / total, "APEX":apex / total}
 
 static func _tier_design(architecture: Dictionary, tier: String) -> Dictionary:
 	var design := architecture.duplicate(true)
