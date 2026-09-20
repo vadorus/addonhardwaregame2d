@@ -2083,7 +2083,7 @@ func _refresh_company():
 	_refresh_hr_cases()
 	_refresh_financial_advice()
 
-		var division_lines: Array[String] = []
+	var division_lines: Array[String] = []
 	for sector_value in DivisionManager.get_active_division_keys():
 		var sector := str(sector_value)
 		var division := DivisionManager.get_division(sector)
