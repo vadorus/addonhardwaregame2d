@@ -176,7 +176,7 @@ func start_internal_fab_project() -> bool:
 		return false
 	var cost := int(upgrade.build_cost)
 	var deposit := int(round(float(cost) * 0.25))
-	if Economy.money < deposit:
+	if not Economy.can_afford(deposit, "Acompte construction fab"):
 		return false
 	Economy.add_expense(deposit, "Acompte construction fab")
 	internal_fab["construction"] = {
@@ -202,7 +202,7 @@ func maintain_internal_fab() -> bool:
 		return false
 	var tier := int(internal_fab.tier)
 	var cost := int(INTERNAL_FAB_TIERS[tier].monthly_overhead) * 2
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Maintenance lourde fab"):
 		return false
 	Economy.add_expense(cost, "Maintenance lourde fab")
 	internal_fab["condition"] = clampf(float(internal_fab.get("condition", 100.0)) + 18.0, 0.0, 100.0)
@@ -305,7 +305,7 @@ func commit_route(job: Dictionary) -> bool:
 		return false
 	var setup_fee := int(quote.get("setup_fee", 0))
 	if setup_fee > 0:
-		if Economy.money < setup_fee:
+		if not Economy.can_afford(setup_fee, "Mise en production — %s" % str(quote.provider_name)):
 			return false
 		Economy.add_expense(setup_fee, "Mise en production — %s" % str(quote.provider_name))
 	var contract := {
