@@ -100,6 +100,43 @@ func _ready() -> void:
 	PersonnelManager.load_state(personnel_initial_state)
 	Economy.load_state(economy_initial_state)
 
+	var foundry_initial_state := FoundryManager.get_state().duplicate(true)
+	var foundry_company_state := CompanyManager.get_state().duplicate(true)
+	var foundry_economy_state := Economy.get_state().duplicate(true)
+	var recommended_foundry := FoundryManager.recommended_external_foundry(10000)
+	if recommended_foundry == "":
+		_fail("No external foundry can manufacture the starting 10 µm CPU")
+		return
+	var external_quote := FoundryManager.route_quote("EXTERNAL", recommended_foundry, 10000)
+	if external_quote.is_empty() or float(external_quote.get("precision", 0.0)) <= 0.0 or int(external_quote.get("setup_fee", 0)) <= 0:
+		_fail("External foundry quote is missing real cost/precision data")
+		return
+	if not FoundryManager.route_quote("INTERNAL", "INTERNAL", 10000).is_empty():
+		_fail("Company started with a fictitious internal fab")
+		return
+	if not FoundryManager.start_internal_fab_project():
+		_fail("Could not start the first internal fab construction with sufficient cash and manufacturing knowledge")
+		return
+	for _i in range(4):
+		FoundryManager.process_month()
+	var built_fab := FoundryManager.internal_fab_data()
+	if not bool(built_fab.get("built", false)) or int(built_fab.get("tier", 0)) != 1:
+		_fail("Internal fab construction did not complete")
+		return
+	var internal_quote := FoundryManager.route_quote("INTERNAL", "INTERNAL", 10000)
+	if internal_quote.is_empty() or int(internal_quote.get("max_capacity", 0)) <= 0:
+		_fail("Completed internal fab cannot quote a supported CPU process")
+		return
+	FoundryManager.set_sell_spare_capacity(true)
+	var foundry_income_before := Economy.monthly_income
+	FoundryManager.process_month()
+	if Economy.monthly_income <= foundry_income_before or int(Economy.income_breakdown.get("Services de fonderie", 0)) <= 0:
+		_fail("Selling unused internal fab capacity did not generate foundry-service revenue")
+		return
+	FoundryManager.load_state(foundry_initial_state)
+	CompanyManager.load_state(foundry_company_state)
+	Economy.load_state(foundry_economy_state)
+
 	var era_design := CPU_DESIGN.default_design()
 	if int(era_design.get("node_nm", 0)) != 10000 or int(era_design.get("cores", 0)) != 1:
 		_fail("Default CPU design is not an early-era single-core 10 µm design")
@@ -477,6 +514,21 @@ func _ready() -> void:
 		_fail("CPU became sellable before industrialization completed")
 		return
 	var industrial_job: Dictionary = ProductionManager.get_active_jobs()[0]
+	if str(industrial_job.get("manufacturing_mode", "")) != "EXTERNAL" or str(industrial_job.get("foundry_id", "")) == "":
+		_fail("CPU industrialization did not receive a default external foundry route")
+		return
+	var route_quote := ProductionManager.manufacturing_route_quote(str(industrial_job.get("id", "")))
+	if route_quote.is_empty() or float(route_quote.get("dependency", -1.0)) < 0.0 or float(route_quote.get("confidentiality", -1.0)) < 0.0:
+		_fail("Industrialization route did not expose supplier dependency/confidentiality")
+		return
+	var compatible_foundries := FoundryManager.available_external_foundries(int(industrial_job.get("node_nm", 10000)))
+	if compatible_foundries.is_empty():
+		_fail("No foundry remained compatible with the developed CPU process")
+		return
+	var chosen_foundry := str(compatible_foundries[compatible_foundries.size() - 1])
+	if not ProductionManager.set_manufacturing_route(str(industrial_job.get("id", "")), "EXTERNAL", chosen_foundry):
+		_fail("Could not choose an external foundry before industrialization started")
+		return
 	if not ProductionManager.set_strategy(str(industrial_job.get("id", "")), "QUALITY"):
 		_fail("Could not apply an industrialization strategy")
 		return
@@ -510,6 +562,12 @@ func _ready() -> void:
 		return
 	if str(industrial_result.get("binning_strategy", "")) != "STRICT":
 		_fail("Industrialization did not preserve the chosen binning strategy")
+		return
+	if str(industrial_result.get("manufacturing_mode", "")) != "EXTERNAL" or str(industrial_result.get("foundry_id", "")) != chosen_foundry:
+		_fail("Industrialization did not preserve the selected external foundry")
+		return
+	if str(industrial_result.get("foundry_name", "")) == "" or int(industrial_result.get("foundry_capacity", 0)) <= 0:
+		_fail("Industrialization result lost foundry identity/capacity")
 		return
 	if float(industrial_result.get("die_quality_mean", 0.0)) <= 0.0 or float(industrial_result.get("die_variation", 0.0)) <= 0.0:
 		_fail("Industrialization did not produce manufactured die quality and variation")
@@ -560,6 +618,12 @@ func _ready() -> void:
 		return
 	if str(apex_model.get("binning_strategy", "")) != "STRICT":
 		_fail("CPU products did not inherit the silicon binning strategy")
+		return
+	if str(apex_model.get("foundry_id", "")) != chosen_foundry or str(apex_model.get("manufacturing_mode", "")) != "EXTERNAL":
+		_fail("CPU products did not inherit their actual manufacturing source")
+		return
+	if int(apex_model.get("max_monthly_capacity", 0)) > int(industrial_result.get("foundry_capacity", 0)):
+		_fail("CPU product capacity exceeded the selected foundry capacity")
 		return
 	if float(apex_model.get("die_quality", 0.0)) <= float(signature_model.get("die_quality", 0.0)) or float(signature_model.get("die_quality", 0.0)) <= float(essential_model.get("die_quality", 0.0)):
 		_fail("Electrical die quality does not increase across Essential, Signature and Apex bins")
@@ -824,6 +888,9 @@ func _ready() -> void:
 		return
 	if float(restored_apex.get("die_quality", 0.0)) <= 0.0 or float(restored_apex.get("oc_headroom_pct", -1.0)) < 0.0 or str(restored_apex.get("binning_strategy", "")) != "STRICT":
 		_fail("CPU die/process distribution data did not survive a save round-trip")
+		return
+	if str(restored_apex.get("foundry_id", "")) != chosen_foundry:
+		_fail("CPU manufacturing source did not survive a save round-trip")
 		return
 	if not bool(restored_lifecycle.get("software_released", false)) or int(restored_lifecycle.get("software_version", 0)) != 1:
 		_fail("Linked CPU control software did not survive a save round-trip")
