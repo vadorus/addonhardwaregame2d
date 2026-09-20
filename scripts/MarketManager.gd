@@ -52,7 +52,19 @@ func evaluate_product(product: Dictionary, segment: String) -> float:
 	var software_value = product.get("control_software", {})
 	if typeof(software_value) == TYPE_DICTIONARY and bool(software_value.get("released", false)):
 		software_bonus = minf(float(software_value.get("quality", 0.0)) * 0.045, 4.5)
-	return clampf(score + brand_bonus + support_bonus + promotion_bonus + software_bonus, 0.0, 100.0)
+	var silicon_bonus := 0.0
+	if str(product.get("sector", "")) == "CPU":
+		var oc_headroom := float(product.get("oc_headroom_pct", 0.0))
+		var undervolt := float(product.get("undervolt_headroom_pct", 0.0))
+		var consistency := float(product.get("silicon_consistency", 50.0))
+		match segment:
+			"ENTHUSIAST":
+				silicon_bonus = clampf(oc_headroom * 0.28 + (consistency - 50.0) * 0.035, -2.0, 8.0)
+			"PRO", "ENTERPRISE":
+				silicon_bonus = clampf(undervolt * 0.12 + (consistency - 50.0) * 0.040, -2.0, 5.0)
+			_:
+				silicon_bonus = clampf((consistency - 50.0) * 0.018, -1.5, 2.5)
+	return clampf(score + brand_bonus + support_bonus + promotion_bonus + software_bonus + silicon_bonus, 0.0, 100.0)
 
 func segment_scores(product: Dictionary) -> Dictionary:
 	var result := {}
@@ -65,7 +77,13 @@ func benchmark_score(product: Dictionary) -> float:
 	var sector := str(product.sector)
 	if sector == "SOFTWARE":
 		return float(m.usability)*0.28 + float(m.reliability)*0.24 + float(m.performance)*0.16 + float(m.innovation)*0.16 + float(m.ecosystem)*0.16
-	return float(m.performance)*0.34 + float(m.efficiency)*0.22 + float(m.reliability)*0.18 + float(m.innovation)*0.16 + float(m.sustainability)*0.10
+	var score := float(m.performance)*0.34 + float(m.efficiency)*0.22 + float(m.reliability)*0.18 + float(m.innovation)*0.16 + float(m.sustainability)*0.10
+	if sector == "CPU":
+		var fallback_headroom := clampf((float(m.get("performance", 50.0)) - 55.0) * 0.09, 0.0, 8.0)
+		var headroom := float(product.get("oc_headroom_pct", fallback_headroom))
+		var consistency := float(product.get("silicon_consistency", m.get("reliability", 50.0)))
+		score += clampf(headroom * 0.12 + (consistency - 50.0) * 0.015, -1.0, 3.5)
+	return score
 
 func benchmark_for(product: Dictionary) -> Array:
 	var rows: Array = []
