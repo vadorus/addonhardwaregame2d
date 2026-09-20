@@ -8,30 +8,27 @@ signal industrialization_completed(project, result)
 const BINNING_STRATEGIES := {
 	"VOLUME": {
 		"label":"Binning volume",
-		"variation":2.8,
-		"headroom":-1.0,
-		"undervolt":-0.6,
+		"selection_tolerance":1.18,
+		"headroom_selection":-1.2,
+		"undervolt_selection":-0.8,
 		"apex_shift":0.045,
-		"essential_shift":-0.020,
-		"quality_bonus":-1.0
+		"essential_shift":-0.020
 	},
 	"BALANCED": {
 		"label":"Binning équilibré",
-		"variation":0.0,
-		"headroom":0.0,
-		"undervolt":0.0,
+		"selection_tolerance":1.0,
+		"headroom_selection":0.0,
+		"undervolt_selection":0.0,
 		"apex_shift":0.0,
-		"essential_shift":0.0,
-		"quality_bonus":0.0
+		"essential_shift":0.0
 	},
 	"STRICT": {
 		"label":"Binning strict",
-		"variation":-3.6,
-		"headroom":2.4,
-		"undervolt":1.8,
+		"selection_tolerance":0.72,
+		"headroom_selection":2.4,
+		"undervolt_selection":1.8,
 		"apex_shift":-0.050,
-		"essential_shift":0.025,
-		"quality_bonus":2.2
+		"essential_shift":0.025
 	}
 }
 
@@ -254,15 +251,40 @@ func _complete_job(job: Dictionary):
 	var cost_factor := 1.0 + defect_rate * 0.85 + maxf(1.0 - capacity_factor, 0.0) * 0.12
 	cost_factor = clampf(cost_factor, 0.96, 1.22)
 
-	var silicon_quality_mean := 34.0 + quality_score * 0.34 + mastery * 0.22 + team * 0.12 + reliability * 0.10 - complexity * 0.10
-	silicon_quality_mean += float(binning_strategy.quality_bonus) + rng.randf_range(-1.8, 1.8)
-	silicon_quality_mean = clampf(silicon_quality_mean, 25.0, 97.0)
-	var silicon_variation := 18.0 - mastery * 0.08 - quality_score * 0.06 + complexity * 0.055 + float(binning_strategy.variation)
-	silicon_variation = clampf(silicon_variation, 2.5, 18.0)
-	var silicon_predictability := clampf(100.0 - silicon_variation * 3.9 + mastery * 0.16 + quality_knowledge * 0.08, 28.0, 98.0)
-	var oc_headroom_pct := 2.0 + (silicon_quality_mean - 50.0) * 0.12 + (mastery - 30.0) * 0.045 + float(binning_strategy.headroom)
+	var capability_value = project.get("technical_capabilities_snapshot", {})
+	var capabilities: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
+	var architecture_skill := float(capabilities.get("ARCHITECTURE", ResearchManager.get_cpu_capability("ARCHITECTURE")))
+	var layout_skill := float(capabilities.get("LAYOUT", ResearchManager.get_cpu_capability("LAYOUT")))
+	var miniaturization_skill := float(capabilities.get("MINIATURIZATION", ResearchManager.get_cpu_capability("MINIATURIZATION")))
+	var manufacturing_tech := float(ResearchManager.technologies.get("manufacturing", 12.0))
+	var integration_tech := float(ResearchManager.technologies.get("integration", 10.0))
+	var node_unlock := float(node_profile.get("unlock", 0.0))
+	var equipment_precision := 18.0 + manufacturing_tech * 0.46 + miniaturization_skill * 0.28 + integration_tech * 0.12 + maintenance_knowledge * 0.16
+	equipment_precision -= node_unlock * 0.18
+	equipment_precision = clampf(equipment_precision, 15.0, 98.0)
+
+	var design_estimate_value = project.get("design_estimate", {})
+	var design_estimate: Dictionary = design_estimate_value if typeof(design_estimate_value) == TYPE_DICTIONARY else {}
+	var efficiency := float(project_metrics.get("efficiency", design_estimate.get("efficiency", 55.0)))
+	var frequency_pressure := maxf(float(design_estimate.get("frequency_ratio", 1.0)) - 1.0, 0.0)
+	var design_margin_score := reliability * 0.34 + efficiency * 0.16 + layout_skill * 0.27 + architecture_skill * 0.15 + miniaturization_skill * 0.08
+	design_margin_score -= frequency_pressure * 11.0
+	design_margin_score = clampf(design_margin_score, 15.0, 98.0)
+
+	var process_capability_score := mastery * 0.38 + manufacturing_tech * 0.24 + miniaturization_skill * 0.18 + quality_knowledge * 0.20
+	process_capability_score = clampf(process_capability_score, 15.0, 98.0)
+
+	# La "lotterie" est une dispersion électrique des dies fabriqués. Elle vient du procédé,
+	# de l'équipement de gravure, du layout et des marges de conception — pas d'une note magique du silicium brut.
+	var die_quality_mean := process_capability_score * 0.34 + equipment_precision * 0.25 + design_margin_score * 0.27 + quality_score * 0.14
+	die_quality_mean += rng.randf_range(-1.6, 1.6)
+	die_quality_mean = clampf(die_quality_mean, 20.0, 98.0)
+	var die_variation := 20.0 - mastery * 0.055 - equipment_precision * 0.060 - layout_skill * 0.035 - quality_score * 0.025 + complexity * 0.060
+	die_variation = clampf(die_variation, 2.5, 18.0)
+	var process_predictability := clampf(100.0 - die_variation * 3.8 + mastery * 0.12 + equipment_precision * 0.08, 25.0, 98.0)
+	var oc_headroom_pct := 1.5 + (die_quality_mean - 50.0) * 0.105 + (process_predictability - 50.0) * 0.030 - frequency_pressure * 4.8
 	oc_headroom_pct = clampf(oc_headroom_pct, 0.0, 22.0)
-	var undervolt_headroom_pct := 3.0 + quality_score * 0.045 + mastery * 0.040 + float(binning_strategy.undervolt)
+	var undervolt_headroom_pct := 2.0 + (die_quality_mean - 45.0) * 0.060 + (efficiency - 50.0) * 0.040 + layout_skill * 0.022
 	undervolt_headroom_pct = clampf(undervolt_headroom_pct, 1.0, 20.0)
 
 	var result := {
@@ -279,20 +301,30 @@ func _complete_job(job: Dictionary):
 		"yield_delta":yield_delta,
 		"capacity_factor":capacity_factor,
 		"cost_factor":cost_factor,
-		"silicon_quality_mean":silicon_quality_mean,
-		"silicon_variation":silicon_variation,
-		"silicon_predictability":silicon_predictability,
+		"die_quality_mean":die_quality_mean,
+		"die_variation":die_variation,
+		"process_predictability":process_predictability,
+		"lithography_precision":equipment_precision,
+		"process_capability_score":process_capability_score,
+		"design_margin_score":design_margin_score,
 		"oc_headroom_pct":oc_headroom_pct,
 		"undervolt_headroom_pct":undervolt_headroom_pct,
+		"binning_selection_tolerance":float(binning_strategy.selection_tolerance),
+		"binning_headroom_selection":float(binning_strategy.headroom_selection),
+		"binning_undervolt_selection":float(binning_strategy.undervolt_selection),
 		"binning_apex_shift":float(binning_strategy.apex_shift),
 		"binning_essential_shift":float(binning_strategy.essential_shift),
+		# aliases V16 -> V17 : conservés pour les sauvegardes intermédiaires
+		"silicon_quality_mean":die_quality_mean,
+		"silicon_variation":die_variation,
+		"silicon_predictability":process_predictability,
 		"confidence":production_confidence(node_nm)
 	}
 	job["status"] = "COMPLETED"
 	job["progress"] = 100.0
 	job["result"] = result.duplicate(true)
-	CompanyManager.add_alert("%s : industrialisation terminée — qualité %.0f/100, défauts %.1f%%, silicium %.0f/100 ± %.1f." % [
-		str(job.get("name", "CPU")), quality_score, defect_rate * 100.0, silicon_quality_mean, silicon_variation
+	CompanyManager.add_alert("%s : industrialisation terminée — qualité usine %.0f/100, défauts %.1f%%, qualité électrique des dies %.0f/100 ± %.1f." % [
+		str(job.get("name", "CPU")), quality_score, defect_rate * 100.0, die_quality_mean, die_variation
 	])
 	ProductManager.create_from_industrialization(project, result)
 	industrialization_completed.emit(project, result)
@@ -334,11 +366,17 @@ func load_state(state: Dictionary):
 		if typeof(result_value) == TYPE_DICTIONARY and not result_value.is_empty():
 			var result: Dictionary = result_value
 			result["binning_strategy"] = str(result.get("binning_strategy", job.get("binning_strategy", "BALANCED")))
-			result["silicon_quality_mean"] = float(result.get("silicon_quality_mean", result.get("quality_score", 60.0)))
-			result["silicon_variation"] = float(result.get("silicon_variation", 10.0))
-			result["silicon_predictability"] = float(result.get("silicon_predictability", 60.0))
+			result["die_quality_mean"] = float(result.get("die_quality_mean", result.get("silicon_quality_mean", result.get("quality_score", 60.0))))
+			result["die_variation"] = float(result.get("die_variation", result.get("silicon_variation", 10.0)))
+			result["process_predictability"] = float(result.get("process_predictability", result.get("silicon_predictability", 60.0)))
+			result["lithography_precision"] = float(result.get("lithography_precision", 55.0))
+			result["process_capability_score"] = float(result.get("process_capability_score", 55.0))
+			result["design_margin_score"] = float(result.get("design_margin_score", 55.0))
 			result["oc_headroom_pct"] = float(result.get("oc_headroom_pct", 4.0))
 			result["undervolt_headroom_pct"] = float(result.get("undervolt_headroom_pct", 6.0))
+			result["binning_selection_tolerance"] = float(result.get("binning_selection_tolerance", 1.0))
+			result["binning_headroom_selection"] = float(result.get("binning_headroom_selection", 0.0))
+			result["binning_undervolt_selection"] = float(result.get("binning_undervolt_selection", 0.0))
 			result["binning_apex_shift"] = float(result.get("binning_apex_shift", 0.0))
 			result["binning_essential_shift"] = float(result.get("binning_essential_shift", 0.0))
 			job["result"] = result
