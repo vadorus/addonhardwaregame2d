@@ -17,6 +17,97 @@ func _ready() -> void:
 	if DivisionManager.is_operational("GPU"):
 		_fail("Future divisions must remain locked")
 		return
+	if DivisionManager.delegation_available("CPU"):
+		_fail("Division delegation should stay hidden during the initial garage phase")
+		return
+
+	var division_initial_state := DivisionManager.get_state().duplicate(true)
+	var delegation_company_state := CompanyManager.get_state().duplicate(true)
+	var delegation_research_state := ResearchManager.get_state().duplicate(true)
+	DivisionManager.record_completed_generation("CPU")
+	if not DivisionManager.delegation_available("CPU"):
+		_fail("Division delegation did not unlock after the first completed CPU generation")
+		return
+	var director_id := str(PersonnelManager.staff[0].get("id", ""))
+	var director_profile := PersonnelManager.management_profile(director_id, "CPU")
+	if director_profile.is_empty() or float(director_profile.get("technical", 0.0)) <= 0.0 or float(director_profile.get("financial", 0.0)) <= 0.0:
+		_fail("Division director profile was not derived from the employee")
+		return
+	if not DivisionManager.set_leader("CPU", director_id):
+		_fail("Could not appoint a CPU division director")
+		return
+	if not DivisionManager.set_mandate("CPU", {
+		"priority":"PERFORMANCE",
+		"target_segment":"MAINSTREAM",
+		"risk_tolerance":"CAUTIOUS",
+		"monthly_budget_ceiling":10000,
+		"quality_bias":65.0,
+		"growth_bias":55.0
+	}):
+		_fail("Could not apply a CPU division mandate")
+		return
+	if not DivisionManager.set_control_mode("CPU", "SUPERVISED"):
+		_fail("Could not switch the CPU division to supervised delegation")
+		return
+	if str(CompanyManager.departments["R&D"].get("autonomy", "")) != "SUPERVISED" or str(CompanyManager.departments["Production"].get("autonomy", "")) != "SUPERVISED":
+		_fail("Division delegation did not propagate to operational departments")
+		return
+	var supervised_modifier := DivisionManager.management_modifier("CPU")
+	if supervised_modifier < 0.90 or supervised_modifier > 1.05:
+		_fail("Supervised director execution modifier escaped its supported range")
+		return
+	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":0, "RELIABILITY":0}):
+		_fail("Could not create a small delegated research commitment")
+		return
+	ResearchManager.set_continuous_research_budget(18000)
+	DivisionManager.process_month()
+	var escalations := DivisionManager.get_pending_escalations("CPU")
+	var budget_escalation: Dictionary = {}
+	var new_generation_escalation: Dictionary = {}
+	for escalation_value in escalations:
+		var escalation: Dictionary = escalation_value
+		if str(escalation.get("category", "")) == "BUDGET":
+			budget_escalation = escalation
+		elif str(escalation.get("category", "")) == "NEW_GENERATION":
+			new_generation_escalation = escalation
+	if budget_escalation.is_empty():
+		_fail("Delegated director did not escalate a budget overrun")
+		return
+	if new_generation_escalation.is_empty():
+		_fail("Delegated director launched no CEO escalation for a structural new-generation decision")
+		return
+	if str(DivisionManager.get_division("CPU").get("strategy", "")) != "PERFORMANCE":
+		_fail("Director did not execute the routine strategy inside the mandate")
+		return
+	var ceiling_before := int(DivisionManager.get_division("CPU").get("mandate", {}).get("monthly_budget_ceiling", 0))
+	if not DivisionManager.resolve_escalation(str(budget_escalation.get("id", "")), true):
+		_fail("CEO could not apply the director budget recommendation")
+		return
+	var ceiling_after := int(DivisionManager.get_division("CPU").get("mandate", {}).get("monthly_budget_ceiling", 0))
+	if ceiling_after <= ceiling_before or ceiling_after < DivisionManager.current_commitments("CPU"):
+		_fail("Applied budget arbitration did not update the division mandate")
+		return
+	if not DivisionManager.set_control_mode("CPU", "AUTONOMOUS"):
+		_fail("Could not switch the division to autonomous delegation")
+		return
+	var autonomous_modifier := DivisionManager.management_modifier("CPU")
+	if autonomous_modifier < 0.76 or autonomous_modifier > 1.10:
+		_fail("Autonomous director execution modifier escaped its supported range")
+		return
+	var delegation_round_trip := DivisionManager.get_state().duplicate(true)
+	DivisionManager.reset("CPU")
+	DivisionManager.load_state(delegation_round_trip)
+	var restored_division := DivisionManager.get_division("CPU")
+	if str(restored_division.get("control_mode", "")) != "AUTONOMOUS" or str(restored_division.get("leader_id", "")) != director_id:
+		_fail("Division director/control mode did not survive a save round-trip")
+		return
+	if DivisionManager.get_pending_escalations("CPU").is_empty() or DivisionManager.get_recent_decisions("CPU", 3).is_empty():
+		_fail("Division escalations or decision history did not survive a save round-trip")
+		return
+	CompanyManager.load_state(delegation_company_state)
+	ResearchManager.load_state(delegation_research_state)
+	DivisionManager.load_state(division_initial_state)
+
 	var forbidden: bool = ResearchManager.start_project("Forbidden GPU", "GPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000)
 	if forbidden:
 		_fail("Inactive GPU branch accepted a research project")
