@@ -377,9 +377,26 @@ La fabrication doit avoir un impact réel sans demander au joueur de commander c
 
 Chaque bloc influence plusieurs conséquences : coût unitaire, volume, rendement, consommation, performance, fiabilité, délai, dépendance, impact environnemental et risque de pénurie.
 
-La première implémentation CPU impose déjà une industrialisation entre Développement et lancement. La maîtrise du procédé, la qualité, la maintenance et la stratégie de production déterminent rendement, défauts, capacité et coût. Cette base sera ensuite étendue aux fournisseurs, machines, packaging et contrats industriels.
+La première implémentation CPU impose une industrialisation entre Développement et lancement. La maîtrise du procédé, la qualité, la maintenance et la stratégie de production déterminent rendement, défauts, capacité et coût.
 
-En mode accessible, le responsable choisit les fournisseurs selon une politique. En mode simulation, le joueur compare contrats, capacité, qualité, exclusivité, stocks et dépendances.
+La route de fabrication est désormais un choix réel :
+
+- **fonderie externe** : faible investissement initial, accès immédiat à une capacité et à des équipements déjà maîtrisés, mais coût supérieur, apprentissage interne réduit et dépendance fournisseur ;
+- **fab interne** : investissement lourd et frais fixes permanents, mais contrôle, confidentialité, apprentissage, capacité et coût à long terme plus favorables ;
+- plusieurs fonderies externes ont des profils distincts de précision, vitesse, fiabilité, coût, capacité, confidentialité et dépendance ;
+- une fonderie doit réellement savoir fabriquer le procédé sélectionné ;
+- la précision des équipements de la route choisie entre dans la qualité électrique et la dispersion des dies ;
+- un fournisseur externe peut subir des retards de capacité ;
+- les contrats conservent la provenance de fabrication jusque dans les produits vendus ;
+- la capacité de la fonderie plafonne réellement le volume mensuel des modèles issus de la génération.
+
+La fab interne se construit et s'agrandit par paliers. Chaque niveau demande plusieurs mois, un investissement total, un niveau minimal de savoir-faire industriel, des frais fixes, de la maintenance et possède une précision ainsi qu'une capacité propres. Une fab mal entretenue perd en précision.
+
+Lorsque la fab possède de la capacité libre, le joueur peut activer des **services de fonderie** pour fabriquer pour d'autres entreprises. La capacité vendue rapporte de l'argent mais n'est disponible que tant qu'elle n'est pas utilisée par les propres produits de l'entreprise. Cette base prépare les futurs appels d'offres de fabrication et partenariats inter-entreprises.
+
+Le bras droit intègre les chantiers de fab et les dépendances fournisseur fortes dans ses priorités. Le conseil financier inclut aussi les frais fixes de la fab dans la réserve de trésorerie.
+
+En mode accessible, le responsable pourra choisir les fournisseurs selon une politique. En mode simulation, le joueur compare directement coût, capacité, qualité des équipements, fiabilité, confidentialité et dépendance. Packaging, substrats, matières et logistique internationale seront ajoutés par couches séparées afin de ne pas transformer l'écran Production en tableur.
 
 ## 11. Microcode, logiciel bas niveau et compatibilité
 
