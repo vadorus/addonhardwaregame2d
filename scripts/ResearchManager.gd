@@ -177,7 +177,7 @@ func _concept_stage(progress: float) -> String:
 
 func _process_concept_programs():
 	var team := PersonnelManager.team_score("R&D", "cpu")
-	var management := CompanyManager.department_management_modifier("R&D")
+	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
 	for program in concept_programs:
 		if str(program.get("status", "")) != "ACTIVE":
 			continue
@@ -557,7 +557,7 @@ func _process_continuous_research():
 		return
 	Economy.add_expense(continuous_research_budget, "Recherche fondamentale CPU")
 	var team := PersonnelManager.team_score("R&D", "cpu")
-	var management := CompanyManager.department_management_modifier("R&D")
+	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
 	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
 	var budget_factor := clampf(float(continuous_research_budget) / expected_budget, 0.25, 1.80)
 	var total_gain := 0.0
@@ -616,7 +616,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	var division := DivisionManager.get_division("CPU")
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
 	var team_score := development_team_score() * development_capacity_factor()
-	var management_modifier := CompanyManager.department_management_modifier("Développement")
+	var management_modifier := CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var research_score := research_score_for_focus(focus)
 	var research_confidence_score := research_confidence_for_focus(focus)
 	var field_experience_score := field_experience_for_focus(focus)
@@ -789,7 +789,7 @@ func _process_project_month(project: Dictionary):
 	var management := CompanyManager.department_management_modifier("R&D")
 	if str(project.sector) == "CPU":
 		team = development_team_score() * development_capacity_factor()
-		management = CompanyManager.department_management_modifier("Développement")
+		management = CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
 	var expense := int(float(project.monthly_budget) * float(approach_data.cost))
