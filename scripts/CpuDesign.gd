@@ -496,6 +496,31 @@ static func segment_fit(evaluation: Dictionary, segment: String) -> float:
 	var value_score := clampf((220.0 - unit_cost) / 1.60, 0.0, 100.0)
 	var fit := 0.0
 	match segment:
+		"CALCULATOR":
+			fit = performance * 0.10 + efficiency * 0.10 + reliability * 0.22 + innovation * 0.06 + value_score * 0.52
+		"EMBEDDED":
+			fit = performance * 0.12 + efficiency * 0.24 + reliability * 0.34 + innovation * 0.08 + value_score * 0.22
+		"INDUSTRIAL":
+			fit = performance * 0.13 + efficiency * 0.12 + reliability * 0.43 + innovation * 0.08 + value_score * 0.24
+		"SCIENTIFIC":
+			fit = performance * 0.46 + efficiency * 0.08 + reliability * 0.25 + innovation * 0.16 + value_score * 0.05
+		"HOBBYIST":
+			fit = performance * 0.34 + efficiency * 0.08 + reliability * 0.10 + innovation * 0.30 + value_score * 0.18
+		"BUSINESS_PC":
+			fit = performance * 0.24 + efficiency * 0.10 + reliability * 0.28 + innovation * 0.12 + value_score * 0.26
+		"HOME_PC":
+			fit = performance * 0.23 + efficiency * 0.12 + reliability * 0.18 + innovation * 0.17 + value_score * 0.30
+		"WORKSTATION":
+			fit = performance * 0.43 + efficiency * 0.10 + reliability * 0.27 + innovation * 0.15 + value_score * 0.05
+		"SERVER":
+			fit = performance * 0.24 + efficiency * 0.22 + reliability * 0.41 + innovation * 0.08 + value_score * 0.05
+		"GAMING":
+			fit = performance * 0.55 + efficiency * 0.08 + reliability * 0.12 + innovation * 0.20 + value_score * 0.05
+		"MOBILE_COMPUTING":
+			fit = performance * 0.20 + efficiency * 0.42 + reliability * 0.20 + innovation * 0.13 + value_score * 0.05
+		"DATACENTER":
+			fit = performance * 0.23 + efficiency * 0.31 + reliability * 0.36 + innovation * 0.07 + value_score * 0.03
+		# Compatibilité des anciennes sauvegardes.
 		"BUDGET":
 			fit = performance * 0.12 + efficiency * 0.13 + reliability * 0.20 + innovation * 0.05 + value_score * 0.50
 		"ENTHUSIAST":
