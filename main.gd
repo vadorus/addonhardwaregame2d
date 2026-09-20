@@ -698,7 +698,7 @@ func _create_research_tab():
 
 	rd_segment = OptionButton.new()
 	_fill_segment_options(rd_segment)
-	_select_meta(rd_segment, "MAINSTREAM")
+	_select_meta(rd_segment, MarketManager.default_segment())
 	rd_segment.item_selected.connect(func(_index): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Client cible", rd_segment)
 
@@ -1186,7 +1186,7 @@ func _refresh_cpu_preview():
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
 	if not active_cpu_remediation.is_empty():
 		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
-	var segment := _meta(rd_segment) if rd_segment != null else "MAINSTREAM"
+	var segment := _meta(rd_segment) if rd_segment != null else MarketManager.default_segment()
 	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach_key, GameData.APPROACHES.INTERNAL)
@@ -2113,7 +2113,7 @@ func _refresh_dashboard():
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
-		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, str(active_project.get("segment", "MAINSTREAM")).capitalize()]
+		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, MarketManager.segment_label(MarketManager.normalize_segment(str(active_project.get("segment", MarketManager.default_segment()))))]
 		if remediation_remaining > 0:
 			var remediation: Dictionary = active_project.get("technical_remediation", {})
 			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining
@@ -2139,7 +2139,7 @@ func _refresh_dashboard():
 		dashboard_project_progress.value = 100.0
 		dashboard_metric_a.text = "%s €" % _money(int(ready_product.get("unit_cost", 0)))
 		dashboard_metric_b.text = "Validation OK"
-		dashboard_metric_c.text = str(ready_product.get("target_segment", "MAINSTREAM")).capitalize()
+		dashboard_metric_c.text = MarketManager.segment_label(MarketManager.normalize_segment(str(ready_product.get("target_segment", MarketManager.default_segment()))))
 		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
 		dashboard_action_button.text = "Préparer le lancement"
 		dashboard_target_tab = 4
@@ -2840,7 +2840,7 @@ func _refresh_product_details():
 		metric_lines.append("%s %.1f" % [GameData.metric_label(metric), float(metrics.get(metric, 0.0))])
 	if str(product.get("sector", "")) == "CPU":
 		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
-		var target_label := str(GameData.SEGMENTS.get(str(product.get("target_segment", "MAINSTREAM")), {}).get("label", "Grand public"))
+		var target_label := MarketManager.segment_label(MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment()))))
 		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
