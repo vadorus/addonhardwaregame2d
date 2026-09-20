@@ -36,6 +36,7 @@ func _ready() -> void:
 
 	var executive_initial_state := ExecutiveManager.get_state().duplicate(true)
 	var personnel_initial_state := PersonnelManager.get_state().duplicate(true)
+	var company_initial_state := CompanyManager.get_state().duplicate(true)
 	var economy_initial_state := Economy.get_state().duplicate(true)
 	var right_hand_brief := ExecutiveManager.get_executive_brief()
 	if str(right_hand_brief.get("advisor", {}).get("name", "")).is_empty() or str(right_hand_brief.get("headline", "")).is_empty():
@@ -86,6 +87,7 @@ func _ready() -> void:
 	if int(ExecutiveManager.workplace_data().get("tier", -1)) != 1 or str(ExecutiveManager.benefit_policy.get("HEALTH", "")) != "STRONG":
 		_fail("Executive workplace and benefits did not survive a save round-trip")
 		return
+	CompanyManager.load_state(company_initial_state)
 	ExecutiveManager.load_state(executive_initial_state)
 	PersonnelManager.load_state(personnel_initial_state)
 	Economy.load_state(economy_initial_state)
