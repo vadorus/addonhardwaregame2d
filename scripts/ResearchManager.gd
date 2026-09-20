@@ -592,6 +592,11 @@ func _apply_development_learning(project: Dictionary):
 	if str(project.get("sector", "")) != "CPU":
 		return
 	var domain := research_domain_for_focus(str(project.get("focus", "BALANCED")))
+	var software_gain := 0.018 * development_capacity_factor()
+	var focus_key := str(project.get("focus", "BALANCED"))
+	if focus_key in ["PERFORMANCE", "INNOVATION", "ECOSYSTEM"]:
+		software_gain *= 1.45
+	technologies["software"] = clampf(float(technologies.get("software", 8.0)) + software_gain, 0.0, 100.0)
 	if domain == "":
 		return
 	var data: Dictionary = cpu_research_domains.get(domain, {})
