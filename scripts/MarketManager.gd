@@ -52,7 +52,19 @@ func evaluate_product(product: Dictionary, segment: String) -> float:
 	var software_value = product.get("control_software", {})
 	if typeof(software_value) == TYPE_DICTIONARY and bool(software_value.get("released", false)):
 		software_bonus = minf(float(software_value.get("quality", 0.0)) * 0.045, 4.5)
-	return clampf(score + brand_bonus + support_bonus + promotion_bonus + software_bonus, 0.0, 100.0)
+	var silicon_bonus := 0.0
+	if str(product.get("sector", "")) == "CPU":
+		var oc_headroom := float(product.get("oc_headroom_pct", 0.0))
+		var undervolt := float(product.get("undervolt_headroom_pct", 0.0))
+		var consistency := float(product.get("silicon_consistency", 50.0))
+		match segment:
+			"ENTHUSIAST":
+				silicon_bonus = clampf(oc_headroom * 0.28 + (consistency - 50.0) * 0.035, -2.0, 8.0)
+			"PRO", "ENTERPRISE":
+				silicon_bonus = clampf(undervolt * 0.12 + (consistency - 50.0) * 0.040, -2.0, 5.0)
+			_:
+				silicon_bonus = clampf((consistency - 50.0) * 0.018, -1.5, 2.5)
+	return clampf(score + brand_bonus + support_bonus + promotion_bonus + software_bonus + silicon_bonus, 0.0, 100.0)
 
 func segment_scores(product: Dictionary) -> Dictionary:
 	var result := {}
