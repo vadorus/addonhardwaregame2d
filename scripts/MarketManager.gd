@@ -223,7 +223,7 @@ func segment_market_units(segment: String) -> int:
 	var maturity_growth := 1.0 + minf(float(years_since_anchor) * float(need.growth), 2.25)
 	var tech_surplus := maxf(market_technology_signal() - float(need.tech_trigger), 0.0)
 	var tech_growth := 1.0 + minf(tech_surplus * 0.010, 0.85)
-	return maxi(500, int(round(float(need.base_units) * maturity_growth * tech_growth)))
+	return maxi(500, int(round(float(need.base_units) * maturity_growth * tech_growth * BalanceManager.market_demand_factor())))
 
 func segment_reference_price(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
@@ -481,7 +481,8 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	competitor["target_segment"] = target
 	var market_units := segment_market_units(target)
 	var score := _evaluate_competitor(competitor, target)
-	var share := clampf(0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015, 0.015, 0.28)
+	var pressure := BalanceManager.competitor_pressure_factor()
+	var share := clampf((0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015) * pressure, 0.012, 0.31)
 	var units := mini(int(competitor.get("capacity", 5000)), int(float(market_units) * share))
 	var margin := maxi(int(competitor.get("price", 1)) - int(competitor.get("unit_cost", 1)), 1)
 	var operating_profit := units * margin
@@ -518,6 +519,7 @@ func _advance_cpu_competitor(competitor: Dictionary):
 
 	var progress_gain := 4.8 + float(competitor.get("architecture_skill", 20.0)) * 0.035 + float(competitor.get("integration_skill", 20.0)) * 0.015
 	progress_gain *= clampf(0.82 + budget_factor * 0.18, 0.70, 1.18)
+	progress_gain *= BalanceManager.competitor_pressure_factor()
 	progress_gain += rng.randf_range(-0.45, 0.65)
 	competitor["development_progress"] = clampf(float(competitor.get("development_progress", 0.0)) + progress_gain, 0.0, 100.0)
 	var generation_cost := 24000 + int(competitor.get("generation_index", 1)) * 4500

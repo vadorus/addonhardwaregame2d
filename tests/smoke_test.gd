@@ -118,6 +118,48 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
+	if BalanceManager.active_profile != "STANDARD":
+		_fail("Default CI game did not start on Standard economic balance")
+		return
+	var balance_state := BalanceManager.get_state().duplicate(true)
+	var standard_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
+	var standard_market_units := MarketManager.segment_market_units("EMBEDDED")
+	var standard_runway := BalanceManager.starting_runway_months()
+	BalanceManager.reset("ACCESSIBLE")
+	var accessible_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
+	var accessible_market_units := MarketManager.segment_market_units("EMBEDDED")
+	var accessible_capital := BalanceManager.starting_capital()
+	var accessible_runway := BalanceManager.starting_runway_months()
+	BalanceManager.reset("REALISTIC")
+	var realistic_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
+	var realistic_market_units := MarketManager.segment_market_units("EMBEDDED")
+	var realistic_capital := BalanceManager.starting_capital()
+	var realistic_runway := BalanceManager.starting_runway_months()
+	if not (accessible_salary_cost < standard_salary_cost and standard_salary_cost < realistic_salary_cost):
+		_fail("Difficulty profiles do not change real payroll costs in the expected direction")
+		return
+	if not (accessible_market_units > standard_market_units and standard_market_units > realistic_market_units):
+		_fail("Difficulty profiles do not change available market demand")
+		return
+	if accessible_capital <= 500000 or realistic_capital >= 500000:
+		_fail("Difficulty profiles do not change starting liquidity")
+		return
+	if accessible_runway <= standard_runway or realistic_runway >= standard_runway:
+		_fail("Difficulty profiles do not create distinct starting runway pressure")
+		return
+	if BalanceManager.competitor_pressure_factor() <= 1.0:
+		_fail("Realistic difficulty did not increase competitor pressure")
+		return
+	if BalanceManager.expense_amount(10000, "Production — test CPU") != 10000:
+		_fail("Difficulty changed literal per-unit production economics")
+		return
+	if BalanceManager.expense_amount(10000, "SAV garanties — test CPU") != 10000:
+		_fail("Difficulty changed literal warranty unit economics")
+		return
+	BalanceManager.load_state(balance_state)
+	if BalanceManager.active_profile != "STANDARD":
+		_fail("Economic difficulty did not survive a state round-trip")
+		return
 	if TimeManager.year != 1971:
 		_fail("New companies must start in the early microprocessor era")
 		return
@@ -703,6 +745,19 @@ func _ready() -> void:
 		return
 	if str(essential_model.get("generation_id", "")) != str(apex_model.get("generation_id", "")):
 		_fail("CPU models were not linked to the same generation")
+		return
+	var family_recommended_capacity := 0
+	for family_model in ProductManager.products:
+		family_recommended_capacity += int(family_model.get("recommended_capacity", 0))
+		var suggested_price := int(family_model.get("price", 0))
+		var unit_cost := int(family_model.get("unit_cost", 0))
+		var gross_margin := 1.0 - float(unit_cost) / maxf(float(suggested_price), 1.0)
+		if gross_margin + 0.015 < BalanceManager.gross_margin_target(str(family_model.get("target_segment", "EMBEDDED"))):
+			_fail("Suggested CPU price fell below the market-specific gross margin guard")
+			return
+	var target_family_capacity := maxi(300, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.22))
+	if family_recommended_capacity > target_family_capacity + 6:
+		_fail("CPU launch family capacity exceeded the actual target market sizing")
 		return
 	for family_market_model in [essential_model, signature_model, apex_model]:
 		if str(family_market_model.get("target_segment", "")) != "EMBEDDED":

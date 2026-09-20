@@ -29,7 +29,9 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	var base_yield := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
 	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
 	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 2.60)
-	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * capacity_factor)))
+	# Le plan commercial fixe la capacité recommandée. Une bonne industrialisation peut offrir
+	# de la marge au-dessus via max_capacity, mais ne recommande pas de produire plus que le marché visé.
+	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * minf(capacity_factor, 1.0))))
 	var foundry_capacity := int(industrialization.get("foundry_capacity", 0))
 	if foundry_capacity > 0:
 		effective_monthly_capacity = mini(effective_monthly_capacity, foundry_capacity)
@@ -128,7 +130,9 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var unit_cost := maxi(1, int(round(float(base_unit_cost) * yield_cost_factor * industrial_cost_factor * float(tier.cost_factor))))
 	var price_from_position := float(reference_price) * float(tier.price_factor)
 	var price_from_margin := float(unit_cost) * float(tier.margin_floor)
-	var suggested_price := maxi(unit_cost + 5, _round_price(maxf(price_from_position, price_from_margin)))
+	var target_margin := BalanceManager.gross_margin_target(str(project.get("segment", "EMBEDDED")))
+	var margin_guard_price := float(unit_cost) / maxf(1.0 - target_margin, 0.20)
+	var suggested_price := maxi(unit_cost + 5, _round_price(maxf(price_from_position, maxf(price_from_margin, margin_guard_price))))
 	var recommended_capacity := maxi(100, int(round(float(total_monthly_capacity) * bin_share)))
 	var max_capacity := maxi(recommended_capacity, int(round(float(recommended_capacity) * 1.35)))
 	var suffix := str(tier.suffix)

@@ -78,6 +78,8 @@ var media_label: Label
 
 var setup_name: LineEdit
 var setup_sector: OptionButton
+var setup_difficulty: OptionButton
+var setup_difficulty_label: Label
 var recruit_department: OptionButton
 var rd_name: LineEdit
 var rd_sector: OptionButton
@@ -1618,6 +1620,18 @@ func _build_setup_layer():
 	var desc:=_label("1971. La vertical slice commence aux débuts du microprocesseur : votre petite équipe doit apprendre à concevoir, industrialiser et faire évoluer ses propres CPU avant d’ouvrir d’autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
 	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
+	setup_difficulty = OptionButton.new()
+	for difficulty_value in BalanceManager.profile_keys():
+		var difficulty := str(difficulty_value)
+		setup_difficulty.add_item(BalanceManager.profile_label(difficulty))
+		setup_difficulty.set_item_metadata(setup_difficulty.item_count - 1, difficulty)
+	_select_meta(setup_difficulty, "STANDARD")
+	setup_difficulty.item_selected.connect(func(_i): _refresh_setup_difficulty())
+	box.add_child(setup_difficulty)
+	setup_difficulty_label = _muted_label("", 12)
+	setup_difficulty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(setup_difficulty_label)
+	_refresh_setup_difficulty()
 	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
 	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
 
@@ -1973,8 +1987,26 @@ func _money(value: int) -> String:
 		out=s.substr(i,1)+out; count+=1
 	return ("-" if value<0 else "")+out
 
+func _refresh_setup_difficulty():
+	if setup_difficulty_label == null or setup_difficulty == null or setup_difficulty.item_count == 0:
+		return
+	var key := _meta(setup_difficulty)
+	var data := BalanceManager.profile_data(key)
+	# Calcul local avec le profil sélectionné, sans modifier une partie en cours.
+	var base_company := 21000
+	var base_payroll := 32800
+	var base_research := 12000
+	var projected := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
+	projected += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
+	projected += int(round(float(base_research) * float(data.get("research_cost", 1.0))))
+	var capital := int(data.get("starting_capital", 500000))
+	var runway := float(capital) / maxf(float(projected), 1.0)
+	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois." % [
+		BalanceManager.profile_description(key), _money(capital), _money(projected), runway
+	]
+
 func _start_new_game():
-	SimulationManager.reset_all(setup_name.text,_meta(setup_sector))
+	SimulationManager.reset_all(setup_name.text,_meta(setup_sector),_meta(setup_difficulty))
 	setup_layer.visible=false
 	game_over_layer.visible=false
 	status_label.text="Nora : au début, gardons seulement le QG et le Laboratoire CPU. Lancez votre premier projet pour élargir l'interface."
@@ -2226,6 +2258,10 @@ func _refresh_company():
 	var lines := ["Image de l'entreprise :"]
 	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
 		lines.append("• %s : %.1f/100" % [key.capitalize(), float(r[key])])
+	lines.append("\nÉquilibrage économique : %s" % BalanceManager.profile_label())
+	lines.append("Marge structurelle théorique au départ : %.1f mois • marché x%.2f • pression concurrentielle x%.2f" % [
+		BalanceManager.starting_runway_months(), BalanceManager.market_demand_factor(), BalanceManager.competitor_pressure_factor()
+	])
 	lines.append("\nFiliales : %d" % CompanyManager.subsidiaries.size())
 	for sub in CompanyManager.subsidiaries:
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])

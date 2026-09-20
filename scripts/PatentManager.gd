@@ -30,7 +30,7 @@ func create_candidate(project: Dictionary):
 	patents_changed.emit()
 
 func file_first_candidate() -> bool:
-	if candidates.is_empty() or Economy.money < 8000:
+	if candidates.is_empty() or not Economy.can_afford(8000, "Dépôt de brevet"):
 		return false
 	var c: Dictionary = candidates.pop_front()
 	Economy.add_expense(8000, "Dépôt de brevet")

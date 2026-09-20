@@ -114,7 +114,7 @@ func department_management_modifier(department: String) -> float:
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
 	if not GameData.is_sector_active(sector):
 		return false
-	if capital < 50000 or Economy.money < capital:
+	if capital < 50000 or not Economy.can_afford(capital, "Capital filiale"):
 		return false
 	Economy.add_expense(capital, "Capital filiale")
 	subsidiaries.append({"name":name,"sector":sector,"capital":capital,"reputation":40.0})

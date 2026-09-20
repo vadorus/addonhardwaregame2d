@@ -67,8 +67,8 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		generation_id,
 		generation_index,
 		_base_unit_cost(project),
-		int(sector_data.reference_price),
-		maxi(300, int(float(sector_data.market_units) * 0.22)),
+		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
+		maxi(300, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.22)),
 		float(division.get("maturity", 0.0)),
 		industrialization
 	)
@@ -214,7 +214,7 @@ func start_promotion(product_id: String, promotion_type: String) -> bool:
 		return false
 	var data: Dictionary = PROMOTION_TYPES[promotion_type]
 	var cost := int(data.cost)
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Promotion — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Promotion — %s" % str(product.get("name", "Produit")))
 	product["promotion_type"] = promotion_type
@@ -239,7 +239,7 @@ func apply_hardware_revision(product_id: String, revision_type: String) -> bool:
 	var data: Dictionary = REVISION_TYPES[revision_type]
 	var current_revision := int(product.get("hardware_revision", 0))
 	var cost := int(data.base_cost) + current_revision * 4500 + int(float(product.get("unit_cost", 1)) * 55.0)
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Révision matérielle — %s" % str(product.get("name", "CPU"))):
 		return false
 	Economy.add_expense(cost, "Révision matérielle — %s" % str(product.get("name", "CPU")))
 	var before_cost := int(product.get("unit_cost", 1))
@@ -308,7 +308,7 @@ func release_firmware(product_id: String, firmware_type: String) -> bool:
 	var data: Dictionary = FIRMWARE_TYPES[firmware_type]
 	var version := int(product.get("firmware_version", 1)) + 1
 	var cost := int(data.cost) + int(product.get("units_sold_total", 0)) / 25 + version * 850
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU"))):
 		return false
 	Economy.add_expense(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU")))
 	var metrics: Dictionary = product.get("metrics", {})
@@ -349,7 +349,7 @@ func release_control_software(product_id: String) -> bool:
 	var software: Dictionary = product.get("control_software", {}).duplicate(true)
 	var next_version := int(software.get("version", 0)) + 1
 	var cost := 9000 + supported.size() * 2200 + maxi(next_version - 1, 0) * 3500
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU")))):
 		return false
 	Economy.add_expense(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU"))))
 	var quality_gain := 7.0 if next_version == 1 else 3.5
