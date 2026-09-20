@@ -210,7 +210,7 @@ func management_modifier(sector: String) -> float:
 func current_commitments(sector: String) -> int:
 	if sector != "CPU":
 		return maxi(int(divisions.get(sector, {}).get("monthly_budget", 0)), 0)
-	var total := ResearchManager.continuous_research_budget
+	var total := ResearchManager.continuous_research_budget if ResearchManager.get_total_cpu_research_allocation() > 0 else 0
 	for program in ResearchManager.get_active_cpu_concept_programs():
 		total += int(program.get("monthly_budget", 0))
 	for project in ResearchManager.projects:
@@ -495,6 +495,6 @@ func load_state(state: Dictionary) -> void:
 			var escalation_id := str(escalation.get("id", ""))
 			if escalation_id.begins_with("ESC-"):
 				_next_escalation_id = maxi(_next_escalation_id, int(escalation_id.trim_prefix("ESC-")) + 1)
-		if is_operational(sector):
+		if is_operational(sector) and str(divisions[sector].get("control_mode", "DIRECT")) != "DIRECT":
 			_sync_department_autonomy(sector)
 	divisions_changed.emit()
