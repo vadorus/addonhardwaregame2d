@@ -101,10 +101,13 @@ var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_price: SpinBox
 var product_capacity: SpinBox
+var post_launch_group: VBoxContainer
 var post_launch_label: Label
 var promotion_select: OptionButton
 var revision_select: OptionButton
 var firmware_select: OptionButton
+var firmware_release_button: Button
+var control_software_button: Button
 var market_product_select: OptionButton
 var policy_marketing: SpinBox
 var policy_support: SpinBox
@@ -1288,16 +1291,19 @@ func _create_products_tab():
 	grid.add_child(_label("Capacité mensuelle",14)); product_capacity=_spin(1,1000000,100,5000); grid.add_child(product_capacity)
 	var launch:=Button.new(); launch.text="Lancer sur le marché"; launch.pressed.connect(_launch_product); box.add_child(launch)
 
-	box.add_child(_section("Vie après lancement"))
+	post_launch_group = VBoxContainer.new()
+	post_launch_group.add_theme_constant_override("separation", 10)
+	box.add_child(post_launch_group)
+	post_launch_group.add_child(_section("Vie après lancement"))
 	var lifecycle_intro := _muted_label("Un CPU lancé continue d'évoluer : prix et promotion sont commerciaux, le stepping modifie uniquement les nouvelles unités, tandis que firmware et logiciel peuvent toucher le parc compatible.", 12)
 	lifecycle_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(lifecycle_intro)
+	post_launch_group.add_child(lifecycle_intro)
 	post_launch_label = _rich_label()
-	box.add_child(post_launch_label)
+	post_launch_group.add_child(post_launch_label)
 
 	var lifecycle_grid := GridContainer.new()
 	lifecycle_grid.columns = 2
-	box.add_child(lifecycle_grid)
+	post_launch_group.add_child(lifecycle_grid)
 	lifecycle_grid.add_child(_label("Promotion", 13))
 	promotion_select = OptionButton.new()
 	for promotion_key in ["AWARENESS", "VALUE", "CLEARANCE"]:
@@ -1323,7 +1329,7 @@ func _create_products_tab():
 	var lifecycle_actions := HFlowContainer.new()
 	lifecycle_actions.add_theme_constant_override("h_separation", 8)
 	lifecycle_actions.add_theme_constant_override("v_separation", 8)
-	box.add_child(lifecycle_actions)
+	post_launch_group.add_child(lifecycle_actions)
 	var price_update := Button.new()
 	price_update.text = "Appliquer le nouveau prix"
 	price_update.pressed.connect(_update_launched_product_price)
@@ -1336,14 +1342,14 @@ func _create_products_tab():
 	revise.text = "Valider le stepping"
 	revise.pressed.connect(_apply_product_revision)
 	lifecycle_actions.add_child(revise)
-	var firmware := Button.new()
-	firmware.text = "Publier le firmware"
-	firmware.pressed.connect(_release_product_firmware)
-	lifecycle_actions.add_child(firmware)
-	var software := Button.new()
-	software.text = "Développer / mettre à jour le logiciel de contrôle"
-	software.pressed.connect(_release_product_control_software)
-	lifecycle_actions.add_child(software)
+	firmware_release_button = Button.new()
+	firmware_release_button.text = "Publier le firmware"
+	firmware_release_button.pressed.connect(_release_product_firmware)
+	lifecycle_actions.add_child(firmware_release_button)
+	control_software_button = Button.new()
+	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
+	control_software_button.pressed.connect(_release_product_control_software)
+	lifecycle_actions.add_child(control_software_button)
 
 func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
@@ -2256,10 +2262,14 @@ func _refresh_products():
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
 		product_details_label.text = "Aucun produit sélectionné."
+		if post_launch_group != null:
+			post_launch_group.visible = false
 		return
 	var product := ProductManager.get_product(_meta(product_select))
 	if product.is_empty():
 		return
+	if post_launch_group != null:
+		post_launch_group.visible = str(product.get("status", "")) == "LAUNCHED"
 	var metrics: Dictionary = product.get("metrics", {})
 	var metric_lines: Array[String] = []
 	for metric in GameData.METRICS:
@@ -2306,15 +2316,23 @@ func _refresh_product_details():
 					float(lifecycle.get("software_quality", 0.0)),
 					lifecycle.get("supported_products", []).size()
 				]
-			post_launch_label.text = "Révision actuelle %s • firmware v%d (%s)\nPromotion : %s\nLogiciel de contrôle : %s\nHistorique : %d révision(s) matérielle(s) • %d firmware(s)" % [
+			var firmware_access := "disponible" if bool(lifecycle.get("firmware_available", false)) else "à débloquer par le savoir-faire logiciel/architecture"
+			var software_access := "disponible" if bool(lifecycle.get("control_software_available", false)) else "à débloquer par logiciel + intégration"
+			post_launch_label.text = "Révision actuelle %s • firmware v%d (%s)\nPromotion : %s\nLogiciel de contrôle : %s\nAccès firmware : %s • contrôle logiciel : %s\nHistorique : %d révision(s) matérielle(s) • %d firmware(s)" % [
 				str(lifecycle.get("revision", "A0")),
 				int(lifecycle.get("firmware_version", 1)),
 				str(lifecycle.get("firmware_profile", "ORIGINAL")).to_lower(),
 				promotion_text,
 				software_text,
+				firmware_access,
+				software_access,
 				int(lifecycle.get("revision_count", 0)),
 				int(lifecycle.get("firmware_count", 0))
 			]
+			if firmware_release_button != null:
+				firmware_release_button.disabled = not bool(lifecycle.get("firmware_available", false))
+			if control_software_button != null:
+				control_software_button.disabled = not bool(lifecycle.get("control_software_available", false))
 	var has_capacity_limit := product.has("max_monthly_capacity")
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
