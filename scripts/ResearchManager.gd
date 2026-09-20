@@ -613,6 +613,9 @@ func _apply_development_learning(project: Dictionary):
 func prepare_cpu_generation_proposals(segment: String, approach: String, focus: String, monthly_budget: int, base_design: Dictionary) -> Array:
 	if not DivisionManager.is_operational("CPU"):
 		return []
+	var market_segment := MarketManager.normalize_segment(segment)
+	if not MarketManager.is_segment_available(market_segment):
+		return []
 	var division := DivisionManager.get_division("CPU")
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
 	var team_score := development_team_score() * development_capacity_factor()
@@ -629,7 +632,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
 	var equipment_score := clampf(25.0 + manufacturing_score * 1.55 + integration_score * 0.85, 20.0, 100.0)
 	cpu_generation_context = {
-		"segment":segment,
+		"segment":market_segment,
 		"approach":approach,
 		"focus":focus,
 		"monthly_budget":monthly_budget,
@@ -672,6 +675,11 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}) -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
+	var market_segment := segment
+	if sector == "CPU":
+		market_segment = MarketManager.normalize_segment(segment)
+		if not MarketManager.is_segment_available(market_segment):
+			return false
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
 	if Economy.money < maxi(monthly_budget, 10000) + remediation_upfront:
 		return false
@@ -730,14 +738,14 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		stored_generation_plan = CPU_GENERATION_PLANNER.normalize_saved_proposal(generation_plan)
 		stored_generation_plan["customized"] = (
 			CPU_DESIGN.normalize(stored_generation_plan.get("design", {})) != normalized_design
-			or str(stored_generation_plan.get("segment", segment)) != segment
+			or MarketManager.normalize_segment(str(stored_generation_plan.get("segment", market_segment))) != market_segment
 			or str(stored_generation_plan.get("approach", approach)) != approach
 			or str(stored_generation_plan.get("focus", focus)) != focus
 			or int(stored_generation_plan.get("monthly_budget", monthly_budget)) != monthly_budget
 		)
 
 	var project := {
-		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":segment,
+		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":market_segment,
 		"approach":approach,"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
