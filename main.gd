@@ -185,6 +185,7 @@ func _connect_signals():
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
 	ProductionManager.jobs_changed.connect(_refresh_all)
+	FoundryManager.foundries_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
 	AfterSalesManager.cases_changed.connect(_refresh_market)
 	AfterSalesManager.field_experience_changed.connect(_refresh_all)
@@ -2477,9 +2478,13 @@ func _refresh_products():
 		for job in ProductionManager.jobs:
 			var result: Dictionary = job.get("result", {})
 			if str(job.get("status", "")) == "INDUSTRIALIZATION":
-				production_lines.append("\n%s — %s — %.0f%% • %d mois • coût mensuel base %s €" % [
+				var route := ProductionManager.manufacturing_route_quote(str(job.get("id", "")))
+				var route_name := str(route.get("provider_name", "route à choisir")) if not route.is_empty() else "route incompatible"
+				var route_error := str(job.get("route_error", ""))
+				production_lines.append("\n%s — %s — %.0f%% • %d mois • %s • coût mensuel base %s €%s" % [
 					str(job.get("name", "CPU")), ProductionManager.strategy_label(str(job.get("strategy", "BALANCED"))),
-					float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), _money(int(job.get("monthly_cost", 0)))
+					float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), route_name, _money(int(job.get("monthly_cost", 0))),
+					("\n  ⚠ " + route_error) if route_error != "" else ""
 				])
 			else:
 				production_lines.append("\n%s — industrialisation terminée : qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\n  Gravure/équipement %.0f/100 • conception %.0f/100 • qualité électrique des dies %.0f/100 ± %.1f • prévisibilité %.0f/100\n  OC typique +%.1f%% • undervolt %.1f%% • %s" % [
@@ -2489,6 +2494,10 @@ func _refresh_products():
 					float(result.get("die_quality_mean", result.get("silicon_quality_mean", 0.0))), float(result.get("die_variation", result.get("silicon_variation", 0.0))),
 					float(result.get("process_predictability", result.get("silicon_predictability", 0.0))), float(result.get("oc_headroom_pct", 0.0)),
 					float(result.get("undervolt_headroom_pct", 0.0)), ProductionManager.binning_strategy_label(str(result.get("binning_strategy", "BALANCED")))
+				])
+				production_lines.append("  Fabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100 • capacité ~%s/mois" % [
+					str(result.get("foundry_name", "non renseignée")), float(result.get("foundry_dependency", 0.0)),
+					float(result.get("foundry_confidentiality", 0.0)), _money(int(result.get("foundry_capacity", 0)))
 				])
 		production_label.text = "\n".join(production_lines)
 	if industrialization_select != null:
@@ -2504,6 +2513,40 @@ func _refresh_products():
 			_select_meta(industrialization_strategy, str(active_job.get("strategy", "BALANCED")))
 			if industrialization_binning != null:
 				_select_meta(industrialization_binning, str(active_job.get("binning_strategy", "BALANCED")))
+			_refresh_selected_industrialization_controls()
+	if foundry_overview_label != null:
+		var fab := FoundryManager.internal_fab_data()
+		var foundry_lines: Array[String] = []
+		if bool(fab.get("built", false)):
+			foundry_lines.append("Fab interne : %s • état %.0f/100 • précision %.0f/100 • capacité %s/mois • utilisée %s • libre %s" % [
+				str(fab.get("name", "")), float(fab.get("condition", 0.0)), float(fab.get("precision", 0.0)),
+				_money(int(fab.get("capacity", 0))), _money(int(fab.get("used_capacity", 0))), _money(int(fab.get("spare_capacity", 0)))
+			])
+			foundry_lines.append("Vente de capacité libre : %s • frais fixes %s €/mois" % [
+				"active" if bool(fab.get("sell_spare_capacity", false)) else "inactive",
+				_money(FoundryManager.current_monthly_overhead())
+			])
+		else:
+			var construction := FoundryManager.active_construction()
+			if construction.is_empty():
+				var upgrade := FoundryManager.next_internal_fab_upgrade()
+				foundry_lines.append("Aucune fab interne. Prochaine étape : %s • %s € • %d mois." % [
+					str(upgrade.get("name", "Petite fab intégrée")), _money(int(upgrade.get("build_cost", 0))), int(upgrade.get("build_months", 0))
+				])
+			else:
+				foundry_lines.append("Construction : %s • %d mois restants • %s € encore à financer." % [
+					str(construction.get("name", "")), int(construction.get("months_remaining", 0)), _money(int(construction.get("remaining_cost", 0)))
+				])
+		foundry_lines.append("\nFonderies externes :")
+		for foundry_id_value in FoundryManager.external_foundry_keys():
+			var foundry_id := str(foundry_id_value)
+			var provider := FoundryManager.get_external_foundry(foundry_id)
+			foundry_lines.append("• %s — techno %.0f/100 • précision %.0f/100 • fiabilité %.0f • coût x%.2f • dépendance %.0f" % [
+				str(provider.get("name", foundry_id)), float(provider.get("technology_score", 0.0)), float(provider.get("precision", 0.0)),
+				float(provider.get("reliability", 0.0)), float(provider.get("cost_factor", 1.0)), float(provider.get("dependency", 0.0))
+			])
+		foundry_overview_label.text = "\n".join(foundry_lines)
+
 	var current_id := _meta(product_select) if product_select.item_count > 0 else ""
 	var lines: Array[String] = []
 	for generation in ProductManager.cpu_generations:
@@ -2576,7 +2619,10 @@ func _refresh_product_details():
 			float(product.get("oc_headroom_pct", 0.0)), CPU_DESIGN.format_frequency({"frequency_ghz":float(product.get("typical_oc_frequency_ghz", design.frequency_ghz))}),
 			float(product.get("undervolt_headroom_pct", 0.0)),
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
-			" • ".join(metric_lines)
+			"Fabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100\n%s" % [
+				str(product.get("foundry_name", "non renseignée")), float(product.get("foundry_dependency", 0.0)),
+				float(product.get("foundry_confidentiality", 0.0)), " • ".join(metric_lines)
+			]
 		]
 	else:
 		product_details_label.text = "%s\nApproche : %s | interne %.0f%%\n%s" % [
