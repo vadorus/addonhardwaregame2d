@@ -544,7 +544,7 @@ func _create_company_tab():
 	hr_actions.add_child(bonus)
 	box.add_child(executive_card)
 
-		box.add_child(_section("Budgets mensuels"))
+	box.add_child(_section("Budgets mensuels"))
 	var grid := GridContainer.new(); grid.columns = 2; box.add_child(grid)
 	grid.add_child(_label("Marketing",14)); policy_marketing = _spin(0,200000,1000,6000); grid.add_child(policy_marketing)
 	grid.add_child(_label("SAV / support",14)); policy_support = _spin(0,200000,1000,5000); grid.add_child(policy_support)
