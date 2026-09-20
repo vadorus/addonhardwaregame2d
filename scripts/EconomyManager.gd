@@ -32,6 +32,9 @@ func add_income(amount: int, category: String = "Autres revenus"):
 func quoted_expense(amount: int, category: String = "Autres dépenses") -> int:
 	return BalanceManager.expense_amount(amount, category)
 
+func can_afford(amount: int, category: String = "Autres dépenses") -> bool:
+	return money >= quoted_expense(amount, category)
+
 func add_expense(amount: int, category: String = "Autres dépenses"):
 	if amount <= 0:
 		return
