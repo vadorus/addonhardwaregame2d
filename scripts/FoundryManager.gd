@@ -349,6 +349,16 @@ func external_disruption_factor(foundry_id: String) -> float:
 		return factor
 	return 1.0
 
+func current_monthly_overhead() -> int:
+	var tier := int(internal_fab.get("tier", 0))
+	if tier <= 0:
+		return 0
+	return int(INTERNAL_FAB_TIERS[tier].monthly_overhead)
+
+func active_construction() -> Dictionary:
+	var value = internal_fab.get("construction", {})
+	return value.duplicate(true) if typeof(value) == TYPE_DICTIONARY else {}
+
 func internal_capacity_used() -> int:
 	var used := 0
 	for product in ProductManager.products:
