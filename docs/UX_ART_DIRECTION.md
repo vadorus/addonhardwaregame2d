@@ -187,3 +187,10 @@ Le contenu et les résultats restent identiques.
 6. Ajouter microanimations et ambiance sonore.
 7. Tester séparément 1280×720 et petits écrans Android.
 
+
+
+## Évolution visuelle des locaux
+
+La progression de l'interface doit être soutenue par l'évolution visible du lieu de travail. Le système de locaux possède maintenant quatre paliers de simulation : garage aménagé, atelier + bureaux, siège technique et campus R&D.
+
+L'interface ne doit pas transformer ce système en simple barre de niveau. Chaque changement de palier devra progressivement modifier le décor, l'espace disponible, le confort perçu et les éléments visibles autour des équipes. Au début, le garage garde peu de menus et peu d'informations. Les fonctions RH, financières et de direction deviennent visibles lorsqu'elles ont une utilité concrète.

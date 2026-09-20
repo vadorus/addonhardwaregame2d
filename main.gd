@@ -34,6 +34,14 @@ var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
 var division_label: Label
+var executive_label: Label
+var workplace_label: Label
+var benefit_controls: Dictionary = {}
+var finance_cost_input: SpinBox
+var finance_monthly_input: SpinBox
+var finance_advice_label: Label
+var hr_case_select: OptionButton
+var hr_case_label: Label
 var staff_label: Label
 var candidate_label: Label
 var tech_label: Label
@@ -164,6 +172,7 @@ func _connect_signals():
 	DivisionManager.divisions_changed.connect(_refresh_all)
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
+	ExecutiveManager.executive_changed.connect(_refresh_all)
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
@@ -399,16 +408,16 @@ func _create_dashboard_tab():
 	var advisor_identity := VBoxContainer.new()
 	advisor_identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	advisor_head.add_child(advisor_identity)
-	advisor_identity.add_child(_label("Camille Durand", 16))
-	advisor_identity.add_child(_muted_label("CTO • Responsable R&D", 12))
+	advisor_identity.add_child(_label("Nora Bernard", 16))
+	advisor_identity.add_child(_muted_label("Bras droit • Vice-présidente", 12))
 	dashboard_cto_label = _rich_label()
 	dashboard_cto_label.custom_minimum_size.y = 125
 	dashboard_cto_label.add_theme_font_size_override("font_size", 15)
 	advisor_box.add_child(dashboard_cto_label)
 	dashboard_cto_button = Button.new()
-	dashboard_cto_button.text = "Voir le rapport complet"
+	dashboard_cto_button.text = "Ouvrir le comité de direction"
 	dashboard_cto_button.custom_minimum_size.y = 44
-	dashboard_cto_button.pressed.connect(func(): _show_tab(3))
+	dashboard_cto_button.pressed.connect(func(): _show_tab(1))
 	advisor_box.add_child(dashboard_cto_button)
 
 	dashboard_stats_grid = GridContainer.new()
@@ -459,6 +468,82 @@ func _create_company_tab():
 	division_label = _rich_label()
 	division_card.add_child(division_label)
 	box.add_child(division_card)
+	box.add_child(_section("Direction, RH & environnement de travail"))
+	var executive_card := _card(APP_SHELL, 12, 12)
+	var executive_box := VBoxContainer.new()
+	executive_box.add_theme_constant_override("separation", 10)
+	executive_card.add_child(executive_box)
+	executive_label = _rich_label()
+	executive_box.add_child(executive_label)
+	workplace_label = _rich_label()
+	executive_box.add_child(workplace_label)
+
+	var benefit_grid := GridContainer.new()
+	benefit_grid.columns = 2
+	executive_box.add_child(benefit_grid)
+	for benefit_key_value in ExecutiveManager.benefit_category_keys():
+		var benefit_key := str(benefit_key_value)
+		benefit_grid.add_child(_label(ExecutiveManager.benefit_category_label(benefit_key), 13))
+		var option := OptionButton.new()
+		for choice_value in ExecutiveManager.benefit_option_keys(benefit_key):
+			var choice := str(choice_value)
+			option.add_item(ExecutiveManager.benefit_option_label(benefit_key, choice))
+			option.set_item_metadata(option.item_count - 1, choice)
+		benefit_grid.add_child(option)
+		benefit_controls[benefit_key] = option
+	var benefit_apply := Button.new()
+	benefit_apply.text = "Appliquer les avantages salariés"
+	benefit_apply.pressed.connect(_apply_employee_benefits)
+	executive_box.add_child(benefit_apply)
+
+	var workplace_actions := HFlowContainer.new()
+	workplace_actions.add_theme_constant_override("h_separation", 8)
+	executive_box.add_child(workplace_actions)
+	var renovate := Button.new()
+	renovate.text = "Rénover / agrandir les locaux"
+	renovate.pressed.connect(_upgrade_workplace)
+	workplace_actions.add_child(renovate)
+	var maintain := Button.new()
+	maintain.text = "Remettre les locaux en état"
+	maintain.pressed.connect(_maintain_workplace)
+	workplace_actions.add_child(maintain)
+
+	executive_box.add_child(_eyebrow("AVIS FINANCIER"))
+	var finance_grid := GridContainer.new()
+	finance_grid.columns = 2
+	executive_box.add_child(finance_grid)
+	finance_grid.add_child(_label("Dépense envisagée", 13))
+	finance_cost_input = _spin(0, 10000000, 5000, 50000)
+	finance_grid.add_child(finance_cost_input)
+	finance_grid.add_child(_label("Nouvelle charge mensuelle", 13))
+	finance_monthly_input = _spin(0, 1000000, 1000, 0)
+	finance_grid.add_child(finance_monthly_input)
+	var finance_button := Button.new()
+	finance_button.text = "Demander l'avis financier"
+	finance_button.pressed.connect(_refresh_financial_advice)
+	executive_box.add_child(finance_button)
+	finance_advice_label = _rich_label()
+	executive_box.add_child(finance_advice_label)
+
+	executive_box.add_child(_eyebrow("DOSSIERS RH"))
+	hr_case_select = OptionButton.new()
+	hr_case_select.item_selected.connect(func(_i): _refresh_hr_case())
+	executive_box.add_child(hr_case_select)
+	hr_case_label = _rich_label()
+	executive_box.add_child(hr_case_label)
+	var hr_actions := HFlowContainer.new()
+	hr_actions.add_theme_constant_override("h_separation", 8)
+	executive_box.add_child(hr_actions)
+	var discuss := Button.new()
+	discuss.text = "Entretien / médiation"
+	discuss.pressed.connect(func(): _resolve_hr_case("DISCUSS"))
+	hr_actions.add_child(discuss)
+	var bonus := Button.new()
+	bonus.text = "Mesure financière / prime"
+	bonus.pressed.connect(func(): _resolve_hr_case("BONUS"))
+	hr_actions.add_child(bonus)
+	box.add_child(executive_card)
+
 	box.add_child(_section("Budgets mensuels"))
 	var grid := GridContainer.new(); grid.columns = 2; box.add_child(grid)
 	grid.add_child(_label("Marketing",14)); policy_marketing = _spin(0,200000,1000,6000); grid.add_child(policy_marketing)
@@ -1910,7 +1995,23 @@ func _refresh_dashboard():
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
 
-	dashboard_cash_value.text = "%s €" % _money(Economy.money)
+	var executive_brief := ExecutiveManager.get_executive_brief()
+	if dashboard_cto_label != null:
+		var advisor_lines: Array[String] = [
+			"« %s »" % str(executive_brief.get("headline", "")),
+			"",
+			str(executive_brief.get("text", ""))
+		]
+		var brief_priorities: Array = executive_brief.get("priorities", [])
+		if brief_priorities.size() > 1:
+			advisor_lines.append("")
+			advisor_lines.append("Ensuite :")
+			for priority_value in brief_priorities.slice(1, 3):
+				var priority: Dictionary = priority_value
+				advisor_lines.append("• %s" % str(priority.get("text", "")))
+		dashboard_cto_label.text = "\n".join(advisor_lines)
+
+		dashboard_cash_value.text = "%s €" % _money(Economy.money)
 	if Economy.history.is_empty():
 		dashboard_result_value.text = "Mois en cours"
 	else:
@@ -1952,6 +2053,36 @@ func _refresh_company():
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
 	company_rep_label.text = "\n".join(lines)
 
+	var brief := ExecutiveManager.get_executive_brief()
+	if executive_label != null:
+		var priority_lines: Array[String] = [
+			"Nora Bernard — bras droit / vice-présidente",
+			"%s" % str(brief.get("headline", "")),
+			"Conseil : %s" % str(brief.get("text", "")),
+			"%s • %s" % [str(brief.get("hr_role", "")), str(brief.get("finance_role", ""))]
+		]
+		for priority_value in brief.get("priorities", []):
+			var priority: Dictionary = priority_value
+			priority_lines.append("• [%s] %s — %s" % [str(priority.get("category", "")), str(priority.get("text", "")), str(priority.get("action", ""))])
+		executive_label.text = "\n".join(priority_lines)
+	if workplace_label != null:
+		var workspace := ExecutiveManager.workplace_data()
+		var upgrade := ExecutiveManager.next_workplace_upgrade()
+		var next_text := "niveau maximum actuel"
+		if not upgrade.is_empty():
+			next_text = "prochaine étape : %s (%s €)" % [str(upgrade.get("name", "")), _money(int(upgrade.get("upgrade_cost", 0)))]
+		workplace_label.text = "Locaux : %s • état %.0f/100 • environnement %.0f/100\nCapacité %d personnes • occupation %d • %s\nAvantages salariés : %s €/mois • coût locaux : %s €/mois • moral moyen %.0f/100" % [
+			str(workspace.get("name", "Garage")), float(workspace.get("condition", 0.0)), float(workspace.get("score", 0.0)),
+			int(workspace.get("capacity", 0)), int(workspace.get("occupancy", 0)), next_text,
+			_money(ExecutiveManager.monthly_benefit_cost()), _money(ExecutiveManager.monthly_workplace_cost()), ExecutiveManager.staff_average_morale()
+		]
+	for benefit_key_value in benefit_controls.keys():
+		var benefit_key := str(benefit_key_value)
+		var option: OptionButton = benefit_controls[benefit_key]
+		_select_meta(option, str(ExecutiveManager.benefit_policy.get(benefit_key, "NONE")))
+	_refresh_hr_cases()
+	_refresh_financial_advice()
+
 	var division_lines: Array[String] = []
 	for sector_value in DivisionManager.get_active_division_keys():
 		var sector := str(sector_value)
@@ -1966,6 +2097,73 @@ func _refresh_company():
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
 	_refresh_leader_choices()
+
+func _apply_employee_benefits():
+	for category_value in benefit_controls.keys():
+		var category := str(category_value)
+		ExecutiveManager.set_benefit_policy(category, _meta(benefit_controls[category]))
+	status_label.text = "Politique sociale mise à jour. Le coût et les effets seront visibles chaque mois."
+	_refresh_all()
+
+func _upgrade_workplace():
+	var upgrade := ExecutiveManager.next_workplace_upgrade()
+	if upgrade.is_empty():
+		status_label.text = "Les locaux ont atteint le niveau maximum actuellement disponible."
+	elif ExecutiveManager.renovate_workplace():
+		status_label.text = "Rénovation validée : %s." % str(upgrade.get("name", "nouveaux locaux"))
+	else:
+		var advice := ExecutiveManager.financial_advice(int(upgrade.get("upgrade_cost", 0)), int(upgrade.get("monthly_cost", 0)) - ExecutiveManager.monthly_workplace_cost())
+		status_label.text = "Rénovation impossible. Conseil financier : %s" % str(advice.get("recommendation", "trésorerie insuffisante"))
+	_refresh_all()
+
+func _maintain_workplace():
+	status_label.text = "Locaux remis en état." if ExecutiveManager.maintain_workplace() else "Entretien impossible : trésorerie insuffisante."
+	_refresh_all()
+
+func _refresh_financial_advice():
+	if finance_advice_label == null:
+		return
+	var cost := int(finance_cost_input.value) if finance_cost_input != null else 0
+	var monthly := int(finance_monthly_input.value) if finance_monthly_input != null else 0
+	var advice := ExecutiveManager.financial_advice(cost, monthly)
+	finance_advice_label.text = "Avis : %s\nTrésorerie après décision : %s € • charge structurelle estimée %s €/mois • réserve ~%.1f mois\n%s" % [
+		str(advice.get("level", "")), _money(int(advice.get("cash_after", 0))), _money(int(advice.get("monthly_burn", 0))),
+		float(advice.get("runway_months", 0.0)), str(advice.get("recommendation", ""))
+	]
+	var color := APP_GREEN
+	if str(advice.get("level", "")) in ["TENDU"]:
+		color = APP_AMBER
+	elif str(advice.get("level", "")) in ["DANGEREUX","IMPOSSIBLE"]:
+		color = APP_RED
+	finance_advice_label.add_theme_color_override("font_color", color)
+
+func _refresh_hr_cases():
+	if hr_case_select == null:
+		return
+	var previous := _meta(hr_case_select) if hr_case_select.item_count > 0 else ""
+	hr_case_select.clear()
+	for issue in ExecutiveManager.get_open_hr_issues():
+		hr_case_select.add_item("%s — gravité %.0f" % [str(issue.get("title", "Dossier RH")), float(issue.get("severity", 0.0))])
+		hr_case_select.set_item_metadata(hr_case_select.item_count - 1, str(issue.get("id", "")))
+	if previous != "":
+		_select_meta(hr_case_select, previous)
+	_refresh_hr_case()
+
+func _refresh_hr_case():
+	if hr_case_label == null:
+		return
+	if hr_case_select == null or hr_case_select.item_count == 0:
+		hr_case_label.text = "Aucun dossier RH urgent. Le bras droit et le suivi RH continuent de surveiller moral, cohésion et capacité des locaux."
+		return
+	var issue := ExecutiveManager.get_hr_issue(_meta(hr_case_select))
+	hr_case_label.text = "%s\nGravité %.0f/100\n%s" % [str(issue.get("title", "")), float(issue.get("severity", 0.0)), str(issue.get("text", ""))]
+
+func _resolve_hr_case(action: String):
+	if hr_case_select == null or hr_case_select.item_count == 0:
+		status_label.text = "Aucun dossier RH ouvert."
+		return
+	status_label.text = "Dossier RH traité." if ExecutiveManager.resolve_hr_issue(_meta(hr_case_select), action) else "Impossible de traiter ce dossier avec cette action."
+	_refresh_all()
 
 func _apply_policies():
 	CompanyManager.policies.marketing_budget=int(policy_marketing.value); CompanyManager.policies.support_budget=int(policy_support.value); CompanyManager.policies.environment_budget=int(policy_environment.value); CompanyManager.policies.support_level=_meta(policy_support_level); CompanyManager.company_changed.emit(); status_label.text="Politiques mises à jour."
