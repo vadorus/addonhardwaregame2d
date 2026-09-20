@@ -469,6 +469,86 @@ func _ready() -> void:
 		_fail("CPU launch ignored the binning capacity limit")
 		return
 
+	var lifecycle_initial := ProductManager.get_post_launch_summary(str(apex_model.id))
+	if str(lifecycle_initial.get("revision", "")) != "A0" or int(lifecycle_initial.get("firmware_version", 0)) != 1:
+		_fail("Newly launched CPU did not receive baseline revision and firmware state")
+		return
+
+	var price_before := int(apex_model.price)
+	if not ProductManager.update_product_price(str(apex_model.id), maxi(price_before - 5, 1)):
+		_fail("Could not change price of a launched CPU")
+		return
+	if int(apex_model.price) >= price_before or apex_model.get("commercial_history", []).is_empty():
+		_fail("Post-launch price change did not persist commercially")
+		return
+
+	var demand_before_promotion := MarketManager.estimate_consumer_demand(apex_model)
+	if not ProductManager.start_promotion(str(apex_model.id), "VALUE"):
+		_fail("Could not start a post-launch CPU promotion")
+		return
+	var demand_during_promotion := MarketManager.estimate_consumer_demand(apex_model)
+	if float(demand_during_promotion.get("score", 0.0)) <= float(demand_before_promotion.get("score", 0.0)):
+		_fail("Product promotion did not improve market attractiveness")
+		return
+	if int(apex_model.get("promotion_months_remaining", 0)) != 2:
+		_fail("Promotion duration was not stored on the product")
+		return
+
+	var sold_before_revision := int(apex_model.get("units_sold_total", 0))
+	var defect_before_revision := float(apex_model.get("defect_rate", 0.025))
+	if not ProductManager.apply_hardware_revision(str(apex_model.id), "QUALITY"):
+		_fail("Could not create a post-launch CPU hardware stepping")
+		return
+	if str(apex_model.get("revision_label", "")) != "A1":
+		_fail("Hardware revision did not increment the CPU stepping")
+		return
+	if float(apex_model.get("defect_rate", 1.0)) >= defect_before_revision:
+		_fail("Reliability-focused stepping did not improve future manufacturing defects")
+		return
+	if int(apex_model.get("units_sold_total", -1)) != sold_before_revision:
+		_fail("Hardware stepping incorrectly modified the already-sold installed base")
+		return
+
+	var firmware_field_before := AfterSalesManager.cpu_field_experience("FIRMWARE")
+	var reliability_before_firmware := float(apex_model.get("metrics", {}).get("reliability", 0.0))
+	if not ProductManager.release_firmware(str(apex_model.id), "STABILITY"):
+		_fail("Could not publish a CPU stability firmware")
+		return
+	if int(apex_model.get("firmware_version", 0)) != 2:
+		_fail("Firmware version did not advance")
+		return
+	if float(apex_model.get("metrics", {}).get("reliability", 0.0)) <= reliability_before_firmware:
+		_fail("Stability firmware did not improve reliability")
+		return
+	if AfterSalesManager.cpu_field_experience("FIRMWARE") <= firmware_field_before:
+		_fail("Firmware publication did not teach the support/research loop")
+		return
+
+	var usability_before_software := float(apex_model.get("metrics", {}).get("usability", 0.0))
+	if not ProductManager.release_control_software(str(apex_model.id)):
+		_fail("Could not release linked CPU control software")
+		return
+	var apex_software: Dictionary = apex_model.get("control_software", {})
+	if not bool(apex_software.get("released", false)) or int(apex_software.get("version", 0)) != 1:
+		_fail("CPU control software did not attach to the launched product")
+		return
+	if apex_software.get("supported_product_ids", []).size() != 3:
+		_fail("CPU control software does not expose the explicit compatible model list")
+		return
+	if float(apex_model.get("metrics", {}).get("usability", 0.0)) <= usability_before_software:
+		_fail("CPU control software did not improve the supported product experience")
+		return
+	for family_model in ProductManager.products:
+		if not bool(family_model.get("control_software", {}).get("released", false)):
+			_fail("Generation control software was not shared with every compatible CPU model")
+			return
+
+	ProductManager._tick_post_launch_state(apex_model)
+	ProductManager._tick_post_launch_state(apex_model)
+	if str(apex_model.get("promotion_type", "")) != "NONE" or float(apex_model.get("promotion_bonus", -1.0)) != 0.0:
+		_fail("Expired promotion did not clear its temporary demand bonus")
+		return
+
 	var field_before := AfterSalesManager.cpu_field_experience()
 	apex_model["defect_rate"] = 0.085
 	apex_model["manufacturing_quality"] = 42.0
@@ -571,6 +651,17 @@ func _ready() -> void:
 	ProductManager.load_state(product_round_trip)
 	if ProductManager.cpu_generations.size() != 1 or ProductManager.products.size() != 3:
 		_fail("CPU product family did not survive a save round-trip")
+		return
+	var restored_apex := ProductManager.get_product(str(apex_model.id))
+	var restored_lifecycle := ProductManager.get_post_launch_summary(str(apex_model.id))
+	if restored_apex.is_empty() or str(restored_lifecycle.get("revision", "")) != "A1" or int(restored_lifecycle.get("firmware_version", 0)) != 2:
+		_fail("CPU post-launch revision or firmware state did not survive a save round-trip")
+		return
+	if not bool(restored_lifecycle.get("software_released", false)) or int(restored_lifecycle.get("software_version", 0)) != 1:
+		_fail("Linked CPU control software did not survive a save round-trip")
+		return
+	if restored_apex.get("commercial_history", []).is_empty() or restored_apex.get("revision_history", []).is_empty() or restored_apex.get("firmware_history", []).is_empty():
+		_fail("CPU lifecycle histories did not survive a save round-trip")
 		return
 	var legacy_product_state := product_round_trip.duplicate(true)
 	legacy_product_state.erase("cpu_generations")
