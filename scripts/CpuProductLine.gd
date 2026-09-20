@@ -28,8 +28,11 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	var potential_models := clampi(maxi(int(generation_plan.get("potential_models", 3)), 3), 3, 6)
 	var base_yield := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
 	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
-	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 1.35)
+	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 2.60)
 	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * capacity_factor)))
+	var foundry_capacity := int(industrialization.get("foundry_capacity", 0))
+	if foundry_capacity > 0:
+		effective_monthly_capacity = mini(effective_monthly_capacity, foundry_capacity)
 	var bin_distribution := _bin_distribution(yield_rate, industrialization)
 	var products: Array = []
 	for tier_index in range(TIERS.size()):
@@ -54,6 +57,13 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"manufacturing_quality":float(industrialization.get("quality_score", 60.0)),
 		"defect_rate":float(industrialization.get("defect_rate", 0.025)),
 		"process_mastery":float(industrialization.get("process_mastery", 35.0)),
+		"manufacturing_mode":str(industrialization.get("manufacturing_mode", "EXTERNAL")),
+		"foundry_id":str(industrialization.get("foundry_id", "")),
+		"foundry_name":str(industrialization.get("foundry_name", "")),
+		"foundry_dependency":float(industrialization.get("foundry_dependency", 0.0)),
+		"foundry_confidentiality":float(industrialization.get("foundry_confidentiality", 0.0)),
+		"foundry_reliability":float(industrialization.get("foundry_reliability", 0.0)),
+		"foundry_capacity":foundry_capacity,
 		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
 		"die_quality_mean":float(industrialization.get("die_quality_mean", industrialization.get("silicon_quality_mean", industrialization.get("quality_score", 60.0)))),
 		"die_variation":float(industrialization.get("die_variation", industrialization.get("silicon_variation", 10.0))),
@@ -158,6 +168,12 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"typical_oc_frequency_ghz":float(design.frequency_ghz) * (1.0 + oc_headroom / 100.0),
 		"typical_undervolt_power_factor":clampf(1.0 - undervolt_headroom / 180.0, 0.78, 1.0),
 		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
+		"manufacturing_mode":str(industrialization.get("manufacturing_mode", "EXTERNAL")),
+		"foundry_id":str(industrialization.get("foundry_id", "")),
+		"foundry_name":str(industrialization.get("foundry_name", "")),
+		"foundry_dependency":float(industrialization.get("foundry_dependency", 0.0)),
+		"foundry_confidentiality":float(industrialization.get("foundry_confidentiality", 0.0)),
+		"foundry_reliability":float(industrialization.get("foundry_reliability", 0.0)),
 		"yield_rate":yield_rate,
 		"manufacturing_quality":manufacturing_quality,
 		"defect_rate":defect_rate,
