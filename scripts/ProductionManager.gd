@@ -5,6 +5,36 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 signal jobs_changed
 signal industrialization_completed(project, result)
 
+const BINNING_STRATEGIES := {
+	"VOLUME": {
+		"label":"Binning volume",
+		"variation":2.8,
+		"headroom":-1.0,
+		"undervolt":-0.6,
+		"apex_shift":0.045,
+		"essential_shift":-0.020,
+		"quality_bonus":-1.0
+	},
+	"BALANCED": {
+		"label":"Binning équilibré",
+		"variation":0.0,
+		"headroom":0.0,
+		"undervolt":0.0,
+		"apex_shift":0.0,
+		"essential_shift":0.0,
+		"quality_bonus":0.0
+	},
+	"STRICT": {
+		"label":"Binning strict",
+		"variation":-3.6,
+		"headroom":2.4,
+		"undervolt":1.8,
+		"apex_shift":-0.050,
+		"essential_shift":0.025,
+		"quality_bonus":2.2
+	}
+}
+
 const STRATEGIES := {
 	"ECONOMY": {
 		"label":"Économie",
@@ -79,6 +109,7 @@ func _on_project_completed(project: Dictionary):
 		"node_nm":node_nm,
 		"complexity":complexity,
 		"strategy":"BALANCED",
+		"binning_strategy":"BALANCED",
 		"progress":0.0,
 		"months_spent":0,
 		"status":"INDUSTRIALIZATION",
@@ -95,6 +126,12 @@ func get_strategy_keys() -> Array:
 
 func strategy_label(strategy: String) -> String:
 	return str(STRATEGIES.get(strategy, STRATEGIES.BALANCED).label)
+
+func get_binning_strategy_keys() -> Array:
+	return BINNING_STRATEGIES.keys()
+
+func binning_strategy_label(strategy: String) -> String:
+	return str(BINNING_STRATEGIES.get(strategy, BINNING_STRATEGIES.BALANCED).label)
 
 func get_job(job_id: String) -> Dictionary:
 	for job in jobs:
@@ -117,6 +154,19 @@ func set_strategy(job_id: String, strategy: String) -> bool:
 		return false
 	job["strategy"] = strategy
 	CompanyManager.add_alert("%s : stratégie industrielle « %s »." % [str(job.get("name", "CPU")), strategy_label(strategy)])
+	jobs_changed.emit()
+	return true
+
+func set_binning_strategy(job_id: String, strategy: String) -> bool:
+	if not BINNING_STRATEGIES.has(strategy):
+		return false
+	var job := get_job(job_id)
+	if job.is_empty() or str(job.get("status", "")) != "INDUSTRIALIZATION":
+		return false
+	job["binning_strategy"] = strategy
+	CompanyManager.add_alert("%s : politique de sélection du silicium « %s »." % [
+		str(job.get("name", "CPU")), binning_strategy_label(strategy)
+	])
 	jobs_changed.emit()
 	return true
 
@@ -180,6 +230,7 @@ func _process_learning(node_nm: int, complexity: float, team: float):
 func _complete_job(job: Dictionary):
 	var project: Dictionary = job.get("project", {})
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
+	var binning_strategy: Dictionary = BINNING_STRATEGIES.get(str(job.get("binning_strategy", "BALANCED")), BINNING_STRATEGIES.BALANCED)
 	var node_nm := int(job.get("node_nm", 10000))
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
@@ -202,10 +253,24 @@ func _complete_job(job: Dictionary):
 	capacity_factor = clampf(capacity_factor, 0.62, 1.28)
 	var cost_factor := 1.0 + defect_rate * 0.85 + maxf(1.0 - capacity_factor, 0.0) * 0.12
 	cost_factor = clampf(cost_factor, 0.96, 1.22)
+
+	var silicon_quality_mean := 34.0 + quality_score * 0.34 + mastery * 0.22 + team * 0.12 + reliability * 0.10 - complexity * 0.10
+	silicon_quality_mean += float(binning_strategy.quality_bonus) + rng.randf_range(-1.8, 1.8)
+	silicon_quality_mean = clampf(silicon_quality_mean, 25.0, 97.0)
+	var silicon_variation := 18.0 - mastery * 0.08 - quality_score * 0.06 + complexity * 0.055 + float(binning_strategy.variation)
+	silicon_variation = clampf(silicon_variation, 2.5, 18.0)
+	var silicon_predictability := clampf(100.0 - silicon_variation * 3.9 + mastery * 0.16 + quality_knowledge * 0.08, 28.0, 98.0)
+	var oc_headroom_pct := 2.0 + (silicon_quality_mean - 50.0) * 0.12 + (mastery - 30.0) * 0.045 + float(binning_strategy.headroom)
+	oc_headroom_pct = clampf(oc_headroom_pct, 0.0, 22.0)
+	var undervolt_headroom_pct := 3.0 + quality_score * 0.045 + mastery * 0.040 + float(binning_strategy.undervolt)
+	undervolt_headroom_pct = clampf(undervolt_headroom_pct, 1.0, 20.0)
+
 	var result := {
 		"job_id":str(job.get("id", "")),
 		"strategy":str(job.get("strategy", "BALANCED")),
 		"strategy_label":strategy_label(str(job.get("strategy", "BALANCED"))),
+		"binning_strategy":str(job.get("binning_strategy", "BALANCED")),
+		"binning_strategy_label":binning_strategy_label(str(job.get("binning_strategy", "BALANCED"))),
 		"months":int(job.get("months_spent", 0)),
 		"team_score":team,
 		"process_mastery":mastery,
@@ -214,12 +279,21 @@ func _complete_job(job: Dictionary):
 		"yield_delta":yield_delta,
 		"capacity_factor":capacity_factor,
 		"cost_factor":cost_factor,
+		"silicon_quality_mean":silicon_quality_mean,
+		"silicon_variation":silicon_variation,
+		"silicon_predictability":silicon_predictability,
+		"oc_headroom_pct":oc_headroom_pct,
+		"undervolt_headroom_pct":undervolt_headroom_pct,
+		"binning_apex_shift":float(binning_strategy.apex_shift),
+		"binning_essential_shift":float(binning_strategy.essential_shift),
 		"confidence":production_confidence(node_nm)
 	}
 	job["status"] = "COMPLETED"
 	job["progress"] = 100.0
 	job["result"] = result.duplicate(true)
-	CompanyManager.add_alert("%s : industrialisation terminée — qualité %.0f/100, défauts estimés %.1f%%." % [str(job.get("name", "CPU")), quality_score, defect_rate * 100.0])
+	CompanyManager.add_alert("%s : industrialisation terminée — qualité %.0f/100, défauts %.1f%%, silicium %.0f/100 ± %.1f." % [
+		str(job.get("name", "CPU")), quality_score, defect_rate * 100.0, silicon_quality_mean, silicon_variation
+	])
 	ProductManager.create_from_industrialization(project, result)
 	industrialization_completed.emit(project, result)
 
@@ -254,6 +328,20 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary):
 	jobs = state.get("jobs", []).duplicate(true)
+	for job in jobs:
+		job["binning_strategy"] = str(job.get("binning_strategy", "BALANCED"))
+		var result_value = job.get("result", {})
+		if typeof(result_value) == TYPE_DICTIONARY and not result_value.is_empty():
+			var result: Dictionary = result_value
+			result["binning_strategy"] = str(result.get("binning_strategy", job.get("binning_strategy", "BALANCED")))
+			result["silicon_quality_mean"] = float(result.get("silicon_quality_mean", result.get("quality_score", 60.0)))
+			result["silicon_variation"] = float(result.get("silicon_variation", 10.0))
+			result["silicon_predictability"] = float(result.get("silicon_predictability", 60.0))
+			result["oc_headroom_pct"] = float(result.get("oc_headroom_pct", 4.0))
+			result["undervolt_headroom_pct"] = float(result.get("undervolt_headroom_pct", 6.0))
+			result["binning_apex_shift"] = float(result.get("binning_apex_shift", 0.0))
+			result["binning_essential_shift"] = float(result.get("binning_essential_shift", 0.0))
+			job["result"] = result
 	var saved_mastery = state.get("process_mastery", {})
 	process_mastery = _default_process_mastery()
 	if typeof(saved_mastery) == TYPE_DICTIONARY:
