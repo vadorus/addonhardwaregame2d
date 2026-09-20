@@ -35,6 +35,18 @@ var dashboard_label: Label
 var alerts_label: Label
 var company_rep_label: Label
 var division_label: Label
+var division_delegation_group: VBoxContainer
+var division_director_select: OptionButton
+var division_control_select: OptionButton
+var division_priority_select: OptionButton
+var division_target_select: OptionButton
+var division_risk_select: OptionButton
+var division_budget_ceiling: SpinBox
+var division_quality_bias: SpinBox
+var division_growth_bias: SpinBox
+var division_mandate_label: Label
+var division_escalation_select: OptionButton
+var division_escalation_label: Label
 var executive_label: Label
 var workplace_label: Label
 var benefit_controls: Dictionary = {}
@@ -475,6 +487,78 @@ func _create_company_tab():
 	division_label = _rich_label()
 	division_card.add_child(division_label)
 	box.add_child(division_card)
+
+	division_delegation_group = VBoxContainer.new()
+	division_delegation_group.add_theme_constant_override("separation", 10)
+	box.add_child(division_delegation_group)
+	division_delegation_group.add_child(_section("Direction de division CPU"))
+	var delegation_intro := _muted_label("Quand l'entreprise grandit, vous pouvez garder la main, superviser un directeur ou lui déléguer les décisions courantes. Les choix structurants remontent toujours au CEO.", 12)
+	delegation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	division_delegation_group.add_child(delegation_intro)
+
+	var division_grid := GridContainer.new()
+	division_grid.columns = 2
+	division_delegation_group.add_child(division_grid)
+	division_grid.add_child(_label("Directeur", 13))
+	division_director_select = OptionButton.new()
+	division_grid.add_child(division_director_select)
+	division_grid.add_child(_label("Mode de pilotage", 13))
+	division_control_select = OptionButton.new()
+	for mode_data in [["Direction directe","DIRECT"],["Délégation supervisée","SUPERVISED"],["Délégation autonome","AUTONOMOUS"]]:
+		division_control_select.add_item(str(mode_data[0]))
+		division_control_select.set_item_metadata(division_control_select.item_count - 1, str(mode_data[1]))
+	division_grid.add_child(division_control_select)
+	division_grid.add_child(_label("Priorité du mandat", 13))
+	division_priority_select = OptionButton.new()
+	for priority_data in [["Équilibré","BALANCED"],["Performance","PERFORMANCE"],["Efficacité","EFFICIENCY"],["Fiabilité","RELIABILITY"],["Innovation","INNOVATION"]]:
+		division_priority_select.add_item(str(priority_data[0]))
+		division_priority_select.set_item_metadata(division_priority_select.item_count - 1, str(priority_data[1]))
+	division_grid.add_child(division_priority_select)
+	division_grid.add_child(_label("Client cible", 13))
+	division_target_select = OptionButton.new()
+	_fill_segment_options(division_target_select)
+	division_grid.add_child(division_target_select)
+	division_grid.add_child(_label("Tolérance au risque", 13))
+	division_risk_select = OptionButton.new()
+	for risk_data in [["Prudent","CAUTIOUS"],["Modéré","MODERATE"],["Audacieux","BOLD"]]:
+		division_risk_select.add_item(str(risk_data[0]))
+		division_risk_select.set_item_metadata(division_risk_select.item_count - 1, str(risk_data[1]))
+	division_grid.add_child(division_risk_select)
+	division_grid.add_child(_label("Plafond mensuel division", 13))
+	division_budget_ceiling = _spin(10000, 1000000, 5000, 60000)
+	division_grid.add_child(division_budget_ceiling)
+	division_grid.add_child(_label("Exigence qualité", 13))
+	division_quality_bias = _spin(0, 100, 5, 55)
+	division_grid.add_child(division_quality_bias)
+	division_grid.add_child(_label("Priorité croissance", 13))
+	division_growth_bias = _spin(0, 100, 5, 50)
+	division_grid.add_child(division_growth_bias)
+
+	var apply_mandate := Button.new()
+	apply_mandate.text = "Affecter le directeur et appliquer le mandat"
+	apply_mandate.pressed.connect(_apply_division_mandate)
+	division_delegation_group.add_child(apply_mandate)
+	division_mandate_label = _rich_label()
+	division_delegation_group.add_child(division_mandate_label)
+
+	division_delegation_group.add_child(_eyebrow("ARBITRAGES REMONTÉS AU CEO"))
+	division_escalation_select = OptionButton.new()
+	division_escalation_select.item_selected.connect(func(_i): _refresh_division_escalation())
+	division_delegation_group.add_child(division_escalation_select)
+	division_escalation_label = _rich_label()
+	division_delegation_group.add_child(division_escalation_label)
+	var escalation_actions := HFlowContainer.new()
+	escalation_actions.add_theme_constant_override("h_separation", 8)
+	division_delegation_group.add_child(escalation_actions)
+	var follow_recommendation := Button.new()
+	follow_recommendation.text = "Suivre la recommandation"
+	follow_recommendation.pressed.connect(func(): _resolve_division_escalation(true))
+	escalation_actions.add_child(follow_recommendation)
+	var keep_current := Button.new()
+	keep_current.text = "Conserver ma décision / clôturer"
+	keep_current.pressed.connect(func(): _resolve_division_escalation(false))
+	escalation_actions.add_child(keep_current)
+
 	box.add_child(_section("Direction, RH & environnement de travail"))
 	var executive_card := _card(APP_SHELL, 12, 12)
 	var executive_box := VBoxContainer.new()
@@ -2169,11 +2253,142 @@ func _refresh_company():
 	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
 	division_label.text = "\n".join(division_lines)
 
+	_refresh_division_delegation()
+
 	policy_marketing.value = float(CompanyManager.policies.marketing_budget)
 	policy_support.value = float(CompanyManager.policies.support_budget)
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	_select_meta(policy_support_level, str(CompanyManager.policies.support_level))
 	_refresh_leader_choices()
+
+func _refresh_division_delegation():
+	if division_delegation_group == null:
+		return
+	var sector := "CPU"
+	var available := DivisionManager.delegation_available(sector)
+	division_delegation_group.visible = available
+	var division := DivisionManager.get_division(sector)
+	if not available:
+		if division_label != null:
+			division_label.text += "\n\nLe pilotage reste volontairement direct au début. La direction de division apparaîtra après une première génération ou quand l'entreprise aura assez grandi."
+		return
+	var current_director := str(division.get("leader_id", ""))
+	if division_director_select != null:
+		division_director_select.clear()
+		division_director_select.add_item("Aucun directeur")
+		division_director_select.set_item_metadata(0, "")
+		for emp in PersonnelManager.staff:
+			var profile := PersonnelManager.management_profile(str(emp.get("id", "")), sector)
+			division_director_select.add_item("%s — tech %.0f • finance %.0f • risque %.0f • humain %.0f" % [
+				str(emp.get("name", "")), float(profile.get("technical", 0.0)), float(profile.get("financial", 0.0)),
+				float(profile.get("risk", 0.0)), float(profile.get("people", 0.0))
+			])
+			division_director_select.set_item_metadata(division_director_select.item_count - 1, str(emp.get("id", "")))
+		_select_meta(division_director_select, current_director)
+	if division_control_select != null:
+		_select_meta(division_control_select, str(division.get("control_mode", "DIRECT")))
+	var mandate: Dictionary = division.get("mandate", {})
+	if division_priority_select != null:
+		_select_meta(division_priority_select, str(mandate.get("priority", "BALANCED")))
+	if division_target_select != null:
+		_select_meta(division_target_select, str(mandate.get("target_segment", "MAINSTREAM")))
+	if division_risk_select != null:
+		_select_meta(division_risk_select, str(mandate.get("risk_tolerance", "MODERATE")))
+	if division_budget_ceiling != null:
+		division_budget_ceiling.value = int(mandate.get("monthly_budget_ceiling", 60000))
+	if division_quality_bias != null:
+		division_quality_bias.value = float(mandate.get("quality_bias", 55.0))
+	if division_growth_bias != null:
+		division_growth_bias.value = float(mandate.get("growth_bias", 50.0))
+
+	if division_mandate_label != null:
+		var director := DivisionManager.director_profile(sector)
+		var director_text := "Aucun directeur affecté"
+		if not director.is_empty():
+			director_text = "%s • adéquation au mandat %.0f/100 • technique %.0f • finance %.0f • innovation %.0f • risque %.0f • humain %.0f • marché %.0f" % [
+				str(director.get("name", "")), float(director.get("mandate_fit", 0.0)), float(director.get("technical", 0.0)),
+				float(director.get("financial", 0.0)), float(director.get("innovation", 0.0)), float(director.get("risk", 0.0)),
+				float(director.get("people", 0.0)), float(director.get("market", 0.0))
+			]
+		var decision_lines: Array[String] = []
+		for decision_value in DivisionManager.get_recent_decisions(sector, 3):
+			var decision: Dictionary = decision_value
+			decision_lines.append("• %s" % str(decision.get("text", "")))
+		division_mandate_label.text = "%s\nMode : %s • exécution %.0f%%\nMandat : %s • cible %s • risque %s • plafond %s €/mois • engagements actuels %s €/mois\nQualité %.0f/100 • croissance %.0f/100%s" % [
+			director_text,
+			DivisionManager.control_mode_label(str(division.get("control_mode", "DIRECT"))),
+			DivisionManager.management_modifier(sector) * 100.0,
+			str(mandate.get("priority", "BALANCED")).to_lower(),
+			str(mandate.get("target_segment", "MAINSTREAM")).to_lower(),
+			DivisionManager.risk_label(str(mandate.get("risk_tolerance", "MODERATE"))).to_lower(),
+			_money(int(mandate.get("monthly_budget_ceiling", 60000))),
+			_money(DivisionManager.current_commitments(sector)),
+			float(mandate.get("quality_bias", 55.0)), float(mandate.get("growth_bias", 50.0)),
+			("\nDécisions récentes :\n" + "\n".join(decision_lines)) if not decision_lines.is_empty() else ""
+		]
+	_refresh_division_escalations()
+
+func _apply_division_mandate():
+	var sector := "CPU"
+	if not DivisionManager.delegation_available(sector):
+		status_label.text = "La direction de division n'est pas encore nécessaire à ce stade de l'entreprise."
+		return
+	var director_id := _meta(division_director_select) if division_director_select != null else ""
+	if not DivisionManager.set_leader(sector, director_id):
+		status_label.text = "Impossible d'affecter ce directeur."
+		return
+	var mandate_ok := DivisionManager.set_mandate(sector, {
+		"priority":_meta(division_priority_select),
+		"target_segment":_meta(division_target_select),
+		"risk_tolerance":_meta(division_risk_select),
+		"monthly_budget_ceiling":int(division_budget_ceiling.value),
+		"quality_bias":float(division_quality_bias.value),
+		"growth_bias":float(division_growth_bias.value)
+	})
+	var mode := _meta(division_control_select)
+	var mode_ok := DivisionManager.set_control_mode(sector, mode)
+	if mandate_ok and mode_ok:
+		status_label.text = "Mandat CPU appliqué : %s." % DivisionManager.control_mode_label(mode)
+	elif mandate_ok and mode != "DIRECT" and director_id == "":
+		status_label.text = "Mandat enregistré, mais il faut affecter un directeur avant de déléguer."
+	else:
+		status_label.text = "Impossible d'appliquer complètement ce mandat."
+	_refresh_all()
+
+func _refresh_division_escalations():
+	if division_escalation_select == null:
+		return
+	var previous := _meta(division_escalation_select) if division_escalation_select.item_count > 0 else ""
+	division_escalation_select.clear()
+	for escalation_value in DivisionManager.get_pending_escalations("CPU"):
+		var escalation: Dictionary = escalation_value
+		division_escalation_select.add_item("%s — gravité %.0f" % [str(escalation.get("title", "Arbitrage")), float(escalation.get("severity", 0.0))])
+		division_escalation_select.set_item_metadata(division_escalation_select.item_count - 1, str(escalation.get("id", "")))
+	if previous != "":
+		_select_meta(division_escalation_select, previous)
+	_refresh_division_escalation()
+
+func _refresh_division_escalation():
+	if division_escalation_label == null:
+		return
+	if division_escalation_select == null or division_escalation_select.item_count == 0:
+		division_escalation_label.text = "Aucun arbitrage en attente. Le directeur gère les décisions courantes à l'intérieur de son mandat."
+		return
+	var escalation := DivisionManager.get_escalation(_meta(division_escalation_select))
+	division_escalation_label.text = "%s\nGravité %.0f/100\n%s\n\nRecommandation : %s" % [
+		str(escalation.get("title", "")), float(escalation.get("severity", 0.0)),
+		str(escalation.get("text", "")), str(escalation.get("recommendation", ""))
+	]
+
+func _resolve_division_escalation(apply_recommendation: bool):
+	if division_escalation_select == null or division_escalation_select.item_count == 0:
+		status_label.text = "Aucun arbitrage de division en attente."
+		return
+	if DivisionManager.resolve_escalation(_meta(division_escalation_select), apply_recommendation):
+		status_label.text = "Arbitrage clôturé : %s." % ("recommandation appliquée" if apply_recommendation else "décision actuelle conservée")
+	else:
+		status_label.text = "Impossible de clôturer cet arbitrage."
+	_refresh_all()
 
 func _apply_employee_benefits():
 	for category_value in benefit_controls.keys():
