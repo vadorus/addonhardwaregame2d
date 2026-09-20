@@ -287,6 +287,25 @@ Les fonctionnalités logicielles avancées ne sont pas débloquées par une ann�
 
 L'interface respecte la progression pédagogique : la section de gestion post-lancement reste invisible tant qu'aucun produit sélectionné n'est réellement commercialisé.
 
+### Direction, RH, avantages salariés et locaux
+
+Le bras droit / vice-président est présent dès le garage et devient le guide transversal de l'entreprise. Il ne remplace pas les spécialistes : il filtre les informations, hiérarchise jusqu'à trois priorités et renvoie le joueur vers la bonne décision.
+
+La première fondation jouable comprend :
+
+- un brief du bras droit sur la trésorerie, les dossiers RH, les locaux, les projets techniques, le SAV et les lancements ;
+- un suivi RH capable de détecter baisse de moral, manque de cohésion et locaux saturés ;
+- des réponses RH concrètes (entretien/médiation ou mesure financière) ;
+- une politique d'avantages salariés : couverture santé/mutuelle, repas, formation continue et espaces de qualité de vie ;
+- des coûts mensuels réels et des effets sur moral, fidélisation et progression des salariés ;
+- une progression des locaux : garage aménagé → atelier + bureaux → siège technique → campus R&D ;
+- capacité, état, qualité de l'environnement, coût d'entretien et rénovation ;
+- un avis financier qui calcule la trésorerie restante, la charge structurelle estimée et le nombre de mois de réserve avant d'accepter une dépense.
+
+L'avis financier ne décide jamais pour le joueur. Il classe la situation (confortable, maîtrisée, tendue, dangereuse ou impossible), explique pourquoi et laisse le joueur arbitrer.
+
+Le suivi RH et financier est d'abord assuré avec le bras droit. À mesure que l'effectif grandit, l'interface peut ensuite matérialiser un DRH et un DAF dédiés sans changer la logique sous-jacente.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :
