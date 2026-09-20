@@ -124,7 +124,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	selected_variation = clampf(selected_variation, 1.5, 20.0)
 	metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + (manufacturing_quality - 60.0) * 0.075 - defect_rate * 22.0 + (consistency - 60.0) * 0.018, 0.0, 100.0)
 	var yield_cost_factor := 1.0 + (1.0 - yield_rate) * 0.55
-	var industrial_cost_factor := clampf(float(industrialization.get("cost_factor", 1.0)), 0.90, 1.30)
+	var industrial_cost_factor := clampf(float(industrialization.get("cost_factor", 1.0)), 0.80, 1.60)
 	var unit_cost := maxi(1, int(round(float(base_unit_cost) * yield_cost_factor * industrial_cost_factor * float(tier.cost_factor))))
 	var price_from_position := float(reference_price) * float(tier.price_factor)
 	var price_from_margin := float(unit_cost) * float(tier.margin_floor)
