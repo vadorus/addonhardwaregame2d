@@ -56,7 +56,7 @@ func evaluate_product(product: Dictionary, segment: String) -> float:
 	if str(product.get("sector", "")) == "CPU":
 		var oc_headroom := float(product.get("oc_headroom_pct", 0.0))
 		var undervolt := float(product.get("undervolt_headroom_pct", 0.0))
-		var consistency := float(product.get("silicon_consistency", 50.0))
+		var consistency := float(product.get("die_consistency", product.get("silicon_consistency", 50.0)))
 		match segment:
 			"ENTHUSIAST":
 				silicon_bonus = clampf(oc_headroom * 0.28 + (consistency - 50.0) * 0.035, -2.0, 8.0)
@@ -81,7 +81,7 @@ func benchmark_score(product: Dictionary) -> float:
 	if sector == "CPU":
 		var fallback_headroom := clampf((float(m.get("performance", 50.0)) - 55.0) * 0.09, 0.0, 8.0)
 		var headroom := float(product.get("oc_headroom_pct", fallback_headroom))
-		var consistency := float(product.get("silicon_consistency", m.get("reliability", 50.0)))
+		var consistency := float(product.get("die_consistency", product.get("silicon_consistency", m.get("reliability", 50.0))))
 		score += clampf(headroom * 0.12 + (consistency - 50.0) * 0.015, -1.0, 3.5)
 	return score
 
