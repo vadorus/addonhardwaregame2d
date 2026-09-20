@@ -476,8 +476,6 @@ func load_state(state: Dictionary) -> void:
 				mandate["risk_tolerance"] = "MODERATE"
 			if not GameData.SEGMENTS.has(str(mandate.get("target_segment", "EMBEDDED"))):
 				mandate["target_segment"] = "EMBEDDED"
-			elif MarketManager.is_legacy_segment(str(mandate.get("target_segment", ""))):
-				mandate["target_segment"] = MarketManager.normalize_segment(str(mandate.get("target_segment", "")))
 			mandate["monthly_budget_ceiling"] = clampi(int(mandate.get("monthly_budget_ceiling", 60000)), 10000, 1000000)
 			mandate["quality_bias"] = clampf(float(mandate.get("quality_bias", 55.0)), 0.0, 100.0)
 			mandate["growth_bias"] = clampf(float(mandate.get("growth_bias", 50.0)), 0.0, 100.0)
