@@ -2415,11 +2415,12 @@ func _refresh_products():
 					float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), _money(int(job.get("monthly_cost", 0)))
 				])
 			else:
-				production_lines.append("\n%s — industrialisation terminée : qualité %.0f/100 • défauts %.1f%% • maîtrise %.0f/100\n  Silicium %.0f/100 ± %.1f • prévisibilité %.0f/100 • OC typique +%.1f%% • undervolt %.1f%% • %s" % [
+				production_lines.append("\n%s — industrialisation terminée : qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\n  Gravure/équipement %.0f/100 • conception %.0f/100 • qualité électrique des dies %.0f/100 ± %.1f • prévisibilité %.0f/100\n  OC typique +%.1f%% • undervolt %.1f%% • %s" % [
 					str(job.get("name", "CPU")), float(result.get("quality_score", 0.0)),
 					float(result.get("defect_rate", 0.0)) * 100.0, float(result.get("process_mastery", 0.0)),
-					float(result.get("silicon_quality_mean", 0.0)), float(result.get("silicon_variation", 0.0)),
-					float(result.get("silicon_predictability", 0.0)), float(result.get("oc_headroom_pct", 0.0)),
+					float(result.get("lithography_precision", 0.0)), float(result.get("design_margin_score", 0.0)),
+					float(result.get("die_quality_mean", result.get("silicon_quality_mean", 0.0))), float(result.get("die_variation", result.get("silicon_variation", 0.0))),
+					float(result.get("process_predictability", result.get("silicon_predictability", 0.0))), float(result.get("oc_headroom_pct", 0.0)),
 					float(result.get("undervolt_headroom_pct", 0.0)), ProductionManager.binning_strategy_label(str(result.get("binning_strategy", "BALANCED")))
 				])
 		production_label.text = "\n".join(production_lines)
@@ -2447,12 +2448,12 @@ func _refresh_products():
 				ready_count += 1
 			elif str(model.get("status", "")) == "LAUNCHED":
 				launched_count += 1
-		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • silicium %.0f/100 ± %.1f • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
+		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • dies électriques %.0f/100 ± %.1f • gravure %.0f/100 • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
 			int(generation.get("generation_index", 1)), str(generation.get("name", "Architecture CPU")),
 			float(generation.get("yield_rate", 0.0)) * 100.0, float(generation.get("manufacturing_quality", 60.0)),
-			float(generation.get("defect_rate", 0.025)) * 100.0, float(generation.get("silicon_quality_mean", 60.0)),
-			float(generation.get("silicon_variation", 10.0)), int(generation.get("model_ids", []).size()),
-			ready_count, launched_count, int(generation.get("future_model_slots", 0))
+			float(generation.get("defect_rate", 0.025)) * 100.0, float(generation.get("die_quality_mean", generation.get("silicon_quality_mean", 60.0))),
+			float(generation.get("die_variation", generation.get("silicon_variation", 10.0))), float(generation.get("lithography_precision", 55.0)),
+			int(generation.get("model_ids", []).size()), ready_count, launched_count, int(generation.get("future_model_slots", 0))
 		])
 	for product in ProductManager.products:
 		var product_tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
@@ -2494,7 +2495,7 @@ func _refresh_product_details():
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nSilicium %.0f/100 • constance %.0f/100 • variation ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nGravure/équipement %.0f/100 • marge conception %.0f/100\nDie sélectionné : qualité électrique %.0f/100 • constance %.0f/100 • dispersion ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
 			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
@@ -2503,7 +2504,8 @@ func _refresh_product_details():
 			int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
 			ProductionManager.binning_strategy_label(str(product.get("binning_strategy", "BALANCED"))),
 			ProductionManager.strategy_label(str(product.get("industrialization_strategy", "BALANCED"))), int(product.get("industrialization_months", 0)),
-			float(product.get("silicon_quality", 60.0)), float(product.get("silicon_consistency", 60.0)), float(product.get("silicon_variation", 10.0)),
+			float(product.get("lithography_precision", 55.0)), float(product.get("design_margin_score", 55.0)),
+			float(product.get("die_quality", product.get("silicon_quality", 60.0))), float(product.get("die_consistency", product.get("silicon_consistency", 60.0))), float(product.get("die_variation", product.get("silicon_variation", 10.0))),
 			float(product.get("oc_headroom_pct", 0.0)), CPU_DESIGN.format_frequency({"frequency_ghz":float(product.get("typical_oc_frequency_ghz", design.frequency_ghz))}),
 			float(product.get("undervolt_headroom_pct", 0.0)),
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
