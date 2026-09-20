@@ -293,6 +293,11 @@ func _learn_from_case(case_data: Dictionary, amount: float):
 func _add_field_experience(issue_type: String, amount: float):
 	field_experience[issue_type] = clampf(float(field_experience.get(issue_type, 0.0)) + maxf(amount, 0.0), 0.0, 100.0)
 
+func add_firmware_field_learning(amount: float):
+	_add_field_experience("FIRMWARE", amount)
+	field_experience_changed.emit()
+	ResearchManager.research_changed.emit()
+
 func process_month():
 	for case_data in cases:
 		var status := str(case_data.get("status", ""))
