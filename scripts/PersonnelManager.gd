@@ -216,6 +216,65 @@ func get_leader_quality(employee_id: String, department: String) -> float:
 			return clampf(float(emp.leadership) * 0.55 + float(emp.skill) * 0.20 + exp + dept_bonus, 0.0, 100.0)
 	return 0.0
 
+func management_profile(employee_id: String, sector: String = "CPU") -> Dictionary:
+	var emp := get_employee(employee_id)
+	if emp.is_empty():
+		return {}
+	var profile: Dictionary = emp.get("profile", {})
+	var experience := minf(float(emp.get("experience_years", 0.0)) * 2.4, 24.0)
+	var leadership := float(emp.get("leadership", 50.0))
+	var skill := float(emp.get("skill", 50.0))
+	var morale := float(emp.get("morale", 70.0))
+	var specialization := str(emp.get("specialization", ""))
+	var domain_bonus := 0.0
+	if sector == "CPU" and specialization in ["cpu", "product", "validation", "integration", "manufacturing", "process"]:
+		domain_bonus = 8.0
+	var technical := clampf(
+		skill * 0.34 + float(profile.get("problem_solving", 50.0)) * 0.24
+		+ float(profile.get("process_quality", 50.0)) * 0.16 + experience + domain_bonus,
+		0.0, 100.0
+	)
+	var financial := clampf(
+		float(profile.get("rigor", 50.0)) * 0.34 + leadership * 0.26
+		+ float(profile.get("stress_tolerance", 50.0)) * 0.18 + experience * 0.65,
+		0.0, 100.0
+	)
+	var innovation := clampf(
+		float(profile.get("creativity", 50.0)) * 0.42 + float(profile.get("problem_solving", 50.0)) * 0.24
+		+ skill * 0.18 + experience * 0.45 + domain_bonus * 0.70,
+		0.0, 100.0
+	)
+	var risk_management := clampf(
+		float(profile.get("rigor", 50.0)) * 0.37 + float(profile.get("process_quality", 50.0)) * 0.25
+		+ float(profile.get("stress_tolerance", 50.0)) * 0.23 + leadership * 0.10,
+		0.0, 100.0
+	)
+	var people := clampf(
+		float(profile.get("teamwork", 50.0)) * 0.36 + leadership * 0.38
+		+ morale * 0.12 + experience * 0.35,
+		0.0, 100.0
+	)
+	var market := clampf(
+		leadership * 0.22 + float(profile.get("creativity", 50.0)) * 0.18
+		+ float(profile.get("teamwork", 50.0)) * 0.18 + skill * 0.14
+		+ (14.0 if specialization == "marketing" else 0.0) + experience * 0.35,
+		0.0, 100.0
+	)
+	return {
+		"id":str(emp.get("id", "")),
+		"name":str(emp.get("name", "")),
+		"role":str(emp.get("role", "")),
+		"department":str(emp.get("department", "")),
+		"technical":technical,
+		"financial":financial,
+		"innovation":innovation,
+		"risk":risk_management,
+		"people":people,
+		"market":market,
+		"leadership":leadership,
+		"experience":float(emp.get("experience_years", 0.0))
+	}
+
 func count_department(department: String) -> int:
 	var count := 0
 	for emp in staff:
