@@ -1992,7 +1992,6 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	var monthly_burn := BalanceManager.projected_starting_monthly_burn()
 	# Calcul local avec le profil sélectionné, sans modifier une partie en cours.
 	var base_company := 21000
 	var base_payroll := 32800
@@ -2259,6 +2258,10 @@ func _refresh_company():
 	var lines := ["Image de l'entreprise :"]
 	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
 		lines.append("• %s : %.1f/100" % [key.capitalize(), float(r[key])])
+	lines.append("\nÉquilibrage économique : %s" % BalanceManager.profile_label())
+	lines.append("Marge structurelle théorique au départ : %.1f mois • marché x%.2f • pression concurrentielle x%.2f" % [
+		BalanceManager.starting_runway_months(), BalanceManager.market_demand_factor(), BalanceManager.competitor_pressure_factor()
+	])
 	lines.append("\nFiliales : %d" % CompanyManager.subsidiaries.size())
 	for sub in CompanyManager.subsidiaries:
 		lines.append("• %s — %s — capital %s €" % [str(sub.name), str(sub.sector), _money(int(sub.capital))])
