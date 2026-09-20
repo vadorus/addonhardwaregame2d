@@ -29,14 +29,18 @@ func add_income(amount: int, category: String = "Autres revenus"):
 	money_changed.emit(money)
 	transaction_recorded.emit("income", category, amount)
 
+func quoted_expense(amount: int, category: String = "Autres dépenses") -> int:
+	return BalanceManager.expense_amount(amount, category)
+
 func add_expense(amount: int, category: String = "Autres dépenses"):
 	if amount <= 0:
 		return
-	monthly_expenses += amount
-	money -= amount
-	expense_breakdown[category] = int(expense_breakdown.get(category, 0)) + amount
+	var charged := quoted_expense(amount, category)
+	monthly_expenses += charged
+	money -= charged
+	expense_breakdown[category] = int(expense_breakdown.get(category, 0)) + charged
 	money_changed.emit(money)
-	transaction_recorded.emit("expense", category, amount)
+	transaction_recorded.emit("expense", category, charged)
 
 func close_month() -> Dictionary:
 	var report := {
