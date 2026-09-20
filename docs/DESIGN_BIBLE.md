@@ -455,6 +455,36 @@ Les médias et créateurs de contenu testent les produits à partir des données
 
 Le marketing choisit cible, message, canal, budget, durée et territoire. Une promesse excessive augmente l'attente et donc le risque de déception. Les tests, retours, forums, streamers et bouche-à-oreille doivent expliquer au joueur ce qui se passe sur le marché.
 
+### Marché historique évolutif et concurrents
+
+Le marché CPU ne doit jamais présenter les mêmes besoins en 1971 et plusieurs décennies plus tard. Le jeu utilise des **besoins concrets** plutôt que des catégories modernes permanentes.
+
+Au démarrage de 1971, les besoins visibles sont volontairement limités à :
+- calculatrices / contrôle numérique ;
+- systèmes embarqués ;
+- industriel / automatisation.
+
+D'autres usages peuvent ensuite apparaître : scientifique / instrumentation, kits et passionnés, micro-informatique professionnelle, ordinateurs personnels, stations de travail, serveurs, gaming, informatique mobile puis datacenters.
+
+Les dates historiques servent de **repères de diffusion**, jamais de barrières absolues. Un marché apparaît si son époque historique est atteinte **ou** si le niveau technologique global de la partie atteint assez tôt les conditions qui rendent cet usage crédible. Le joueur ou un concurrent peut donc provoquer une histoire alternative accélérée.
+
+La taille et le prix de référence de chaque besoin évoluent indépendamment. Les gammes Essential / Signature / Apex restent trois bins d'une même famille de CPU : un Apex de 1971 ne devient pas artificiellement un produit gaming si ce marché n'existe pas encore.
+
+Les concurrents CPU ne gagnent plus des points gratuitement chaque mois. Chaque entreprise concurrente possède :
+- trésorerie ;
+- budget R&D ;
+- compétences architecture, layout, miniaturisation, fabrication et intégration ;
+- stratégie propre ;
+- progression de développement ;
+- procédé de fabrication réellement accessible ;
+- rendement, coût unitaire et capacité ;
+- produit actuellement commercialisé et marché cible ;
+- historique de générations.
+
+Leurs ventes alimentent leur trésorerie, tandis que R&D et frais fixes la consomment. Une nouvelle génération demande un vrai cycle de développement et un investissement. Une entreprise qui manque durablement de liquidités peut se restructurer, perdre de la marque et réduire sa capacité. Les concurrents obéissent donc à une grammaire économique comparable à celle du joueur, même si leur simulation reste plus agrégée pour préserver les performances.
+
+Le marché compare les produits aux attentes du besoin réellement visé. Les marchés passionnés valorisent davantage performance et marge OC ; industrie, serveurs et datacenters valorisent davantage fiabilité, constance et efficacité. Les contrats B2B utilisent également des clients cohérents avec le besoin actif.
+
 ## 14. Synergies entre divisions
 
 Les technologies internes peuvent être réutilisées :

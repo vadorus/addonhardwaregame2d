@@ -264,18 +264,12 @@ static func _tier_metrics(project_metrics: Dictionary, design_estimate: Dictiona
 		result[metric] = clampf(float(result.get(metric, 55.0)) + float(deltas[metric_value]), 0.0, 100.0)
 	return result
 
-static func _target_segment(project_segment: String, tier: String) -> String:
-	match tier:
-		"ESSENTIAL":
-			return "BUDGET"
-		"APEX":
-			if project_segment in ["PRO", "ENTERPRISE", "PREMIUM"]:
-				return project_segment
-			return "ENTHUSIAST"
-		_:
-			if project_segment in ["PRO", "ENTERPRISE"]:
-				return "PRO"
-			return "MAINSTREAM"
+static func _target_segment(project_segment: String, _tier: String) -> String:
+	# Les trois bins sont des positions de gamme d'un même besoin marché.
+	# Un Apex 1971 ne devient donc pas magiquement un CPU "gaming".
+	if GameData.SEGMENTS.has(project_segment):
+		return project_segment
+	return "EMBEDDED"
 
 static func _scaled_core_value(value: float) -> int:
 	return maxi(int(round(value)), 1)

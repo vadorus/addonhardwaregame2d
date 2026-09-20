@@ -43,7 +43,7 @@ func _new_division(sector: String, status: String) -> Dictionary:
 		"control_mode":"DIRECT",
 		"mandate":{
 			"priority":"BALANCED",
-			"target_segment":"MAINSTREAM",
+			"target_segment":"EMBEDDED",
 			"monthly_budget_ceiling":60000,
 			"risk_tolerance":"MODERATE",
 			"quality_bias":55.0,
@@ -146,7 +146,7 @@ func set_mandate(sector: String, mandate_update: Dictionary) -> bool:
 	var risk := str(mandate_update.get("risk_tolerance", mandate.get("risk_tolerance", "MODERATE")))
 	if not RISK_LEVELS.has(risk):
 		return false
-	var segment := str(mandate_update.get("target_segment", mandate.get("target_segment", "MAINSTREAM")))
+	var segment := str(mandate_update.get("target_segment", mandate.get("target_segment", "EMBEDDED")))
 	if not GameData.SEGMENTS.has(segment):
 		return false
 	mandate["priority"] = priority
@@ -474,8 +474,8 @@ func load_state(state: Dictionary) -> void:
 				mandate["priority"] = "BALANCED"
 			if not RISK_LEVELS.has(str(mandate.get("risk_tolerance", "MODERATE"))):
 				mandate["risk_tolerance"] = "MODERATE"
-			if not GameData.SEGMENTS.has(str(mandate.get("target_segment", "MAINSTREAM"))):
-				mandate["target_segment"] = "MAINSTREAM"
+			if not GameData.SEGMENTS.has(str(mandate.get("target_segment", "EMBEDDED"))):
+				mandate["target_segment"] = "EMBEDDED"
 			mandate["monthly_budget_ceiling"] = clampi(int(mandate.get("monthly_budget_ceiling", 60000)), 10000, 1000000)
 			mandate["quality_bias"] = clampf(float(mandate.get("quality_bias", 55.0)), 0.0, 100.0)
 			mandate["growth_bias"] = clampf(float(mandate.get("growth_bias", 50.0)), 0.0, 100.0)
