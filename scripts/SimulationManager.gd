@@ -5,11 +5,12 @@ signal game_over(reason, report)
 
 var is_game_over := false
 
-func reset_all(company_name: String, starting_sector: String):
+func reset_all(company_name: String, starting_sector: String, difficulty: String = "STANDARD"):
 	is_game_over = false
 	var active_sector := starting_sector if GameData.is_sector_active(starting_sector) else "CPU"
 	TimeManager.reset()
-	CompanyManager.reset(company_name, active_sector, 500_000)
+	BalanceManager.reset(difficulty)
+	CompanyManager.reset(company_name, active_sector, BalanceManager.starting_capital())
 	DivisionManager.reset(active_sector)
 	PersonnelManager.reset(active_sector)
 	ExecutiveManager.reset()
