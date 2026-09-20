@@ -130,7 +130,7 @@ func get_active_cpu_concept_programs() -> Array:
 func start_cpu_concept_program(axis: String, monthly_budget: int, ambition: int) -> bool:
 	if not CPU_CONCEPT_AXES.has(axis):
 		return false
-	if Economy.money < maxi(monthly_budget, 5000):
+	if not Economy.can_afford(maxi(monthly_budget, 5000), "R&D Concept"):
 		return false
 	if get_cpu_research_capacity() <= 0:
 		return false
@@ -681,7 +681,10 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		if not MarketManager.is_segment_available(market_segment):
 			return false
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
-	if Economy.money < maxi(monthly_budget, 10000) + remediation_upfront:
+	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
+	if remediation_upfront > 0:
+		first_month_commitment += Economy.quoted_expense(remediation_upfront, "Programme technique")
+	if Economy.money < first_month_commitment:
 		return false
 	if sector == "CPU" and get_development_team_size() <= 0:
 		return false
