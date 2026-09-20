@@ -160,6 +160,34 @@ func process_month(active_departments: Array):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
 	staff_changed.emit()
 
+func apply_company_environment(morale_delta: float, training_gain: float):
+	for emp in staff:
+		emp["morale"] = clampf(float(emp.get("morale", 75.0)) + morale_delta, 0.0, 100.0)
+		if training_gain > 0.0:
+			emp["experience_years"] = float(emp.get("experience_years", 0.0)) + training_gain
+			var spec := str(emp.get("specialization", ""))
+			if spec != "":
+				var domain_exp: Dictionary = emp.get("domain_experience", {})
+				domain_exp[spec] = float(domain_exp.get(spec, 0.0)) + training_gain
+				emp["domain_experience"] = domain_exp
+	staff_changed.emit()
+
+func change_employee_morale(employee_id: String, delta: float) -> bool:
+	for emp in staff:
+		if str(emp.get("id", "")) == employee_id:
+			emp["morale"] = clampf(float(emp.get("morale", 75.0)) + delta, 0.0, 100.0)
+			staff_changed.emit()
+			return true
+	return false
+
+func average_morale() -> float:
+	if staff.is_empty():
+		return 50.0
+	var total := 0.0
+	for emp in staff:
+		total += float(emp.get("morale", 50.0))
+	return total / float(staff.size())
+
 func team_score(department: String, specialization: String = "") -> float:
 	var members: Array = []
 	for emp in staff:
