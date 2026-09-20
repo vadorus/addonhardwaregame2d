@@ -443,7 +443,7 @@ func estimated_structural_monthly_cost() -> int:
 	for emp in PersonnelManager.staff:
 		payroll += int(emp.get("salary", 0))
 	var policy_cost := int(CompanyManager.policies.get("marketing_budget", 0)) + int(CompanyManager.policies.get("support_budget", 0)) + int(CompanyManager.policies.get("environment_budget", 0))
-	return 7500 + payroll + policy_cost + monthly_benefit_cost() + monthly_workplace_cost()
+	return 7500 + payroll + policy_cost + monthly_benefit_cost() + monthly_workplace_cost() + FoundryManager.current_monthly_overhead()
 
 func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Dictionary:
 	var cash_after := Economy.money - maxi(proposed_cost, 0)
@@ -502,6 +502,26 @@ func get_executive_brief() -> Dictionary:
 	if not open_sav.is_empty():
 		var sav: Dictionary = open_sav[0]
 		priorities.append({"category":"SAV","severity":float(sav.get("severity", 55.0)),"text":"Un dossier SAV important concerne %s." % str(sav.get("product_name", "un produit")),"action":"Faire diagnostiquer la cause avant qu'elle ne dégrade la réputation."})
+
+	var fab_project := FoundryManager.active_construction()
+	if not fab_project.is_empty():
+		priorities.append({
+			"category":"FONDERIE",
+			"severity":58,
+			"text":"%s est en construction (%d mois restants)." % [str(fab_project.get("name", "Fab interne")), int(fab_project.get("months_remaining", 0))],
+			"action":"Surveillez la trésorerie : les appels de fonds continuent jusqu'à la mise en service."
+		})
+	for foundry_job in ProductionManager.get_active_jobs():
+		if str(foundry_job.get("manufacturing_mode", "EXTERNAL")) == "EXTERNAL":
+			var quote := ProductionManager.manufacturing_route_quote(str(foundry_job.get("id", "")))
+			if not quote.is_empty() and float(quote.get("dependency", 0.0)) >= 50.0:
+				priorities.append({
+					"category":"FOURNISSEUR",
+					"severity":54,
+					"text":"%s dépend fortement de %s." % [str(foundry_job.get("name", "CPU")), str(quote.get("provider_name", "la fonderie externe"))],
+					"action":"Cette route est rapide/capacitaire mais expose davantage aux retards fournisseur."
+				})
+				break
 
 	var remediation_project: Dictionary = {}
 	var active_project: Dictionary = {}
