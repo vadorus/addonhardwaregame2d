@@ -306,31 +306,31 @@ L'avis financier ne décide jamais pour le joueur. Il classe la situation (confo
 
 Le suivi RH et financier est d'abord assuré avec le bras droit. À mesure que l'effectif grandit, l'interface peut ensuite matérialiser un DRH et un DAF dédiés sans changer la logique sous-jacente.
 
-### Qualité du silicium, binning et marge électrique
+### Dispersion des dies, gravure, binning et marge électrique
 
-Une génération CPU n'a pas une qualité de silicium parfaitement uniforme. L'industrialisation produit désormais une **qualité moyenne**, une **dispersion**, une **prévisibilité**, une **marge d'overclocking typique** et une **marge d'undervolt**.
+La « silicon lottery » est un résultat de fabrication, pas une statistique abstraite sur la qualité du silicium brut.
 
-Ces valeurs dépendent de la qualité d'industrialisation, de la maîtrise du procédé, de l'équipe Production, de la fiabilité du design et de sa complexité. Un procédé mûr donne surtout une distribution plus prévisible ; un procédé mal maîtrisé peut parfois produire de très bons dies, mais avec davantage de dispersion.
+La qualité électrique des dies et leur dispersion viennent principalement de la **technologie de gravure utilisée**, de la **précision et stabilité des équipements**, de la **maturité du procédé**, du **layout**, des **marges de conception**, de la fréquence visée et de la qualité de l'industrialisation. Une conception agressive sur un procédé ou des machines encore peu maîtrisés peut donner quelques très bons dies, mais une distribution plus large et moins prévisible.
 
-Le joueur choisit aussi la politique de sélection des dies :
+Le moteur distingue donc :
+- précision gravure / équipement ;
+- maîtrise du procédé ;
+- marge de conception ;
+- qualité électrique moyenne des dies ;
+- dispersion et prévisibilité ;
+- marge OC et undervolt.
 
-- **Binning volume** : davantage de dies poussés vers les bins supérieurs, mais plus de dispersion et moins de marge moyenne ;
+Le joueur choisit ensuite une politique de **binning**, qui ne crée pas de meilleurs dies : elle décide seulement comment trier ceux qui ont réellement été fabriqués.
+
+- **Binning volume** : critères plus larges, davantage de dies dans les bins élevés, mais davantage de dispersion dans chaque référence ;
 - **Binning équilibré** : compromis par défaut ;
-- **Binning strict** : moins de dies Apex, mais une qualité plus homogène, davantage de marge OC/undervolt et une meilleure prévisibilité.
+- **Binning strict** : moins de dies Apex, mais sélection plus homogène et davantage de marge électrique moyenne dans le bin.
 
-Les modèles Essentiel, Signature et Apex héritent d'une distribution différente : l'Apex reçoit statistiquement les meilleurs dies, tandis que l'Essentiel absorbe davantage les dies fonctionnels mais moins favorables.
+Les modèles Essentiel, Signature et Apex sont donc des sélections différentes d'une même distribution physique. L'Apex reçoit les dies les plus favorables ; l'Essentiel utilise davantage de dies fonctionnels mais moins marginés.
 
-La marge OC n'est pas une fréquence garantie. L'interface affiche la fréquence officielle et une estimation de la fréquence typique atteignable sur un bon échantillon. Le marché Enthousiaste et les benchmarks peuvent valoriser cette marge ; les segments professionnels valorisent davantage la constance et la capacité d'undervolt.
+La marge OC n'est jamais une fréquence garantie. L'interface affiche la fréquence officielle et une estimation typique issue de la distribution mesurée. Le marché Enthousiaste peut valoriser cette marge ; les segments professionnels valorisent davantage la constance et l'undervolt.
 
-Une révision matérielle peut ensuite améliorer la distribution des **nouvelles unités produites** sans modifier physiquement les CPU déjà vendus.
-
-### Progression pédagogique de l'interface
-
-Le jeu dissocie la profondeur de simulation de la quantité d'interface visible. Les systèmes peuvent déjà exister sous le capot, mais leurs panneaux ne deviennent accessibles que lorsqu'ils servent une décision réelle.
-
-Le premier écran jouable expose uniquement le QG et le laboratoire CPU. Les écrans Équipe, Entreprise, Produits, Marché et Presse sont ensuite débloqués par des jalons de gameplay. Les déblocages sont persistants et le bras droit les présente comme de nouvelles responsabilités de l'entreprise.
-
-Cette progression constitue une mécanique d'apprentissage : découvrir une nouvelle fonction revient à gagner une nouvelle capacité dans un RPG, plutôt qu'à recevoir un manuel de cinquante boutons au premier lancement.
+Une révision matérielle peut améliorer les **futures unités** en changeant le layout, les règles électriques, la calibration ou le procédé, sans modifier physiquement les CPU déjà vendus.
 
 ## 8. Générations et propositions d'architecture
 
