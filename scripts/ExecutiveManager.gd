@@ -57,6 +57,16 @@ var workplace := {
 var hr_issues: Array = []
 var _next_hr_issue_id := 1
 var months_operated := 0
+var interface_unlocks := {
+	"QG":true,
+	"LAB":true,
+	"COMPANY":false,
+	"TEAM":false,
+	"PRODUCTS":false,
+	"MARKET":false,
+	"PRESS":false
+}
+var unlock_history: Array = []
 
 func reset():
 	benefit_policy = {"HEALTH":"BASIC","MEALS":"NONE","TRAINING":"NONE","REST":"BASIC"}
@@ -64,7 +74,106 @@ func reset():
 	hr_issues = []
 	_next_hr_issue_id = 1
 	months_operated = 0
+	interface_unlocks = {
+		"QG":true,
+		"LAB":true,
+		"COMPANY":false,
+		"TEAM":false,
+		"PRODUCTS":false,
+		"MARKET":false,
+		"PRESS":false
+	}
+	unlock_history = []
 	executive_changed.emit()
+
+func is_interface_feature_unlocked(feature: String) -> bool:
+	return bool(interface_unlocks.get(feature, false))
+
+func get_interface_unlocks() -> Dictionary:
+	return interface_unlocks.duplicate(true)
+
+func get_unlock_history() -> Array:
+	return unlock_history.duplicate(true)
+
+func sync_interface_unlocks() -> Array:
+	var newly_unlocked: Array = []
+	if not CompanyManager.created:
+		return newly_unlocked
+
+	var has_project := not ResearchManager.projects.is_empty()
+	var has_production := not ProductionManager.jobs.is_empty()
+	var has_products := not ProductManager.products.is_empty()
+	var has_launched_product := false
+	var has_market_history := false
+	for product in ProductManager.products:
+		if str(product.get("status", "")) == "LAUNCHED":
+			has_launched_product = true
+			if int(product.get("months_on_market", 0)) >= 1:
+				has_market_history = true
+
+	var rules := {
+		"TEAM":has_project or has_production or has_products,
+		"COMPANY":months_operated >= 1 or not get_open_hr_issues().is_empty() or int(workplace.get("tier", 0)) > 0,
+		"PRODUCTS":has_production or has_products,
+		"MARKET":has_launched_product,
+		"PRESS":not MediaManager.news.is_empty() or has_market_history
+	}
+	for feature_value in rules.keys():
+		var feature := str(feature_value)
+		if bool(rules[feature]) and not is_interface_feature_unlocked(feature):
+			_unlock_interface_feature(feature)
+			newly_unlocked.append(feature)
+	return newly_unlocked
+
+func _unlock_interface_feature(feature: String):
+	interface_unlocks[feature] = true
+	var data := interface_feature_info(feature)
+	var event := {
+		"feature":feature,
+		"label":str(data.get("label", feature)),
+		"message":str(data.get("message", "")),
+		"month":TimeManager.month,
+		"year":TimeManager.year
+	}
+	unlock_history.push_front(event)
+	if unlock_history.size() > 20:
+		unlock_history.pop_back()
+	CompanyManager.add_alert("Nora : nouveau panneau disponible — %s. %s" % [str(event.label), str(event.message)])
+
+func interface_feature_info(feature: String) -> Dictionary:
+	match feature:
+		"QG":
+			return {"label":"QG","message":"Votre point d'entrée : une priorité à la fois."}
+		"LAB":
+			return {"label":"Laboratoire CPU","message":"Commencez par construire et comprendre votre premier processeur."}
+		"TEAM":
+			return {"label":"Équipe","message":"Le projet est lancé : les compétences et l'organisation humaine ont maintenant un impact concret."}
+		"COMPANY":
+			return {"label":"Entreprise","message":"Après vos premiers mois, budgets, avantages, locaux et conseil financier deviennent utiles."}
+		"PRODUCTS":
+			return {"label":"Production & Produits","message":"Votre CPU quitte le laboratoire : industrialisation, binning et préparation commerciale entrent en jeu."}
+		"MARKET":
+			return {"label":"Marché","message":"Votre premier CPU est vendu : concurrence, demande, contrats et SAV deviennent visibles."}
+		"PRESS":
+			return {"label":"Presse","message":"Le marché commence à parler de vous. Les avis et événements publics comptent désormais."}
+	return {"label":feature,"message":""}
+
+func next_interface_unlock_hint() -> Dictionary:
+	for feature in ["TEAM","COMPANY","PRODUCTS","MARKET","PRESS"]:
+		if is_interface_feature_unlocked(feature):
+			continue
+		match feature:
+			"TEAM":
+				return {"feature":feature,"text":"Lancez votre premier projet CPU pour ouvrir la gestion de l'équipe."}
+			"COMPANY":
+				return {"feature":feature,"text":"Faites tourner l'entreprise un premier mois pour ouvrir budgets, RH et locaux."}
+			"PRODUCTS":
+				return {"feature":feature,"text":"Terminez le développement d'un CPU pour ouvrir l'industrialisation et les produits."}
+			"MARKET":
+				return {"feature":feature,"text":"Commercialisez un CPU pour ouvrir l'analyse du marché."}
+			"PRESS":
+				return {"feature":feature,"text":"Obtenez vos premiers retours publics pour ouvrir la presse."}
+	return {}
 
 func get_right_hand() -> Dictionary:
 	return right_hand.duplicate(true)
@@ -200,6 +309,7 @@ func process_month():
 		morale_delta -= minf(0.18 * float(overflow), 1.2)
 	PersonnelManager.apply_company_environment(morale_delta, benefits_training_gain())
 	_detect_hr_issues()
+	sync_interface_unlocks()
 	executive_changed.emit()
 
 func _detect_hr_issues():
@@ -406,6 +516,10 @@ func get_executive_brief() -> Dictionary:
 	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
 		priorities.append({"category":"DÉMARRAGE","severity":72,"text":"Nous n'avons encore aucun produit en développement.","action":"Concentrez-vous sur un premier CPU simple et maîtrisable."})
 
+	var unlock_hint := next_interface_unlock_hint()
+	if not unlock_hint.is_empty() and priorities.size() < 3:
+		priorities.append({"category":"GUIDE","severity":28,"text":"Prochaine fonction à découvrir : %s." % str(interface_feature_info(str(unlock_hint.feature)).get("label", "")),"action":str(unlock_hint.text)})
+
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "READY":
 			priorities.append({"category":"LANCEMENT","severity":64,"text":"%s est prêt mais pas encore commercialisé." % str(product.get("name", "Un CPU")),"action":"Décidez du prix et de la capacité avant le lancement."})
@@ -437,7 +551,9 @@ func get_state() -> Dictionary:
 		"workplace":workplace,
 		"hr_issues":hr_issues,
 		"next_hr_issue_id":_next_hr_issue_id,
-		"months_operated":months_operated
+		"months_operated":months_operated,
+		"interface_unlocks":interface_unlocks,
+		"unlock_history":unlock_history
 	}
 
 func load_state(state: Dictionary):
@@ -457,4 +573,20 @@ func load_state(state: Dictionary):
 	hr_issues = state.get("hr_issues", []).duplicate(true)
 	_next_hr_issue_id = int(state.get("next_hr_issue_id", hr_issues.size() + 1))
 	months_operated = int(state.get("months_operated", 0))
+	interface_unlocks = {
+		"QG":true,
+		"LAB":true,
+		"COMPANY":false,
+		"TEAM":false,
+		"PRODUCTS":false,
+		"MARKET":false,
+		"PRESS":false
+	}
+	var saved_unlocks = state.get("interface_unlocks", {})
+	if typeof(saved_unlocks) == TYPE_DICTIONARY:
+		for feature in interface_unlocks.keys():
+			interface_unlocks[feature] = bool(saved_unlocks.get(feature, interface_unlocks[feature]))
+	interface_unlocks["QG"] = true
+	interface_unlocks["LAB"] = true
+	unlock_history = state.get("unlock_history", []).duplicate(true)
 	executive_changed.emit()
