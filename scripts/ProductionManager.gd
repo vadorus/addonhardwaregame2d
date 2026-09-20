@@ -213,7 +213,7 @@ func production_team_score() -> float:
 
 func production_confidence(node_nm: int) -> float:
 	var mastery := get_process_mastery(node_nm)
-	var management := CompanyManager.department_management_modifier("Production")
+	var management := CompanyManager.department_management_modifier("Production") * DivisionManager.management_modifier("CPU")
 	return clampf(20.0 + production_team_score() * 0.48 + mastery * 0.24 + quality_knowledge * 0.12 + (management - 0.8) * 20.0, 20.0, 96.0)
 
 func get_process_mastery(node_nm: int) -> float:
@@ -242,7 +242,7 @@ func _process_job_month(job: Dictionary):
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
-	var management := CompanyManager.department_management_modifier("Production")
+	var management := CompanyManager.department_management_modifier("Production") * DivisionManager.management_modifier("CPU")
 	var stress_tolerance := PersonnelManager.team_attribute("Production", "stress_tolerance")
 	var base_cost := int(job.get("monthly_cost", _base_monthly_cost(node_nm, complexity)))
 	var expense := int(round(float(base_cost) * float(strategy.cost) * float(route.get("cost_factor", 1.0))))
