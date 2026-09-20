@@ -473,6 +473,9 @@ func _ready() -> void:
 	if str(lifecycle_initial.get("revision", "")) != "A0" or int(lifecycle_initial.get("firmware_version", 0)) != 1:
 		_fail("Newly launched CPU did not receive baseline revision and firmware state")
 		return
+	if bool(lifecycle_initial.get("firmware_available", true)) or bool(lifecycle_initial.get("control_software_available", true)):
+		_fail("Advanced CPU software lifecycle should not be available to the early-era company immediately")
+		return
 
 	var price_before := int(apex_model.price)
 	if not ProductManager.update_product_price(str(apex_model.id), maxi(price_before - 5, 1)):
@@ -509,6 +512,12 @@ func _ready() -> void:
 		_fail("Hardware stepping incorrectly modified the already-sold installed base")
 		return
 
+	ResearchManager.technologies["software"] = 20.0
+	ResearchManager.technologies["integration"] = 28.0
+	ResearchManager.cpu_capabilities["ARCHITECTURE"] = maxf(ResearchManager.get_cpu_capability("ARCHITECTURE"), 30.0)
+	if not ProductManager.firmware_available(apex_model) or not ProductManager.control_software_available(apex_model):
+		_fail("CPU software lifecycle did not unlock after sufficient software, integration and architecture knowledge")
+		return
 	var firmware_field_before := AfterSalesManager.cpu_field_experience("FIRMWARE")
 	var reliability_before_firmware := float(apex_model.get("metrics", {}).get("reliability", 0.0))
 	if not ProductManager.release_firmware(str(apex_model.id), "STABILITY"):
