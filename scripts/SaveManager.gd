@@ -49,6 +49,7 @@ func load_game() -> bool:
 		return false
 	var state: Dictionary = parsed
 	CompanyManager.load_state(state.get("company", {}))
+	TimeManager.load_state(state.get("time", {}))
 	DivisionManager.load_state(state.get("divisions", {}))
 	Economy.load_state(state.get("economy", {}))
 	PersonnelManager.load_state(state.get("personnel", {}))
@@ -59,7 +60,6 @@ func load_game() -> bool:
 	PatentManager.load_state(state.get("patents", {}))
 	ProductManager.load_state(state.get("products", {}))
 	AfterSalesManager.load_state(state.get("after_sales", {}))
-	TimeManager.load_state(state.get("time", {}))
 	MarketManager.load_state(state.get("market", {}))
 	MediaManager.load_state(state.get("media", {}))
 	save_completed.emit(true, "Partie chargée.")
