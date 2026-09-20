@@ -511,10 +511,13 @@ func _ready() -> void:
 	if str(industrial_result.get("binning_strategy", "")) != "STRICT":
 		_fail("Industrialization did not preserve the chosen binning strategy")
 		return
-	if float(industrial_result.get("silicon_quality_mean", 0.0)) <= 0.0 or float(industrial_result.get("silicon_variation", 0.0)) <= 0.0:
-		_fail("Industrialization did not produce silicon quality and variation")
+	if float(industrial_result.get("die_quality_mean", 0.0)) <= 0.0 or float(industrial_result.get("die_variation", 0.0)) <= 0.0:
+		_fail("Industrialization did not produce manufactured die quality and variation")
 		return
-	if float(industrial_result.get("silicon_predictability", 0.0)) < 20.0 or float(industrial_result.get("oc_headroom_pct", -1.0)) < 0.0:
+	if float(industrial_result.get("lithography_precision", 0.0)) <= 0.0 or float(industrial_result.get("design_margin_score", 0.0)) <= 0.0:
+		_fail("Die quality is not causally tied to lithography/equipment and design margin")
+		return
+	if float(industrial_result.get("process_predictability", 0.0)) < 20.0 or float(industrial_result.get("oc_headroom_pct", -1.0)) < 0.0:
 		_fail("Industrialization silicon predictability/headroom escaped supported ranges")
 		return
 	var cpu_generation: Dictionary = ProductManager.cpu_generations[0]
@@ -558,8 +561,11 @@ func _ready() -> void:
 	if str(apex_model.get("binning_strategy", "")) != "STRICT":
 		_fail("CPU products did not inherit the silicon binning strategy")
 		return
-	if float(apex_model.get("silicon_quality", 0.0)) <= float(signature_model.get("silicon_quality", 0.0)) or float(signature_model.get("silicon_quality", 0.0)) <= float(essential_model.get("silicon_quality", 0.0)):
-		_fail("Silicon lottery quality does not increase across Essential, Signature and Apex bins")
+	if float(apex_model.get("die_quality", 0.0)) <= float(signature_model.get("die_quality", 0.0)) or float(signature_model.get("die_quality", 0.0)) <= float(essential_model.get("die_quality", 0.0)):
+		_fail("Electrical die quality does not increase across Essential, Signature and Apex bins")
+		return
+	if float(apex_model.get("die_variation", 99.0)) >= float(cpu_generation.get("die_variation", 99.0)):
+		_fail("Strict binning did not narrow the variation inside the selected Apex bin")
 		return
 	if float(apex_model.get("oc_headroom_pct", 0.0)) <= float(essential_model.get("oc_headroom_pct", 0.0)):
 		_fail("Apex silicon should expose more typical overclocking headroom than Essential")
@@ -569,9 +575,9 @@ func _ready() -> void:
 		return
 	var enthusiast_baseline := apex_model.duplicate(true)
 	enthusiast_baseline["oc_headroom_pct"] = 0.0
-	enthusiast_baseline["silicon_consistency"] = 50.0
+	enthusiast_baseline["die_consistency"] = 50.0
 	if MarketManager.evaluate_product(apex_model, "ENTHUSIAST") <= MarketManager.evaluate_product(enthusiast_baseline, "ENTHUSIAST"):
-		_fail("Enthusiast market does not value silicon headroom and consistency")
+		_fail("Enthusiast market does not value die headroom and consistency")
 		return
 
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(ProductManager.products)
@@ -640,7 +646,8 @@ func _ready() -> void:
 
 	var sold_before_revision := int(apex_model.get("units_sold_total", 0))
 	var defect_before_revision := float(apex_model.get("defect_rate", 0.025))
-	var consistency_before_revision := float(apex_model.get("silicon_consistency", 0.0))
+	var consistency_before_revision := float(apex_model.get("die_consistency", 0.0))
+	var lithography_before_revision := float(apex_model.get("lithography_precision", 0.0))
 	var oc_before_revision := float(apex_model.get("oc_headroom_pct", 0.0))
 	if not ProductManager.apply_hardware_revision(str(apex_model.id), "QUALITY"):
 		_fail("Could not create a post-launch CPU hardware stepping")
@@ -654,8 +661,11 @@ func _ready() -> void:
 	if int(apex_model.get("units_sold_total", -1)) != sold_before_revision:
 		_fail("Hardware stepping incorrectly modified the already-sold installed base")
 		return
-	if float(apex_model.get("silicon_consistency", 0.0)) <= consistency_before_revision or float(apex_model.get("oc_headroom_pct", 0.0)) <= oc_before_revision:
-		_fail("Reliability stepping did not improve future silicon consistency/headroom")
+	if float(apex_model.get("die_consistency", 0.0)) <= consistency_before_revision or float(apex_model.get("oc_headroom_pct", 0.0)) <= oc_before_revision:
+		_fail("Reliability stepping did not improve future die consistency/headroom")
+		return
+	if float(apex_model.get("lithography_precision", 0.0)) <= lithography_before_revision:
+		_fail("Reliability stepping did not improve future process/calibration precision")
 		return
 
 	ResearchManager.technologies["software"] = 20.0
@@ -812,8 +822,8 @@ func _ready() -> void:
 	if restored_apex.is_empty() or str(restored_lifecycle.get("revision", "")) != "A1" or int(restored_lifecycle.get("firmware_version", 0)) != 2:
 		_fail("CPU post-launch revision or firmware state did not survive a save round-trip")
 		return
-	if float(restored_apex.get("silicon_quality", 0.0)) <= 0.0 or float(restored_apex.get("oc_headroom_pct", -1.0)) < 0.0 or str(restored_apex.get("binning_strategy", "")) != "STRICT":
-		_fail("CPU silicon lottery data did not survive a save round-trip")
+	if float(restored_apex.get("die_quality", 0.0)) <= 0.0 or float(restored_apex.get("oc_headroom_pct", -1.0)) < 0.0 or str(restored_apex.get("binning_strategy", "")) != "STRICT":
+		_fail("CPU die/process distribution data did not survive a save round-trip")
 		return
 	if not bool(restored_lifecycle.get("software_released", false)) or int(restored_lifecycle.get("software_version", 0)) != 1:
 		_fail("Linked CPU control software did not survive a save round-trip")
