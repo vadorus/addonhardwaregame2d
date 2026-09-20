@@ -67,8 +67,8 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		generation_id,
 		generation_index,
 		_base_unit_cost(project),
-		int(sector_data.reference_price),
-		maxi(300, int(float(sector_data.market_units) * 0.22)),
+		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
+		maxi(300, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.22)),
 		float(division.get("maturity", 0.0)),
 		industrialization
 	)
