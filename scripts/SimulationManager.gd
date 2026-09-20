@@ -26,6 +26,7 @@ func process_month_end() -> Dictionary:
 	if is_game_over:
 		return {}
 	CompanyManager.process_month()
+	DivisionManager.process_month()
 	var active := ResearchManager.active_departments()
 	for dept in FoundryManager.active_departments():
 		if not active.has(dept):

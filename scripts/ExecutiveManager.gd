@@ -489,6 +489,16 @@ func get_executive_brief() -> Dictionary:
 	if str(finance.level) in ["IMPOSSIBLE","DANGEREUX","TENDU"]:
 		priorities.append({"category":"FINANCE","severity":90 if str(finance.level) in ["IMPOSSIBLE","DANGEREUX"] else 68,"text":"Trésorerie : environ %.1f mois de marge structurelle." % float(finance.runway_months),"action":"Surveiller les dépenses avant tout nouvel engagement."})
 
+	var escalations := DivisionManager.get_pending_escalations()
+	if not escalations.is_empty():
+		var escalation: Dictionary = escalations[0]
+		priorities.append({
+			"category":"ARBITRAGE",
+			"severity":float(escalation.get("severity", 60.0)),
+			"text":"%s : %s" % [str(escalation.get("title", "Décision division")), str(escalation.get("text", ""))],
+			"action":str(escalation.get("recommendation", "Le CEO doit arbitrer."))
+		})
+
 	var open_hr := get_open_hr_issues()
 	if not open_hr.is_empty():
 		var issue: Dictionary = open_hr[0]
