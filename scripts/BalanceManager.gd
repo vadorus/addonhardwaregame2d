@@ -76,6 +76,9 @@ func expense_factor(category: String) -> float:
 	var normalized := category.to_lower()
 	if normalized.contains("capital filiale"):
 		return 1.0
+	# Les coûts variables par unité restent physiques et identiques au chiffre affiché sur le produit.
+	if normalized.begins_with("production —") or normalized.begins_with("sav garanties —"):
+		return 1.0
 	if normalized.contains("salaire") or normalized.contains("recrutement"):
 		return float(profile.get("salary_cost", 1.0))
 	if (
