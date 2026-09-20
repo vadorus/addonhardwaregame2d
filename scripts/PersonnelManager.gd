@@ -77,7 +77,7 @@ func hire_candidate() -> bool:
 	if candidate.is_empty():
 		return false
 	var signing_cost := int(candidate.salary) * 2
-	if Economy.money < signing_cost:
+	if not Economy.can_afford(signing_cost, "Recrutement"):
 		return false
 	Economy.add_expense(signing_cost, "Recrutement")
 	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary), candidate.get("profile", {}))
