@@ -29,7 +29,9 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	var base_yield := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
 	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
 	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 2.60)
-	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * capacity_factor)))
+	# Le plan commercial fixe la capacité recommandée. Une bonne industrialisation peut offrir
+	# de la marge au-dessus via max_capacity, mais ne recommande pas de produire plus que le marché visé.
+	var effective_monthly_capacity := maxi(100, int(round(float(total_monthly_capacity) * minf(capacity_factor, 1.0))))
 	var foundry_capacity := int(industrialization.get("foundry_capacity", 0))
 	if foundry_capacity > 0:
 		effective_monthly_capacity = mini(effective_monthly_capacity, foundry_capacity)
