@@ -55,9 +55,12 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"defect_rate":float(industrialization.get("defect_rate", 0.025)),
 		"process_mastery":float(industrialization.get("process_mastery", 35.0)),
 		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
-		"silicon_quality_mean":float(industrialization.get("silicon_quality_mean", industrialization.get("quality_score", 60.0))),
-		"silicon_variation":float(industrialization.get("silicon_variation", 10.0)),
-		"silicon_predictability":float(industrialization.get("silicon_predictability", 60.0)),
+		"die_quality_mean":float(industrialization.get("die_quality_mean", industrialization.get("silicon_quality_mean", industrialization.get("quality_score", 60.0)))),
+		"die_variation":float(industrialization.get("die_variation", industrialization.get("silicon_variation", 10.0))),
+		"process_predictability":float(industrialization.get("process_predictability", industrialization.get("silicon_predictability", 60.0))),
+		"lithography_precision":float(industrialization.get("lithography_precision", 55.0)),
+		"process_capability_score":float(industrialization.get("process_capability_score", 55.0)),
+		"design_margin_score":float(industrialization.get("design_margin_score", 55.0)),
 		"oc_headroom_pct":float(industrialization.get("oc_headroom_pct", 4.0)),
 		"undervolt_headroom_pct":float(industrialization.get("undervolt_headroom_pct", 6.0)),
 		"bin_distribution":bin_distribution,
@@ -76,33 +79,39 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var metrics := _tier_metrics(project_metrics, design_estimate, tier_key)
 	var manufacturing_quality := float(industrialization.get("quality_score", 60.0))
 	var defect_rate := float(industrialization.get("defect_rate", 0.025))
-	var silicon_mean := float(industrialization.get("silicon_quality_mean", manufacturing_quality))
-	var silicon_variation := float(industrialization.get("silicon_variation", 10.0))
+	var die_mean := float(industrialization.get("die_quality_mean", industrialization.get("silicon_quality_mean", manufacturing_quality)))
+	var die_variation := float(industrialization.get("die_variation", industrialization.get("silicon_variation", 10.0)))
 	var base_oc := float(industrialization.get("oc_headroom_pct", 4.0))
 	var base_uv := float(industrialization.get("undervolt_headroom_pct", 6.0))
-	var silicon_quality := silicon_mean
+	var process_predictability := float(industrialization.get("process_predictability", industrialization.get("silicon_predictability", 60.0)))
+	var selection_tolerance := clampf(float(industrialization.get("binning_selection_tolerance", 1.0)), 0.55, 1.35)
+	var selection_oc := float(industrialization.get("binning_headroom_selection", 0.0))
+	var selection_uv := float(industrialization.get("binning_undervolt_selection", 0.0))
+	var die_quality := die_mean
 	var oc_headroom := base_oc
 	var undervolt_headroom := base_uv
-	var consistency := float(industrialization.get("silicon_predictability", 60.0))
+	var consistency := process_predictability + (1.0 - selection_tolerance) * 20.0
+	var selected_variation := die_variation * selection_tolerance
 	match tier_key:
 		"ESSENTIAL":
-			silicon_quality -= 11.0
-			oc_headroom -= 2.2
+			die_quality -= 10.0
+			oc_headroom -= 2.0
 			undervolt_headroom -= 0.8
-			consistency -= silicon_variation * 0.35
+			consistency -= selected_variation * 0.20
 		"SIGNATURE":
-			silicon_quality += 1.0
-			oc_headroom += 0.3
-			undervolt_headroom += 0.4
+			die_quality += 1.0 + selection_oc * 0.25
+			oc_headroom += 0.4 + selection_oc * 0.35
+			undervolt_headroom += 0.4 + selection_uv * 0.25
 		"APEX":
-			silicon_quality += 13.0
-			oc_headroom += 4.0
-			undervolt_headroom += 2.0
+			die_quality += 12.0 + selection_oc * 1.4
+			oc_headroom += 4.0 + selection_oc
+			undervolt_headroom += 2.0 + selection_uv
 			consistency += 5.0
-	silicon_quality = clampf(silicon_quality, 18.0, 99.0)
+	die_quality = clampf(die_quality, 18.0, 99.0)
 	oc_headroom = clampf(oc_headroom, 0.0, 28.0)
 	undervolt_headroom = clampf(undervolt_headroom, 0.0, 24.0)
 	consistency = clampf(consistency, 20.0, 99.0)
+	selected_variation = clampf(selected_variation, 1.5, 20.0)
 	metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + (manufacturing_quality - 60.0) * 0.075 - defect_rate * 22.0 + (consistency - 60.0) * 0.018, 0.0, 100.0)
 	var yield_cost_factor := 1.0 + (1.0 - yield_rate) * 0.55
 	var industrial_cost_factor := clampf(float(industrialization.get("cost_factor", 1.0)), 0.90, 1.30)
@@ -134,8 +143,15 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"range_role":str(tier.role),
 		"bin_quality":int(tier.bin_quality),
 		"bin_share":bin_share,
-		"silicon_quality":silicon_quality,
-		"silicon_variation":silicon_variation,
+		"die_quality":die_quality,
+		"die_variation":selected_variation,
+		"die_consistency":consistency,
+		"lithography_precision":float(industrialization.get("lithography_precision", 55.0)),
+		"process_capability_score":float(industrialization.get("process_capability_score", 55.0)),
+		"design_margin_score":float(industrialization.get("design_margin_score", 55.0)),
+		# aliases conservés pour la migration des sauvegardes V16
+		"silicon_quality":die_quality,
+		"silicon_variation":selected_variation,
 		"silicon_consistency":consistency,
 		"oc_headroom_pct":oc_headroom,
 		"undervolt_headroom_pct":undervolt_headroom,
