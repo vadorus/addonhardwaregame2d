@@ -38,7 +38,7 @@ func _ready() -> void:
 		return
 	if not DivisionManager.set_mandate("CPU", {
 		"priority":"PERFORMANCE",
-		"target_segment":"MAINSTREAM",
+		"target_segment":"EMBEDDED",
 		"risk_tolerance":"CAUTIOUS",
 		"monthly_budget_ceiling":10000,
 		"quality_bias":65.0,
@@ -124,6 +124,28 @@ func _ready() -> void:
 	if CompanyManager.founded_year != 1971:
 		_fail("Company founding year did not follow the early CPU era")
 		return
+	var starting_markets := MarketManager.available_segment_keys()
+	for required_market in ["CALCULATOR", "EMBEDDED", "INDUSTRIAL"]:
+		if not starting_markets.has(required_market):
+			_fail("1971 market is missing the early CPU need: %s" % required_market)
+			return
+	for anachronistic_market in ["HOME_PC", "GAMING", "SERVER", "DATACENTER"]:
+		if starting_markets.has(anachronistic_market):
+			_fail("1971 market exposed an anachronistic segment: %s" % anachronistic_market)
+			return
+	var market_research_probe := ResearchManager.get_state().duplicate(true)
+	ResearchManager.technologies["cpu"] = 60.0
+	ResearchManager.cpu_capabilities["ARCHITECTURE"] = 60.0
+	ResearchManager.cpu_capabilities["LAYOUT"] = 60.0
+	ResearchManager.cpu_capabilities["MINIATURIZATION"] = 60.0
+	var accelerated_markets := MarketManager.available_segment_keys()
+	if not accelerated_markets.has("HOBBYIST") or not accelerated_markets.has("BUSINESS_PC"):
+		_fail("Technological lead could not make later CPU markets emerge ahead of the historical date")
+		return
+	if accelerated_markets.has("GAMING"):
+		_fail("Moderate technological lead unlocked gaming too early")
+		return
+	ResearchManager.load_state(market_research_probe)
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
 		_fail("Garage onboarding did not expose QG and CPU Lab")
@@ -731,16 +753,18 @@ func _ready() -> void:
 	var enthusiast_baseline := apex_model.duplicate(true)
 	enthusiast_baseline["oc_headroom_pct"] = 0.0
 	enthusiast_baseline["die_consistency"] = 50.0
-	if MarketManager.evaluate_product(apex_model, "ENTHUSIAST") <= MarketManager.evaluate_product(enthusiast_baseline, "ENTHUSIAST"):
-		_fail("Enthusiast market does not value die headroom and consistency")
+	if MarketManager.evaluate_product(apex_model, "HOBBYIST") <= MarketManager.evaluate_product(enthusiast_baseline, "HOBBYIST"):
+		_fail("Hobbyist market does not value die headroom and consistency")
 		return
 
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(ProductManager.products)
 	var portfolio_units := 0
 	for demand_product in ProductManager.products:
 		portfolio_units += int(portfolio_demand.get(str(demand_product.id), {}).get("units", 0))
-	if portfolio_demand.size() != 3 or portfolio_units > int(GameData.SECTORS.CPU.market_units):
-		_fail("Portfolio demand did not cap the CPU family to the available market")
+	var family_market := MarketManager.normalize_segment(str(apex_model.get("target_segment", MarketManager.default_segment())))
+	var family_market_units := MarketManager.segment_market_units(family_market)
+	if portfolio_demand.size() != 3 or portfolio_units > family_market_units:
+		_fail("Portfolio demand did not cap the CPU family to its actual era market")
 		return
 
 	var apex_max_capacity := int(apex_model.get("max_monthly_capacity", 1))
@@ -931,19 +955,44 @@ func _ready() -> void:
 		return
 
 	var competitor_before: Dictionary = MarketManager.competitors.get("CPU", [])[0].duplicate(true)
-	var competitor_score_before := MarketManager.benchmark_score(competitor_before.merged({"sector":"CPU"}, true))
-	MarketManager.process_month([])
+	var competitor_generation_before := int(competitor_before.get("generation_index", 1))
+	var competitor_arch_before := float(competitor_before.get("architecture_skill", 0.0))
+	var competitor_progress_before := float(competitor_before.get("development_progress", 0.0))
+	var competitor_cash_before := int(competitor_before.get("cash", 0))
+	var competitor_loops := 0
+	while int(MarketManager.competitors.get("CPU", [])[0].get("generation_index", 1)) == competitor_generation_before and competitor_loops < 30:
+		MarketManager.process_month([])
+		competitor_loops += 1
 	var competitor_after: Dictionary = MarketManager.competitors.get("CPU", [])[0].duplicate(true)
-	var competitor_score_after := MarketManager.benchmark_score(competitor_after.merged({"sector":"CPU"}, true))
-	if competitor_score_after <= competitor_score_before:
-		_fail("Scripted CPU competitor did not progress with the market")
+	if float(competitor_after.get("architecture_skill", 0.0)) <= competitor_arch_before:
+		_fail("CPU competitor R&D did not improve its technical capability")
+		return
+	if int(competitor_after.get("cash", 0)) == competitor_cash_before:
+		_fail("CPU competitor finances did not react to sales, R&D and fixed costs")
+		return
+	if int(competitor_after.get("generation_index", 1)) <= competitor_generation_before:
+		_fail("CPU competitor did not complete a real next-generation development cycle")
+		return
+	if float(competitor_after.get("development_progress", 100.0)) >= competitor_progress_before and competitor_loops >= 30:
+		_fail("CPU competitor development did not reset after its generation launch")
+		return
+	if int(competitor_after.get("node_nm", 0)) <= 0 or int(competitor_after.get("capacity", 0)) <= 0 or float(competitor_after.get("yield_rate", 0.0)) <= 0.0:
+		_fail("CPU competitor generation has no process, capacity or yield constraints")
 		return
 	var market_round_trip := MarketManager.get_state().duplicate(true)
 	var saved_market_age := MarketManager.market_age_months
+	var saved_competitor_generation := int(competitor_after.get("generation_index", 1))
+	var saved_known_markets := MarketManager.known_segments.size()
 	MarketManager.reset()
 	MarketManager.load_state(market_round_trip)
 	if MarketManager.market_age_months != saved_market_age:
 		_fail("Market age did not survive a save round-trip")
+		return
+	if int(MarketManager.competitors.get("CPU", [])[0].get("generation_index", 0)) != saved_competitor_generation:
+		_fail("Competitor generation state did not survive a save round-trip")
+		return
+	if MarketManager.known_segments.size() != saved_known_markets:
+		_fail("Evolving market unlock state did not survive a save round-trip")
 		return
 	var after_sales_round_trip := AfterSalesManager.get_state().duplicate(true)
 	var saved_field_experience := AfterSalesManager.cpu_field_experience()
