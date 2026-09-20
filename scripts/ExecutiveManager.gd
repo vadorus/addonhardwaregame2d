@@ -105,6 +105,11 @@ func sync_interface_unlocks() -> Array:
 	var has_products := not ProductManager.products.is_empty()
 	var has_launched_product := false
 	var has_market_history := false
+	var has_public_product_feedback := false
+	for news_item in MediaManager.news:
+		if str(news_item.get("category", "")) == "Test produit":
+			has_public_product_feedback = true
+			break
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "LAUNCHED":
 			has_launched_product = true
@@ -116,7 +121,7 @@ func sync_interface_unlocks() -> Array:
 		"COMPANY":months_operated >= 1 or not get_open_hr_issues().is_empty() or int(workplace.get("tier", 0)) > 0,
 		"PRODUCTS":has_production or has_products,
 		"MARKET":has_launched_product,
-		"PRESS":not MediaManager.news.is_empty() or has_market_history
+		"PRESS":has_public_product_feedback or has_market_history
 	}
 	for feature_value in rules.keys():
 		var feature := str(feature_value)
