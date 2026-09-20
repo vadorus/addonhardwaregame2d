@@ -537,6 +537,9 @@ func _ready() -> void:
 		_fail("Technical remediation upfront cost was not charged when the project started")
 		return
 	var project: Dictionary = ResearchManager.projects[0]
+	if str(project.get("segment", "")) != "EMBEDDED":
+		_fail("Legacy MAINSTREAM project target was not normalized to the real 1971 embedded market")
+		return
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("TEAM"):
 		_fail("Starting the first CPU project did not reveal the Team screen")
@@ -701,6 +704,10 @@ func _ready() -> void:
 	if str(essential_model.get("generation_id", "")) != str(apex_model.get("generation_id", "")):
 		_fail("CPU models were not linked to the same generation")
 		return
+	for family_market_model in [essential_model, signature_model, apex_model]:
+		if str(family_market_model.get("target_segment", "")) != "EMBEDDED":
+			_fail("CPU binning invented a modern market instead of preserving the selected 1971 use case")
+			return
 	if float(apex_model.get("metrics", {}).get("performance", 0.0)) <= float(essential_model.get("metrics", {}).get("performance", 0.0)):
 		_fail("Apex model must outperform the Essential model")
 		return
