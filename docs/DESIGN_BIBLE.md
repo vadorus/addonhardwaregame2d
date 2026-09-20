@@ -324,6 +324,14 @@ La marge OC n'est pas une fréquence garantie. L'interface affiche la fréquence
 
 Une révision matérielle peut ensuite améliorer la distribution des **nouvelles unités produites** sans modifier physiquement les CPU déjà vendus.
 
+### Progression pédagogique de l'interface
+
+Le jeu dissocie la profondeur de simulation de la quantité d'interface visible. Les systèmes peuvent déjà exister sous le capot, mais leurs panneaux ne deviennent accessibles que lorsqu'ils servent une décision réelle.
+
+Le premier écran jouable expose uniquement le QG et le laboratoire CPU. Les écrans Équipe, Entreprise, Produits, Marché et Presse sont ensuite débloqués par des jalons de gameplay. Les déblocages sont persistants et le bras droit les présente comme de nouvelles responsabilités de l'entreprise.
+
+Cette progression constitue une mécanique d'apprentissage : découvrir une nouvelle fonction revient à gagner une nouvelle capacité dans un RPG, plutôt qu'à recevoir un manuel de cinquante boutons au premier lancement.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :

@@ -1,6 +1,7 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
 const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
@@ -1728,7 +1729,14 @@ func _build_navigation(parent: HBoxContainer):
 func _show_tab(index: int):
 	if tabs == null:
 		return
-	tabs.current_tab = clampi(index, 0, tabs.get_tab_count() - 1)
+	var safe_index := clampi(index, 0, tabs.get_tab_count() - 1)
+	if CompanyManager.created and safe_index < NAV_FEATURES.size():
+		var feature := str(NAV_FEATURES[safe_index])
+		if not ExecutiveManager.is_interface_feature_unlocked(feature):
+			var hint := ExecutiveManager.next_interface_unlock_hint()
+			status_label.text = "Nora : cette fonction viendra plus tard. %s" % str(hint.get("text", "Continuez la progression de l'entreprise."))
+			return
+	tabs.current_tab = safe_index
 	_update_nav_state()
 
 func _update_nav_state():
@@ -1736,6 +1744,10 @@ func _update_nav_state():
 		return
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
+		var visible := true
+		if CompanyManager.created and i < NAV_FEATURES.size():
+			visible = ExecutiveManager.is_interface_feature_unlocked(str(NAV_FEATURES[i]))
+		button.visible = visible
 		var selected := i == tabs.current_tab
 		button.add_theme_color_override("font_color", APP_CYAN if selected else APP_MUTED)
 		button.add_theme_color_override("font_hover_color", APP_TEXT)
@@ -1826,7 +1838,7 @@ func _start_new_game():
 	SimulationManager.reset_all(setup_name.text,_meta(setup_sector))
 	setup_layer.visible=false
 	game_over_layer.visible=false
-	status_label.text="Entreprise créée. Votre première décision : lancer un projet R&D."
+	status_label.text="Nora : au début, gardons seulement le QG et le Laboratoire CPU. Lancez votre premier projet pour élargir l'interface."
 	_refresh_all()
 
 func _load_game():
@@ -1892,7 +1904,25 @@ func _refresh_top():
 	money_label.add_theme_color_override("font_color", cash_color)
 
 func _refresh_all():
+	_refresh_navigation_progression()
 	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+
+func _refresh_navigation_progression():
+	if tabs == null:
+		return
+	var newly_unlocked := ExecutiveManager.sync_interface_unlocks() if CompanyManager.created else []
+	if CompanyManager.created and tabs.current_tab < NAV_FEATURES.size():
+		var current_feature := str(NAV_FEATURES[tabs.current_tab])
+		if not ExecutiveManager.is_interface_feature_unlocked(current_feature):
+			tabs.current_tab = 0
+	_update_nav_state()
+	if dashboard_cto_button != null:
+		dashboard_cto_button.visible = not CompanyManager.created or ExecutiveManager.is_interface_feature_unlocked("COMPANY")
+	if not newly_unlocked.is_empty() and status_label != null:
+		var labels: Array[String] = []
+		for feature_value in newly_unlocked:
+			labels.append(str(ExecutiveManager.interface_feature_info(str(feature_value)).get("label", feature_value)))
+		status_label.text = "Nora : nouvelle fonction disponible — %s." % ", ".join(labels)
 
 func _refresh_dashboard():
 	if dashboard_label == null:

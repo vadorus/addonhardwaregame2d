@@ -194,3 +194,20 @@ Le contenu et les résultats restent identiques.
 La progression de l'interface doit être soutenue par l'évolution visible du lieu de travail. Le système de locaux possède maintenant quatre paliers de simulation : garage aménagé, atelier + bureaux, siège technique et campus R&D.
 
 L'interface ne doit pas transformer ce système en simple barre de niveau. Chaque changement de palier devra progressivement modifier le décor, l'espace disponible, le confort perçu et les éléments visibles autour des équipes. Au début, le garage garde peu de menus et peu d'informations. Les fonctions RH, financières et de direction deviennent visibles lorsqu'elles ont une utilité concrète.
+
+
+## Déblocage progressif de l'interface
+
+L'interface suit désormais le principe « bas niveau WoW » : le joueur ne reçoit pas tous les boutons au démarrage.
+
+Au garage, seuls **QG** et **Laboratoire CPU** sont disponibles. Les fonctions apparaissent ensuite lorsqu'elles deviennent utiles :
+
+1. **Équipe** après le lancement du premier projet CPU ;
+2. **Entreprise** après le premier mois d'exploitation ou si un sujet RH/locaux l'exige ;
+3. **Produits** lorsque le premier CPU entre en industrialisation ;
+4. **Marché** lors de la première commercialisation ;
+5. **Presse** après les premiers retours publics réels.
+
+Les déblocages sont permanents et sauvegardés. Nora annonce chaque nouvelle fonction et explique pourquoi elle apparaît. Un écran encore verrouillé ne doit jamais être présenté comme une punition : le QG indique la prochaine fonction à découvrir et la condition logique qui la rendra pertinente.
+
+Ce système doit rester extensible aux futures divisions. Une nouvelle branche ne doit pas ajouter immédiatement cinq nouveaux onglets ; ses outils apparaissent au fur et à mesure que le joueur rencontre leurs décisions.
