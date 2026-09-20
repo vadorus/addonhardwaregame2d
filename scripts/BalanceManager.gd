@@ -74,6 +74,8 @@ func expense_amount(base_amount: int, category: String) -> int:
 func expense_factor(category: String) -> float:
 	var profile := profile_data()
 	var normalized := category.to_lower()
+	if normalized.contains("capital filiale"):
+		return 1.0
 	if normalized.contains("salaire") or normalized.contains("recrutement"):
 		return float(profile.get("salary_cost", 1.0))
 	if (
@@ -88,7 +90,7 @@ func expense_factor(category: String) -> float:
 		normalized.contains("production")
 		or normalized.contains("industrialisation")
 		or normalized.contains("fonderie")
-		or normalized.contains("fab ")
+		or normalized.contains("fab")
 		or normalized.contains("construction")
 		or normalized.contains("mise en production")
 		or normalized.contains("maintenance usine")
