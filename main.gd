@@ -1937,7 +1937,24 @@ func _fill_sector_options(option: OptionButton):
 		option.set_item_disabled(item_index, not active)
 
 func _fill_segment_options(option: OptionButton):
-	option.clear(); for key in GameData.get_segment_keys(): option.add_item(str(GameData.SEGMENTS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
+	_refresh_segment_options(option)
+
+func _refresh_segment_options(option: OptionButton, preferred: String = ""):
+	if option == null:
+		return
+	var current := preferred
+	if current == "" and option.item_count > 0:
+		current = _meta(option)
+	option.clear()
+	for segment_value in MarketManager.available_segment_keys():
+		var segment := str(segment_value)
+		option.add_item(MarketManager.segment_label(segment))
+		option.set_item_metadata(option.item_count - 1, segment)
+	if current != "":
+		var normalized := MarketManager.normalize_segment(current)
+		_select_meta(option, normalized)
+	if option.selected < 0 and option.item_count > 0:
+		_select_meta(option, MarketManager.default_segment())
 
 func _fill_approach_options(option: OptionButton):
 	option.clear(); for key in GameData.get_approach_keys(): option.add_item(str(GameData.APPROACHES[key].label)); option.set_item_metadata(option.item_count-1,str(key))
@@ -2288,10 +2305,12 @@ func _refresh_division_delegation():
 	if division_control_select != null:
 		_select_meta(division_control_select, str(division.get("control_mode", "DIRECT")))
 	var mandate: Dictionary = division.get("mandate", {})
+	if division_target_select != null:
+		_refresh_segment_options(division_target_select, str(mandate.get("target_segment", MarketManager.default_segment())))
 	if division_priority_select != null:
 		_select_meta(division_priority_select, str(mandate.get("priority", "BALANCED")))
 	if division_target_select != null:
-		_select_meta(division_target_select, str(mandate.get("target_segment", "MAINSTREAM")))
+		_select_meta(division_target_select, MarketManager.normalize_segment(str(mandate.get("target_segment", MarketManager.default_segment()))))
 	if division_risk_select != null:
 		_select_meta(division_risk_select, str(mandate.get("risk_tolerance", "MODERATE")))
 	if division_budget_ceiling != null:
@@ -2319,7 +2338,7 @@ func _refresh_division_delegation():
 			DivisionManager.control_mode_label(str(division.get("control_mode", "DIRECT"))),
 			DivisionManager.management_modifier(sector) * 100.0,
 			str(mandate.get("priority", "BALANCED")).to_lower(),
-			str(mandate.get("target_segment", "MAINSTREAM")).to_lower(),
+			MarketManager.segment_label(MarketManager.normalize_segment(str(mandate.get("target_segment", MarketManager.default_segment())))).to_lower(),
 			DivisionManager.risk_label(str(mandate.get("risk_tolerance", "MODERATE"))).to_lower(),
 			_money(int(mandate.get("monthly_budget_ceiling", 60000))),
 			_money(DivisionManager.current_commitments(sector)),
@@ -2531,6 +2550,8 @@ func _start_cpu_concept_program():
 func _refresh_research():
 	if tech_label == null:
 		return
+	if rd_segment != null:
+		_refresh_segment_options(rd_segment)
 	_refresh_cpu_node_options()
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
@@ -3060,32 +3081,90 @@ func _refresh_market_product_options():
 	if current!="": _select_meta(market_product_select,current)
 
 func _refresh_market():
-	if market_label==null: return
+	if market_label == null:
+		return
 	_refresh_market_product_options()
 	_refresh_after_sales()
-	if market_product_select.item_count==0: market_label.text="Lancez un produit pour obtenir benchmarks, retours clients et parts de marché."; contract_label.text="Aucun contrat."; return
-	var p:=ProductManager.get_product(_meta(market_product_select)); if p.is_empty(): return
-	var bench:=MarketManager.benchmark_for(p); var lines:=["Benchmark %s :" % str(p.name)]
-	for i in range(bench.size()): lines.append("%d. %s — %.1f pts — %s €%s" % [i+1,str(bench[i].name),float(bench[i].score),_money(int(bench[i].price))," ← vous" if bool(bench[i].player) else ""])
-	lines.append("\nÉvaluation par clientèle :")
-	for seg in GameData.SEGMENTS.keys(): lines.append("• %s : %.1f/100" % [GameData.SEGMENTS[seg].label,MarketManager.evaluate_product(p,str(seg))])
-	var age_penalty := float(p.get("last_month_age_penalty", MarketManager.product_age_penalty(p)))
-	lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d'âge -%.1f pts" % [MarketManager.product_lifecycle_label(p), int(p.get("months_on_market", 0)), age_penalty])
-	lines.append("Marché global : %d mois d'évolution depuis le début de la partie." % MarketManager.market_age_months)
-	var lifecycle := ProductManager.get_post_launch_summary(str(p.get("id", "")))
-	var promotion_note := "aucune promotion"
-	if str(lifecycle.get("promotion_type", "NONE")) != "NONE":
-		promotion_note = "%s • %d mois restants" % [ProductManager.promotion_label(str(lifecycle.promotion_type)), int(lifecycle.promotion_months_remaining)]
-	lines.append("\nSuivi produit : stepping %s • firmware v%d • %s" % [
-		str(lifecycle.get("revision", "A0")), int(lifecycle.get("firmware_version", 1)), promotion_note
-	])
-	lines.append("Logiciel de contrôle : %s" % ("v%d" % int(lifecycle.get("software_version", 0)) if bool(lifecycle.get("software_released", false)) else "non publié"))
-	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
-	market_label.text="\n".join(lines)
-	var c_lines:=[]
-	for c in MarketManager.contracts:
-		c_lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [str(c.customer),str(c.product_name),_money(int(c.units_per_month)),_money(int(c.unit_price)),int(c.remaining_months),str(c.status)])
-	contract_label.text="\n".join(c_lines) if not c_lines.is_empty() else "Aucune proposition. Les produits adaptés au calcul, à l'efficacité ou à la fiabilité peuvent attirer des entreprises."
+
+	var lines: Array[String] = [
+		"Marché CPU — %d • signal technologique %.0f/100" % [TimeManager.year, MarketManager.market_technology_signal()],
+		"",
+		"Besoins actifs :"
+	]
+	for row_value in MarketManager.market_landscape():
+		var row: Dictionary = row_value
+		lines.append("• %s — marché ~%s unités/mois • repère prix %s €" % [
+			str(row.get("label", "")), _money(int(row.get("units", 0))), _money(int(row.get("reference_price", 0)))
+		])
+		lines.append("  %s" % str(row.get("description", "")))
+
+	var next_needs := MarketManager.next_market_needs()
+	if not next_needs.is_empty():
+		lines.append("\nBesoins susceptibles d'émerger ensuite :")
+		for next_value in next_needs:
+			var next_need: Dictionary = next_value
+			lines.append("• %s — repère historique %d, ou plus tôt si le signal techno atteint %.0f/100" % [
+				str(next_need.get("label", "")), int(next_need.get("historical_year", 0)), float(next_need.get("tech_trigger", 0.0))
+			])
+
+	lines.append("\nConcurrents CPU :")
+	for competitor_value in MarketManager.competitor_summaries():
+		var competitor: Dictionary = competitor_value
+		lines.append("• %s — %s G%d • %s • %s • R&D %.0f%%" % [
+			str(competitor.get("company", "")), str(competitor.get("product", "")), int(competitor.get("generation", 1)),
+			CPU_DESIGN.node_label(int(competitor.get("node_nm", 10000))),
+			MarketManager.segment_label(str(competitor.get("target_segment", "EMBEDDED"))),
+			float(competitor.get("development_progress", 0.0))
+		])
+		lines.append("  trésorerie %s € • arch %.0f • fabrication %.0f • rendement %.0f%% • capacité %s/mois • ventes %s le mois dernier" % [
+			_money(int(competitor.get("cash", 0))), float(competitor.get("architecture", 0.0)),
+			float(competitor.get("manufacturing", 0.0)), float(competitor.get("yield_rate", 0.0)) * 100.0,
+			_money(int(competitor.get("capacity", 0))), _money(int(competitor.get("last_month_units", 0)))
+		])
+
+	if market_product_select.item_count == 0:
+		lines.append("\nAucun de vos CPU n'est encore commercialisé. Le marché et les concurrents continuent néanmoins d'évoluer.")
+		market_label.text = "\n".join(lines)
+	else:
+		var product := ProductManager.get_product(_meta(market_product_select))
+		if not product.is_empty():
+			var benchmark := MarketManager.benchmark_for(product)
+			lines.append("\nBenchmark %s :" % str(product.get("name", "CPU")))
+			for i in range(benchmark.size()):
+				lines.append("%d. %s — %.1f pts — %s €%s" % [
+					i + 1, str(benchmark[i].name), float(benchmark[i].score), _money(int(benchmark[i].price)),
+					" ← vous" if bool(benchmark[i].player) else ""
+				])
+			lines.append("\nÉvaluation sur les marchés actuellement ouverts :")
+			for segment_value in MarketManager.available_segment_keys():
+				var segment := str(segment_value)
+				lines.append("• %s : %.1f/100" % [MarketManager.segment_label(segment), MarketManager.evaluate_product(product, segment)])
+			var age_penalty := float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))
+			lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d'âge -%.1f pts" % [
+				MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), age_penalty
+			])
+			var lifecycle := ProductManager.get_post_launch_summary(str(product.get("id", "")))
+			var promotion_note := "aucune promotion"
+			if str(lifecycle.get("promotion_type", "NONE")) != "NONE":
+				promotion_note = "%s • %d mois restants" % [
+					ProductManager.promotion_label(str(lifecycle.promotion_type)), int(lifecycle.promotion_months_remaining)
+				]
+			lines.append("Suivi produit : stepping %s • firmware v%d • %s" % [
+				str(lifecycle.get("revision", "A0")), int(lifecycle.get("firmware_version", 1)), promotion_note
+			])
+			lines.append("Dernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [
+				_money(int(product.get("last_month_sales", 0))), float(product.get("last_month_share", 0.0)) * 100.0,
+				int(product.get("last_month_returns", 0)), float(product.get("customer_satisfaction", 50.0))
+			])
+	market_label.text = "\n".join(lines)
+
+	var contract_lines: Array[String] = []
+	for contract in MarketManager.contracts:
+		contract_lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [
+			str(contract.get("customer", "")), str(contract.get("product_name", "")), _money(int(contract.get("units_per_month", 0))),
+			_money(int(contract.get("unit_price", 0))), int(contract.get("remaining_months", 0)), str(contract.get("status", ""))
+		])
+	contract_label.text = "\n".join(contract_lines) if not contract_lines.is_empty() else "Aucune proposition. Les marchés industriels, scientifiques et professionnels peuvent générer des contrats quand un CPU devient crédible."
 
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
 
