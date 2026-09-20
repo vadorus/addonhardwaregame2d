@@ -1355,6 +1355,7 @@ func _create_products_tab():
 	box.add_child(production_grid)
 	production_grid.add_child(_label("Projet en industrialisation", 14))
 	industrialization_select = OptionButton.new()
+	industrialization_select.item_selected.connect(func(_index): _refresh_selected_industrialization_controls())
 	production_grid.add_child(industrialization_select)
 	production_grid.add_child(_label("Stratégie industrielle", 14))
 	industrialization_strategy = OptionButton.new()
@@ -2553,6 +2554,17 @@ func _refresh_product_details():
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
+
+func _refresh_selected_industrialization_controls():
+	if industrialization_select == null or industrialization_select.item_count == 0:
+		return
+	var active_job := ProductionManager.get_job(_meta(industrialization_select))
+	if active_job.is_empty():
+		return
+	if industrialization_strategy != null:
+		_select_meta(industrialization_strategy, str(active_job.get("strategy", "BALANCED")))
+	if industrialization_binning != null:
+		_select_meta(industrialization_binning, str(active_job.get("binning_strategy", "BALANCED")))
 
 func _apply_industrialization_strategy():
 	if industrialization_select == null or industrialization_select.item_count == 0:
