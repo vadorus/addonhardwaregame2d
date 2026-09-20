@@ -77,7 +77,13 @@ func benchmark_score(product: Dictionary) -> float:
 	var sector := str(product.sector)
 	if sector == "SOFTWARE":
 		return float(m.usability)*0.28 + float(m.reliability)*0.24 + float(m.performance)*0.16 + float(m.innovation)*0.16 + float(m.ecosystem)*0.16
-	return float(m.performance)*0.34 + float(m.efficiency)*0.22 + float(m.reliability)*0.18 + float(m.innovation)*0.16 + float(m.sustainability)*0.10
+	var score := float(m.performance)*0.34 + float(m.efficiency)*0.22 + float(m.reliability)*0.18 + float(m.innovation)*0.16 + float(m.sustainability)*0.10
+	if sector == "CPU":
+		var fallback_headroom := clampf((float(m.get("performance", 50.0)) - 55.0) * 0.09, 0.0, 8.0)
+		var headroom := float(product.get("oc_headroom_pct", fallback_headroom))
+		var consistency := float(product.get("silicon_consistency", m.get("reliability", 50.0)))
+		score += clampf(headroom * 0.12 + (consistency - 50.0) * 0.015, -1.0, 3.5)
+	return score
 
 func benchmark_for(product: Dictionary) -> Array:
 	var rows: Array = []
