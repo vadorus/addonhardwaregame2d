@@ -128,7 +128,7 @@ Trois profils existent :
 - **Standard** : réglage de référence utilisé pour l'équilibrage principal ;
 - **Réaliste** : capital plus serré, salaires/R&D/industrie plus coûteux, marché moins permissif et concurrents plus rapides.
 
-Tous les débits de trésorerie passent par le même système de coût afin que salaires, R&D, développement, industrialisation, fonderie et frais de structure soient cohérents avec le profil choisi. Les transferts de capital purs, par exemple le capital affecté à une filiale, conservent leur montant exact afin de ne pas créer artificiellement ou détruire de valeur.
+Les principaux coûts de structure et d'investissement passent par le même système afin que salaires, R&D, développement, industrialisation, fonderie et frais fixes soient cohérents avec le profil choisi. Les coûts variables par unité restent physiques et identiques aux chiffres affichés sur les produits ; la difficulté ne fausse donc pas la marge unitaire. Les transferts de capital purs, par exemple le capital affecté à une filiale, conservent également leur montant exact.
 
 La taille des marchés est également ajustée par le profil. La difficulté ne modifie pas arbitrairement la qualité des produits du joueur : elle agit sur le contexte économique dans lequel ces produits doivent survivre.
 
