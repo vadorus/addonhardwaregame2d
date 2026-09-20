@@ -241,7 +241,7 @@ func renovate_workplace() -> bool:
 	if upgrade.is_empty():
 		return false
 	var cost := int(upgrade.get("upgrade_cost", 0))
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Rénovation / nouveaux locaux"):
 		return false
 	Economy.add_expense(cost, "Rénovation / nouveaux locaux")
 	workplace["tier"] = int(upgrade.tier)
@@ -257,7 +257,7 @@ func renovate_workplace() -> bool:
 func maintain_workplace() -> bool:
 	var tier := int(workplace.get("tier", 0))
 	var cost := 4000 + int(WORKPLACE_TIERS[tier].monthly_cost) * 2
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Entretien des locaux"):
 		return false
 	Economy.add_expense(cost, "Entretien des locaux")
 	workplace["condition"] = clampf(float(workplace.get("condition", 60.0)) + 18.0, 0.0, 100.0)
@@ -406,7 +406,7 @@ func resolve_hr_issue(issue_id: String, action: String) -> bool:
 				var emp := PersonnelManager.get_employee(subject_id)
 				if not emp.is_empty():
 					cost = maxi(2500, int(emp.get("salary", 4000)) / 2)
-			if Economy.money < cost:
+			if not Economy.can_afford(cost, "Action RH exceptionnelle"):
 				return false
 			Economy.add_expense(cost, "Action RH exceptionnelle")
 			if subject_id != "":
