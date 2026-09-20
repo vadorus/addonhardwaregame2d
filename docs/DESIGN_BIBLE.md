@@ -151,7 +151,22 @@ Le niveau de contrôle est défini séparément pour chaque domaine : direct, su
 
 Les divisions sont confiées à des directeurs qui reçoivent un mandat clair : budget, priorité, segment visé, niveau de risque, qualité attendue, politique de croissance et autonomie autorisée. Les chefs de projet pilotent ensuite des produits ou programmes précis.
 
-Leur profil influence réellement les résultats : expertise technique, finance, innovation, gestion humaine, prudence, vitesse d'exécution, maîtrise des coûts, communication et capacité à détecter un problème tôt. Un bon responsable n'est pas un bonus fixe ; il prend de meilleures décisions dans les limites de son mandat.
+Leur profil influence réellement les résultats : expertise technique, finance, innovation, gestion humaine, prudence, maîtrise des risques, lecture du marché et expérience. Un bon responsable n'est pas un bonus fixe ; son efficacité dépend de l'adéquation entre son profil et le mandat reçu.
+
+La première implémentation jouable fonctionne ainsi :
+
+- le pilotage de division n'apparaît pas dans le garage ; il devient pertinent après une première génération ou lorsque l'entreprise a suffisamment grandi ;
+- le joueur choisit un directeur parmi les salariés existants ;
+- chaque directeur possède un profil multidimensionnel calculé à partir de ses vraies compétences, de son leadership, de son expérience et de son profil comportemental ;
+- le mandat CPU précise priorité, segment cible, plafond mensuel, tolérance au risque, exigence qualité et priorité de croissance ;
+- en **direct**, le joueur conserve l'exécution opérationnelle ;
+- en **supervisé**, le directeur exécute les décisions courantes mais remonte les écarts de budget, de risque ou de dépendance ;
+- en **autonome**, son profil et son adéquation au mandat pèsent davantage sur l'exécution de la R&D, du développement et de l'industrialisation ;
+- les décisions structurantes restent des arbitrages CEO : nouvelle génération, lancement commercial, dépassement significatif du mandat ou dépendance fournisseur trop forte ;
+- les arbitrages remontent dans le comité de direction et Nora les place parmi les priorités si leur gravité l'exige ;
+- chaque division conserve un historique court des décisions et arbitrages afin que la délégation reste lisible.
+
+La délégation ne sert donc pas à supprimer du gameplay. Elle déplace le niveau de décision du joueur : réglage opérationnel lorsqu'il pilote directement, définition de mandat et arbitrage lorsqu'il délègue.
 
 ### Comité de direction
 
