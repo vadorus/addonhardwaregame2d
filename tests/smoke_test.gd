@@ -150,6 +150,12 @@ func _ready() -> void:
 	if BalanceManager.competitor_pressure_factor() <= 1.0:
 		_fail("Realistic difficulty did not increase competitor pressure")
 		return
+	if BalanceManager.expense_amount(10000, "Production — test CPU") != 10000:
+		_fail("Difficulty changed literal per-unit production economics")
+		return
+	if BalanceManager.expense_amount(10000, "SAV garanties — test CPU") != 10000:
+		_fail("Difficulty changed literal warranty unit economics")
+		return
 	BalanceManager.load_state(balance_state)
 	if BalanceManager.active_profile != "STANDARD":
 		_fail("Economic difficulty did not survive a state round-trip")
@@ -739,6 +745,19 @@ func _ready() -> void:
 		return
 	if str(essential_model.get("generation_id", "")) != str(apex_model.get("generation_id", "")):
 		_fail("CPU models were not linked to the same generation")
+		return
+	var family_recommended_capacity := 0
+	for family_model in ProductManager.products:
+		family_recommended_capacity += int(family_model.get("recommended_capacity", 0))
+		var suggested_price := int(family_model.get("price", 0))
+		var unit_cost := int(family_model.get("unit_cost", 0))
+		var gross_margin := 1.0 - float(unit_cost) / maxf(float(suggested_price), 1.0)
+		if gross_margin + 0.015 < BalanceManager.gross_margin_target(str(family_model.get("target_segment", "EMBEDDED"))):
+			_fail("Suggested CPU price fell below the market-specific gross margin guard")
+			return
+	var target_family_capacity := maxi(300, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.22))
+	if family_recommended_capacity > target_family_capacity + 6:
+		_fail("CPU launch family capacity exceeded the actual target market sizing")
 		return
 	for family_market_model in [essential_model, signature_model, apex_model]:
 		if str(family_market_model.get("target_segment", "")) != "EMBEDDED":
