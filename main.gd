@@ -101,6 +101,13 @@ var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_price: SpinBox
 var product_capacity: SpinBox
+var post_launch_group: VBoxContainer
+var post_launch_label: Label
+var promotion_select: OptionButton
+var revision_select: OptionButton
+var firmware_select: OptionButton
+var firmware_release_button: Button
+var control_software_button: Button
 var market_product_select: OptionButton
 var policy_marketing: SpinBox
 var policy_support: SpinBox
@@ -1284,6 +1291,66 @@ func _create_products_tab():
 	grid.add_child(_label("Capacité mensuelle",14)); product_capacity=_spin(1,1000000,100,5000); grid.add_child(product_capacity)
 	var launch:=Button.new(); launch.text="Lancer sur le marché"; launch.pressed.connect(_launch_product); box.add_child(launch)
 
+	post_launch_group = VBoxContainer.new()
+	post_launch_group.add_theme_constant_override("separation", 10)
+	box.add_child(post_launch_group)
+	post_launch_group.add_child(_section("Vie après lancement"))
+	var lifecycle_intro := _muted_label("Un CPU lancé continue d'évoluer : prix et promotion sont commerciaux, le stepping modifie uniquement les nouvelles unités, tandis que firmware et logiciel peuvent toucher le parc compatible.", 12)
+	lifecycle_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	post_launch_group.add_child(lifecycle_intro)
+	post_launch_label = _rich_label()
+	post_launch_group.add_child(post_launch_label)
+
+	var lifecycle_grid := GridContainer.new()
+	lifecycle_grid.columns = 2
+	post_launch_group.add_child(lifecycle_grid)
+	lifecycle_grid.add_child(_label("Promotion", 13))
+	promotion_select = OptionButton.new()
+	for promotion_key in ["AWARENESS", "VALUE", "CLEARANCE"]:
+		promotion_select.add_item(ProductManager.promotion_label(promotion_key))
+		promotion_select.set_item_metadata(promotion_select.item_count - 1, promotion_key)
+	lifecycle_grid.add_child(promotion_select)
+
+	lifecycle_grid.add_child(_label("Révision matérielle", 13))
+	revision_select = OptionButton.new()
+	for revision_key in ["QUALITY", "COST", "EFFICIENCY"]:
+		revision_select.add_item(ProductManager.revision_label(revision_key))
+		revision_select.set_item_metadata(revision_select.item_count - 1, revision_key)
+	lifecycle_grid.add_child(revision_select)
+
+	lifecycle_grid.add_child(_label("Firmware / microcode", 13))
+	firmware_select = OptionButton.new()
+	for firmware_key in ["STABILITY", "BALANCED", "PERFORMANCE"]:
+		firmware_select.add_item(ProductManager.firmware_label(firmware_key))
+		firmware_select.set_item_metadata(firmware_select.item_count - 1, firmware_key)
+	_select_meta(firmware_select, "BALANCED")
+	lifecycle_grid.add_child(firmware_select)
+
+	var lifecycle_actions := HFlowContainer.new()
+	lifecycle_actions.add_theme_constant_override("h_separation", 8)
+	lifecycle_actions.add_theme_constant_override("v_separation", 8)
+	post_launch_group.add_child(lifecycle_actions)
+	var price_update := Button.new()
+	price_update.text = "Appliquer le nouveau prix"
+	price_update.pressed.connect(_update_launched_product_price)
+	lifecycle_actions.add_child(price_update)
+	var promote := Button.new()
+	promote.text = "Lancer la promotion"
+	promote.pressed.connect(_start_product_promotion)
+	lifecycle_actions.add_child(promote)
+	var revise := Button.new()
+	revise.text = "Valider le stepping"
+	revise.pressed.connect(_apply_product_revision)
+	lifecycle_actions.add_child(revise)
+	firmware_release_button = Button.new()
+	firmware_release_button.text = "Publier le firmware"
+	firmware_release_button.pressed.connect(_release_product_firmware)
+	lifecycle_actions.add_child(firmware_release_button)
+	control_software_button = Button.new()
+	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
+	control_software_button.pressed.connect(_release_product_control_software)
+	lifecycle_actions.add_child(control_software_button)
+
 func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
 	var box: VBoxContainer = scroll.get_child(0)
@@ -2195,10 +2262,14 @@ func _refresh_products():
 func _refresh_product_details():
 	if product_details_label == null or product_select.item_count == 0:
 		product_details_label.text = "Aucun produit sélectionné."
+		if post_launch_group != null:
+			post_launch_group.visible = false
 		return
 	var product := ProductManager.get_product(_meta(product_select))
 	if product.is_empty():
 		return
+	if post_launch_group != null:
+		post_launch_group.visible = str(product.get("status", "")) == "LAUNCHED"
 	var metrics: Dictionary = product.get("metrics", {})
 	var metric_lines: Array[String] = []
 	for metric in GameData.METRICS:
@@ -2227,6 +2298,41 @@ func _refresh_product_details():
 			float(product.internal_ratio) * 100.0, " • ".join(metric_lines)
 		]
 	product_price.value = float(product.price)
+	if post_launch_label != null:
+		if str(product.get("status", "")) != "LAUNCHED":
+			post_launch_label.text = "Ce produit n'est pas encore sur le marché. Les actions post-lancement seront disponibles après son lancement."
+		else:
+			var lifecycle := ProductManager.get_post_launch_summary(str(product.get("id", "")))
+			var promotion_text := "aucune"
+			if str(lifecycle.get("promotion_type", "NONE")) != "NONE":
+				promotion_text = "%s (%d mois restants)" % [
+					ProductManager.promotion_label(str(lifecycle.get("promotion_type", "NONE"))),
+					int(lifecycle.get("promotion_months_remaining", 0))
+				]
+			var software_text := "non publié"
+			if bool(lifecycle.get("software_released", false)):
+				software_text = "v%d • qualité %.0f/100 • %d modèle(s) supporté(s)" % [
+					int(lifecycle.get("software_version", 0)),
+					float(lifecycle.get("software_quality", 0.0)),
+					lifecycle.get("supported_products", []).size()
+				]
+			var firmware_access := "disponible" if bool(lifecycle.get("firmware_available", false)) else "à débloquer par le savoir-faire logiciel/architecture"
+			var software_access := "disponible" if bool(lifecycle.get("control_software_available", false)) else "à débloquer par logiciel + intégration"
+			post_launch_label.text = "Révision actuelle %s • firmware v%d (%s)\nPromotion : %s\nLogiciel de contrôle : %s\nAccès firmware : %s • contrôle logiciel : %s\nHistorique : %d révision(s) matérielle(s) • %d firmware(s)" % [
+				str(lifecycle.get("revision", "A0")),
+				int(lifecycle.get("firmware_version", 1)),
+				str(lifecycle.get("firmware_profile", "ORIGINAL")).to_lower(),
+				promotion_text,
+				software_text,
+				firmware_access,
+				software_access,
+				int(lifecycle.get("revision_count", 0)),
+				int(lifecycle.get("firmware_count", 0))
+			]
+			if firmware_release_button != null:
+				firmware_release_button.disabled = not bool(lifecycle.get("firmware_available", false))
+			if control_software_button != null:
+				control_software_button.disabled = not bool(lifecycle.get("control_software_available", false))
 	var has_capacity_limit := product.has("max_monthly_capacity")
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
@@ -2249,6 +2355,51 @@ func _launch_product():
 	if ProductManager.launch_product(_meta(product_select),int(product_price.value),int(product_capacity.value)): status_label.text="Produit lancé : la presse et les clients vont maintenant le juger."
 	else: status_label.text="Ce produit est déjà lancé ou indisponible."; _refresh_all()
 
+func _update_launched_product_price():
+	if product_select == null or product_select.item_count == 0:
+		return
+	if ProductManager.update_product_price(_meta(product_select), int(product_price.value)):
+		status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."
+	else:
+		status_label.text = "Le prix n'a pas été modifié ou le produit n'est pas encore lancé."
+	_refresh_all()
+
+func _start_product_promotion():
+	if product_select == null or product_select.item_count == 0 or promotion_select == null:
+		return
+	if ProductManager.start_promotion(_meta(product_select), _meta(promotion_select)):
+		status_label.text = "Campagne commerciale lancée."
+	else:
+		status_label.text = "Promotion impossible : produit non lancé ou trésorerie insuffisante."
+	_refresh_all()
+
+func _apply_product_revision():
+	if product_select == null or product_select.item_count == 0 or revision_select == null:
+		return
+	if ProductManager.apply_hardware_revision(_meta(product_select), _meta(revision_select)):
+		status_label.text = "Nouveau stepping validé. Seules les unités fabriquées désormais utilisent cette révision."
+	else:
+		status_label.text = "Révision impossible : produit non lancé, incompatible ou trésorerie insuffisante."
+	_refresh_all()
+
+func _release_product_firmware():
+	if product_select == null or product_select.item_count == 0 or firmware_select == null:
+		return
+	if ProductManager.release_firmware(_meta(product_select), _meta(firmware_select)):
+		status_label.text = "Firmware publié sur le parc compatible."
+	else:
+		status_label.text = "Publication impossible : produit non lancé ou trésorerie insuffisante."
+	_refresh_all()
+
+func _release_product_control_software():
+	if product_select == null or product_select.item_count == 0:
+		return
+	if ProductManager.release_control_software(_meta(product_select)):
+		status_label.text = "Logiciel de contrôle publié ou mis à jour pour les modèles compatibles de cette génération."
+	else:
+		status_label.text = "Logiciel impossible à publier : produit non lancé ou trésorerie insuffisante."
+	_refresh_all()
+
 func _refresh_market_product_options():
 	if market_product_select==null: return
 	var current:=_meta(market_product_select) if market_product_select.item_count>0 else ""; market_product_select.clear()
@@ -2269,6 +2420,14 @@ func _refresh_market():
 	var age_penalty := float(p.get("last_month_age_penalty", MarketManager.product_age_penalty(p)))
 	lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d'âge -%.1f pts" % [MarketManager.product_lifecycle_label(p), int(p.get("months_on_market", 0)), age_penalty])
 	lines.append("Marché global : %d mois d'évolution depuis le début de la partie." % MarketManager.market_age_months)
+	var lifecycle := ProductManager.get_post_launch_summary(str(p.get("id", "")))
+	var promotion_note := "aucune promotion"
+	if str(lifecycle.get("promotion_type", "NONE")) != "NONE":
+		promotion_note = "%s • %d mois restants" % [ProductManager.promotion_label(str(lifecycle.promotion_type)), int(lifecycle.promotion_months_remaining)]
+	lines.append("\nSuivi produit : stepping %s • firmware v%d • %s" % [
+		str(lifecycle.get("revision", "A0")), int(lifecycle.get("firmware_version", 1)), promotion_note
+	])
+	lines.append("Logiciel de contrôle : %s" % ("v%d" % int(lifecycle.get("software_version", 0)) if bool(lifecycle.get("software_released", false)) else "non publié"))
 	lines.append("\nDernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [_money(int(p.last_month_sales)),float(p.last_month_share)*100.0,int(p.last_month_returns),float(p.customer_satisfaction)])
 	market_label.text="\n".join(lines)
 	var c_lines:=[]

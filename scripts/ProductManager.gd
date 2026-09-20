@@ -7,6 +7,25 @@ signal products_changed
 signal product_launched(product)
 signal cpu_range_created(generation)
 signal sales_report_created(report)
+signal lifecycle_action_applied(product, action)
+
+const PROMOTION_TYPES := {
+	"AWARENESS":{"label":"Campagne de notoriété","cost":6500,"months":2,"demand_bonus":4.0,"brand":0.35},
+	"VALUE":{"label":"Campagne valeur / prix","cost":9000,"months":2,"demand_bonus":6.0,"brand":0.18},
+	"CLEARANCE":{"label":"Fin de série / déstockage","cost":12000,"months":3,"demand_bonus":8.0,"brand":-0.05}
+}
+
+const REVISION_TYPES := {
+	"QUALITY":{"label":"Stepping fiabilité","base_cost":16000,"reliability":1.8,"efficiency":0.4,"cost_factor":1.00,"defect_factor":0.74,"quality":2.4},
+	"COST":{"label":"Stepping coût","base_cost":13000,"reliability":0.5,"efficiency":0.1,"cost_factor":0.95,"defect_factor":0.90,"quality":0.6},
+	"EFFICIENCY":{"label":"Stepping efficacité","base_cost":17500,"reliability":0.8,"efficiency":1.9,"cost_factor":1.01,"defect_factor":0.84,"quality":1.4}
+}
+
+const FIRMWARE_TYPES := {
+	"STABILITY":{"label":"Firmware stabilité","cost":6500,"performance":-0.5,"reliability":2.4,"efficiency":0.5,"support":0.25},
+	"BALANCED":{"label":"Firmware équilibré","cost":7500,"performance":0.5,"reliability":1.3,"efficiency":0.4,"support":0.20},
+	"PERFORMANCE":{"label":"Firmware performance","cost":8500,"performance":1.6,"reliability":-0.5,"efficiency":-0.3,"support":0.08}
+}
 
 var products: Array = []
 var cpu_generations: Array = []
@@ -59,6 +78,7 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
+		_ensure_lifecycle_fields(product)
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
@@ -85,6 +105,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
 		"last_month_share":0.0,"last_month_returns":0,"customer_satisfaction":50.0
 	}
+	_ensure_lifecycle_fields(product)
 	_next_id += 1
 	products.append(product)
 
@@ -112,6 +133,225 @@ func _metric_average(metrics: Dictionary) -> float:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
 
+func _ensure_lifecycle_fields(product: Dictionary) -> void:
+	product["commercial_history"] = product.get("commercial_history", []).duplicate(true)
+	product["revision_history"] = product.get("revision_history", []).duplicate(true)
+	product["firmware_history"] = product.get("firmware_history", []).duplicate(true)
+	product["promotion_type"] = str(product.get("promotion_type", "NONE"))
+	product["promotion_months_remaining"] = maxi(int(product.get("promotion_months_remaining", 0)), 0)
+	product["promotion_bonus"] = maxf(float(product.get("promotion_bonus", 0.0)), 0.0)
+	product["hardware_revision"] = maxi(int(product.get("hardware_revision", 0)), 0)
+	product["revision_label"] = str(product.get("revision_label", "A0"))
+	product["firmware_version"] = maxi(int(product.get("firmware_version", 1)), 1)
+	product["firmware_profile"] = str(product.get("firmware_profile", "ORIGINAL"))
+	var software_value = product.get("control_software", {})
+	var software: Dictionary = software_value.duplicate(true) if typeof(software_value) == TYPE_DICTIONARY else {}
+	software["released"] = bool(software.get("released", false))
+	software["version"] = maxi(int(software.get("version", 0)), 0)
+	software["name"] = str(software.get("name", "%s Control" % str(product.get("generation_name", product.get("name", "CPU")))))
+	software["quality"] = clampf(float(software.get("quality", 0.0)), 0.0, 100.0)
+	var support_value = software.get("supported_product_ids", [])
+	software["supported_product_ids"] = support_value.duplicate(true) if typeof(support_value) == TYPE_ARRAY else []
+	product["control_software"] = software
+
+func promotion_label(key: String) -> String:
+	return str(PROMOTION_TYPES.get(key, {}).get("label", key.capitalize()))
+
+func revision_label(key: String) -> String:
+	return str(REVISION_TYPES.get(key, {}).get("label", key.capitalize()))
+
+func firmware_label(key: String) -> String:
+	return str(FIRMWARE_TYPES.get(key, {}).get("label", key.capitalize()))
+
+func update_product_price(product_id: String, new_price: int) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	var price := maxi(new_price, 1)
+	if price == int(product.get("price", 0)):
+		return false
+	var old_price := int(product.get("price", 0))
+	product["price"] = price
+	var history: Array = product.get("commercial_history", [])
+	history.push_front({"type":"PRICE","month":TimeManager.month,"year":TimeManager.year,"from":old_price,"to":price})
+	if history.size() > 20:
+		history.pop_back()
+	product["commercial_history"] = history
+	CompanyManager.add_alert("%s : prix ajusté de %d € à %d €." % [str(product.get("name", "Produit")), old_price, price])
+	lifecycle_action_applied.emit(product, "PRICE")
+	products_changed.emit()
+	return true
+
+func start_promotion(product_id: String, promotion_type: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or not PROMOTION_TYPES.has(promotion_type):
+		return false
+	var data: Dictionary = PROMOTION_TYPES[promotion_type]
+	var cost := int(data.cost)
+	if Economy.money < cost:
+		return false
+	Economy.add_expense(cost, "Promotion — %s" % str(product.get("name", "Produit")))
+	product["promotion_type"] = promotion_type
+	product["promotion_months_remaining"] = int(data.months)
+	product["promotion_bonus"] = float(data.demand_bonus)
+	var history: Array = product.get("commercial_history", [])
+	history.push_front({"type":"PROMOTION","promotion":promotion_type,"month":TimeManager.month,"year":TimeManager.year,"cost":cost})
+	if history.size() > 20:
+		history.pop_back()
+	product["commercial_history"] = history
+	CompanyManager.change_reputation({"prestige":float(data.brand), "value":0.20 if promotion_type == "VALUE" else 0.0})
+	CompanyManager.add_alert("%s : %s lancée pour %d mois." % [str(product.get("name", "Produit")), str(data.label), int(data.months)])
+	lifecycle_action_applied.emit(product, "PROMOTION")
+	products_changed.emit()
+	return true
+
+func apply_hardware_revision(product_id: String, revision_type: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU" or not REVISION_TYPES.has(revision_type):
+		return false
+	_ensure_lifecycle_fields(product)
+	var data: Dictionary = REVISION_TYPES[revision_type]
+	var current_revision := int(product.get("hardware_revision", 0))
+	var cost := int(data.base_cost) + current_revision * 4500 + int(float(product.get("unit_cost", 1)) * 55.0)
+	if Economy.money < cost:
+		return false
+	Economy.add_expense(cost, "Révision matérielle — %s" % str(product.get("name", "CPU")))
+	var before_cost := int(product.get("unit_cost", 1))
+	var before_defect := float(product.get("defect_rate", 0.025))
+	var metrics: Dictionary = product.get("metrics", {})
+	metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + float(data.reliability), 0.0, 98.0)
+	metrics["efficiency"] = clampf(float(metrics.get("efficiency", 50.0)) + float(data.efficiency), 0.0, 98.0)
+	product["metrics"] = metrics
+	product["unit_cost"] = maxi(1, int(round(float(before_cost) * float(data.cost_factor))))
+	product["defect_rate"] = clampf(before_defect * float(data.defect_factor), 0.002, 0.20)
+	product["manufacturing_quality"] = clampf(float(product.get("manufacturing_quality", 60.0)) + float(data.quality), 0.0, 100.0)
+	product["hardware_revision"] = current_revision + 1
+	product["revision_label"] = "A%d" % (current_revision + 1)
+	var revisions: Array = product.get("revision_history", [])
+	revisions.push_front({
+		"revision":str(product.revision_label),"type":revision_type,"month":TimeManager.month,"year":TimeManager.year,
+		"cost":cost,"unit_cost_before":before_cost,"unit_cost_after":int(product.unit_cost),
+		"defect_before":before_defect,"defect_after":float(product.defect_rate),
+		"note":"Cette révision concerne uniquement les unités fabriquées après sa validation."
+	})
+	if revisions.size() > 12:
+		revisions.pop_back()
+	product["revision_history"] = revisions
+	ProductionManager.quality_knowledge = clampf(ProductionManager.quality_knowledge + 0.6 + current_revision * 0.15, 0.0, 100.0)
+	CompanyManager.add_alert("%s passe au stepping %s. Les unités déjà vendues ne sont pas modifiées." % [str(product.get("name", "CPU")), str(product.revision_label)])
+	lifecycle_action_applied.emit(product, "HARDWARE_REVISION")
+	products_changed.emit()
+	return true
+
+func firmware_available(product: Dictionary) -> bool:
+	if product.is_empty() or str(product.get("sector", "")) != "CPU":
+		return false
+	return float(ResearchManager.technologies.get("software", 0.0)) >= 12.0 and ResearchManager.get_cpu_capability("ARCHITECTURE") >= 24.0
+
+func control_software_available(product: Dictionary) -> bool:
+	if product.is_empty() or str(product.get("sector", "")) != "CPU":
+		return false
+	return float(ResearchManager.technologies.get("software", 0.0)) >= 18.0 and float(ResearchManager.technologies.get("integration", 0.0)) >= 24.0
+
+func release_firmware(product_id: String, firmware_type: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU" or not FIRMWARE_TYPES.has(firmware_type):
+		return false
+	if not firmware_available(product):
+		return false
+	_ensure_lifecycle_fields(product)
+	var data: Dictionary = FIRMWARE_TYPES[firmware_type]
+	var version := int(product.get("firmware_version", 1)) + 1
+	var cost := int(data.cost) + int(product.get("units_sold_total", 0)) / 25 + version * 850
+	if Economy.money < cost:
+		return false
+	Economy.add_expense(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU")))
+	var metrics: Dictionary = product.get("metrics", {})
+	metrics["performance"] = clampf(float(metrics.get("performance", 50.0)) + float(data.performance), 0.0, 98.0)
+	metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + float(data.reliability), 0.0, 98.0)
+	metrics["efficiency"] = clampf(float(metrics.get("efficiency", 50.0)) + float(data.efficiency), 0.0, 98.0)
+	product["metrics"] = metrics
+	product["firmware_version"] = version
+	product["firmware_profile"] = firmware_type
+	var firmware_history: Array = product.get("firmware_history", [])
+	firmware_history.push_front({
+		"version":version,"profile":firmware_type,"month":TimeManager.month,"year":TimeManager.year,"cost":cost,
+		"installed_base":int(product.get("units_sold_total", 0)),
+		"note":"Le firmware peut être déployé sur les unités compatibles déjà vendues."
+	})
+	if firmware_history.size() > 16:
+		firmware_history.pop_back()
+	product["firmware_history"] = firmware_history
+	AfterSalesManager.add_firmware_field_learning(0.8 + float(version) * 0.08)
+	CompanyManager.change_reputation({"support":float(data.support), "professional":0.12})
+	CompanyManager.add_alert("%s reçoit le firmware v%d — profil %s." % [str(product.get("name", "CPU")), version, str(data.label)])
+	lifecycle_action_applied.emit(product, "FIRMWARE")
+	products_changed.emit()
+	return true
+
+func release_control_software(product_id: String) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU":
+		return false
+	if not control_software_available(product):
+		return false
+	_ensure_lifecycle_fields(product)
+	var generation_id := str(product.get("generation_id", ""))
+	var supported: Array = []
+	for candidate in products:
+		if str(candidate.get("sector", "")) == "CPU" and str(candidate.get("generation_id", "")) == generation_id:
+			supported.append(str(candidate.get("id", "")))
+	var software: Dictionary = product.get("control_software", {}).duplicate(true)
+	var next_version := int(software.get("version", 0)) + 1
+	var cost := 9000 + supported.size() * 2200 + maxi(next_version - 1, 0) * 3500
+	if Economy.money < cost:
+		return false
+	Economy.add_expense(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU"))))
+	var quality_gain := 7.0 if next_version == 1 else 3.5
+	for candidate in products:
+		if not supported.has(str(candidate.get("id", ""))):
+			continue
+		_ensure_lifecycle_fields(candidate)
+		var candidate_software: Dictionary = candidate.get("control_software", {}).duplicate(true)
+		candidate_software["released"] = true
+		candidate_software["version"] = next_version
+		candidate_software["name"] = str(software.get("name", "%s Control" % str(candidate.get("generation_name", "CPU"))))
+		candidate_software["quality"] = clampf(float(candidate_software.get("quality", 0.0)) + quality_gain, 0.0, 100.0)
+		candidate_software["supported_product_ids"] = supported.duplicate(true)
+		candidate["control_software"] = candidate_software
+		var metrics: Dictionary = candidate.get("metrics", {})
+		metrics["usability"] = clampf(float(metrics.get("usability", 50.0)) + (1.8 if next_version == 1 else 0.8), 0.0, 98.0)
+		metrics["ecosystem"] = clampf(float(metrics.get("ecosystem", 50.0)) + (2.6 if next_version == 1 else 1.1), 0.0, 98.0)
+		candidate["metrics"] = metrics
+	CompanyManager.change_reputation({"support":0.40, "professional":0.30, "innovation":0.20})
+	CompanyManager.add_alert("%s Control v%d prend en charge %d modèle(s) de la génération." % [str(software.get("name", "CPU Control")), next_version, supported.size()])
+	lifecycle_action_applied.emit(product, "CONTROL_SOFTWARE")
+	products_changed.emit()
+	return true
+
+func get_post_launch_summary(product_id: String) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	_ensure_lifecycle_fields(product)
+	var software: Dictionary = product.get("control_software", {})
+	return {
+		"revision":str(product.get("revision_label", "A0")),
+		"firmware_version":int(product.get("firmware_version", 1)),
+		"firmware_profile":str(product.get("firmware_profile", "ORIGINAL")),
+		"promotion_type":str(product.get("promotion_type", "NONE")),
+		"promotion_months_remaining":int(product.get("promotion_months_remaining", 0)),
+		"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
+		"software_released":bool(software.get("released", false)),
+		"software_version":int(software.get("version", 0)),
+		"software_quality":float(software.get("quality", 0.0)),
+		"firmware_available":firmware_available(product),
+		"control_software_available":control_software_available(product),
+		"supported_products":software.get("supported_product_ids", []).duplicate(true),
+		"revision_count":product.get("revision_history", []).size(),
+		"firmware_count":product.get("firmware_history", []).size()
+	}
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
@@ -136,7 +376,20 @@ func process_month():
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(launched)
 	for product in launched:
 		_sell_product_month(product, portfolio_demand.get(str(product.id), {}))
+		_tick_post_launch_state(product)
 	products_changed.emit()
+
+func _tick_post_launch_state(product: Dictionary):
+	_ensure_lifecycle_fields(product)
+	var remaining := int(product.get("promotion_months_remaining", 0))
+	if remaining > 0:
+		remaining -= 1
+		product["promotion_months_remaining"] = remaining
+		if remaining <= 0:
+			var ended := str(product.get("promotion_type", "NONE"))
+			product["promotion_type"] = "NONE"
+			product["promotion_bonus"] = 0.0
+			CompanyManager.add_alert("%s : la campagne %s est terminée." % [str(product.get("name", "Produit")), promotion_label(ended)])
 
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
@@ -247,6 +500,7 @@ func load_state(state: Dictionary):
 		product["industrialization_months"] = int(product.get("industrialization_months", 0))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
+		_ensure_lifecycle_fields(product)
 
 	cpu_generations = []
 	var saved_generations_value = state.get("cpu_generations", [])

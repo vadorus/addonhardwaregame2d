@@ -47,7 +47,12 @@ func evaluate_product(product: Dictionary, segment: String) -> float:
 	score += price_score(product) * float(weights.get("price", 0.0))
 	var brand_bonus := (CompanyManager.get_brand_score() - 50.0) * 0.08 if str(product.company) == CompanyManager.company_name else 0.0
 	var support_bonus := (float(CompanyManager.reputation.support) - 50.0) * 0.05 if str(product.company) == CompanyManager.company_name else 0.0
-	return clampf(score + brand_bonus + support_bonus, 0.0, 100.0)
+	var promotion_bonus := float(product.get("promotion_bonus", 0.0)) * 0.65 if str(product.company) == CompanyManager.company_name else 0.0
+	var software_bonus := 0.0
+	var software_value = product.get("control_software", {})
+	if typeof(software_value) == TYPE_DICTIONARY and bool(software_value.get("released", false)):
+		software_bonus = minf(float(software_value.get("quality", 0.0)) * 0.045, 4.5)
+	return clampf(score + brand_bonus + support_bonus + promotion_bonus + software_bonus, 0.0, 100.0)
 
 func segment_scores(product: Dictionary) -> Dictionary:
 	var result := {}
@@ -174,7 +179,12 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var units := int(float(sd.market_units) * share)
 	var expectation: float = 50.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*35.0 + maxf((float(product.price)/float(sd.reference_price)-1.0)*18.0, 0.0)
 	var gap := score - expectation
-	return {"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,"expectation_gap":gap}
+	return {
+		"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,
+		"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,
+		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
+		"software_supported":bool(product.get("control_software", {}).get("released", false))
+	}
 
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}

@@ -274,6 +274,19 @@ Si le joueur accepte une solution, elle devient une **vraie phase de mise au poi
 
 Le joueur conserve toujours les trois choix fondamentaux : modifier son CPU, accepter le détour technique proposé, ou conserver une conception plus risquée sans cette aide.
 
+### Vie après lancement d'un CPU
+
+Un CPU commercialisé continue d'évoluer sans que toutes les améliorations soient confondues entre elles.
+
+- **Prix et promotion** : décisions commerciales temporaires. Elles peuvent améliorer l'attractivité sans modifier le matériel.
+- **Révision matérielle / stepping** : change uniquement les unités fabriquées après validation. Elle peut viser fiabilité, coût ou efficacité. Les unités déjà vendues restent physiquement inchangées.
+- **Firmware / microcode** : peut toucher le parc compatible déjà vendu et créer un compromis performance / stabilité / efficacité.
+- **Logiciel de contrôle** : produit associé distinct, avec version et liste explicite des CPU compatibles. Il améliore surtout utilisabilité et écosystème, sans transformer magiquement le silicium.
+
+Les fonctionnalités logicielles avancées ne sont pas débloquées par une année arbitraire. Elles deviennent disponibles lorsque l'entreprise a acquis assez de savoir-faire logiciel, d'intégration et d'architecture.
+
+L'interface respecte la progression pédagogique : la section de gestion post-lancement reste invisible tant qu'aucun produit sélectionné n'est réellement commercialisé.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :
