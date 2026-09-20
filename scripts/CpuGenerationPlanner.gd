@@ -94,12 +94,48 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 				design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
 			if capability >= 64.0 and architecture_capability >= 52.0 and int(base.cores) < 2:
 				design.cores = int(base.cores) + 1
-	_apply_segment(design, str(context.get("segment", "MAINSTREAM")), archetype)
+	_apply_segment(design, str(context.get("segment", "EMBEDDED")), archetype)
 	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability, architecture_capability, layout_score)
 	return CPU_DESIGN.normalize(design)
 
 static func _apply_segment(design: Dictionary, segment: String, archetype: String) -> void:
 	match segment:
+		"CALCULATOR":
+			design.frequency_ghz = float(design.frequency_ghz) * 0.90
+			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
+		"EMBEDDED":
+			design.frequency_ghz = float(design.frequency_ghz) * 0.95
+			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
+		"INDUSTRIAL":
+			design.frequency_ghz = float(design.frequency_ghz) * 0.96
+		"SCIENTIFIC":
+			design.frequency_ghz = float(design.frequency_ghz) * 1.05
+		"HOBBYIST":
+			design.frequency_ghz = float(design.frequency_ghz) * 1.04
+		"BUSINESS_PC":
+			design.frequency_ghz = float(design.frequency_ghz) * 1.01
+		"HOME_PC":
+			design.frequency_ghz = float(design.frequency_ghz) * 0.98
+			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
+		"WORKSTATION":
+			design.frequency_ghz = float(design.frequency_ghz) * 1.06
+			if float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.15
+		"SERVER":
+			design.tdp_w = int(design.tdp_w) + (1 if archetype != "SAFE" else 0)
+			if float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.20
+		"GAMING":
+			design.frequency_ghz = float(design.frequency_ghz) * 1.10
+			design.tdp_w = int(design.tdp_w) + 1
+		"MOBILE_COMPUTING":
+			design.frequency_ghz = float(design.frequency_ghz) * 0.92
+			design.tdp_w = maxi(int(design.tdp_w) - 2, 1)
+		"DATACENTER":
+			design.tdp_w = int(design.tdp_w) + (1 if archetype != "SAFE" else 0)
+			if float(design.cache_mb) > 0.0:
+				design.cache_mb = float(design.cache_mb) * 1.25
+		# Compatibilité des anciennes sauvegardes / plans.
 		"BUDGET":
 			design.frequency_ghz = float(design.frequency_ghz) * 0.92
 			design.tdp_w = maxi(int(design.tdp_w) - 1, 1)
@@ -181,7 +217,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	var metric_deltas := {}
 	for metric in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
 		metric_deltas[metric] = float(evaluation.get(metric, 0.0)) - float(base_evaluation.get(metric, 0.0))
-	var target_fit := CPU_DESIGN.segment_fit(evaluation, str(context.get("segment", "MAINSTREAM")))
+	var target_fit := CPU_DESIGN.segment_fit(evaluation, str(context.get("segment", "EMBEDDED")))
 	var strengths := _strengths_for(str(profile.key), metric_deltas, target_fit, potential_models)
 	var field_experience := float(context.get("field_experience", 0.0))
 	if field_experience >= 28.0:
@@ -199,7 +235,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"design":design.duplicate(true),
 		"evaluation":evaluation.duplicate(true),
 		"metric_deltas":metric_deltas,
-		"segment":str(context.get("segment", "MAINSTREAM")),
+		"segment":str(context.get("segment", "EMBEDDED")),
 		"approach":str(context.get("approach", "INTERNAL")),
 		"focus":str(context.get("focus", "BALANCED")),
 		"monthly_budget":monthly_budget,
