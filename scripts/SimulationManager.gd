@@ -27,6 +27,9 @@ func process_month_end() -> Dictionary:
 		return {}
 	CompanyManager.process_month()
 	var active := ResearchManager.active_departments()
+	for dept in FoundryManager.active_departments():
+		if not active.has(dept):
+			active.append(dept)
 	for dept in ProductionManager.active_departments():
 		if not active.has(dept):
 			active.append(dept)
