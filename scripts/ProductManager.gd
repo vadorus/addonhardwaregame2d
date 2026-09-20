@@ -133,23 +133,33 @@ func _metric_average(metrics: Dictionary) -> float:
 		avg += float(metrics.get(metric, 50.0))
 	return avg / float(GameData.METRICS.size())
 
-func _ensure_silicon_fields(product: Dictionary) -> void:
+func _ensure_die_fields(product: Dictionary) -> void:
 	if str(product.get("sector", "")) != "CPU":
 		return
 	var quality := float(product.get("manufacturing_quality", 60.0))
 	var bin_quality := float(product.get("bin_quality", 70.0))
-	product["silicon_quality"] = clampf(float(product.get("silicon_quality", quality * 0.62 + bin_quality * 0.38)), 15.0, 99.0)
-	product["silicon_variation"] = clampf(float(product.get("silicon_variation", 10.0)), 2.0, 20.0)
-	product["silicon_consistency"] = clampf(float(product.get("silicon_consistency", 60.0)), 20.0, 99.0)
+	var migrated_quality := float(product.get("die_quality", product.get("silicon_quality", quality * 0.62 + bin_quality * 0.38)))
+	var migrated_variation := float(product.get("die_variation", product.get("silicon_variation", 10.0)))
+	var migrated_consistency := float(product.get("die_consistency", product.get("silicon_consistency", 60.0)))
+	product["die_quality"] = clampf(migrated_quality, 15.0, 99.0)
+	product["die_variation"] = clampf(migrated_variation, 1.5, 20.0)
+	product["die_consistency"] = clampf(migrated_consistency, 20.0, 99.0)
+	product["lithography_precision"] = clampf(float(product.get("lithography_precision", 55.0)), 10.0, 100.0)
+	product["process_capability_score"] = clampf(float(product.get("process_capability_score", 55.0)), 10.0, 100.0)
+	product["design_margin_score"] = clampf(float(product.get("design_margin_score", 55.0)), 10.0, 100.0)
 	product["oc_headroom_pct"] = clampf(float(product.get("oc_headroom_pct", 4.0)), 0.0, 30.0)
 	product["undervolt_headroom_pct"] = clampf(float(product.get("undervolt_headroom_pct", 6.0)), 0.0, 25.0)
 	product["binning_strategy"] = str(product.get("binning_strategy", "BALANCED"))
+	# Compatibilité lecture V16 : ces aliases ne sont plus utilisés par les calculs.
+	product["silicon_quality"] = float(product.die_quality)
+	product["silicon_variation"] = float(product.die_variation)
+	product["silicon_consistency"] = float(product.die_consistency)
 	var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 	product["typical_oc_frequency_ghz"] = float(product.get("typical_oc_frequency_ghz", float(design.frequency_ghz) * (1.0 + float(product.oc_headroom_pct) / 100.0)))
 	product["typical_undervolt_power_factor"] = clampf(float(product.get("typical_undervolt_power_factor", 1.0 - float(product.undervolt_headroom_pct) / 180.0)), 0.75, 1.0)
 
 func _ensure_lifecycle_fields(product: Dictionary) -> void:
-	_ensure_silicon_fields(product)
+	_ensure_die_fields(product)
 	product["commercial_history"] = product.get("commercial_history", []).duplicate(true)
 	product["revision_history"] = product.get("revision_history", []).duplicate(true)
 	product["firmware_history"] = product.get("firmware_history", []).duplicate(true)
@@ -241,17 +251,22 @@ func apply_hardware_revision(product_id: String, revision_type: String) -> bool:
 	product["unit_cost"] = maxi(1, int(round(float(before_cost) * float(data.cost_factor))))
 	product["defect_rate"] = clampf(before_defect * float(data.defect_factor), 0.002, 0.20)
 	product["manufacturing_quality"] = clampf(float(product.get("manufacturing_quality", 60.0)) + float(data.quality), 0.0, 100.0)
-	_ensure_silicon_fields(product)
+	_ensure_die_fields(product)
 	match revision_type:
 		"QUALITY":
-			product["silicon_consistency"] = clampf(float(product.silicon_consistency) + 4.5, 20.0, 99.0)
+			product["die_consistency"] = clampf(float(product.die_consistency) + 4.5, 20.0, 99.0)
 			product["oc_headroom_pct"] = clampf(float(product.oc_headroom_pct) + 1.0, 0.0, 30.0)
+			product["lithography_precision"] = clampf(float(product.lithography_precision) + 1.5, 10.0, 100.0)
 		"COST":
-			product["silicon_consistency"] = clampf(float(product.silicon_consistency) - 1.5, 20.0, 99.0)
-			product["silicon_variation"] = clampf(float(product.silicon_variation) + 0.8, 2.0, 20.0)
+			product["die_consistency"] = clampf(float(product.die_consistency) - 1.5, 20.0, 99.0)
+			product["die_variation"] = clampf(float(product.die_variation) + 0.8, 1.5, 20.0)
 		"EFFICIENCY":
-			product["silicon_consistency"] = clampf(float(product.silicon_consistency) + 2.0, 20.0, 99.0)
+			product["die_consistency"] = clampf(float(product.die_consistency) + 2.0, 20.0, 99.0)
 			product["undervolt_headroom_pct"] = clampf(float(product.undervolt_headroom_pct) + 2.2, 0.0, 25.0)
+			product["design_margin_score"] = clampf(float(product.design_margin_score) + 1.2, 10.0, 100.0)
+	product["silicon_quality"] = float(product.get("die_quality", 60.0))
+	product["silicon_variation"] = float(product.get("die_variation", 10.0))
+	product["silicon_consistency"] = float(product.get("die_consistency", 60.0))
 	var revised_design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 	product["typical_oc_frequency_ghz"] = float(revised_design.frequency_ghz) * (1.0 + float(product.oc_headroom_pct) / 100.0)
 	product["typical_undervolt_power_factor"] = clampf(1.0 - float(product.undervolt_headroom_pct) / 180.0, 0.75, 1.0)
@@ -377,9 +392,12 @@ func get_post_launch_summary(product_id: String) -> Dictionary:
 		"software_quality":float(software.get("quality", 0.0)),
 		"firmware_available":firmware_available(product),
 		"control_software_available":control_software_available(product),
-		"silicon_quality":float(product.get("silicon_quality", 60.0)),
-		"silicon_variation":float(product.get("silicon_variation", 10.0)),
-		"silicon_consistency":float(product.get("silicon_consistency", 60.0)),
+		"die_quality":float(product.get("die_quality", product.get("silicon_quality", 60.0))),
+		"die_variation":float(product.get("die_variation", product.get("silicon_variation", 10.0))),
+		"die_consistency":float(product.get("die_consistency", product.get("silicon_consistency", 60.0))),
+		"lithography_precision":float(product.get("lithography_precision", 55.0)),
+		"process_capability_score":float(product.get("process_capability_score", 55.0)),
+		"design_margin_score":float(product.get("design_margin_score", 55.0)),
 		"oc_headroom_pct":float(product.get("oc_headroom_pct", 0.0)),
 		"undervolt_headroom_pct":float(product.get("undervolt_headroom_pct", 0.0)),
 		"typical_oc_frequency_ghz":float(product.get("typical_oc_frequency_ghz", 0.0)),
@@ -538,7 +556,7 @@ func load_state(state: Dictionary):
 		product["industrialization_months"] = int(product.get("industrialization_months", 0))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
-		_ensure_silicon_fields(product)
+		_ensure_die_fields(product)
 		_ensure_lifecycle_fields(product)
 
 	cpu_generations = []
