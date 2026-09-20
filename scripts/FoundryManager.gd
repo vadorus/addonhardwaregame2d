@@ -412,6 +412,11 @@ func _process_internal_fab_operations():
 			Economy.add_income(revenue, "Services de fonderie")
 			internal_fab["service_reputation"] = clampf(float(internal_fab.get("service_reputation", 50.0)) + 0.12, 0.0, 100.0)
 
+func active_departments() -> Array:
+	if not internal_fab.get("construction", {}).is_empty() or int(internal_fab.get("tier", 0)) > 0:
+		return ["Production"]
+	return []
+
 func get_state() -> Dictionary:
 	return {
 		"external_foundries":external_foundries,
