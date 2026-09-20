@@ -306,6 +306,24 @@ L'avis financier ne décide jamais pour le joueur. Il classe la situation (confo
 
 Le suivi RH et financier est d'abord assuré avec le bras droit. À mesure que l'effectif grandit, l'interface peut ensuite matérialiser un DRH et un DAF dédiés sans changer la logique sous-jacente.
 
+### Qualité du silicium, binning et marge électrique
+
+Une génération CPU n'a pas une qualité de silicium parfaitement uniforme. L'industrialisation produit désormais une **qualité moyenne**, une **dispersion**, une **prévisibilité**, une **marge d'overclocking typique** et une **marge d'undervolt**.
+
+Ces valeurs dépendent de la qualité d'industrialisation, de la maîtrise du procédé, de l'équipe Production, de la fiabilité du design et de sa complexité. Un procédé mûr donne surtout une distribution plus prévisible ; un procédé mal maîtrisé peut parfois produire de très bons dies, mais avec davantage de dispersion.
+
+Le joueur choisit aussi la politique de sélection des dies :
+
+- **Binning volume** : davantage de dies poussés vers les bins supérieurs, mais plus de dispersion et moins de marge moyenne ;
+- **Binning équilibré** : compromis par défaut ;
+- **Binning strict** : moins de dies Apex, mais une qualité plus homogène, davantage de marge OC/undervolt et une meilleure prévisibilité.
+
+Les modèles Essentiel, Signature et Apex héritent d'une distribution différente : l'Apex reçoit statistiquement les meilleurs dies, tandis que l'Essentiel absorbe davantage les dies fonctionnels mais moins favorables.
+
+La marge OC n'est pas une fréquence garantie. L'interface affiche la fréquence officielle et une estimation de la fréquence typique atteignable sur un bon échantillon. Le marché Enthousiaste et les benchmarks peuvent valoriser cette marge ; les segments professionnels valorisent davantage la constance et la capacité d'undervolt.
+
+Une révision matérielle peut ensuite améliorer la distribution des **nouvelles unités produites** sans modifier physiquement les CPU déjà vendus.
+
 ## 8. Générations et propositions d'architecture
 
 Quand le joueur demande une nouvelle génération, l'équipe prépare idéalement trois plans compréhensibles :
