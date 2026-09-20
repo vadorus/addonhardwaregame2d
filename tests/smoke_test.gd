@@ -33,6 +33,14 @@ func _ready() -> void:
 	if CompanyManager.founded_year != 1971:
 		_fail("Company founding year did not follow the early CPU era")
 		return
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
+		_fail("Garage onboarding did not expose QG and CPU Lab")
+		return
+	for locked_feature in ["COMPANY","TEAM","PRODUCTS","MARKET","PRESS"]:
+		if ExecutiveManager.is_interface_feature_unlocked(locked_feature):
+			_fail("Garage onboarding exposed advanced feature too early: %s" % locked_feature)
+			return
 
 	var executive_initial_state := ExecutiveManager.get_state().duplicate(true)
 	var personnel_initial_state := PersonnelManager.get_state().duplicate(true)
@@ -379,6 +387,13 @@ func _ready() -> void:
 		_fail("Technical remediation upfront cost was not charged when the project started")
 		return
 	var project: Dictionary = ResearchManager.projects[0]
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("TEAM"):
+		_fail("Starting the first CPU project did not reveal the Team screen")
+		return
+	if ExecutiveManager.is_interface_feature_unlocked("PRODUCTS") or ExecutiveManager.is_interface_feature_unlocked("MARKET"):
+		_fail("Product/Market screens unlocked before the CPU reached production")
+		return
 	if int(project.get("cpu_design", {}).get("cores", 0)) != int(cpu_design.get("cores", -1)):
 		_fail("Selected generation design was not stored on the R&D project")
 		return
@@ -418,6 +433,10 @@ func _ready() -> void:
 	if int(report.get("money", -1)) != Economy.money:
 		_fail("Monthly report balance does not match economy")
 		return
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("COMPANY"):
+		_fail("Company screen did not unlock after the first operating month")
+		return
 	if initial_remediation_months > 0:
 		if int(project.get("phase_index", -1)) != 0 or float(project.get("phase_progress", -1.0)) != 0.0:
 			_fail("CPU product development advanced before the accepted technical solution was validated")
@@ -444,6 +463,13 @@ func _ready() -> void:
 	range_project["final_metrics"] = completed_metrics
 	range_project["status"] = "COMPLETED"
 	ProductionManager._on_project_completed(range_project)
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("PRODUCTS"):
+		_fail("Products screen did not unlock when CPU industrialization began")
+		return
+	if ExecutiveManager.is_interface_feature_unlocked("MARKET"):
+		_fail("Market screen unlocked before a CPU was commercialized")
+		return
 	if ProductionManager.get_active_jobs().size() != 1:
 		_fail("Completed CPU development did not enter industrialization")
 		return
@@ -562,6 +588,26 @@ func _ready() -> void:
 		return
 	if int(apex_model.production_capacity) != apex_max_capacity:
 		_fail("CPU launch ignored the binning capacity limit")
+		return
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("MARKET"):
+		_fail("Market screen did not unlock after the first CPU launch")
+		return
+	if ExecutiveManager.is_interface_feature_unlocked("PRESS"):
+		_fail("Press screen unlocked before any real product feedback")
+		return
+	var review_scores := MarketManager.segment_scores(apex_model)
+	var review_rows := MarketManager.benchmark_for(apex_model)
+	MediaManager.publish_product_review(apex_model, review_scores, MarketManager.benchmark_rank(apex_model), review_rows.size())
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("PRESS"):
+		_fail("Press screen did not unlock after the first public CPU review")
+		return
+	var progressed_executive_state := ExecutiveManager.get_state().duplicate(true)
+	ExecutiveManager.reset()
+	ExecutiveManager.load_state(progressed_executive_state)
+	if not ExecutiveManager.is_interface_feature_unlocked("PRESS") or ExecutiveManager.get_unlock_history().is_empty():
+		_fail("Progressive UI unlocks did not survive an executive-state round-trip")
 		return
 
 	var lifecycle_initial := ProductManager.get_post_launch_summary(str(apex_model.id))
