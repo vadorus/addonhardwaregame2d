@@ -51,6 +51,7 @@ var products_label: Label
 var production_label: Label
 var industrialization_select: OptionButton
 var industrialization_strategy: OptionButton
+var industrialization_binning: OptionButton
 var product_details_label: Label
 var market_label: Label
 var contract_label: Label
@@ -1355,15 +1356,22 @@ func _create_products_tab():
 	production_grid.add_child(_label("Projet en industrialisation", 14))
 	industrialization_select = OptionButton.new()
 	production_grid.add_child(industrialization_select)
-	production_grid.add_child(_label("Stratégie", 14))
+	production_grid.add_child(_label("Stratégie industrielle", 14))
 	industrialization_strategy = OptionButton.new()
 	for strategy_key in ["ECONOMY", "BALANCED", "QUALITY", "SPEED"]:
 		industrialization_strategy.add_item(ProductionManager.strategy_label(strategy_key))
 		industrialization_strategy.set_item_metadata(industrialization_strategy.item_count - 1, strategy_key)
 	_select_meta(industrialization_strategy, "BALANCED")
 	production_grid.add_child(industrialization_strategy)
+	production_grid.add_child(_label("Sélection du silicium", 14))
+	industrialization_binning = OptionButton.new()
+	for binning_key in ["VOLUME", "BALANCED", "STRICT"]:
+		industrialization_binning.add_item(ProductionManager.binning_strategy_label(binning_key))
+		industrialization_binning.set_item_metadata(industrialization_binning.item_count - 1, binning_key)
+	_select_meta(industrialization_binning, "BALANCED")
+	production_grid.add_child(industrialization_binning)
 	var apply_production := Button.new()
-	apply_production.text = "Appliquer la stratégie industrielle"
+	apply_production.text = "Appliquer fabrication + binning"
 	apply_production.pressed.connect(_apply_industrialization_strategy)
 	box.add_child(apply_production)
 
@@ -2406,9 +2414,12 @@ func _refresh_products():
 					float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), _money(int(job.get("monthly_cost", 0)))
 				])
 			else:
-				production_lines.append("\n%s — industrialisation terminée : qualité %.0f/100 • défauts %.1f%% • maîtrise %.0f/100" % [
+				production_lines.append("\n%s — industrialisation terminée : qualité %.0f/100 • défauts %.1f%% • maîtrise %.0f/100\n  Silicium %.0f/100 ± %.1f • prévisibilité %.0f/100 • OC typique +%.1f%% • undervolt %.1f%% • %s" % [
 					str(job.get("name", "CPU")), float(result.get("quality_score", 0.0)),
-					float(result.get("defect_rate", 0.0)) * 100.0, float(result.get("process_mastery", 0.0))
+					float(result.get("defect_rate", 0.0)) * 100.0, float(result.get("process_mastery", 0.0)),
+					float(result.get("silicon_quality_mean", 0.0)), float(result.get("silicon_variation", 0.0)),
+					float(result.get("silicon_predictability", 0.0)), float(result.get("oc_headroom_pct", 0.0)),
+					float(result.get("undervolt_headroom_pct", 0.0)), ProductionManager.binning_strategy_label(str(result.get("binning_strategy", "BALANCED")))
 				])
 		production_label.text = "\n".join(production_lines)
 	if industrialization_select != null:
@@ -2422,6 +2433,8 @@ func _refresh_products():
 		if industrialization_select.item_count > 0:
 			var active_job := ProductionManager.get_job(_meta(industrialization_select))
 			_select_meta(industrialization_strategy, str(active_job.get("strategy", "BALANCED")))
+			if industrialization_binning != null:
+				_select_meta(industrialization_binning, str(active_job.get("binning_strategy", "BALANCED")))
 	var current_id := _meta(product_select) if product_select.item_count > 0 else ""
 	var lines: Array[String] = []
 	for generation in ProductManager.cpu_generations:
@@ -2433,10 +2446,11 @@ func _refresh_products():
 				ready_count += 1
 			elif str(model.get("status", "")) == "LAUNCHED":
 				launched_count += 1
-		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
+		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • silicium %.0f/100 ± %.1f • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
 			int(generation.get("generation_index", 1)), str(generation.get("name", "Architecture CPU")),
 			float(generation.get("yield_rate", 0.0)) * 100.0, float(generation.get("manufacturing_quality", 60.0)),
-			float(generation.get("defect_rate", 0.025)) * 100.0, int(generation.get("model_ids", []).size()),
+			float(generation.get("defect_rate", 0.025)) * 100.0, float(generation.get("silicon_quality_mean", 60.0)),
+			float(generation.get("silicon_variation", 10.0)), int(generation.get("model_ids", []).size()),
 			ready_count, launched_count, int(generation.get("future_model_slots", 0))
 		])
 	for product in ProductManager.products:
@@ -2479,14 +2493,18 @@ func _refresh_product_details():
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • stratégie %s (%d mois)\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nSilicium %.0f/100 • constance %.0f/100 • variation ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 			str(product.get("range_role", "")), target_label,
 			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 			float(product.get("yield_rate", 0.0)) * 100.0, float(product.get("manufacturing_quality", 60.0)),
 			float(product.get("defect_rate", 0.025)) * 100.0, float(product.get("process_mastery", 35.0)),
 			int(product.get("bin_quality", 0)), float(product.get("bin_share", 0.0)) * 100.0,
+			ProductionManager.binning_strategy_label(str(product.get("binning_strategy", "BALANCED"))),
 			ProductionManager.strategy_label(str(product.get("industrialization_strategy", "BALANCED"))), int(product.get("industrialization_months", 0)),
+			float(product.get("silicon_quality", 60.0)), float(product.get("silicon_consistency", 60.0)), float(product.get("silicon_variation", 10.0)),
+			float(product.get("oc_headroom_pct", 0.0)), CPU_DESIGN.format_frequency({"frequency_ghz":float(product.get("typical_oc_frequency_ghz", design.frequency_ghz))}),
+			float(product.get("undervolt_headroom_pct", 0.0)),
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
 			" • ".join(metric_lines)
 		]
@@ -2542,8 +2560,13 @@ func _apply_industrialization_strategy():
 		return
 	var job_id := _meta(industrialization_select)
 	var strategy := _meta(industrialization_strategy)
-	if ProductionManager.set_strategy(job_id, strategy):
-		status_label.text = "Stratégie Production appliquée : %s." % ProductionManager.strategy_label(strategy)
+	var binning := _meta(industrialization_binning) if industrialization_binning != null else "BALANCED"
+	var strategy_ok := ProductionManager.set_strategy(job_id, strategy)
+	var binning_ok := ProductionManager.set_binning_strategy(job_id, binning)
+	if strategy_ok and binning_ok:
+		status_label.text = "Production : %s • %s." % [
+			ProductionManager.strategy_label(strategy), ProductionManager.binning_strategy_label(binning)
+		]
 	else:
 		status_label.text = "Impossible de modifier cette industrialisation."
 	_refresh_all()
