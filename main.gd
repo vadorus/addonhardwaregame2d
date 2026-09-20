@@ -53,6 +53,10 @@ var production_label: Label
 var industrialization_select: OptionButton
 var industrialization_strategy: OptionButton
 var industrialization_binning: OptionButton
+var manufacturing_mode_select: OptionButton
+var foundry_select: OptionButton
+var foundry_route_label: Label
+var foundry_overview_label: Label
 var product_details_label: Label
 var market_label: Label
 var contract_label: Label
@@ -1372,10 +1376,43 @@ func _create_products_tab():
 		industrialization_binning.set_item_metadata(industrialization_binning.item_count - 1, binning_key)
 	_select_meta(industrialization_binning, "BALANCED")
 	production_grid.add_child(industrialization_binning)
+	production_grid.add_child(_label("Route de fabrication", 14))
+	manufacturing_mode_select = OptionButton.new()
+	for route_data in [["Sous-traitance / fonderie externe","EXTERNAL"],["Fab interne","INTERNAL"]]:
+		manufacturing_mode_select.add_item(str(route_data[0]))
+		manufacturing_mode_select.set_item_metadata(manufacturing_mode_select.item_count - 1, str(route_data[1]))
+	manufacturing_mode_select.item_selected.connect(func(_i): _refresh_foundry_options())
+	production_grid.add_child(manufacturing_mode_select)
+	production_grid.add_child(_label("Fonderie", 14))
+	foundry_select = OptionButton.new()
+	foundry_select.item_selected.connect(func(_i): _refresh_foundry_route_summary())
+	production_grid.add_child(foundry_select)
 	var apply_production := Button.new()
-	apply_production.text = "Appliquer fabrication + binning"
+	apply_production.text = "Appliquer fabrication + binning + fonderie"
 	apply_production.pressed.connect(_apply_industrialization_strategy)
 	box.add_child(apply_production)
+	foundry_route_label = _rich_label()
+	box.add_child(foundry_route_label)
+
+	box.add_child(_section("Fonderies & capacité"))
+	foundry_overview_label = _rich_label()
+	box.add_child(foundry_overview_label)
+	var foundry_actions := HFlowContainer.new()
+	foundry_actions.add_theme_constant_override("h_separation", 8)
+	foundry_actions.add_theme_constant_override("v_separation", 8)
+	box.add_child(foundry_actions)
+	var build_fab := Button.new()
+	build_fab.text = "Construire / agrandir la fab interne"
+	build_fab.pressed.connect(_start_internal_fab_project)
+	foundry_actions.add_child(build_fab)
+	var maintain_fab := Button.new()
+	maintain_fab.text = "Maintenance lourde de la fab"
+	maintain_fab.pressed.connect(_maintain_internal_fab)
+	foundry_actions.add_child(maintain_fab)
+	var sell_capacity := Button.new()
+	sell_capacity.text = "Activer / couper la vente de capacité libre"
+	sell_capacity.pressed.connect(_toggle_foundry_capacity_sales)
+	foundry_actions.add_child(sell_capacity)
 
 	box.add_child(_section("Gamme CPU / lancer"))
 	products_label=_rich_label(); box.add_child(products_label)
@@ -2597,6 +2634,87 @@ func _refresh_selected_industrialization_controls():
 		_select_meta(industrialization_strategy, str(active_job.get("strategy", "BALANCED")))
 	if industrialization_binning != null:
 		_select_meta(industrialization_binning, str(active_job.get("binning_strategy", "BALANCED")))
+	if manufacturing_mode_select != null:
+		_select_meta(manufacturing_mode_select, str(active_job.get("manufacturing_mode", "EXTERNAL")))
+	_refresh_foundry_options()
+	if foundry_select != null:
+		_select_meta(foundry_select, "INTERNAL" if str(active_job.get("manufacturing_mode", "EXTERNAL")) == "INTERNAL" else str(active_job.get("foundry_id", "")))
+	_refresh_foundry_route_summary()
+
+func _refresh_foundry_options():
+	if manufacturing_mode_select == null or foundry_select == null:
+		return
+	var mode := _meta(manufacturing_mode_select)
+	var node_nm := 10000
+	if industrialization_select != null and industrialization_select.item_count > 0:
+		var job := ProductionManager.get_job(_meta(industrialization_select))
+		node_nm = int(job.get("node_nm", 10000))
+	var previous := _meta(foundry_select) if foundry_select.item_count > 0 else ""
+	foundry_select.clear()
+	if mode == "INTERNAL":
+		var fab := FoundryManager.internal_fab_data()
+		if bool(fab.get("built", false)) and FoundryManager.internal_supports_node(node_nm):
+			foundry_select.add_item("%s" % str(fab.get("name", "Fab interne")))
+			foundry_select.set_item_metadata(0, "INTERNAL")
+		else:
+			foundry_select.add_item("Fab interne indisponible pour ce procédé")
+			foundry_select.set_item_metadata(0, "")
+	else:
+		for foundry_id_value in FoundryManager.available_external_foundries(node_nm):
+			var foundry_id := str(foundry_id_value)
+			var data := FoundryManager.get_external_foundry(foundry_id)
+			foundry_select.add_item("%s" % str(data.get("name", foundry_id)))
+			foundry_select.set_item_metadata(foundry_select.item_count - 1, foundry_id)
+	if previous != "":
+		_select_meta(foundry_select, previous)
+	if foundry_select.selected < 0 and foundry_select.item_count > 0:
+		foundry_select.select(0)
+	_refresh_foundry_route_summary()
+
+func _refresh_foundry_route_summary():
+	if foundry_route_label == null:
+		return
+	if industrialization_select == null or industrialization_select.item_count == 0:
+		foundry_route_label.text = "Aucun CPU en industrialisation."
+		return
+	var job := ProductionManager.get_job(_meta(industrialization_select))
+	var mode := _meta(manufacturing_mode_select) if manufacturing_mode_select != null else str(job.get("manufacturing_mode", "EXTERNAL"))
+	var provider_id := _meta(foundry_select) if foundry_select != null and foundry_select.item_count > 0 else ""
+	var quote := FoundryManager.route_quote(mode, provider_id, int(job.get("node_nm", 10000)))
+	if quote.is_empty():
+		foundry_route_label.text = "Cette route ne peut pas fabriquer %s avec les moyens actuels." % CPU_DESIGN.node_label(int(job.get("node_nm", 10000)))
+		return
+	foundry_route_label.text = "%s\nPrécision équipement %.0f/100 • fiabilité %.0f/100 • dépendance %.0f/100 • confidentialité %.0f/100\nCoût x%.2f • vitesse x%.2f • capacité max ~%s unités/mois • frais de mise en production %s €\nApprentissage interne x%.2f" % [
+		str(quote.get("provider_name", "")), float(quote.get("precision", 0.0)), float(quote.get("reliability", 0.0)),
+		float(quote.get("dependency", 0.0)), float(quote.get("confidentiality", 0.0)), float(quote.get("cost_factor", 1.0)),
+		float(quote.get("speed_factor", 1.0)), _money(int(quote.get("max_capacity", 0))), _money(int(quote.get("setup_fee", 0))),
+		float(quote.get("learning_factor", 1.0))
+	]
+
+func _start_internal_fab_project():
+	var upgrade := FoundryManager.next_internal_fab_upgrade()
+	if upgrade.is_empty():
+		status_label.text = "La fab interne a atteint son niveau maximum."
+	elif FoundryManager.start_internal_fab_project():
+		status_label.text = "Construction lancée : %s, %d mois, coût total %s €." % [
+			str(upgrade.get("name", "fab")), int(upgrade.get("build_months", 0)), _money(int(upgrade.get("build_cost", 0)))
+		]
+	else:
+		var advice := ExecutiveManager.financial_advice(int(upgrade.get("build_cost", 0)), int(upgrade.get("monthly_overhead", 0)))
+		status_label.text = "Construction impossible : technologie, chantier existant ou trésorerie insuffisante. %s" % str(advice.get("recommendation", ""))
+	_refresh_all()
+
+func _maintain_internal_fab():
+	status_label.text = "Maintenance lourde terminée." if FoundryManager.maintain_internal_fab() else "Maintenance impossible : aucune fab ou trésorerie insuffisante."
+	_refresh_all()
+
+func _toggle_foundry_capacity_sales():
+	var fab := FoundryManager.internal_fab_data()
+	if not bool(fab.get("built", false)):
+		status_label.text = "Il faut d'abord posséder une fab interne."
+		return
+	FoundryManager.set_sell_spare_capacity(not bool(fab.get("sell_spare_capacity", false)))
+	_refresh_all()
 
 func _apply_industrialization_strategy():
 	if industrialization_select == null or industrialization_select.item_count == 0:
@@ -2605,14 +2723,18 @@ func _apply_industrialization_strategy():
 	var job_id := _meta(industrialization_select)
 	var strategy := _meta(industrialization_strategy)
 	var binning := _meta(industrialization_binning) if industrialization_binning != null else "BALANCED"
+	var mode := _meta(manufacturing_mode_select) if manufacturing_mode_select != null else "EXTERNAL"
+	var provider := _meta(foundry_select) if foundry_select != null and foundry_select.item_count > 0 else ""
 	var strategy_ok := ProductionManager.set_strategy(job_id, strategy)
 	var binning_ok := ProductionManager.set_binning_strategy(job_id, binning)
-	if strategy_ok and binning_ok:
-		status_label.text = "Production : %s • %s." % [
-			ProductionManager.strategy_label(strategy), ProductionManager.binning_strategy_label(binning)
+	var route_ok := ProductionManager.set_manufacturing_route(job_id, mode, provider)
+	if strategy_ok and binning_ok and route_ok:
+		var quote := ProductionManager.manufacturing_route_quote(job_id)
+		status_label.text = "Production : %s • %s • %s." % [
+			ProductionManager.strategy_label(strategy), ProductionManager.binning_strategy_label(binning), str(quote.get("provider_name", "fabrication"))
 		]
 	else:
-		status_label.text = "Impossible de modifier cette industrialisation."
+		status_label.text = "Impossible de modifier cette industrialisation : la route est peut-être déjà engagée ou incompatible."
 	_refresh_all()
 
 func _launch_product():
