@@ -183,7 +183,7 @@ func start_investigation(case_id: String) -> bool:
 		return false
 	var severity := float(case_data.get("severity", 40.0))
 	var cost := int(round(3500.0 + severity * 95.0))
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Enquête SAV — %s" % str(case_data.get("product_name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Enquête SAV — %s" % str(case_data.get("product_name", "Produit")))
 	case_data["status"] = "INVESTIGATING"
@@ -215,7 +215,7 @@ func apply_corrective_action(case_id: String) -> bool:
 	var severity := float(case_data.get("severity", 40.0))
 	var units_sold := int(product.get("units_sold_total", 0))
 	var cost := int(round(7000.0 + severity * 145.0 + float(units_sold) * float(product.get("unit_cost", 1)) * 0.008))
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Correctif SAV — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Correctif SAV — %s" % str(product.get("name", "Produit")))
 	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, false)
@@ -240,7 +240,7 @@ func recall_product(case_id: String) -> bool:
 	var severity := float(case_data.get("severity", 40.0))
 	var unit_cost := int(product.get("unit_cost", 1))
 	var cost := maxi(15000, int(round(float(units_sold) * float(unit_cost) * (0.18 + severity / 420.0))))
-	if Economy.money < cost:
+	if not Economy.can_afford(cost, "Rappel produit — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Rappel produit — %s" % str(product.get("name", "Produit")))
 	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, true)
