@@ -139,16 +139,14 @@ func is_legacy_segment(segment: String) -> bool:
 	return bool(GameData.SEGMENTS.get(segment, {}).get("legacy", false))
 
 func market_technology_signal() -> float:
-	var player_signal := 0.0
-	if Engine.has_singleton("ResearchManager") or ResearchManager != null:
-		var cpu_tech := float(ResearchManager.technologies.get("cpu", 18.0))
-		var capabilities := ResearchManager.get_cpu_capabilities()
-		var capability_avg := (
-			float(capabilities.get("ARCHITECTURE", 18.0))
-			+ float(capabilities.get("LAYOUT", 14.0))
-			+ float(capabilities.get("MINIATURIZATION", 12.0))
-		) / 3.0
-		player_signal = cpu_tech * 0.48 + capability_avg * 0.52
+	var cpu_tech := float(ResearchManager.technologies.get("cpu", 18.0))
+	var capabilities := ResearchManager.get_cpu_capabilities()
+	var capability_avg := (
+		float(capabilities.get("ARCHITECTURE", 18.0))
+		+ float(capabilities.get("LAYOUT", 14.0))
+		+ float(capabilities.get("MINIATURIZATION", 12.0))
+	) / 3.0
+	var player_signal := cpu_tech * 0.48 + capability_avg * 0.52
 	var competitor_signal := 0.0
 	for competitor in competitors.get("CPU", []):
 		competitor_signal = maxf(competitor_signal, _competitor_technology_signal(competitor))
@@ -193,13 +191,27 @@ func normalize_segment(segment: String) -> String:
 		"MAINSTREAM":
 			return "HOME_PC" if is_segment_available("HOME_PC") else "EMBEDDED"
 		"ENTHUSIAST":
-			return "GAMING" if is_segment_available("GAMING") else ("HOBBYIST" if is_segment_available("HOBBYIST") else "SCIENTIFIC")
+			if is_segment_available("GAMING"):
+				return "GAMING"
+			if is_segment_available("HOBBYIST"):
+				return "HOBBYIST"
+			if is_segment_available("SCIENTIFIC"):
+				return "SCIENTIFIC"
+			return default_segment()
 		"PRO":
-			return "BUSINESS_PC" if is_segment_available("BUSINESS_PC") else "SCIENTIFIC"
+			if is_segment_available("BUSINESS_PC"):
+				return "BUSINESS_PC"
+			if is_segment_available("SCIENTIFIC"):
+				return "SCIENTIFIC"
+			return default_segment()
 		"ENTERPRISE":
 			return "SERVER" if is_segment_available("SERVER") else "INDUSTRIAL"
 		"PREMIUM":
-			return "WORKSTATION" if is_segment_available("WORKSTATION") else "SCIENTIFIC"
+			if is_segment_available("WORKSTATION"):
+				return "WORKSTATION"
+			if is_segment_available("SCIENTIFIC"):
+				return "SCIENTIFIC"
+			return default_segment()
 	return default_segment()
 
 func segment_market_units(segment: String) -> int:
