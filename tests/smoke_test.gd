@@ -30,6 +30,66 @@ func _ready() -> void:
 	if TimeManager.year != 1971:
 		_fail("New companies must start in the early microprocessor era")
 		return
+	if CompanyManager.founded_year != 1971:
+		_fail("Company founding year did not follow the early CPU era")
+		return
+
+	var executive_initial_state := ExecutiveManager.get_state().duplicate(true)
+	var personnel_initial_state := PersonnelManager.get_state().duplicate(true)
+	var economy_initial_state := Economy.get_state().duplicate(true)
+	var right_hand_brief := ExecutiveManager.get_executive_brief()
+	if str(right_hand_brief.get("advisor", {}).get("name", "")).is_empty() or str(right_hand_brief.get("headline", "")).is_empty():
+		_fail("Right-hand guide was not available from the garage stage")
+		return
+	var starting_workplace := ExecutiveManager.workplace_data()
+	if int(starting_workplace.get("tier", -1)) != 0 or int(starting_workplace.get("capacity", 0)) != 8:
+		_fail("Company did not start in the expected garage workplace")
+		return
+	var small_advice := ExecutiveManager.financial_advice(10_000, 0)
+	var dangerous_advice := ExecutiveManager.financial_advice(480_000, 25_000)
+	if float(dangerous_advice.get("runway_months", 999.0)) >= float(small_advice.get("runway_months", 0.0)):
+		_fail("Financial advisor did not detect the additional liquidity risk")
+		return
+	var benefits_before := ExecutiveManager.monthly_benefit_cost()
+	if not ExecutiveManager.set_benefit_policy("HEALTH", "STRONG"):
+		_fail("Could not improve employee health benefits")
+		return
+	if ExecutiveManager.monthly_benefit_cost() <= benefits_before:
+		_fail("Improved employee benefits did not increase the real monthly cost")
+		return
+	var upgrade := ExecutiveManager.next_workplace_upgrade()
+	if upgrade.is_empty() or str(upgrade.get("name", "")).is_empty():
+		_fail("Garage did not expose a real next workplace upgrade")
+		return
+	if not ExecutiveManager.renovate_workplace():
+		_fail("Could not renovate the starting workplace with sufficient cash")
+		return
+	if int(ExecutiveManager.workplace_data().get("tier", -1)) != 1 or int(ExecutiveManager.workplace_data().get("capacity", 0)) <= int(starting_workplace.get("capacity", 0)):
+		_fail("Workplace renovation did not improve company capacity")
+		return
+	PersonnelManager.staff[0]["morale"] = 40.0
+	ExecutiveManager._detect_hr_issues()
+	var hr_issues := ExecutiveManager.get_open_hr_issues()
+	if hr_issues.is_empty():
+		_fail("Low employee morale did not create an HR alert")
+		return
+	var morale_before_hr := float(PersonnelManager.staff[0].get("morale", 0.0))
+	if not ExecutiveManager.resolve_hr_issue(str(hr_issues[0].get("id", "")), "DISCUSS"):
+		_fail("HR issue could not be handled through an employee discussion")
+		return
+	if float(PersonnelManager.staff[0].get("morale", 0.0)) <= morale_before_hr:
+		_fail("HR intervention did not improve the affected employee morale")
+		return
+	var executive_round_trip := ExecutiveManager.get_state().duplicate(true)
+	ExecutiveManager.reset()
+	ExecutiveManager.load_state(executive_round_trip)
+	if int(ExecutiveManager.workplace_data().get("tier", -1)) != 1 or str(ExecutiveManager.benefit_policy.get("HEALTH", "")) != "STRONG":
+		_fail("Executive workplace and benefits did not survive a save round-trip")
+		return
+	ExecutiveManager.load_state(executive_initial_state)
+	PersonnelManager.load_state(personnel_initial_state)
+	Economy.load_state(economy_initial_state)
+
 	var era_design := CPU_DESIGN.default_design()
 	if int(era_design.get("node_nm", 0)) != 10000 or int(era_design.get("cores", 0)) != 1:
 		_fail("Default CPU design is not an early-era single-core 10 µm design")
