@@ -243,9 +243,21 @@ func apply_hardware_revision(product_id: String, revision_type: String) -> bool:
 	products_changed.emit()
 	return true
 
+func firmware_available(product: Dictionary) -> bool:
+	if product.is_empty() or str(product.get("sector", "")) != "CPU":
+		return false
+	return float(ResearchManager.technologies.get("software", 0.0)) >= 12.0 and ResearchManager.get_cpu_capability("ARCHITECTURE") >= 24.0
+
+func control_software_available(product: Dictionary) -> bool:
+	if product.is_empty() or str(product.get("sector", "")) != "CPU":
+		return false
+	return float(ResearchManager.technologies.get("software", 0.0)) >= 18.0 and float(ResearchManager.technologies.get("integration", 0.0)) >= 24.0
+
 func release_firmware(product_id: String, firmware_type: String) -> bool:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU" or not FIRMWARE_TYPES.has(firmware_type):
+		return false
+	if not firmware_available(product):
 		return false
 	_ensure_lifecycle_fields(product)
 	var data: Dictionary = FIRMWARE_TYPES[firmware_type]
@@ -280,6 +292,8 @@ func release_firmware(product_id: String, firmware_type: String) -> bool:
 func release_control_software(product_id: String) -> bool:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU":
+		return false
+	if not control_software_available(product):
 		return false
 	_ensure_lifecycle_fields(product)
 	var generation_id := str(product.get("generation_id", ""))
@@ -331,6 +345,8 @@ func get_post_launch_summary(product_id: String) -> Dictionary:
 		"software_released":bool(software.get("released", false)),
 		"software_version":int(software.get("version", 0)),
 		"software_quality":float(software.get("quality", 0.0)),
+		"firmware_available":firmware_available(product),
+		"control_software_available":control_software_available(product),
 		"supported_products":software.get("supported_product_ids", []).duplicate(true),
 		"revision_count":product.get("revision_history", []).size(),
 		"firmware_count":product.get("firmware_history", []).size()
