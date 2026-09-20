@@ -554,6 +554,12 @@ func load_state(state: Dictionary):
 		product["process_mastery"] = float(product.get("process_mastery", 35.0))
 		product["industrialization_strategy"] = str(product.get("industrialization_strategy", "LEGACY"))
 		product["industrialization_months"] = int(product.get("industrialization_months", 0))
+		product["manufacturing_mode"] = str(product.get("manufacturing_mode", "EXTERNAL"))
+		product["foundry_id"] = str(product.get("foundry_id", "LEGACY"))
+		product["foundry_name"] = str(product.get("foundry_name", "Fonderie historique"))
+		product["foundry_dependency"] = float(product.get("foundry_dependency", 35.0))
+		product["foundry_confidentiality"] = float(product.get("foundry_confidentiality", 65.0))
+		product["foundry_reliability"] = float(product.get("foundry_reliability", 80.0))
 		product["recommended_capacity"] = int(product.get("recommended_capacity", product.get("production_capacity", 100)))
 		product["max_monthly_capacity"] = maxi(int(product.get("max_monthly_capacity", int(product.recommended_capacity) * 2)), 1)
 		_ensure_die_fields(product)
@@ -604,8 +610,17 @@ func _legacy_generation_from_product(product: Dictionary) -> Dictionary:
 			"quality_score":float(product.get("manufacturing_quality", 60.0)),
 			"defect_rate":float(product.get("defect_rate", 0.025)),
 			"process_mastery":float(product.get("process_mastery", 35.0)),
-			"strategy":str(product.get("industrialization_strategy", "LEGACY"))
+			"strategy":str(product.get("industrialization_strategy", "LEGACY")),
+			"manufacturing_mode":str(product.get("manufacturing_mode", "EXTERNAL")),
+			"foundry_id":str(product.get("foundry_id", "LEGACY")),
+			"foundry_name":str(product.get("foundry_name", "Fonderie historique"))
 		},
+		"manufacturing_mode":str(product.get("manufacturing_mode", "EXTERNAL")),
+		"foundry_id":str(product.get("foundry_id", "LEGACY")),
+		"foundry_name":str(product.get("foundry_name", "Fonderie historique")),
+		"foundry_dependency":float(product.get("foundry_dependency", 35.0)),
+		"foundry_confidentiality":float(product.get("foundry_confidentiality", 65.0)),
+		"foundry_reliability":float(product.get("foundry_reliability", 80.0)),
 		"bin_distribution":{"LEGACY":1.0},
 		"potential_models":1,
 		"initial_model_count":1,

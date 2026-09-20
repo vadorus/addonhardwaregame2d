@@ -98,6 +98,7 @@ func _on_project_completed(project: Dictionary):
 	var node_nm := int(design.get("node_nm", 10000))
 	var estimate: Dictionary = project.get("design_estimate", {})
 	var complexity := float(project.get("complexity", estimate.get("complexity", 50.0)))
+	var default_foundry := FoundryManager.recommended_external_foundry(node_nm)
 	var job := {
 		"id":"IND-%03d" % _next_job_id,
 		"project_id":str(project.get("id", "")),
@@ -107,6 +108,11 @@ func _on_project_completed(project: Dictionary):
 		"complexity":complexity,
 		"strategy":"BALANCED",
 		"binning_strategy":"BALANCED",
+		"manufacturing_mode":"EXTERNAL",
+		"foundry_id":default_foundry,
+		"route_committed":false,
+		"foundry_contract_id":"",
+		"route_error":"",
 		"progress":0.0,
 		"months_spent":0,
 		"status":"INDUSTRIALIZATION",
@@ -167,6 +173,36 @@ func set_binning_strategy(job_id: String, strategy: String) -> bool:
 	jobs_changed.emit()
 	return true
 
+func set_manufacturing_route(job_id: String, mode: String, foundry_id: String = "") -> bool:
+	var job := get_job(job_id)
+	if job.is_empty() or str(job.get("status", "")) != "INDUSTRIALIZATION":
+		return false
+	if bool(job.get("route_committed", false)) or float(job.get("progress", 0.0)) > 0.001:
+		return false
+	var node_nm := int(job.get("node_nm", 10000))
+	var selected_foundry := foundry_id
+	if mode == "EXTERNAL" and selected_foundry == "":
+		selected_foundry = FoundryManager.recommended_external_foundry(node_nm)
+	var quote := FoundryManager.route_quote(mode, selected_foundry, node_nm)
+	if quote.is_empty():
+		return false
+	job["manufacturing_mode"] = mode
+	job["foundry_id"] = str(quote.get("provider_id", selected_foundry))
+	job["route_error"] = ""
+	CompanyManager.add_alert("%s : route de fabrication « %s » sélectionnée." % [str(job.get("name", "CPU")), str(quote.get("provider_name", mode))])
+	jobs_changed.emit()
+	return true
+
+func manufacturing_route_quote(job_id: String) -> Dictionary:
+	var job := get_job(job_id)
+	if job.is_empty():
+		return {}
+	return FoundryManager.route_quote(
+		str(job.get("manufacturing_mode", "EXTERNAL")),
+		str(job.get("foundry_id", "")),
+		int(job.get("node_nm", 10000))
+	)
+
 func production_team_score() -> float:
 	var base := PersonnelManager.team_score("Production", "manufacturing")
 	var rigor := PersonnelManager.team_attribute("Production", "rigor")
@@ -193,34 +229,46 @@ func process_month():
 func _process_job_month(job: Dictionary):
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
 	var node_nm := int(job.get("node_nm", 10000))
+	var route := manufacturing_route_quote(str(job.get("id", "")))
+	if route.is_empty():
+		job["route_error"] = "Aucune route de fabrication compatible avec ce procédé."
+		job["last_progress"] = 0.0
+		return
+	if not FoundryManager.commit_route(job):
+		job["route_error"] = "Contrat de fabrication non engagé : trésorerie ou fournisseur indisponible."
+		job["last_progress"] = 0.0
+		return
+	job["route_error"] = ""
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
 	var management := CompanyManager.department_management_modifier("Production")
 	var stress_tolerance := PersonnelManager.team_attribute("Production", "stress_tolerance")
 	var base_cost := int(job.get("monthly_cost", _base_monthly_cost(node_nm, complexity)))
-	var expense := int(round(float(base_cost) * float(strategy.cost)))
-	Economy.add_expense(expense, "Industrialisation — %s" % str(job.get("name", "CPU")))
+	var expense := int(round(float(base_cost) * float(strategy.cost) * float(route.get("cost_factor", 1.0))))
+	Economy.add_expense(expense, "Industrialisation — %s (%s)" % [str(job.get("name", "CPU")), str(route.get("provider_name", "fabrication"))])
 	job["months_spent"] = int(job.get("months_spent", 0)) + 1
 	var complexity_factor := lerpf(0.86, 1.30, clampf(complexity / 100.0, 0.0, 1.0))
 	var progress := (14.0 + team * 0.31 + mastery * 0.16 + quality_knowledge * 0.08 + stress_tolerance * 0.035) * management
-	progress *= float(strategy.speed)
+	progress *= float(strategy.speed) * float(route.get("speed_factor", 1.0))
+	if str(route.get("mode", "EXTERNAL")) == "EXTERNAL":
+		progress *= FoundryManager.external_disruption_factor(str(route.get("provider_id", "")))
 	progress /= complexity_factor
-	progress = clampf(progress, 12.0, 72.0)
+	progress = clampf(progress, 8.0, 76.0)
 	job["last_progress"] = progress
 	job["progress"] = float(job.get("progress", 0.0)) + progress
-	_process_learning(node_nm, complexity, team)
+	_process_learning(node_nm, complexity, team, float(route.get("learning_factor", 1.0)))
 	if float(job.progress) >= 100.0:
 		_complete_job(job)
 
-func _process_learning(node_nm: int, complexity: float, team: float):
+func _process_learning(node_nm: int, complexity: float, team: float, learning_factor: float = 1.0):
 	var key := str(node_nm)
 	var current := get_process_mastery(node_nm)
 	var difficulty := clampf(complexity / 100.0, 0.35, 1.0)
-	var mastery_gain := (0.75 + team / 120.0) * difficulty * lerpf(1.0, 0.32, current / 100.0)
+	var mastery_gain := (0.75 + team / 120.0) * difficulty * lerpf(1.0, 0.32, current / 100.0) * clampf(learning_factor, 0.25, 1.5)
 	process_mastery[key] = clampf(current + mastery_gain, 0.0, 100.0)
-	quality_knowledge = clampf(quality_knowledge + 0.30 + team / 420.0, 0.0, 100.0)
-	maintenance_knowledge = clampf(maintenance_knowledge + 0.18 + team / 600.0, 0.0, 100.0)
+	quality_knowledge = clampf(quality_knowledge + (0.30 + team / 420.0) * clampf(learning_factor, 0.35, 1.35), 0.0, 100.0)
+	maintenance_knowledge = clampf(maintenance_knowledge + (0.18 + team / 600.0) * clampf(learning_factor, 0.35, 1.35), 0.0, 100.0)
 	ResearchManager.technologies["manufacturing"] = clampf(float(ResearchManager.technologies.get("manufacturing", 12.0)) + mastery_gain * 0.20, 0.0, 100.0)
 	ResearchManager.add_cpu_capability_experience("MINIATURIZATION", mastery_gain * 0.055)
 
@@ -229,6 +277,11 @@ func _complete_job(job: Dictionary):
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
 	var binning_strategy: Dictionary = BINNING_STRATEGIES.get(str(job.get("binning_strategy", "BALANCED")), BINNING_STRATEGIES.BALANCED)
 	var node_nm := int(job.get("node_nm", 10000))
+	var route := manufacturing_route_quote(str(job.get("id", "")))
+	if route.is_empty():
+		job["route_error"] = "La route de fabrication n'est plus disponible."
+		job["progress"] = 99.0
+		return
 	var complexity := float(job.get("complexity", 50.0))
 	var team := production_team_score()
 	var mastery := get_process_mastery(node_nm)
@@ -237,19 +290,20 @@ func _complete_job(job: Dictionary):
 	var node_profile: Dictionary = CPU_DESIGN.node_profile(node_nm)
 	var advanced_penalty := clampf((float(node_profile.get("difficulty", 0.65)) - 0.65) * 0.055, 0.0, 0.055)
 	var quality_score := 24.0 + team * 0.46 + mastery * 0.22 + quality_knowledge * 0.16 - complexity * 0.10
-	quality_score += float(strategy.quality) + rng.randf_range(-2.0, 2.0)
+	quality_score += float(strategy.quality) + float(route.get("quality_delta", 0.0)) + rng.randf_range(-2.0, 2.0)
 	quality_score = clampf(quality_score, 20.0, 98.0)
 	var defect_rate := 0.105 - quality_score * 0.00072 - reliability * 0.00022 + advanced_penalty
-	defect_rate += float(strategy.defect)
+	defect_rate += float(strategy.defect) + float(route.get("defect_delta", 0.0))
 	defect_rate = clampf(defect_rate, 0.006, 0.16)
 	var yield_delta := (quality_score - 60.0) * 0.0018 + (mastery - 35.0) * 0.0011
-	yield_delta += float(strategy.yield)
+	yield_delta += float(strategy.yield) + float(route.get("yield_delta", 0.0))
 	yield_delta = clampf(yield_delta, -0.14, 0.14)
 	var capacity_factor := 0.74 + team * 0.0028 + mastery * 0.0017 + maintenance_knowledge * 0.0010
-	capacity_factor *= float(strategy.capacity)
+	capacity_factor *= float(strategy.capacity) * float(route.get("capacity_factor", 1.0))
 	capacity_factor = clampf(capacity_factor, 0.62, 1.28)
 	var cost_factor := 1.0 + defect_rate * 0.85 + maxf(1.0 - capacity_factor, 0.0) * 0.12
-	cost_factor = clampf(cost_factor, 0.96, 1.22)
+	cost_factor *= float(route.get("cost_factor", 1.0))
+	cost_factor = clampf(cost_factor, 0.82, 1.55)
 
 	var capability_value = project.get("technical_capabilities_snapshot", {})
 	var capabilities: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
@@ -259,8 +313,11 @@ func _complete_job(job: Dictionary):
 	var manufacturing_tech := float(ResearchManager.technologies.get("manufacturing", 12.0))
 	var integration_tech := float(ResearchManager.technologies.get("integration", 10.0))
 	var node_unlock := float(node_profile.get("unlock", 0.0))
-	var equipment_precision := 18.0 + manufacturing_tech * 0.46 + miniaturization_skill * 0.28 + integration_tech * 0.12 + maintenance_knowledge * 0.16
-	equipment_precision -= node_unlock * 0.18
+	var internal_process_precision := 18.0 + manufacturing_tech * 0.46 + miniaturization_skill * 0.28 + integration_tech * 0.12 + maintenance_knowledge * 0.16
+	internal_process_precision -= node_unlock * 0.18
+	var route_precision := float(route.get("precision", internal_process_precision))
+	var route_weight := 0.58 if str(route.get("mode", "EXTERNAL")) == "EXTERNAL" else 0.42
+	var equipment_precision := lerpf(internal_process_precision, route_precision, route_weight)
 	equipment_precision = clampf(equipment_precision, 15.0, 98.0)
 
 	var design_estimate_value = project.get("design_estimate", {})
@@ -293,6 +350,13 @@ func _complete_job(job: Dictionary):
 		"strategy_label":strategy_label(str(job.get("strategy", "BALANCED"))),
 		"binning_strategy":str(job.get("binning_strategy", "BALANCED")),
 		"binning_strategy_label":binning_strategy_label(str(job.get("binning_strategy", "BALANCED"))),
+		"manufacturing_mode":str(route.get("mode", "EXTERNAL")),
+		"foundry_id":str(route.get("provider_id", "")),
+		"foundry_name":str(route.get("provider_name", "")),
+		"foundry_dependency":float(route.get("dependency", 0.0)),
+		"foundry_confidentiality":float(route.get("confidentiality", 0.0)),
+		"foundry_reliability":float(route.get("reliability", 0.0)),
+		"foundry_capacity":int(route.get("max_capacity", 0)),
 		"months":int(job.get("months_spent", 0)),
 		"team_score":team,
 		"process_mastery":mastery,
@@ -326,6 +390,7 @@ func _complete_job(job: Dictionary):
 	CompanyManager.add_alert("%s : industrialisation terminée — qualité usine %.0f/100, défauts %.1f%%, qualité électrique des dies %.0f/100 ± %.1f." % [
 		str(job.get("name", "CPU")), quality_score, defect_rate * 100.0, die_quality_mean, die_variation
 	])
+	FoundryManager.close_job_contract(str(job.get("id", "")))
 	ProductManager.create_from_industrialization(project, result)
 	industrialization_completed.emit(project, result)
 
@@ -362,6 +427,12 @@ func load_state(state: Dictionary):
 	jobs = state.get("jobs", []).duplicate(true)
 	for job in jobs:
 		job["binning_strategy"] = str(job.get("binning_strategy", "BALANCED"))
+		job["manufacturing_mode"] = str(job.get("manufacturing_mode", "EXTERNAL"))
+		if str(job.get("foundry_id", "")) == "":
+			job["foundry_id"] = FoundryManager.recommended_external_foundry(int(job.get("node_nm", 10000)))
+		job["route_committed"] = bool(job.get("route_committed", false))
+		job["foundry_contract_id"] = str(job.get("foundry_contract_id", ""))
+		job["route_error"] = str(job.get("route_error", ""))
 		var result_value = job.get("result", {})
 		if typeof(result_value) == TYPE_DICTIONARY and not result_value.is_empty():
 			var result: Dictionary = result_value
