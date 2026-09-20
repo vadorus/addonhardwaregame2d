@@ -2482,6 +2482,10 @@ func _refresh_personnel():
 		var leader_mark:=""
 		for dept in CompanyManager.departments:
 			if str(CompanyManager.departments[dept].leader_id)==str(emp.id): leader_mark=" ★ responsable %s" % dept
+		for sector_value in DivisionManager.get_active_division_keys():
+			var sector := str(sector_value)
+			if str(DivisionManager.get_division(sector).get("leader_id", "")) == str(emp.id):
+				leader_mark += " ★ directeur %s" % str(DivisionManager.get_division(sector).get("label", sector))
 		lines.append("• %s — %s | %s | compétence %d | expérience %.1f ans | leadership %d | spé. %s | %s €/mois%s" % [str(emp.name),str(emp.role),str(emp.department),int(emp.skill),float(emp.experience_years),int(emp.leadership),str(emp.specialization),_money(int(emp.salary)),leader_mark])
 	staff_label.text="\n".join(lines)
 	if PersonnelManager.candidate.is_empty(): candidate_label.text="Aucun candidat sélectionné."
