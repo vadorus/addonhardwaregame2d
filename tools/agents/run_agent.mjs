@@ -51,7 +51,12 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 function redact(value) {
-  return String(value)
+  let result = String(value);
+  for (const name of ["OPENAI_API_KEY", "OPENAI_EXECUTOR_API_KEY", "CODEX_API_KEY"]) {
+    const secret = process.env[name]?.trim();
+    if (secret) result = result.split(secret).join("[SECRET_REDACTED]");
+  }
+  return result
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, "[SECRET_REDACTED]")
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [SECRET_REDACTED]");
 }
@@ -228,6 +233,8 @@ async function main() {
       "/tmp:rw,nosuid,nodev,size=536870912",
       "--mount",
       `type=bind,source=${workspace},target=/workspace`,
+      "--mount",
+      `type=bind,source=${path.join(workspace, ".git")},target=/workspace/.git,readonly`,
       "--mount",
       `type=bind,source=${godotBinary},target=/usr/local/bin/godot,readonly`,
       "--workdir",
