@@ -21,6 +21,7 @@ const APP_RED := Color(1.000, 0.482, 0.482, 1.0)
 var qg_background: TextureRect
 var qg_background_tint: ColorRect
 var company_label: Label
+var company_stage_label: Label
 var date_label: Label
 var money_label: Label
 var status_label: Label
@@ -205,6 +206,13 @@ var startup_progress_label: Label
 var startup_contract_select: OptionButton
 var startup_contract_hint: Label
 var startup_action_button: Button
+var startup_work_actions: HFlowContainer
+var startup_work_hint: Label
+var startup_work_buttons: Array[Button] = []
+var startup_founder_level_label: Label
+var startup_founder_xp_bar: ProgressBar
+var startup_founder_skill_bars: Dictionary = {}
+var startup_founder_branch_label: Label
 var startup_roadmap_label: Label
 var lab_startup_roadmap_label: Label
 var _refresh_pending := false
@@ -238,6 +246,8 @@ func _notification(what: int) -> void:
 func _on_day_changed(day: int, month: int, year: int) -> void:
 	if date_label != null:
 		date_label.text = "Jour %d • Mois %d • %d" % [day, month, year]
+	if StartupManager.is_pre_cpu_phase():
+		_refresh_startup_dashboard()
 
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
@@ -249,6 +259,9 @@ func _connect_signals():
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
 	ExecutiveManager.executive_changed.connect(_refresh_all)
+	FounderManager.founder_changed.connect(_refresh_all)
+	FounderManager.level_up.connect(func(new_level): status_label.text = "Niveau du fondateur atteint : %d." % int(new_level))
+	FounderManager.branch_level_up.connect(func(branch, new_level): status_label.text = "%s atteint le niveau %d : nouveau savoir-faire débloqué." % [FounderManager.branch_label(str(branch)), int(new_level)])
 	StartupManager.startup_changed.connect(_refresh_all)
 	StartupManager.milestone_unlocked.connect(_on_startup_milestone)
 	ResearchManager.projects_changed.connect(_refresh_all)
@@ -328,8 +341,8 @@ func _build_ui():
 	top.add_child(brand_box)
 	company_label = _label("Tech Empire", 17)
 	brand_box.add_child(company_label)
-	var era_label := _muted_label("CPU • débuts du microprocesseur", 11)
-	brand_box.add_child(era_label)
+	company_stage_label = _muted_label("Garage • logiciels & électronique", 11)
+	brand_box.add_child(company_stage_label)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -608,12 +621,46 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(startup_progress_label)
 
+	var founder_card := _card(Color(0.025, 0.050, 0.078, 0.98), 12, 12)
+	box.add_child(founder_card)
+	var founder_box := VBoxContainer.new()
+	founder_box.add_theme_constant_override("separation", 6)
+	founder_card.add_child(founder_box)
+	var founder_head := HBoxContainer.new()
+	founder_box.add_child(founder_head)
+	founder_head.add_child(_eyebrow("VOTRE PERSONNAGE"))
+	startup_founder_level_label = _muted_label("", 12)
+	startup_founder_level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	startup_founder_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	founder_head.add_child(startup_founder_level_label)
+	startup_founder_xp_bar = ProgressBar.new()
+	startup_founder_xp_bar.min_value = 0
+	startup_founder_xp_bar.max_value = 100
+	startup_founder_xp_bar.show_percentage = false
+	startup_founder_xp_bar.custom_minimum_size.y = 12
+	founder_box.add_child(startup_founder_xp_bar)
+
+	var skill_grid := GridContainer.new()
+	skill_grid.columns = 2
+	skill_grid.add_theme_constant_override("h_separation", 10)
+	skill_grid.add_theme_constant_override("v_separation", 4)
+	founder_box.add_child(skill_grid)
+	for skill in [FounderManager.SKILL_PROGRAMMING, FounderManager.SKILL_ELECTRONICS, FounderManager.SKILL_MANAGEMENT, FounderManager.SKILL_COMMERCIAL]:
+		var skill_label := _muted_label(FounderManager.skill_label(skill), 11)
+		skill_grid.add_child(skill_label)
+		var skill_bar := ProgressBar.new()
+		skill_bar.min_value = 0
+		skill_bar.max_value = 100
+		skill_bar.show_percentage = true
+		skill_bar.custom_minimum_size = Vector2(180, 16)
+		skill_grid.add_child(skill_bar)
+		startup_founder_skill_bars[skill] = skill_bar
+
+	startup_founder_branch_label = _muted_label("", 11)
+	startup_founder_branch_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	founder_box.add_child(startup_founder_branch_label)
+
 	startup_contract_select = OptionButton.new()
-	for contract_id_value in StartupManager.available_contract_ids():
-		var contract_id := str(contract_id_value)
-		var data := StartupManager.contract_data(contract_id)
-		startup_contract_select.add_item(str(data.get("title", contract_id)))
-		startup_contract_select.set_item_metadata(startup_contract_select.item_count - 1, contract_id)
 	startup_contract_select.item_selected.connect(func(_index): _refresh_startup_contract_hint())
 	box.add_child(startup_contract_select)
 
@@ -626,6 +673,22 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_action_button.pressed.connect(_startup_primary_action)
 	box.add_child(startup_action_button)
 
+	startup_work_actions = HFlowContainer.new()
+	startup_work_actions.add_theme_constant_override("h_separation", 8)
+	startup_work_actions.add_theme_constant_override("v_separation", 8)
+	box.add_child(startup_work_actions)
+	for work_data in [["Coder / assembler","BUILD"],["Tester / mesurer","TEST"],["Client / documentation","CLIENT"]]:
+		var work_btn := Button.new()
+		work_btn.text = str(work_data[0])
+		work_btn.custom_minimum_size = Vector2(180, 44)
+		var work_action := str(work_data[1])
+		work_btn.pressed.connect(func(): _startup_work_action(work_action))
+		startup_work_actions.add_child(work_btn)
+		startup_work_buttons.append(work_btn)
+	startup_work_hint = _muted_label("", 12)
+	startup_work_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(startup_work_hint)
+
 	var roadmap_card := _card(Color(0.025, 0.045, 0.070, 0.96), 11, 11)
 	box.add_child(roadmap_card)
 	var roadmap_box := VBoxContainer.new()
@@ -636,16 +699,71 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_roadmap_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	roadmap_box.add_child(startup_roadmap_label)
 
+func _refresh_startup_contract_options() -> void:
+	if startup_contract_select == null:
+		return
+	var previous := _meta(startup_contract_select) if startup_contract_select.item_count > 0 else ""
+	startup_contract_select.clear()
+	var ids := StartupManager.available_contract_ids()
+	for contract_id_value in ids:
+		var contract_id := str(contract_id_value)
+		var data := StartupManager.contract_data(contract_id)
+		var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+		var label := "[%s Niv.%d] %s" % [FounderManager.branch_label(branch), FounderManager.branch_level(branch), str(data.get("title", contract_id))]
+		startup_contract_select.add_item(label)
+		startup_contract_select.set_item_metadata(startup_contract_select.item_count - 1, contract_id)
+		if contract_id == previous:
+			startup_contract_select.select(startup_contract_select.item_count - 1)
+
+func _next_branch_perk_text(branch: String) -> String:
+	for node_value in FounderManager.branch_tree(branch):
+		var node: Dictionary = node_value
+		if not bool(node.get("unlocked", false)):
+			return "%s au niv.%d — %s" % [str(node.get("title", "Savoir-faire")), int(node.get("level", 0)), str(node.get("effect", ""))]
+	return "Arbre actuel maîtrisé"
+
+func _founder_branch_summary_text() -> String:
+	var lines: Array[String] = []
+	for branch_value in FounderManager.available_branches():
+		var branch := str(branch_value)
+		lines.append("%s • Niv.%d • %d/%d XP • prochain : %s" % [
+			FounderManager.branch_label(branch),
+			FounderManager.branch_level(branch),
+			FounderManager.branch_xp_value(branch),
+			FounderManager.branch_xp_to_next(branch),
+			_next_branch_perk_text(branch)
+		])
+	if not FounderManager.branch_available(FounderManager.BRANCH_WEB):
+		lines.append("Web • verrouillé jusqu'à 1991")
+	return "\n".join(lines)
+
+func _refresh_founder_panel() -> void:
+	if startup_founder_level_label == null:
+		return
+	startup_founder_level_label.text = "Niveau %d • %d/%d XP" % [FounderManager.level, FounderManager.level_xp, FounderManager.xp_to_next_level()]
+	startup_founder_xp_bar.value = FounderManager.xp_progress_ratio() * 100.0
+	for skill in startup_founder_skill_bars.keys():
+		var bar: ProgressBar = startup_founder_skill_bars[skill]
+		bar.value = FounderManager.skill_value(str(skill))
+	startup_founder_branch_label.text = _founder_branch_summary_text()
+
 func _refresh_startup_contract_hint() -> void:
 	if startup_contract_hint == null or startup_contract_select == null or startup_contract_select.item_count == 0:
 		return
 	var contract_id := _meta(startup_contract_select)
 	var data := StartupManager.contract_data(contract_id)
-	startup_contract_hint.text = "%s\n%d mois • %s €/mois • paiement à la livraison : %s €" % [
+	var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+	var base_cost := int(data.get("monthly_cost", 0))
+	var effective_cost := int(round(float(base_cost) * (1.0 - FounderManager.branch_cost_discount(branch))))
+	startup_contract_hint.text = "%s\nBranche : %s • niveau %d • vitesse x%.2f\n%d mois • %s €/mois • paiement de base %s €\nProchain savoir-faire : %s" % [
 		str(data.get("description", "")),
+		FounderManager.branch_label(branch),
+		FounderManager.branch_level(branch),
+		FounderManager.branch_speed_multiplier(branch),
 		int(data.get("duration_months", 0)),
-		_money(int(data.get("monthly_cost", 0))),
-		_money(int(data.get("reward", 0)))
+		_money(effective_cost),
+		_money(int(data.get("reward", 0))),
+		_next_branch_perk_text(branch)
 	]
 
 func _startup_roadmap_text() -> String:
@@ -669,6 +787,7 @@ func _refresh_startup_dashboard() -> void:
 	if not visible:
 		return
 
+	_refresh_founder_panel()
 	var objective := StartupManager.current_objective()
 	startup_summary_label.text = str(objective.get("title", "Votre garage"))
 	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
@@ -678,9 +797,25 @@ func _refresh_startup_dashboard() -> void:
 	startup_contract_select.visible = contract_choices_visible
 	startup_contract_hint.visible = contract_choices_visible
 	if contract_choices_visible:
+		_refresh_startup_contract_options()
 		_refresh_startup_contract_hint()
 
-	startup_action_button.visible = not action.is_empty()
+	var work_mode := action in ["WORK_CONTRACT", "WORK_ELECTRONICS"]
+	startup_work_actions.visible = work_mode
+	startup_work_hint.visible = work_mode
+	if work_mode:
+		var available := StartupManager.work_session_available()
+		var wait_days := StartupManager.days_until_next_work_session()
+		for index in range(startup_work_buttons.size()):
+			var work_btn: Button = startup_work_buttons[index]
+			work_btn.disabled = not available
+			if action == "WORK_ELECTRONICS":
+				work_btn.text = ["Assembler le prototype","Mesurer et tester","Documenter le montage"][index]
+			else:
+				work_btn.text = ["Coder une fonctionnalité","Tester et corriger","Revoir avec le client"][index]
+		startup_work_hint.text = "Session disponible : choisissez votre priorité." if available else "Prochaine grosse session dans %d jour(s). Le projet continue d'avancer avec le temps." % wait_days
+
+	startup_action_button.visible = not action.is_empty() and not work_mode
 	startup_action_button.disabled = false
 	match action:
 		"START_SOFTWARE":
@@ -716,6 +851,19 @@ func _startup_primary_action() -> void:
 	if not ok:
 		status_label.text = "Action impossible : vérifiez la trésorerie ou le jalon précédent."
 	_refresh_all()
+
+func _startup_work_action(action: String) -> void:
+	if StartupManager.perform_work_session(action):
+		match action:
+			"BUILD":
+				status_label.text = "Travail terminé : progression et XP de spécialisation gagnées."
+			"TEST":
+				status_label.text = "Tests terminés : qualité renforcée et XP gagnée."
+			"CLIENT":
+				status_label.text = "Échange client terminé : confiance, commercial et XP progressent."
+		_refresh_all()
+	else:
+		status_label.text = "Cette semaine est déjà bien remplie. Laissez quelques jours passer avant une nouvelle grosse session."
 
 func _on_startup_milestone(title: String, message: String) -> void:
 	status_label.text = "%s — %s" % [title, message]
@@ -2780,6 +2928,17 @@ func _restart_from_game_over():
 
 func _refresh_top():
 	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
+	if company_stage_label != null:
+		if not CompanyManager.created:
+			company_stage_label.text = "1971 • un garage, une idée"
+		elif StartupManager.stage == StartupManager.STAGE_GARAGE:
+			company_stage_label.text = "Garage • contrats logiciels"
+		elif StartupManager.stage == StartupManager.STAGE_FIRST_HIRE:
+			company_stage_label.text = "Garage • premier recrutement"
+		elif StartupManager.stage == StartupManager.STAGE_ELECTRONICS:
+			company_stage_label.text = "Atelier • électronique numérique"
+		else:
+			company_stage_label.text = "Programme CPU • microprocesseur"
 	if date_label != null:
 		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
 	money_label.text="%s €" % _money(Economy.money)
