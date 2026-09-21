@@ -2293,6 +2293,8 @@ func _refresh_dashboard():
 		dashboard_target_tab = 0
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 0.0, false)
+			if dashboard_chip.has_method("set_identity"):
+				dashboard_chip.call("set_identity", {"package_style":"CLASSIC","accent":"CYAN"})
 		return
 
 	var active_project: Dictionary = {}
@@ -2340,6 +2342,8 @@ func _refresh_dashboard():
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
+			if dashboard_chip.has_method("set_identity"):
+				dashboard_chip.call("set_identity", active_project.get("product_identity", {}))
 	elif not ready_product.is_empty():
 		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
 		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
@@ -2353,6 +2357,8 @@ func _refresh_dashboard():
 		dashboard_target_tab = 4
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
+			if dashboard_chip.has_method("set_identity"):
+				dashboard_chip.call("set_identity", ready_product.get("product_identity", {}))
 	elif not launched_product.is_empty():
 		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
 		var lifecycle := MarketManager.product_lifecycle_label(launched_product)
@@ -2367,6 +2373,8 @@ func _refresh_dashboard():
 		dashboard_target_tab = 5
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
+			if dashboard_chip.has_method("set_identity"):
+				dashboard_chip.call("set_identity", launched_product.get("product_identity", {}))
 	else:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."
@@ -2380,6 +2388,8 @@ func _refresh_dashboard():
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
+			if dashboard_chip.has_method("set_identity"):
+				dashboard_chip.call("set_identity", {"package_style":"CLASSIC","accent":"CYAN"})
 
 	var executive_brief := ExecutiveManager.get_executive_brief()
 	if dashboard_cto_label != null:
@@ -2896,7 +2906,8 @@ func _start_project():
 	var remediation := active_cpu_remediation.duplicate(true)
 	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, _current_cpu_identity()):
 		rd_name.text = ""
-		rd_family_name.text = "" if rd_family_name != null else ""
+		if rd_family_name != null:
+			rd_family_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
 		status_label.text = "%s entre en développement — profil %s%s%s." % [name, str(evaluation.profile), plan_text, remediation_text]
