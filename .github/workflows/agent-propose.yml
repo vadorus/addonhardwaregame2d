@@ -102,8 +102,46 @@ jobs:
           EXPECTED_BASE_SHA: ${{ github.sha }}
         run: bash "$AGENT_RUNTIME/collect_patch.sh"
 
-      - name: Publier la proposition pour revue humaine
+      - name: Vérifier que l'artefact ne contient aucun secret
+        id: artifact_secret_scan
         if: always()
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_EXECUTOR_API_KEY: ${{ secrets.OPENAI_EXECUTOR_API_KEY }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path(".agent-output")
+          if not root.exists():
+              sys.exit(0)
+
+          exact = [
+              value.encode()
+              for value in (
+                  os.environ.get("OPENAI_API_KEY", ""),
+                  os.environ.get("OPENAI_EXECUTOR_API_KEY", ""),
+              )
+              if value
+          ]
+          generic = re.compile(rb"sk-[A-Za-z0-9_-]{12,}")
+
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if any(secret in data for secret in exact) or generic.search(data):
+                  print(f"::error::Secret potentiel détecté dans {path}; artefact bloqué.")
+                  sys.exit(1)
+          PY
+
+      - name: Publier la proposition pour revue humaine
+        if: ${{ always() && steps.artifact_secret_scan.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: agent-proposal-${{ github.run_id }}
