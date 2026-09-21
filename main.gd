@@ -25,6 +25,15 @@ var status_label: Label
 var tabs: TabContainer
 var setup_layer: Control
 var month_layer: Control
+var month_panel: PanelContainer
+var month_period_label: Label
+var month_result_label: Label
+var month_result_caption: Label
+var month_income_value: Label
+var month_expense_value: Label
+var month_cash_value: Label
+var month_breakdown_label: Label
+var month_nora_label: Label
 var month_report_label: Label
 var game_over_layer: Control
 var game_over_label: Label
@@ -1813,12 +1822,87 @@ func _build_setup_layer():
 	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
 
 func _build_month_layer():
-	month_layer=ColorRect.new(); month_layer.color=Color(0,0,0,0.72); month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.visible=false; add_child(month_layer)
-	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.add_child(center)
-	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,430); center.add_child(panel)
-	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",12); panel.add_child(box)
-	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
-	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
+	month_layer = ColorRect.new()
+	month_layer.color = Color(0.0, 0.0, 0.0, 0.76)
+	month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	month_layer.visible = false
+	add_child(month_layer)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	month_layer.add_child(center)
+
+	month_panel = _card(Color(0.035, 0.060, 0.095, 0.98), 18, 22)
+	month_panel.custom_minimum_size = Vector2(700, 500)
+	center.add_child(month_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	month_panel.add_child(box)
+
+	var heading := HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 12)
+	box.add_child(heading)
+
+	var heading_copy := VBoxContainer.new()
+	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(heading_copy)
+	heading_copy.add_child(_eyebrow("BILAN DE FIN DE MOIS"))
+	var title := _label("Votre entreprise en un regard", 26)
+	heading_copy.add_child(title)
+	month_period_label = _muted_label("Mois — / 1971", 13)
+	heading_copy.add_child(month_period_label)
+
+	var result_card := _card(APP_PANEL_ALT, 14, 14)
+	box.add_child(result_card)
+	var result_box := VBoxContainer.new()
+	result_box.add_theme_constant_override("separation", 4)
+	result_card.add_child(result_box)
+	month_result_caption = _muted_label("RÉSULTAT DU MOIS", 11)
+	result_box.add_child(month_result_caption)
+	month_result_label = _label("0 €", 32)
+	result_box.add_child(month_result_label)
+
+	var metrics := GridContainer.new()
+	metrics.name = "MonthMetrics"
+	metrics.columns = 3
+	metrics.add_theme_constant_override("h_separation", 10)
+	metrics.add_theme_constant_override("v_separation", 10)
+	box.add_child(metrics)
+	month_income_value = _add_stat_card(metrics, "REVENUS")
+	month_expense_value = _add_stat_card(metrics, "DÉPENSES")
+	month_cash_value = _add_stat_card(metrics, "TRÉSORERIE")
+
+	var detail_card := _card(Color(0.026, 0.047, 0.076, 0.96), 12, 12)
+	box.add_child(detail_card)
+	var detail_box := VBoxContainer.new()
+	detail_box.add_theme_constant_override("separation", 7)
+	detail_card.add_child(detail_box)
+	detail_box.add_child(_eyebrow("OÙ EST PARTI L'ARGENT ?"))
+	month_breakdown_label = _muted_label("Aucun mouvement notable.", 12)
+	month_breakdown_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_box.add_child(month_breakdown_label)
+
+	var nora_card := _card(Color(0.045, 0.085, 0.115, 0.98), 12, 12)
+	box.add_child(nora_card)
+	var nora_box := VBoxContainer.new()
+	nora_box.add_theme_constant_override("separation", 5)
+	nora_card.add_child(nora_box)
+	nora_box.add_child(_eyebrow("NORA • LECTURE RAPIDE"))
+	month_nora_label = _muted_label("", 13)
+	month_nora_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nora_box.add_child(month_nora_label)
+
+	# Compatibilité avec le code et les anciennes références.
+	month_report_label = _rich_label()
+	month_report_label.visible = false
+	box.add_child(month_report_label)
+
+	var cont := Button.new()
+	cont.text = "Continuer vers le mois suivant"
+	cont.custom_minimum_size.y = 48
+	cont.pressed.connect(_close_month_report)
+	box.add_child(cont)
 
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
@@ -2113,6 +2197,8 @@ func _update_responsive_layout():
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
 		lab_stats_grid.columns = 1 if narrow else 3
+	if month_panel != null:
+		month_panel.custom_minimum_size = Vector2(560 if compact else 700, 0)
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
@@ -2210,17 +2296,70 @@ func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
 
 func _on_month_closed(report: Dictionary):
-	TimeManager.time_scale=0.0
-	var inc_lines:=_breakdown(report.income_breakdown)
-	var exp_lines:=_breakdown(report.expense_breakdown)
-	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
-	month_layer.visible=true
+	TimeManager.time_scale = 0.0
+	var income := int(report.get("income", 0))
+	var expenses := int(report.get("expenses", 0))
+	var result := int(report.get("result", income - expenses))
+	var cash := int(report.get("money", Economy.money))
+	var month := int(report.get("month", TimeManager.month))
+	var year := int(report.get("year", TimeManager.year))
+
+	month_period_label.text = "Mois %d • %d" % [month, year]
+	month_result_label.text = ("%s%s €" % ["+" if result > 0 else "", _money(result)])
+	month_income_value.text = "%s €" % _money(income)
+	month_expense_value.text = "%s €" % _money(expenses)
+	month_cash_value.text = "%s €" % _money(cash)
+
+	if result > 0:
+		month_result_label.add_theme_color_override("font_color", APP_GREEN)
+		month_result_caption.text = "RÉSULTAT POSITIF"
+	elif result < 0:
+		month_result_label.add_theme_color_override("font_color", APP_RED if cash < 100000 else APP_AMBER)
+		month_result_caption.text = "INVESTISSEMENT / PERTE DU MOIS"
+	else:
+		month_result_label.add_theme_color_override("font_color", APP_TEXT)
+		month_result_caption.text = "ÉQUILIBRE DU MOIS"
+
+	var expense_breakdown: Dictionary = report.get("expense_breakdown", {})
+	var income_breakdown: Dictionary = report.get("income_breakdown", {})
+	month_breakdown_label.text = _month_breakdown_summary(income_breakdown, expense_breakdown)
+	month_nora_label.text = _month_nora_summary(result, cash, income, expenses)
+	month_layer.visible = true
 	call_deferred("_autosave_after_month_close")
 	_refresh_all()
 
 func _autosave_after_month_close() -> void:
 	if CompanyManager.created:
 		SaveManager.save_game()
+
+func _month_breakdown_summary(income: Dictionary, expenses: Dictionary) -> String:
+	var lines: Array[String] = []
+	if not income.is_empty():
+		var income_rows: Array = []
+		for key in income.keys():
+			income_rows.append({"label": str(key), "value": int(income[key])})
+		income_rows.sort_custom(func(a, b): return int(a.value) > int(b.value))
+		for row in income_rows.slice(0, mini(2, income_rows.size())):
+			lines.append("↑ %s : %s €" % [str(row.label), _money(int(row.value))])
+	if not expenses.is_empty():
+		var expense_rows: Array = []
+		for key in expenses.keys():
+			expense_rows.append({"label": str(key), "value": int(expenses[key])})
+		expense_rows.sort_custom(func(a, b): return int(a.value) > int(b.value))
+		for row in expense_rows.slice(0, mini(4, expense_rows.size())):
+			lines.append("↓ %s : %s €" % [str(row.label), _money(int(row.value))])
+	return "Aucun mouvement notable." if lines.is_empty() else "   •   ".join(lines)
+
+func _month_nora_summary(result: int, cash: int, income: int, expenses: int) -> String:
+	if result > 0:
+		return "Bon mois : l'entreprise génère plus qu'elle ne dépense. Gardez une marge de trésorerie avant d'accélérer les investissements."
+	if cash < 75000:
+		return "Attention : la trésorerie devient critique. Réduisez les dépenses non essentielles et privilégiez les décisions qui rapprochent rapidement d'un lancement."
+	if result < 0 and income <= 0:
+		return "Nous sommes encore dans une phase d'investissement sans revenus. C'est acceptable au début, mais il faut rapprocher le premier CPU du marché."
+	if result < 0:
+		return "Le mois est déficitaire, mais l'entreprise conserve une marge de manœuvre. Vérifiez surtout les plus gros postes de dépenses avant d'engager un nouveau projet."
+	return "Mois stable. Profitez de cet équilibre pour préparer la prochaine décision sans augmenter inutilement les coûts fixes."
 
 func _breakdown(data: Dictionary) -> String:
 	if data.is_empty(): return "  —"
