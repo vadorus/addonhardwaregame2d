@@ -240,9 +240,9 @@ func _complete_active_contract() -> void:
 	})
 	CompanyManager.add_alert("Contrat livré : %s. Qualité %.0f/100 • paiement %d € • %s +%d XP." % [title, quality, reward, FounderManager.branch_label(branch), branch_xp_reward])
 	active_contract = {}
-	if software_contracts_completed >= 2:
+	if software_contracts_completed >= 2 and stage == STAGE_GARAGE and not first_engineer_hired:
 		stage = STAGE_FIRST_HIRE
-		milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre.")
+		milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre. Les contrats logiciels restent disponibles pour financer la suite.")
 
 func _complete_electronics_project() -> void:
 	if electronics_project.is_empty():
@@ -307,7 +307,9 @@ func contract_data(contract_id: String) -> Dictionary:
 	return SOFTWARE_CONTRACTS.get(contract_id, {}).duplicate(true)
 
 func can_start_software_contract(contract_id: String) -> bool:
-	if stage != STAGE_GARAGE or not active_contract.is_empty():
+	# Les contrats restent une source de revenus et de savoir au-delà du tutoriel garage.
+	# Le jalon de recrutement ouvre une nouvelle possibilité ; il ne ferme jamais le logiciel.
+	if not active_contract.is_empty():
 		return false
 	if not SOFTWARE_CONTRACTS.has(contract_id) or not available_contract_ids().has(contract_id):
 		return false
