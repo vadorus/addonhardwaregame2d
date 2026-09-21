@@ -165,17 +165,24 @@ func _write_atomic(path: String, state: Dictionary) -> bool:
 		DirAccess.remove_absolute(temp_abs)
 		return false
 
-	if FileAccess.file_exists(backup):
-		var remove_error := DirAccess.remove_absolute(backup_abs)
-		if remove_error != OK:
-			push_error("SaveManager: impossible de remplacer la sauvegarde de secours (%s)." % error_string(remove_error))
-			DirAccess.remove_absolute(temp_abs)
-			return false
-
-	if FileAccess.file_exists(path):
+	var main_is_valid := not _read_valid_state(path).is_empty()
+	if main_is_valid:
+		if FileAccess.file_exists(backup):
+			var remove_error := DirAccess.remove_absolute(backup_abs)
+			if remove_error != OK:
+				push_error("SaveManager: impossible de remplacer la sauvegarde de secours (%s)." % error_string(remove_error))
+				DirAccess.remove_absolute(temp_abs)
+				return false
 		var backup_error := DirAccess.rename_absolute(path_abs, backup_abs)
 		if backup_error != OK:
 			push_error("SaveManager: impossible de créer la sauvegarde de secours (%s)." % error_string(backup_error))
+			DirAccess.remove_absolute(temp_abs)
+			return false
+	elif FileAccess.file_exists(path):
+		# Le principal est illisible : on le retire mais on conserve un .bak valide s'il existe.
+		var remove_invalid_error := DirAccess.remove_absolute(path_abs)
+		if remove_invalid_error != OK:
+			push_error("SaveManager: impossible d'écarter la sauvegarde principale corrompue (%s)." % error_string(remove_invalid_error))
 			DirAccess.remove_absolute(temp_abs)
 			return false
 
@@ -378,9 +385,6 @@ func load_game(slot_id: String = "") -> bool:
 		path = _slot_path(target_slot)
 
 	var state := _read_valid_state(path) if is_legacy else _read_with_backup(path)
-	if state.is_empty() and not is_legacy and FileAccess.file_exists(LEGACY_SAVE_PATH):
-		state = _read_valid_state(LEGACY_SAVE_PATH)
-		is_legacy = not state.is_empty()
 	if state.is_empty():
 		save_completed.emit(false, "Aucune sauvegarde valide trouvée.")
 		return false
