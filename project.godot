@@ -14,8 +14,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Tech Empire Prototype V0.3 — CPU Field Experience"
-run/main_scene="uid://e28phl1nvy5i"
+config/name="Tech Empire V0.3.1 — UI Preview"
+run/main_scene="res://ui/MainMenuV031.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
