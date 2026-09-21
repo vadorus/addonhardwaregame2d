@@ -10,6 +10,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	var active_sector := starting_sector if GameData.is_sector_active(starting_sector) else "CPU"
 	TimeManager.reset()
 	BalanceManager.reset(difficulty)
+	FounderManager.reset()
 	StartupManager.reset()
 	CompanyManager.reset(company_name, active_sector, BalanceManager.starting_capital())
 	DivisionManager.reset(active_sector)
