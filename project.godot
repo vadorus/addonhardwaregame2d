@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 
 GameData="*res://scripts/GameData.gd"
 BalanceManager="*res://scripts/BalanceManager.gd"
+StartupManager="*res://scripts/StartupManager.gd"
 Economy="*res://scripts/EconomyManager.gd"
 CompanyManager="*res://scripts/CompanyManager.gd"
 DivisionManager="*res://scripts/DivisionManager.gd"
