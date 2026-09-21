@@ -39,6 +39,7 @@ AfterSalesManager="*res://scripts/AfterSalesManager.gd"
 SimulationManager="*res://scripts/SimulationManager.gd"
 TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
+SettingsManager="*res://scripts/SettingsManager.gd"
 
 [display]
 
