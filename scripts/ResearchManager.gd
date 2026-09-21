@@ -672,7 +672,23 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}) -> bool:
+func normalize_cpu_product_identity(identity: Dictionary, fallback_name: String = "CPU") -> Dictionary:
+	var family_name := str(identity.get("family_name", fallback_name)).strip_edges()
+	if family_name.is_empty():
+		family_name = fallback_name
+	var package_style := str(identity.get("package_style", "CLASSIC")).to_upper()
+	if not package_style in ["CLASSIC", "TECHNICAL", "PREMIUM", "INDUSTRIAL"]:
+		package_style = "CLASSIC"
+	var accent := str(identity.get("accent", "CYAN")).to_upper()
+	if not accent in ["CYAN", "AMBER", "GREEN", "STEEL"]:
+		accent = "CYAN"
+	return {
+		"family_name": family_name,
+		"package_style": package_style,
+		"accent": accent
+	}
+
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, product_identity: Dictionary = {}) -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	var market_segment := segment
@@ -747,6 +763,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			or int(stored_generation_plan.get("monthly_budget", monthly_budget)) != monthly_budget
 		)
 
+	var stored_product_identity := normalize_cpu_product_identity(product_identity, project_name) if sector == "CPU" else {}
 	var project := {
 		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":market_segment,
 		"approach":approach,"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
@@ -754,6 +771,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
+		"product_identity":stored_product_identity,
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
 		"technical_capabilities_snapshot":effective_capabilities.duplicate(true) if sector == "CPU" else {},
@@ -961,6 +979,9 @@ func load_state(state: Dictionary):
 			var remediation: Dictionary = remediation_value if typeof(remediation_value) == TYPE_DICTIONARY else {}
 			estimate = _apply_remediation_estimate_modifiers(estimate, remediation)
 			project["cpu_design"] = design
+			var identity_value = project.get("product_identity", {})
+			var identity: Dictionary = identity_value if typeof(identity_value) == TYPE_DICTIONARY else {}
+			project["product_identity"] = normalize_cpu_product_identity(identity, str(project.get("name", "CPU")))
 			project["technical_remediation"] = remediation
 			project["remediation_months_remaining"] = maxi(int(project.get("remediation_months_remaining", 0)), 0)
 			project["remediation_total_months"] = maxi(int(project.get("remediation_total_months", remediation.get("extra_months", 0))), 0)
