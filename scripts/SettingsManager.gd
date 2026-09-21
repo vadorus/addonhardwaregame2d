@@ -6,7 +6,7 @@ const SETTINGS_PATH := "user://tech_empire_settings.cfg"
 
 const DEFAULTS := {
 	"display": {
-		"fullscreen": false,
+		"fullscreen": true,
 		"ui_scale": 1.0,
 		"reduce_motion": false
 	},
