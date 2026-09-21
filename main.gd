@@ -205,6 +205,7 @@ var startup_summary_label: Label
 var startup_progress_label: Label
 var startup_contract_select: OptionButton
 var startup_contract_hint: Label
+var startup_contract_action_button: Button
 var startup_action_button: Button
 var startup_work_actions: HFlowContainer
 var startup_work_hint: Label
@@ -668,6 +669,12 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_contract_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(startup_contract_hint)
 
+	startup_contract_action_button = Button.new()
+	startup_contract_action_button.text = "Accepter ce contrat"
+	startup_contract_action_button.custom_minimum_size.y = 48
+	startup_contract_action_button.pressed.connect(_startup_contract_action)
+	box.add_child(startup_contract_action_button)
+
 	startup_action_button = Button.new()
 	startup_action_button.custom_minimum_size.y = 48
 	startup_action_button.pressed.connect(_startup_primary_action)
@@ -782,7 +789,7 @@ func _startup_roadmap_text() -> String:
 func _refresh_startup_dashboard() -> void:
 	if startup_dashboard_panel == null:
 		return
-	var visible := CompanyManager.created and StartupManager.is_pre_cpu_phase()
+	var visible := CompanyManager.created and (StartupManager.is_pre_cpu_phase() or ProductManager.products.is_empty())
 	startup_dashboard_panel.visible = visible
 	if not visible:
 		return
@@ -793,12 +800,17 @@ func _refresh_startup_dashboard() -> void:
 	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
 	var action := str(objective.get("action", ""))
 
-	var contract_choices_visible := action == "START_SOFTWARE"
+	var contract_choices_visible := StartupManager.active_contract.is_empty() and not StartupManager.available_contract_ids().is_empty()
 	startup_contract_select.visible = contract_choices_visible
 	startup_contract_hint.visible = contract_choices_visible
+	startup_contract_action_button.visible = contract_choices_visible
 	if contract_choices_visible:
 		_refresh_startup_contract_options()
 		_refresh_startup_contract_hint()
+		if startup_contract_select.item_count > 0:
+			startup_contract_action_button.disabled = not StartupManager.can_start_software_contract(_meta(startup_contract_select))
+		else:
+			startup_contract_action_button.disabled = true
 
 	var work_mode := action in ["WORK_CONTRACT", "WORK_ELECTRONICS"]
 	startup_work_actions.visible = work_mode
@@ -819,7 +831,7 @@ func _refresh_startup_dashboard() -> void:
 	startup_action_button.disabled = false
 	match action:
 		"START_SOFTWARE":
-			startup_action_button.text = "Accepter ce contrat"
+			startup_action_button.visible = false
 		"HIRE_ENGINEER":
 			startup_action_button.text = "Recruter Élise • 3 500 €"
 			startup_action_button.disabled = not StartupManager.can_hire_first_engineer()
@@ -832,6 +844,16 @@ func _refresh_startup_dashboard() -> void:
 			startup_action_button.visible = false
 
 	startup_roadmap_label.text = _startup_roadmap_text()
+
+func _startup_contract_action() -> void:
+	if startup_contract_select == null or startup_contract_select.item_count <= 0:
+		status_label.text = "Aucun contrat disponible pour le moment."
+		return
+	if StartupManager.start_software_contract(_meta(startup_contract_select)):
+		status_label.text = "Contrat accepté. Le logiciel reste une activité de l'entreprise pendant sa montée vers le hardware."
+	else:
+		status_label.text = "Impossible d'accepter ce contrat : vérifiez la trésorerie et la capacité disponible."
+	_refresh_all()
 
 func _startup_primary_action() -> void:
 	var objective := StartupManager.current_objective()
