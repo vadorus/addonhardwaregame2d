@@ -7,11 +7,11 @@ signal loading_finished(ok)
 
 const SAVE_DIR := "user://saves"
 const LEGACY_SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 24
+const SAVE_VERSION := 25
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
 const STATE_SECTIONS := [
-	"time", "balance", "startup", "economy", "company", "divisions", "personnel",
+	"time", "balance", "founder", "startup", "economy", "company", "divisions", "personnel",
 	"executive", "research", "foundry", "production", "patents",
 	"products", "after_sales", "market", "media"
 ]
@@ -112,6 +112,10 @@ func _migrate_state(raw_state: Dictionary) -> Dictionary:
 		# V24 introduit le parcours garage. Les anciennes sauvegardes sans section
 		# startup sont reconnues par StartupManager comme des parties déjà avancées.
 		state["version"] = 24
+		version = 24
+	if version <= 24:
+		# V25 ajoute le profil du fondateur et les spécialisations logicielles.
+		state["version"] = 25
 	return state
 
 func _read_valid_state(path: String) -> Dictionary:
@@ -307,6 +311,7 @@ func _build_state(slot_id: String, slot_name: String) -> Dictionary:
 		},
 		"time": TimeManager.get_state(),
 		"balance": BalanceManager.get_state(),
+		"founder": FounderManager.get_state(),
 		"startup": StartupManager.get_state(),
 		"economy": Economy.get_state(),
 		"company": CompanyManager.get_state(),
@@ -365,6 +370,7 @@ func _apply_state(state: Dictionary) -> bool:
 	CompanyManager.load_state(state.get("company", {}))
 	TimeManager.load_state(state.get("time", {}))
 	BalanceManager.load_state(state.get("balance", {"active_profile":"STANDARD"}))
+	FounderManager.load_state(state.get("founder", {}))
 	StartupManager.load_state(state.get("startup", {}))
 	DivisionManager.load_state(state.get("divisions", {}))
 	Economy.load_state(state.get("economy", {}))
