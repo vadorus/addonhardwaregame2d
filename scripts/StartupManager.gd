@@ -382,7 +382,7 @@ func process_month() -> void:
 		Economy.add_expense(cost, "Contrat logiciel — développement")
 		var total_months := maxi(int(active_contract.get("total_months", 1)), 1)
 		var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
-		var passive_speed := FounderManager.branch_speed_multiplier(branch) * FounderManager.programming_multiplier()
+		var passive_speed := FounderManager.branch_speed_multiplier(branch) * maxf(FounderManager.programming_multiplier(), 1.0)
 		active_contract["progress"] = minf(float(active_contract.get("progress", 0.0)) + (100.0 / float(total_months)) * passive_speed, 100.0)
 		_update_contract_remaining_months()
 		if float(active_contract.get("progress", 0.0)) >= 100.0:
