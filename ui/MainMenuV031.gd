@@ -61,15 +61,15 @@ func _build_menu() -> void:
 
 	_left_panel = PanelContainer.new()
 	_left_panel.name = "MainMenuPanel"
-	_left_panel.custom_minimum_size = Vector2(420, 0)
+	_left_panel.custom_minimum_size = Vector2(390, 0)
 	_left_panel.add_theme_stylebox_override("panel", _panel_style())
 	row.add_child(_left_panel)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 26)
-	margin.add_theme_constant_override("margin_top", 22)
-	margin.add_theme_constant_override("margin_right", 26)
-	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_bottom", 18)
 	_left_panel.add_child(margin)
 
 	var column := VBoxContainer.new()
@@ -79,7 +79,7 @@ func _build_menu() -> void:
 	_logo = TextureRect.new()
 	_logo.name = "TechEmpireLogo"
 	_logo.texture = GAME_LOGO
-	_logo.custom_minimum_size = Vector2(360, 205)
+	_logo.custom_minimum_size = Vector2(320, 165)
 	_logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -157,9 +157,9 @@ func _build_menu() -> void:
 func _menu_button(label_text: String, primary := false) -> Button:
 	var button := Button.new()
 	button.text = label_text
-	button.custom_minimum_size = Vector2(360, 52)
+	button.custom_minimum_size = Vector2(330, 50)
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.add_theme_font_size_override("font_size", 19)
+	button.add_theme_font_size_override("font_size", 18)
 	button.add_theme_color_override("font_color", TEXT)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_stylebox_override("normal", _button_style(primary, false))
