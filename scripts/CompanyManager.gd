@@ -45,10 +45,10 @@ func reset(name: String, sector: String, capital: int = 500_000):
 	founded_year = TimeManager.year
 	created = true
 	reputation = {
-		"innovation":50.0,"reliability":50.0,"value":50.0,"support":50.0,
-		"sustainability":50.0,"prestige":35.0,"professional":45.0
+		"innovation":12.0,"reliability":18.0,"value":20.0,"support":10.0,
+		"sustainability":15.0,"prestige":5.0,"professional":10.0
 	}
-	policies = {"marketing_budget":6000,"support_budget":5000,"environment_budget":2500,"support_level":"STANDARD"}
+	policies = {"marketing_budget":0,"support_budget":0,"environment_budget":0,"support_level":"MINIMAL"}
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
 		"Développement":{"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0},
@@ -58,12 +58,20 @@ func reset(name: String, sector: String, capital: int = 500_000):
 		"Finance":{"leader_id":"","autonomy":"AUTONOMOUS","cohesion":30.0}
 	}
 	subsidiaries = []
-	brands = [{"name":company_name, "sector":"GROUP", "reputation":45.0}]
+	brands = [{"name":company_name, "sector":"GROUP", "reputation":8.0}]
 	alerts = []
 	Economy.reset(capital)
 	company_changed.emit()
 
 func process_month():
+	if StartupManager.is_pre_cpu_phase():
+		var startup_overhead := 500 if StartupManager.is_garage_phase() else 900
+		Economy.add_expense(startup_overhead, "Garage et fournitures" if StartupManager.is_garage_phase() else "Atelier électronique")
+		return
+	if ProductManager.products.is_empty():
+		# Premier programme CPU : petit atelier, pas encore une société structurée avec marketing et SAV complets.
+		Economy.add_expense(1800, "Atelier et infrastructure")
+		return
 	Economy.add_expense(7500, "Bureaux et infrastructure")
 	Economy.add_expense(int(policies.marketing_budget), "Marketing")
 	Economy.add_expense(int(policies.support_budget), "SAV / support")
