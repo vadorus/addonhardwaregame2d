@@ -83,6 +83,10 @@ var setup_difficulty: OptionButton
 var setup_difficulty_label: Label
 var recruit_department: OptionButton
 var rd_name: LineEdit
+var rd_family_name: LineEdit
+var rd_package_style: OptionButton
+var rd_brand_accent: OptionButton
+var lab_branding_preview_label: Label
 var rd_sector: OptionButton
 var rd_segment: OptionButton
 var rd_approach: OptionButton
@@ -712,7 +716,7 @@ func _create_research_tab():
 	wizard_bar.add_theme_constant_override("h_separation", 8)
 	wizard_bar.add_theme_constant_override("v_separation", 8)
 	box.add_child(wizard_bar)
-	for step_data in [["1  Identité", 1], ["2  Technique", 2], ["3  Validation", 3], ["4  Lancer", 4]]:
+	for step_data in [["1  Marché", 1], ["2  Technique", 2], ["3  Design & marque", 3], ["4  Valider", 4]]:
 		var step_button := Button.new()
 		step_button.text = str(step_data[0])
 		step_button.custom_minimum_size = Vector2(128, 40)
@@ -720,7 +724,7 @@ func _create_research_tab():
 		step_button.pressed.connect(func(): _lab_go_to_step(step_index))
 		wizard_bar.add_child(step_button)
 
-	lab_wizard_status_label = _muted_label("Étape 1/4 • Donnez un nom au CPU, choisissez sa cible et l'intention de l'équipe.", 12)
+	lab_wizard_status_label = _muted_label("Étape 1/4 • Choisissez le marché, le nom du projet et l'intention de l'équipe.", 12)
 	lab_wizard_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(lab_wizard_status_label)
 
@@ -922,6 +926,37 @@ func _create_research_tab():
 	lab_remediation_accept_button.pressed.connect(_accept_cpu_remediation)
 	configuration_box.add_child(lab_remediation_accept_button)
 
+	configuration_box.add_child(_eyebrow("DESIGN & IDENTITÉ PRODUIT"))
+	var branding_intro := _muted_label("Cette identité est purement cosmétique : elle ne change ni les performances ni les ventes. Elle accompagne le CPU jusqu'à la gamme commerciale.", 11)
+	branding_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(branding_intro)
+
+	rd_family_name = LineEdit.new()
+	rd_family_name.placeholder_text = "Ex. Nova, Orion, Atlas"
+	rd_family_name.text_changed.connect(func(_text): _refresh_branding_preview())
+	_add_labeled_control(configuration_box, "Nom de gamme", rd_family_name)
+
+	rd_package_style = OptionButton.new()
+	for package_data in [["Classique 1971","CLASSIC"],["Technique","TECHNICAL"],["Premium","PREMIUM"],["Industriel","INDUSTRIAL"]]:
+		rd_package_style.add_item(str(package_data[0]))
+		rd_package_style.set_item_metadata(rd_package_style.item_count - 1, str(package_data[1]))
+	rd_package_style.item_selected.connect(func(_index): _refresh_branding_preview())
+	_add_labeled_control(configuration_box, "Style du processeur", rd_package_style)
+
+	rd_brand_accent = OptionButton.new()
+	for accent_data in [["Bleu cyan","CYAN"],["Ambre","AMBER"],["Vert","GREEN"],["Acier","STEEL"]]:
+		rd_brand_accent.add_item(str(accent_data[0]))
+		rd_brand_accent.set_item_metadata(rd_brand_accent.item_count - 1, str(accent_data[1]))
+	rd_brand_accent.item_selected.connect(func(_index): _refresh_branding_preview())
+	_add_labeled_control(configuration_box, "Accent visuel", rd_brand_accent)
+
+	var branding_panel := PanelContainer.new()
+	branding_panel.add_theme_stylebox_override("panel", _stylebox(APP_CYAN_DARK, 10, 1, APP_CYAN, 10))
+	lab_branding_preview_label = _muted_label("", 12)
+	lab_branding_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	branding_panel.add_child(lab_branding_preview_label)
+	configuration_box.add_child(branding_panel)
+
 	lab_start_button = Button.new()
 	lab_start_button.text = "Lancer ce CPU en développement"
 	lab_start_button.custom_minimum_size.y = 50
@@ -1049,10 +1084,10 @@ func _lab_go_to_step(step: int):
 			lab_wizard_status_label.text = "Étape 2/4 • Technique : choisissez l'architecture et observez immédiatement les compromis."
 			target = rd_cores
 		3:
-			lab_wizard_status_label.text = "Étape 3/4 • Validation : l'équipe traduit les chiffres en conséquences, risques et solutions."
-			target = lab_team_guidance_label
+			lab_wizard_status_label.text = "Étape 3/4 • Design & marque : donnez une identité visuelle à la gamme, sans effet sur les statistiques."
+			target = rd_family_name
 		4:
-			lab_wizard_status_label.text = "Étape 4/4 • Lancement : vérifiez coût, délai et adéquation au marché avant de démarrer."
+			lab_wizard_status_label.text = "Étape 4/4 • Validation : vérifiez coût, délai, risque et adéquation au marché avant de démarrer."
 			target = lab_start_button
 	if target != null:
 		lab_scroll.ensure_control_visible(target)
@@ -1124,6 +1159,47 @@ func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 	metric_box.add_child(bar)
 	cpu_metric_bars[key] = bar
 	cpu_metric_labels[key] = value_label
+
+func _current_cpu_identity() -> Dictionary:
+	var project_name := rd_name.text.strip_edges() if rd_name != null else "CPU"
+	if project_name.is_empty():
+		project_name = "CPU"
+	var family_name := rd_family_name.text.strip_edges() if rd_family_name != null else ""
+	if family_name.is_empty():
+		family_name = project_name
+	return {
+		"family_name": family_name,
+		"package_style": _meta(rd_package_style) if rd_package_style != null and rd_package_style.item_count > 0 else "CLASSIC",
+		"accent": _meta(rd_brand_accent) if rd_brand_accent != null and rd_brand_accent.item_count > 0 else "CYAN"
+	}
+
+func _refresh_branding_preview():
+	if lab_branding_preview_label == null:
+		return
+	var identity := _current_cpu_identity()
+	var package_labels := {
+		"CLASSIC":"Classique 1971",
+		"TECHNICAL":"Technique",
+		"PREMIUM":"Premium",
+		"INDUSTRIAL":"Industriel"
+	}
+	var accent_labels := {
+		"CYAN":"bleu cyan",
+		"AMBER":"ambre",
+		"GREEN":"vert",
+		"STEEL":"acier"
+	}
+	var project_name := rd_name.text.strip_edges() if rd_name != null else ""
+	if project_name.is_empty():
+		project_name = "Votre CPU"
+	lab_branding_preview_label.text = "%s • gamme %s • style %s • accent %s\nCosmétique uniquement — aucune modification de performance, coût, rendement ou ventes." % [
+		project_name,
+		str(identity.get("family_name", project_name)),
+		str(package_labels.get(str(identity.get("package_style", "CLASSIC")), "Classique 1971")),
+		str(accent_labels.get(str(identity.get("accent", "CYAN")), "bleu cyan"))
+	]
+	if lab_chip != null and lab_chip.has_method("set_identity"):
+		lab_chip.call("set_identity", identity)
 
 func _current_cpu_design() -> Dictionary:
 	if rd_cores == null or rd_frequency == null or rd_cache == null or rd_node == null or rd_tdp == null or rd_node.item_count == 0:
@@ -1356,6 +1432,7 @@ func _refresh_cpu_preview():
 
 	if lab_chip.has_method("set_design"):
 		lab_chip.call("set_design", design, 16.0, false)
+	_refresh_branding_preview()
 
 func _refresh_cpu_guidance(guidance: Dictionary, design: Dictionary):
 	var ranges: Dictionary = guidance.get("ranges", {})
@@ -2817,8 +2894,9 @@ func _start_project():
 		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
 	var generation_plan := active_cpu_generation_plan.duplicate(true)
 	var remediation := active_cpu_remediation.duplicate(true)
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation):
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, _current_cpu_identity()):
 		rd_name.text = ""
+		rd_family_name.text = "" if rd_family_name != null else ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
 		status_label.text = "%s entre en développement — profil %s%s%s." % [name, str(evaluation.profile), plan_text, remediation_text]
