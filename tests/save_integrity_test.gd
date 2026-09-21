@@ -40,7 +40,7 @@ func _canonical(value) -> Variant:
 func _test_save_round_trip() -> void:
 	SimulationManager.reset_all("CI Save Integrity", "CPU", "STANDARD")
 	SaveManager.set_current_slot("slot_5")
-	var before := _canonical(_snapshot())
+	var before: Variant = _canonical(_snapshot())
 	var saved := SaveManager.save_game("slot_5", "CI Save Integrity")
 	_check(saved, "Impossible d'écrire le slot de test.")
 	if not saved:
@@ -52,7 +52,7 @@ func _test_save_round_trip() -> void:
 	var loaded := SaveManager.load_game("slot_5")
 	_check(loaded, "Impossible de recharger le slot de test.")
 	if loaded:
-		var after := _canonical(_snapshot())
+		var after: Variant = _canonical(_snapshot())
 		_check(before == after, "L'état n'est pas identique après sauvegarde/rechargement.")
 
 	SaveManager.delete_slot("slot_5")

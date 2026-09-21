@@ -1,7 +1,7 @@
 extends Control
 
-const MENU_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.webp")
-const GAME_LOGO: Texture2D = preload("res://assets/ui/runtime/branding/tech_empire_logo.webp")
+const MENU_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.png")
+const GAME_LOGO: Texture2D = preload("res://assets/ui/runtime/branding/tech_empire_logo.png")
 const GAME_SCENE := "res://main.tscn"
 
 const NAVY := Color("#081624")

@@ -1,7 +1,7 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
-const QG_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.webp")
+const QG_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.png")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
