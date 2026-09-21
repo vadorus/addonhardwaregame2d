@@ -181,6 +181,7 @@ var dashboard_metric_c: Label
 var dashboard_action_button: Button
 var dashboard_cto_button: Button
 var dashboard_target_tab := 3
+var _refresh_pending := false
 
 func _ready():
 	theme = _create_app_theme()
@@ -191,13 +192,19 @@ func _ready():
 	setup_layer.visible = not CompanyManager.created
 	call_deferred("_update_responsive_layout")
 
-func _process(_delta):
-	if CompanyManager.created:
-		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		money_label.text = "%s €" % _money(Economy.money)
+func _notification(what: int) -> void:
+	if not CompanyManager.created:
+		return
+	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_WM_GO_BACK_REQUEST]:
+		SaveManager.save_game()
+
+func _on_day_changed(day: int, month: int, year: int) -> void:
+	if date_label != null:
+		date_label.text = "Jour %d • Mois %d • %d" % [day, month, year]
 
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
+	TimeManager.day_changed.connect(_on_day_changed)
 	Economy.month_closed.connect(_on_month_closed)
 	CompanyManager.company_changed.connect(_refresh_all)
 	CompanyManager.reputation_changed.connect(_refresh_all)
@@ -2208,7 +2215,12 @@ func _on_month_closed(report: Dictionary):
 	var exp_lines:=_breakdown(report.expense_breakdown)
 	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
 	month_layer.visible=true
+	call_deferred("_autosave_after_month_close")
 	_refresh_all()
+
+func _autosave_after_month_close() -> void:
+	if CompanyManager.created:
+		SaveManager.save_game()
 
 func _breakdown(data: Dictionary) -> String:
 	if data.is_empty(): return "  —"
@@ -2240,6 +2252,8 @@ func _restart_from_game_over():
 
 func _refresh_top():
 	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
+	if date_label != null:
+		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
 	money_label.text="%s €" % _money(Economy.money)
 	var cash_color := APP_GREEN
 	if Economy.money <= 0:
@@ -2251,8 +2265,22 @@ func _refresh_top():
 	money_label.add_theme_color_override("font_color", cash_color)
 
 func _refresh_all():
+	if _refresh_pending:
+		return
+	_refresh_pending = true
+	call_deferred("_perform_full_refresh")
+
+func _perform_full_refresh():
+	_refresh_pending = false
 	_refresh_navigation_progression()
-	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	_refresh_top()
+	_refresh_dashboard()
+	_refresh_company()
+	_refresh_personnel()
+	_refresh_research()
+	_refresh_products()
+	_refresh_market()
+	_refresh_media()
 
 func _refresh_navigation_progression():
 	if tabs == null:
