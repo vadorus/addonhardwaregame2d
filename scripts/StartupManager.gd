@@ -11,27 +11,74 @@ const STAGE_CPU_READY := "CPU_READY"
 const SOFTWARE_CONTRACTS := {
 	"STOCK": {
 		"title":"Gestion de stock pour un revendeur",
-		"description":"Un petit outil sur terminal pour suivre entrées, sorties et inventaire.",
-		"duration_months":2,
-		"monthly_cost":700,
-		"reward":6500,
-		"reputation":1.5
+		"description":"Suivre entrées, sorties et inventaire depuis un terminal.",
+		"branch":FounderManager.BRANCH_BUSINESS,
+		"required_branch_level":1,
+		"duration_months":2,"monthly_cost":700,"reward":6500,"reputation":1.5,"branch_xp":70
 	},
 	"INVOICING": {
 		"title":"Facturation pour un atelier",
-		"description":"Saisie clients, factures et historique sur terminal.",
-		"duration_months":2,
-		"monthly_cost":900,
-		"reward":8500,
-		"reputation":2.0
+		"description":"Clients, factures et historique pour une petite entreprise.",
+		"branch":FounderManager.BRANCH_BUSINESS,
+		"required_branch_level":1,
+		"duration_months":2,"monthly_cost":900,"reward":8500,"reputation":2.0,"branch_xp":85
+	},
+	"PAYROLL": {
+		"title":"Paie et heures travaillées",
+		"description":"Un outil métier plus complexe, réservé aux développeurs déjà habitués aux logiciels de gestion.",
+		"branch":FounderManager.BRANCH_BUSINESS,
+		"required_branch_level":2,
+		"duration_months":3,"monthly_cost":1100,"reward":10500,"reputation":2.4,"branch_xp":105
 	},
 	"INDUSTRIAL_LOG": {
 		"title":"Journal de production industriel",
-		"description":"Enregistrement des incidents et temps de cycle d'un petit atelier.",
-		"duration_months":3,
-		"monthly_cost":1200,
-		"reward":12000,
-		"reputation":3.0
+		"description":"Enregistrer incidents, arrêts et temps de cycle d'un atelier.",
+		"branch":FounderManager.BRANCH_INDUSTRIAL,
+		"required_branch_level":1,
+		"duration_months":3,"monthly_cost":1200,"reward":12000,"reputation":3.0,"branch_xp":100
+	},
+	"MACHINE_CONTROL": {
+		"title":"Supervision d'une machine-outil",
+		"description":"Surveillance et commandes simples pour un équipement industriel.",
+		"branch":FounderManager.BRANCH_INDUSTRIAL,
+		"required_branch_level":2,
+		"duration_months":3,"monthly_cost":1600,"reward":15500,"reputation":3.4,"branch_xp":125
+	},
+	"SCIENTIFIC_TABLES": {
+		"title":"Calculs pour un laboratoire",
+		"description":"Automatiser des tables de calcul et réduire les erreurs manuelles.",
+		"branch":FounderManager.BRANCH_SCIENTIFIC,
+		"required_branch_level":1,
+		"duration_months":2,"monthly_cost":900,"reward":8000,"reputation":1.8,"branch_xp":75
+	},
+	"LAB_ANALYSIS": {
+		"title":"Analyse de mesures expérimentales",
+		"description":"Traitement de séries de mesures et génération de résultats comparables.",
+		"branch":FounderManager.BRANCH_SCIENTIFIC,
+		"required_branch_level":2,
+		"duration_months":3,"monthly_cost":1400,"reward":13500,"reputation":3.0,"branch_xp":115
+	},
+	"ROM_CONTROL": {
+		"title":"Programme de commande en ROM",
+		"description":"Une petite logique de commande destinée à un équipement électronique.",
+		"branch":FounderManager.BRANCH_EMBEDDED,
+		"required_branch_level":1,
+		"duration_months":3,"monthly_cost":1300,"reward":12500,"reputation":3.0,"branch_xp":105
+	},
+	"DEVICE_DIAGNOSTIC": {
+		"title":"Diagnostic d'un équipement électronique",
+		"description":"Logiciel de test et de diagnostic pour une carte spécialisée.",
+		"branch":FounderManager.BRANCH_EMBEDDED,
+		"required_branch_level":2,
+		"duration_months":3,"monthly_cost":1600,"reward":15000,"reputation":3.5,"branch_xp":125
+	},
+	"WEB_CATALOG": {
+		"title":"Catalogue sur le World Wide Web",
+		"description":"Une présence hypertexte simple pour présenter les produits d'un client.",
+		"branch":FounderManager.BRANCH_WEB,
+		"required_branch_level":1,
+		"min_year":1991,
+		"duration_months":2,"monthly_cost":1100,"reward":9000,"reputation":2.2,"branch_xp":80
 	}
 }
 
@@ -101,17 +148,26 @@ func perform_work_session(action: String) -> bool:
 		return false
 	if not active_contract.is_empty():
 		_ensure_contract_runtime_fields()
+		var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
+		var speed := FounderManager.branch_speed_multiplier(branch) * FounderManager.programming_multiplier()
+		var quality_bonus := FounderManager.branch_quality_bonus(branch) * 0.15
 		match action:
 			"BUILD":
-				active_contract["progress"] = minf(float(active_contract.progress) + 18.0, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 1.5, 0.0, 100.0)
+				active_contract["progress"] = minf(float(active_contract.progress) + 18.0 * speed, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 1.5 + quality_bonus, 0.0, 100.0)
+				FounderManager.add_multi_experience(10, {FounderManager.SKILL_PROGRAMMING:1.1, FounderManager.SKILL_MANAGEMENT:0.2})
+				FounderManager.add_branch_experience(branch, 10)
 			"TEST":
-				active_contract["progress"] = minf(float(active_contract.progress) + 9.0, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 8.0, 0.0, 100.0)
+				active_contract["progress"] = minf(float(active_contract.progress) + 9.0 * speed, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 8.0 + quality_bonus, 0.0, 100.0)
+				FounderManager.add_multi_experience(8, {FounderManager.SKILL_PROGRAMMING:0.8, FounderManager.SKILL_MANAGEMENT:0.3})
+				FounderManager.add_branch_experience(branch, 8)
 			"CLIENT":
-				active_contract["progress"] = minf(float(active_contract.progress) + 6.0, 100.0)
-				active_contract["client_confidence"] = clampf(float(active_contract.client_confidence) + 10.0, 0.0, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 3.0, 0.0, 100.0)
+				active_contract["progress"] = minf(float(active_contract.progress) + 6.0 * speed, 100.0)
+				active_contract["client_confidence"] = clampf(float(active_contract.client_confidence) + 10.0 * FounderManager.commercial_multiplier(), 0.0, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 3.0 + quality_bonus, 0.0, 100.0)
+				FounderManager.add_multi_experience(8, {FounderManager.SKILL_COMMERCIAL:1.0, FounderManager.SKILL_MANAGEMENT:0.4})
+				FounderManager.add_branch_experience(branch, 7)
 			_:
 				return false
 		active_contract["last_work_day"] = _absolute_day()
@@ -125,13 +181,16 @@ func perform_work_session(action: String) -> bool:
 		_ensure_electronics_runtime_fields()
 		match action:
 			"BUILD":
-				electronics_project["progress"] = minf(float(electronics_project.progress) + 16.0, 100.0)
+				electronics_project["progress"] = minf(float(electronics_project.progress) + 16.0 * FounderManager.electronics_multiplier(), 100.0)
+				FounderManager.add_multi_experience(12, {FounderManager.SKILL_ELECTRONICS:1.3, FounderManager.SKILL_PROGRAMMING:0.3})
 			"TEST":
-				electronics_project["progress"] = minf(float(electronics_project.progress) + 9.0, 100.0)
+				electronics_project["progress"] = minf(float(electronics_project.progress) + 9.0 * FounderManager.electronics_multiplier(), 100.0)
 				electronics_project["quality"] = clampf(float(electronics_project.quality) + 9.0, 0.0, 100.0)
+				FounderManager.add_multi_experience(10, {FounderManager.SKILL_ELECTRONICS:1.0, FounderManager.SKILL_MANAGEMENT:0.3})
 			"CLIENT":
 				electronics_project["progress"] = minf(float(electronics_project.progress) + 7.0, 100.0)
 				electronics_project["quality"] = clampf(float(electronics_project.quality) + 5.0, 0.0, 100.0)
+				FounderManager.add_multi_experience(9, {FounderManager.SKILL_COMMERCIAL:0.7, FounderManager.SKILL_ELECTRONICS:0.4})
 			_:
 				return false
 		electronics_project["last_work_day"] = _absolute_day()
@@ -161,7 +220,8 @@ func _complete_active_contract() -> void:
 		return
 	var quality := float(active_contract.get("quality", 50.0))
 	var client_confidence := float(active_contract.get("client_confidence", 50.0))
-	var reward_multiplier := clampf(0.90 + quality / 500.0 + client_confidence / 1000.0, 0.90, 1.20)
+	var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
+	var reward_multiplier := clampf(0.90 + quality / 500.0 + client_confidence / 1000.0 + FounderManager.branch_reward_bonus(branch), 0.90, 1.35)
 	var reward := int(round(float(active_contract.get("reward", 0)) * reward_multiplier))
 	var reputation_gain := float(active_contract.get("reputation", 0.0)) * lerpf(0.85, 1.25, quality / 100.0)
 	var contract_id := str(active_contract.get("id", ""))
@@ -171,7 +231,14 @@ func _complete_active_contract() -> void:
 	if not completed_contract_ids.has(contract_id):
 		completed_contract_ids.append(contract_id)
 	software_contracts_completed += 1
-	CompanyManager.add_alert("Contrat livré : %s. Qualité %.0f/100 • paiement %d €." % [title, quality, reward])
+	var branch_xp_reward := int(active_contract.get("branch_xp_reward", 70))
+	FounderManager.add_branch_experience(branch, branch_xp_reward)
+	FounderManager.add_multi_experience(30 + branch_xp_reward / 4, {
+		FounderManager.SKILL_PROGRAMMING:2.0,
+		FounderManager.SKILL_MANAGEMENT:0.8,
+		FounderManager.SKILL_COMMERCIAL:0.7
+	})
+	CompanyManager.add_alert("Contrat livré : %s. Qualité %.0f/100 • paiement %d € • %s +%d XP." % [title, quality, reward, FounderManager.branch_label(branch), branch_xp_reward])
 	active_contract = {}
 	if software_contracts_completed >= 2:
 		stage = STAGE_FIRST_HIRE
@@ -212,8 +279,28 @@ func is_pre_cpu_phase() -> bool:
 
 func available_contract_ids() -> Array:
 	var result: Array = []
-	for contract_id in SOFTWARE_CONTRACTS.keys():
-		result.append(str(contract_id))
+	for contract_id_value in SOFTWARE_CONTRACTS.keys():
+		var contract_id := str(contract_id_value)
+		var data: Dictionary = SOFTWARE_CONTRACTS[contract_id]
+		var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+		var min_year := int(data.get("min_year", FounderManager.branch_min_year(branch)))
+		var required_level := int(data.get("required_branch_level", 1))
+		if TimeManager.year < min_year:
+			continue
+		if not FounderManager.branch_available(branch):
+			continue
+		if FounderManager.branch_level(branch) < required_level:
+			continue
+		result.append(contract_id)
+	result.sort_custom(func(a, b):
+		var da: Dictionary = SOFTWARE_CONTRACTS[str(a)]
+		var db: Dictionary = SOFTWARE_CONTRACTS[str(b)]
+		var ba := FounderManager.branch_label(str(da.get("branch", "")))
+		var bb := FounderManager.branch_label(str(db.get("branch", "")))
+		if ba == bb:
+			return str(da.get("title", a)) < str(db.get("title", b))
+		return ba < bb
+	)
 	return result
 
 func contract_data(contract_id: String) -> Dictionary:
@@ -222,21 +309,27 @@ func contract_data(contract_id: String) -> Dictionary:
 func can_start_software_contract(contract_id: String) -> bool:
 	if stage != STAGE_GARAGE or not active_contract.is_empty():
 		return false
-	if not SOFTWARE_CONTRACTS.has(contract_id):
+	if not SOFTWARE_CONTRACTS.has(contract_id) or not available_contract_ids().has(contract_id):
 		return false
 	var data: Dictionary = SOFTWARE_CONTRACTS[contract_id]
-	return Economy.money >= int(data.monthly_cost)
+	var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+	var discounted_cost := int(round(float(data.monthly_cost) * (1.0 - FounderManager.branch_cost_discount(branch))))
+	return Economy.money >= discounted_cost
 
 func start_software_contract(contract_id: String) -> bool:
 	if not can_start_software_contract(contract_id):
 		return false
 	var data: Dictionary = SOFTWARE_CONTRACTS[contract_id]
+	var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+	var effective_cost := int(round(float(data.monthly_cost) * (1.0 - FounderManager.branch_cost_discount(branch))))
 	active_contract = {
 		"id":contract_id,
 		"title":str(data.title),
+		"branch":branch,
+		"branch_xp_reward":int(data.get("branch_xp", 70)),
 		"remaining_months":int(data.duration_months),
 		"total_months":int(data.duration_months),
-		"monthly_cost":int(data.monthly_cost),
+		"monthly_cost":effective_cost,
 		"reward":int(data.reward),
 		"reputation":float(data.reputation),
 		"progress":0.0,
@@ -288,7 +381,9 @@ func process_month() -> void:
 		var cost := int(active_contract.get("monthly_cost", 0))
 		Economy.add_expense(cost, "Contrat logiciel — développement")
 		var total_months := maxi(int(active_contract.get("total_months", 1)), 1)
-		active_contract["progress"] = minf(float(active_contract.get("progress", 0.0)) + 100.0 / float(total_months), 100.0)
+		var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
+		var passive_speed := FounderManager.branch_speed_multiplier(branch) * FounderManager.programming_multiplier()
+		active_contract["progress"] = minf(float(active_contract.get("progress", 0.0)) + (100.0 / float(total_months)) * passive_speed, 100.0)
 		_update_contract_remaining_months()
 		if float(active_contract.get("progress", 0.0)) >= 100.0:
 			_complete_active_contract()
@@ -310,7 +405,7 @@ func current_objective() -> Dictionary:
 		_ensure_contract_runtime_fields()
 		return {
 			"title":str(active_contract.get("title", "Contrat logiciel")),
-			"text":"Le contrat avance avec le temps, mais vos sessions de travail peuvent accélérer le développement et améliorer la qualité.",
+			"text":"Branche : %s (niveau %d). Plus vous pratiquez cette spécialité, plus vous développez vite et proprement." % [FounderManager.branch_label(str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))), FounderManager.branch_level(str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS)))],
 			"progress":"Avancement %.0f%% • qualité %.0f/100 • %d mois estimé(s)" % [float(active_contract.get("progress", 0.0)), float(active_contract.get("quality", 50.0)), int(active_contract.get("remaining_months", 0))],
 			"action":"WORK_CONTRACT"
 		}
