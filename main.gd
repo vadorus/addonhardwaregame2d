@@ -590,6 +590,188 @@ func _create_dashboard_tab():
 	dashboard_market_outlook_label.custom_minimum_size.y = 128
 	market_box.add_child(dashboard_market_outlook_label)
 
+func _build_startup_dashboard(parent: VBoxContainer) -> void:
+	startup_dashboard_panel = _card(Color(0.035, 0.070, 0.105, 0.985), 15, 18)
+	startup_dashboard_panel.visible = false
+	parent.add_child(startup_dashboard_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	startup_dashboard_panel.add_child(box)
+	box.add_child(_eyebrow("DÉPART • GARAGE 1971"))
+
+	startup_summary_label = _label("", 23)
+	startup_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(startup_summary_label)
+
+	startup_progress_label = _muted_label("", 13)
+	startup_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(startup_progress_label)
+
+	startup_contract_select = OptionButton.new()
+	for contract_id_value in StartupManager.available_contract_ids():
+		var contract_id := str(contract_id_value)
+		var data := StartupManager.contract_data(contract_id)
+		startup_contract_select.add_item(str(data.get("title", contract_id)))
+		startup_contract_select.set_item_metadata(startup_contract_select.item_count - 1, contract_id)
+	startup_contract_select.item_selected.connect(func(_index): _refresh_startup_contract_hint())
+	box.add_child(startup_contract_select)
+
+	startup_contract_hint = _muted_label("", 12)
+	startup_contract_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(startup_contract_hint)
+
+	startup_action_button = Button.new()
+	startup_action_button.custom_minimum_size.y = 48
+	startup_action_button.pressed.connect(_startup_primary_action)
+	box.add_child(startup_action_button)
+
+	var roadmap_card := _card(Color(0.025, 0.045, 0.070, 0.96), 11, 11)
+	box.add_child(roadmap_card)
+	var roadmap_box := VBoxContainer.new()
+	roadmap_box.add_theme_constant_override("separation", 5)
+	roadmap_card.add_child(roadmap_box)
+	roadmap_box.add_child(_eyebrow("ROADMAP TECHNOLOGIQUE"))
+	startup_roadmap_label = _muted_label("", 12)
+	startup_roadmap_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	roadmap_box.add_child(startup_roadmap_label)
+
+func _refresh_startup_contract_hint() -> void:
+	if startup_contract_hint == null or startup_contract_select == null or startup_contract_select.item_count == 0:
+		return
+	var contract_id := _meta(startup_contract_select)
+	var data := StartupManager.contract_data(contract_id)
+	startup_contract_hint.text = "%s\n%d mois • %s €/mois • paiement à la livraison : %s €" % [
+		str(data.get("description", "")),
+		int(data.get("duration_months", 0)),
+		_money(int(data.get("monthly_cost", 0))),
+		_money(int(data.get("reward", 0)))
+	]
+
+func _startup_roadmap_text() -> String:
+	var lines: Array[String] = []
+	for row_value in StartupManager.roadmap():
+		var row: Dictionary = row_value
+		var status := str(row.get("status", "LOCKED"))
+		var badge := "VERROUILLÉ"
+		match status:
+			"ACQUIRED": badge = "ACQUIS"
+			"AVAILABLE": badge = "DISPONIBLE"
+			"IN_PROGRESS": badge = "EN COURS"
+		lines.append("• %s — %s\n  %s" % [str(row.get("title", "")), badge, str(row.get("condition", ""))])
+	return "\n".join(lines)
+
+func _refresh_startup_dashboard() -> void:
+	if startup_dashboard_panel == null:
+		return
+	var visible := CompanyManager.created and StartupManager.is_pre_cpu_phase()
+	startup_dashboard_panel.visible = visible
+	if not visible:
+		return
+
+	var objective := StartupManager.current_objective()
+	startup_summary_label.text = str(objective.get("title", "Votre garage"))
+	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
+	var action := str(objective.get("action", ""))
+
+	var contract_choices_visible := action == "START_SOFTWARE"
+	startup_contract_select.visible = contract_choices_visible
+	startup_contract_hint.visible = contract_choices_visible
+	if contract_choices_visible:
+		_refresh_startup_contract_hint()
+
+	startup_action_button.visible = not action.is_empty()
+	startup_action_button.disabled = false
+	match action:
+		"START_SOFTWARE":
+			startup_action_button.text = "Accepter ce contrat"
+		"HIRE_ENGINEER":
+			startup_action_button.text = "Recruter Élise • 3 500 €"
+			startup_action_button.disabled = not StartupManager.can_hire_first_engineer()
+		"START_ELECTRONICS":
+			startup_action_button.text = "Lancer le prototype électronique"
+			startup_action_button.disabled = not StartupManager.can_start_electronics_project()
+		"OPEN_CPU":
+			startup_action_button.text = "Ouvrir le laboratoire CPU"
+		_:
+			startup_action_button.visible = false
+
+	startup_roadmap_label.text = _startup_roadmap_text()
+
+func _startup_primary_action() -> void:
+	var objective := StartupManager.current_objective()
+	var action := str(objective.get("action", ""))
+	var ok := false
+	match action:
+		"START_SOFTWARE":
+			if startup_contract_select != null and startup_contract_select.item_count > 0:
+				ok = StartupManager.start_software_contract(_meta(startup_contract_select))
+		"HIRE_ENGINEER":
+			ok = StartupManager.hire_first_engineer()
+		"START_ELECTRONICS":
+			ok = StartupManager.start_electronics_project()
+		"OPEN_CPU":
+			_show_tab(3)
+			return
+	if not ok:
+		status_label.text = "Action impossible : vérifiez la trésorerie ou le jalon précédent."
+	_refresh_all()
+
+func _on_startup_milestone(title: String, message: String) -> void:
+	status_label.text = "%s — %s" % [title, message]
+	_refresh_all()
+
+func _build_startup_intro_layer() -> void:
+	startup_intro_layer = ColorRect.new()
+	startup_intro_layer.color = Color(0.0, 0.0, 0.0, 0.84)
+	startup_intro_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	startup_intro_layer.visible = false
+	add_child(startup_intro_layer)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	startup_intro_layer.add_child(center)
+
+	var panel := _card(Color(0.035, 0.060, 0.090, 0.995), 18, 24)
+	panel.custom_minimum_size = Vector2(720, 0)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	panel.add_child(box)
+	box.add_child(_eyebrow("PRINTEMPS 1971 • LE GARAGE"))
+	var title := _label("Tout commence petit", 30)
+	box.add_child(title)
+	startup_intro_text = _label("", 15)
+	startup_intro_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(startup_intro_text)
+
+	var path_label := _muted_label(
+		"Votre chemin : petits logiciels → premier recrutement → électronique numérique → premier microprocesseur.",
+		13
+	)
+	path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(path_label)
+
+	var start_btn := Button.new()
+	start_btn.text = "Allumer la lumière du garage"
+	start_btn.custom_minimum_size.y = 50
+	start_btn.pressed.connect(_close_startup_intro)
+	box.add_child(start_btn)
+
+func _show_startup_intro() -> void:
+	if startup_intro_layer == null:
+		return
+	TimeManager.time_scale = 0.0
+	startup_intro_text.text = "Depuis des mois, vous passez vos soirées à écrire des programmes et à démonter du matériel récupéré. Un jour, vous prenez une décision : transformer votre garage en atelier et tenter votre chance.\n\nPas d'investisseur. Pas d'équipe. Pas d'usine. Vous disposez de %s € d'économies, d'un terminal d'occasion et de quelques outils. Pour aller plus loin, il faudra d'abord gagner la confiance de vrais clients." % _money(Economy.money)
+	startup_intro_layer.visible = true
+
+func _close_startup_intro() -> void:
+	if startup_intro_layer != null:
+		startup_intro_layer.visible = false
+	StartupManager.mark_intro_seen()
+	if not SimulationManager.is_game_over:
+		TimeManager.time_scale = 1.0
+
 func _create_company_tab():
 	var scroll := _tab_scroll("Entreprise")
 	var box: VBoxContainer = scroll.get_child(0)
@@ -1874,10 +2056,10 @@ func _build_setup_layer():
 	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); setup_layer.add_child(center)
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
-	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("1971. La vertical slice commence aux débuts du microprocesseur : votre petite équipe doit apprendre à concevoir, industrialiser et faire évoluer ses propres CPU avant d’ouvrir d’autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var title:=_label("Créer votre projet technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
+	var desc:=_label("1971. Vous partez seul depuis votre garage. Les premiers mois servent à décrocher des contrats logiciels, constituer une trésorerie et gagner le droit d'attaquer le matériel.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
-	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
+	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); setup_sector.visible=false; box.add_child(setup_sector)
 	setup_difficulty = OptionButton.new()
 	for difficulty_value in BalanceManager.profile_keys():
 		var difficulty := str(difficulty_value)
@@ -1890,7 +2072,7 @@ func _build_setup_layer():
 	setup_difficulty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(setup_difficulty_label)
 	_refresh_setup_difficulty()
-	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
+	var start:=Button.new(); start.text="Commencer dans le garage"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
 	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
 
 func _build_month_layer():
@@ -2471,16 +2653,10 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	# Calcul local avec le profil sélectionné, sans modifier une partie en cours.
-	var base_company := 21000
-	var base_payroll := 32800
-	var base_research := 12000
-	var projected := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
-	projected += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
-	projected += int(round(float(base_research) * float(data.get("research_cost", 1.0))))
-	var capital := int(data.get("starting_capital", 500000))
+	var projected := int(round(500.0 * float(data.get("operating_cost", 1.0)))) + int(round(900.0 * float(data.get("research_cost", 1.0))))
+	var capital := int(data.get("starting_capital", 16000))
 	var runway := float(capital) / maxf(float(projected), 1.0)
-	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois." % [
+	setup_difficulty_label.text = "%s\nÉconomies de départ : %s € • garage + petit contrat ~%s €/mois • environ %.1f mois sans nouvelle recette." % [
 		BalanceManager.profile_description(key), _money(capital), _money(projected), runway
 	]
 
@@ -2488,8 +2664,9 @@ func _start_new_game():
 	SimulationManager.reset_all(setup_name.text,_meta(setup_sector),_meta(setup_difficulty))
 	setup_layer.visible=false
 	game_over_layer.visible=false
-	status_label.text="Nora : au début, gardons seulement le QG et le Laboratoire CPU. Lancez votre premier projet pour élargir l'interface."
+	status_label.text="Objectif : décrochez vos premiers contrats logiciels depuis le garage."
 	_refresh_all()
+	_show_startup_intro()
 
 func _load_game():
 	if SaveManager.load_game():
@@ -2500,6 +2677,8 @@ func _load_game():
 			TimeManager.time_scale = 0.0
 			_on_game_over("Faillite : la trésorerie est épuisée.", {"money": Economy.money})
 		_refresh_all()
+		if not StartupManager.intro_seen:
+			_show_startup_intro()
 		_show_next_pending_research_event()
 
 func _on_save_message(ok: bool, message: String):
@@ -2607,6 +2786,11 @@ func _refresh_top():
 	var cash_color := APP_GREEN
 	if Economy.money <= 0:
 		cash_color = APP_RED
+	elif StartupManager.is_pre_cpu_phase():
+		if Economy.money < 3000:
+			cash_color = APP_RED
+		elif Economy.money < 8000:
+			cash_color = APP_AMBER
 	elif Economy.money < 75000:
 		cash_color = APP_RED
 	elif Economy.money < 175000:
@@ -2651,6 +2835,7 @@ func _refresh_navigation_progression():
 func _refresh_dashboard():
 	if dashboard_label == null:
 		return
+	_refresh_startup_dashboard()
 	if not CompanyManager.created:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
@@ -2673,6 +2858,15 @@ func _refresh_dashboard():
 			if dashboard_chip.has_method("set_identity"):
 				dashboard_chip.call("set_identity", {"package_style":"CLASSIC","accent":"CYAN"})
 		return
+
+	if StartupManager.is_pre_cpu_phase():
+		dashboard_grid.visible = false
+		dashboard_details_toggle.visible = false
+		dashboard_details_container.visible = false
+		return
+
+	dashboard_grid.visible = true
+	dashboard_details_toggle.visible = true
 
 	var active_project: Dictionary = {}
 	for project in ResearchManager.projects:
@@ -3149,6 +3343,8 @@ func _start_cpu_concept_program():
 func _refresh_research():
 	if tech_label == null:
 		return
+	if lab_startup_roadmap_label != null:
+		lab_startup_roadmap_label.text = _startup_roadmap_text() + "\n\nBase de travail actuelle : 10 µm • fréquence et thermique limitées par votre petite équipe. Les réglages verts sont maîtrisés, les réglages orange sont ambitieux."
 	if rd_segment != null:
 		_refresh_segment_options(rd_segment)
 	_refresh_cpu_node_options()
