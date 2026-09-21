@@ -14,7 +14,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Un petit outil sur terminal pour suivre entrées, sorties et inventaire.",
 		"duration_months":2,
 		"monthly_cost":700,
-		"reward":4200,
+		"reward":6500,
 		"reputation":1.5
 	},
 	"INVOICING": {
@@ -22,7 +22,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Saisie clients, factures et historique sur terminal.",
 		"duration_months":2,
 		"monthly_cost":900,
-		"reward":5600,
+		"reward":8500,
 		"reputation":2.0
 	},
 	"INDUSTRIAL_LOG": {
@@ -30,7 +30,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Enregistrement des incidents et temps de cycle d'un petit atelier.",
 		"duration_months":3,
 		"monthly_cost":1200,
-		"reward":8200,
+		"reward":12000,
 		"reputation":3.0
 	}
 }
@@ -39,7 +39,7 @@ const ELECTRONICS_PROJECT := {
 	"title":"Contrôleur logique expérimental",
 	"description":"Une petite carte électronique programmable qui vous fait passer du logiciel au matériel.",
 	"duration_months":3,
-	"monthly_cost":2600
+	"monthly_cost":1600
 }
 
 var stage := STAGE_GARAGE
@@ -164,10 +164,11 @@ func process_month() -> void:
 		electronics_project["remaining_months"] = maxi(int(electronics_project.get("remaining_months", 1)) - 1, 0)
 		if int(electronics_project.remaining_months) <= 0:
 			electronics_project = {}
+			Economy.add_income(40000, "Avance client — premier microprocesseur")
 			cpu_program_unlocked = true
 			stage = STAGE_CPU_READY
 			CompanyManager.change_reputation({"innovation":4.0})
-			CompanyManager.add_alert("Prototype validé : vous maîtrisez enfin assez d'électronique numérique pour ouvrir un programme CPU.")
+			CompanyManager.add_alert("Prototype validé. Un client industriel avance 40 000 € pour étudier un premier microprocesseur dédié.")
 			milestone_unlocked.emit("Programme CPU débloqué", "Le laboratoire CPU devient disponible.")
 			startup_changed.emit()
 
