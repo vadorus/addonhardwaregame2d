@@ -197,6 +197,16 @@ var dashboard_metric_c: Label
 var dashboard_action_button: Button
 var dashboard_cto_button: Button
 var dashboard_target_tab := 3
+var startup_intro_layer: Control
+var startup_intro_text: Label
+var startup_dashboard_panel: PanelContainer
+var startup_summary_label: Label
+var startup_progress_label: Label
+var startup_contract_select: OptionButton
+var startup_contract_hint: Label
+var startup_action_button: Button
+var startup_roadmap_label: Label
+var lab_startup_roadmap_label: Label
 var _refresh_pending := false
 
 func _ready():
@@ -239,6 +249,8 @@ func _connect_signals():
 	PersonnelManager.staff_changed.connect(_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
 	ExecutiveManager.executive_changed.connect(_refresh_all)
+	StartupManager.startup_changed.connect(_refresh_all)
+	StartupManager.milestone_unlocked.connect(_on_startup_milestone)
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
@@ -397,6 +409,7 @@ func _build_ui():
 	_create_media_tab()
 	_on_tab_changed(tabs.current_tab)
 	_build_setup_layer()
+	_build_startup_intro_layer()
 	_build_month_layer()
 	_build_game_over_layer()
 	_build_research_event_layer()
@@ -415,7 +428,9 @@ func _create_dashboard_tab():
 	heading_copy.add_child(_eyebrow("BUREAU DU FONDATEUR"))
 	var title := _label("Votre prochaine décision", 29)
 	heading_copy.add_child(title)
-	heading_copy.add_child(_muted_label("Le bureau reste au centre. Nora et votre projet vous montrent seulement ce qui mérite votre attention maintenant.", 13))
+	heading_copy.add_child(_muted_label("Commencez petit. Chaque nouveau panneau doit être gagné par votre progression.", 13))
+
+	_build_startup_dashboard(box)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -791,6 +806,16 @@ func _create_research_tab():
 	lab_wizard_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(lab_wizard_status_label)
 
+	var tech_status_card := _card(Color(0.030, 0.055, 0.085, 0.96), 11, 11)
+	box.add_child(tech_status_card)
+	var tech_status_box := VBoxContainer.new()
+	tech_status_box.add_theme_constant_override("separation", 5)
+	tech_status_card.add_child(tech_status_box)
+	tech_status_box.add_child(_eyebrow("TECHNOLOGIES DISPONIBLES"))
+	lab_startup_roadmap_label = _muted_label("", 12)
+	lab_startup_roadmap_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tech_status_box.add_child(lab_startup_roadmap_label)
+
 	lab_layout_grid = GridContainer.new()
 	lab_layout_grid.columns = 2
 	lab_layout_grid.add_theme_constant_override("h_separation", 12)
@@ -814,7 +839,7 @@ func _create_research_tab():
 	_fill_segment_options(rd_segment)
 	_select_meta(rd_segment, MarketManager.default_segment())
 	rd_segment.item_selected.connect(func(_index): _refresh_cpu_preview())
-	_add_labeled_control(configuration_box, "Client cible", rd_segment)
+	_add_labeled_control(configuration_box, "Usage visé du CPU", rd_segment)
 
 	rd_approach = OptionButton.new()
 	_fill_approach_options(rd_approach)
@@ -826,7 +851,7 @@ func _create_research_tab():
 	rd_focus.item_selected.connect(func(_index): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Priorité de l'équipe", rd_focus)
 
-	rd_budget = _spin(10000, 250000, 2500, 45000)
+	rd_budget = _spin(5000, 150000, 1000, 8000)
 	rd_budget.value_changed.connect(func(_value): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
 
