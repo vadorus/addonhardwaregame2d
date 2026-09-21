@@ -51,6 +51,144 @@ var first_engineer_hired := false
 var electronics_project: Dictionary = {}
 var cpu_program_unlocked := false
 
+const WORK_SESSION_COOLDOWN_DAYS := 7
+
+func _absolute_day() -> int:
+	return maxi((TimeManager.year - 1971) * 360 + (TimeManager.month - 1) * 30 + TimeManager.day, 1)
+
+func _ensure_contract_runtime_fields() -> void:
+	if active_contract.is_empty():
+		return
+	var total_months := maxi(int(active_contract.get("total_months", 1)), 1)
+	var remaining_months := clampi(int(active_contract.get("remaining_months", total_months)), 0, total_months)
+	if not active_contract.has("progress"):
+		active_contract["progress"] = clampf(float(total_months - remaining_months) / float(total_months) * 100.0, 0.0, 99.0)
+	if not active_contract.has("quality"):
+		active_contract["quality"] = 50.0
+	if not active_contract.has("client_confidence"):
+		active_contract["client_confidence"] = 50.0
+	if not active_contract.has("last_work_day"):
+		active_contract["last_work_day"] = _absolute_day() - WORK_SESSION_COOLDOWN_DAYS
+
+func _ensure_electronics_runtime_fields() -> void:
+	if electronics_project.is_empty():
+		return
+	var total_months := maxi(int(electronics_project.get("total_months", 1)), 1)
+	var remaining_months := clampi(int(electronics_project.get("remaining_months", total_months)), 0, total_months)
+	if not electronics_project.has("progress"):
+		electronics_project["progress"] = clampf(float(total_months - remaining_months) / float(total_months) * 100.0, 0.0, 99.0)
+	if not electronics_project.has("quality"):
+		electronics_project["quality"] = 45.0
+	if not electronics_project.has("last_work_day"):
+		electronics_project["last_work_day"] = _absolute_day() - WORK_SESSION_COOLDOWN_DAYS
+
+func work_session_available() -> bool:
+	var data: Dictionary = active_contract if not active_contract.is_empty() else electronics_project
+	if data.is_empty():
+		return false
+	var last_work_day := int(data.get("last_work_day", _absolute_day() - WORK_SESSION_COOLDOWN_DAYS))
+	return _absolute_day() - last_work_day >= WORK_SESSION_COOLDOWN_DAYS
+
+func days_until_next_work_session() -> int:
+	var data: Dictionary = active_contract if not active_contract.is_empty() else electronics_project
+	if data.is_empty():
+		return 0
+	var last_work_day := int(data.get("last_work_day", _absolute_day() - WORK_SESSION_COOLDOWN_DAYS))
+	return maxi(WORK_SESSION_COOLDOWN_DAYS - (_absolute_day() - last_work_day), 0)
+
+func perform_work_session(action: String) -> bool:
+	if not work_session_available():
+		return false
+	if not active_contract.is_empty():
+		_ensure_contract_runtime_fields()
+		match action:
+			"BUILD":
+				active_contract["progress"] = minf(float(active_contract.progress) + 18.0, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 1.5, 0.0, 100.0)
+			"TEST":
+				active_contract["progress"] = minf(float(active_contract.progress) + 9.0, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 8.0, 0.0, 100.0)
+			"CLIENT":
+				active_contract["progress"] = minf(float(active_contract.progress) + 6.0, 100.0)
+				active_contract["client_confidence"] = clampf(float(active_contract.client_confidence) + 10.0, 0.0, 100.0)
+				active_contract["quality"] = clampf(float(active_contract.quality) + 3.0, 0.0, 100.0)
+			_:
+				return false
+		active_contract["last_work_day"] = _absolute_day()
+		_update_contract_remaining_months()
+		if float(active_contract.progress) >= 100.0:
+			_complete_active_contract()
+		startup_changed.emit()
+		return true
+
+	if not electronics_project.is_empty():
+		_ensure_electronics_runtime_fields()
+		match action:
+			"BUILD":
+				electronics_project["progress"] = minf(float(electronics_project.progress) + 16.0, 100.0)
+			"TEST":
+				electronics_project["progress"] = minf(float(electronics_project.progress) + 9.0, 100.0)
+				electronics_project["quality"] = clampf(float(electronics_project.quality) + 9.0, 0.0, 100.0)
+			"CLIENT":
+				electronics_project["progress"] = minf(float(electronics_project.progress) + 7.0, 100.0)
+				electronics_project["quality"] = clampf(float(electronics_project.quality) + 5.0, 0.0, 100.0)
+			_:
+				return false
+		electronics_project["last_work_day"] = _absolute_day()
+		_update_electronics_remaining_months()
+		if float(electronics_project.progress) >= 100.0:
+			_complete_electronics_project()
+		startup_changed.emit()
+		return true
+	return false
+
+func _update_contract_remaining_months() -> void:
+	if active_contract.is_empty():
+		return
+	var total_months := maxi(int(active_contract.get("total_months", 1)), 1)
+	var monthly_progress := 100.0 / float(total_months)
+	active_contract["remaining_months"] = maxi(int(ceil((100.0 - float(active_contract.get("progress", 0.0))) / monthly_progress)), 0)
+
+func _update_electronics_remaining_months() -> void:
+	if electronics_project.is_empty():
+		return
+	var total_months := maxi(int(electronics_project.get("total_months", 1)), 1)
+	var monthly_progress := 100.0 / float(total_months)
+	electronics_project["remaining_months"] = maxi(int(ceil((100.0 - float(electronics_project.get("progress", 0.0))) / monthly_progress)), 0)
+
+func _complete_active_contract() -> void:
+	if active_contract.is_empty():
+		return
+	var quality := float(active_contract.get("quality", 50.0))
+	var client_confidence := float(active_contract.get("client_confidence", 50.0))
+	var reward_multiplier := clampf(0.90 + quality / 500.0 + client_confidence / 1000.0, 0.90, 1.20)
+	var reward := int(round(float(active_contract.get("reward", 0)) * reward_multiplier))
+	var reputation_gain := float(active_contract.get("reputation", 0.0)) * lerpf(0.85, 1.25, quality / 100.0)
+	var contract_id := str(active_contract.get("id", ""))
+	var title := str(active_contract.get("title", "Logiciel"))
+	Economy.add_income(reward, "Contrat logiciel livré")
+	CompanyManager.change_reputation({"professional":reputation_gain, "reliability":reputation_gain * 0.5})
+	if not completed_contract_ids.has(contract_id):
+		completed_contract_ids.append(contract_id)
+	software_contracts_completed += 1
+	CompanyManager.add_alert("Contrat livré : %s. Qualité %.0f/100 • paiement %d €." % [title, quality, reward])
+	active_contract = {}
+	if software_contracts_completed >= 2:
+		stage = STAGE_FIRST_HIRE
+		milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre.")
+
+func _complete_electronics_project() -> void:
+	if electronics_project.is_empty():
+		return
+	var quality := float(electronics_project.get("quality", 45.0))
+	electronics_project = {}
+	Economy.add_income(40000, "Avance client — premier microprocesseur")
+	cpu_program_unlocked = true
+	stage = STAGE_CPU_READY
+	CompanyManager.change_reputation({"innovation":4.0 + quality / 50.0})
+	CompanyManager.add_alert("Prototype validé. Un client industriel avance 40 000 € pour étudier un premier microprocesseur dédié.")
+	milestone_unlocked.emit("Programme CPU débloqué", "Le laboratoire CPU devient disponible.")
+
 func reset() -> void:
 	stage = STAGE_GARAGE
 	intro_seen = false
@@ -100,7 +238,11 @@ func start_software_contract(contract_id: String) -> bool:
 		"total_months":int(data.duration_months),
 		"monthly_cost":int(data.monthly_cost),
 		"reward":int(data.reward),
-		"reputation":float(data.reputation)
+		"reputation":float(data.reputation),
+		"progress":0.0,
+		"quality":50.0,
+		"client_confidence":50.0,
+		"last_work_day":_absolute_day() - WORK_SESSION_COOLDOWN_DAYS
 	}
 	CompanyManager.add_alert("Garage : contrat lancé — %s." % str(data.title))
 	startup_changed.emit()
@@ -131,7 +273,10 @@ func start_electronics_project() -> bool:
 		"title":str(ELECTRONICS_PROJECT.title),
 		"remaining_months":int(ELECTRONICS_PROJECT.duration_months),
 		"total_months":int(ELECTRONICS_PROJECT.duration_months),
-		"monthly_cost":int(ELECTRONICS_PROJECT.monthly_cost)
+		"monthly_cost":int(ELECTRONICS_PROJECT.monthly_cost),
+		"progress":0.0,
+		"quality":45.0,
+		"last_work_day":_absolute_day() - WORK_SESSION_COOLDOWN_DAYS
 	}
 	CompanyManager.add_alert("Atelier : prototype lancé — %s." % str(ELECTRONICS_PROJECT.title))
 	startup_changed.emit()
@@ -139,53 +284,43 @@ func start_electronics_project() -> bool:
 
 func process_month() -> void:
 	if not active_contract.is_empty():
+		_ensure_contract_runtime_fields()
 		var cost := int(active_contract.get("monthly_cost", 0))
 		Economy.add_expense(cost, "Contrat logiciel — développement")
-		active_contract["remaining_months"] = maxi(int(active_contract.get("remaining_months", 1)) - 1, 0)
-		if int(active_contract.remaining_months) <= 0:
-			var reward := int(active_contract.get("reward", 0))
-			var reputation_gain := float(active_contract.get("reputation", 0.0))
-			var contract_id := str(active_contract.get("id", ""))
-			Economy.add_income(reward, "Contrat logiciel livré")
-			CompanyManager.change_reputation({"professional":reputation_gain, "reliability":reputation_gain * 0.5})
-			if not completed_contract_ids.has(contract_id):
-				completed_contract_ids.append(contract_id)
-			software_contracts_completed += 1
-			CompanyManager.add_alert("Contrat livré : %s. Paiement reçu : %d €." % [str(active_contract.get("title", "Logiciel")), reward])
-			active_contract = {}
-			if software_contracts_completed >= 2:
-				stage = STAGE_FIRST_HIRE
-				milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre.")
+		var total_months := maxi(int(active_contract.get("total_months", 1)), 1)
+		active_contract["progress"] = minf(float(active_contract.get("progress", 0.0)) + 100.0 / float(total_months), 100.0)
+		_update_contract_remaining_months()
+		if float(active_contract.get("progress", 0.0)) >= 100.0:
+			_complete_active_contract()
 		startup_changed.emit()
 
 	if not electronics_project.is_empty():
+		_ensure_electronics_runtime_fields()
 		var electronics_cost := int(electronics_project.get("monthly_cost", 0))
 		Economy.add_expense(electronics_cost, "Prototype électronique")
-		electronics_project["remaining_months"] = maxi(int(electronics_project.get("remaining_months", 1)) - 1, 0)
-		if int(electronics_project.remaining_months) <= 0:
-			electronics_project = {}
-			Economy.add_income(40000, "Avance client — premier microprocesseur")
-			cpu_program_unlocked = true
-			stage = STAGE_CPU_READY
-			CompanyManager.change_reputation({"innovation":4.0})
-			CompanyManager.add_alert("Prototype validé. Un client industriel avance 40 000 € pour étudier un premier microprocesseur dédié.")
-			milestone_unlocked.emit("Programme CPU débloqué", "Le laboratoire CPU devient disponible.")
-			startup_changed.emit()
+		var total_months := maxi(int(electronics_project.get("total_months", 1)), 1)
+		electronics_project["progress"] = minf(float(electronics_project.get("progress", 0.0)) + 100.0 / float(total_months), 100.0)
+		_update_electronics_remaining_months()
+		if float(electronics_project.get("progress", 0.0)) >= 100.0:
+			_complete_electronics_project()
+		startup_changed.emit()
 
 func current_objective() -> Dictionary:
 	if not active_contract.is_empty():
+		_ensure_contract_runtime_fields()
 		return {
 			"title":str(active_contract.get("title", "Contrat logiciel")),
-			"text":"Terminez ce contrat pour construire votre réputation et votre trésorerie.",
-			"progress":"%d mois restant(s)" % int(active_contract.get("remaining_months", 0)),
-			"action":""
+			"text":"Le contrat avance avec le temps, mais vos sessions de travail peuvent accélérer le développement et améliorer la qualité.",
+			"progress":"Avancement %.0f%% • qualité %.0f/100 • %d mois estimé(s)" % [float(active_contract.get("progress", 0.0)), float(active_contract.get("quality", 50.0)), int(active_contract.get("remaining_months", 0))],
+			"action":"WORK_CONTRACT"
 		}
 	if not electronics_project.is_empty():
+		_ensure_electronics_runtime_fields()
 		return {
 			"title":str(electronics_project.get("title", "Prototype électronique")),
-			"text":"Votre premier travail matériel prépare l'ouverture du programme CPU.",
-			"progress":"%d mois restant(s)" % int(electronics_project.get("remaining_months", 0)),
-			"action":""
+			"text":"Assemblez, mesurez et documentez le prototype. Le temps seul le fera avancer, mais vos décisions influencent sa qualité.",
+			"progress":"Avancement %.0f%% • qualité %.0f/100 • %d mois estimé(s)" % [float(electronics_project.get("progress", 0.0)), float(electronics_project.get("quality", 45.0)), int(electronics_project.get("remaining_months", 0))],
+			"action":"WORK_ELECTRONICS"
 		}
 	match stage:
 		STAGE_GARAGE:
@@ -262,7 +397,9 @@ func load_state(state: Dictionary) -> void:
 	for item in state.get("completed_contract_ids", []):
 		completed_contract_ids.append(str(item))
 	active_contract = state.get("active_contract", {}).duplicate(true)
+	_ensure_contract_runtime_fields()
 	first_engineer_hired = bool(state.get("first_engineer_hired", false))
 	electronics_project = state.get("electronics_project", {}).duplicate(true)
+	_ensure_electronics_runtime_fields()
 	cpu_program_unlocked = bool(state.get("cpu_program_unlocked", false))
 	startup_changed.emit()
