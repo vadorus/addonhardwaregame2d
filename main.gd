@@ -39,6 +39,11 @@ var month_nora_label: Label
 var month_report_label: Label
 var game_over_layer: Control
 var game_over_label: Label
+var system_menu_layer: Control
+var system_menu_panel: PanelContainer
+var system_menu_status_label: Label
+var system_menu_fullscreen: CheckButton
+var _system_menu_previous_time_scale := 1.0
 var research_event_layer: Control
 var research_event_label: Label
 var active_research_event_id := ""
@@ -195,6 +200,7 @@ var dashboard_target_tab := 3
 var _refresh_pending := false
 
 func _ready():
+	set_process_unhandled_input(true)
 	theme = _create_app_theme()
 	_build_ui()
 	_connect_signals()
@@ -204,10 +210,20 @@ func _ready():
 	call_deferred("_update_responsive_layout")
 
 func _notification(what: int) -> void:
-	if not CompanyManager.created:
+	if what == NOTIFICATION_APPLICATION_PAUSED:
+		if CompanyManager.created:
+			SaveManager.save_game()
 		return
-	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_WM_GO_BACK_REQUEST]:
-		SaveManager.save_game()
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if system_menu_layer != null and system_menu_layer.visible:
+			_close_system_menu()
+		elif CompanyManager.created:
+			_open_system_menu()
+		return
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if CompanyManager.created:
+			SaveManager.save_game()
+		get_tree().quit()
 
 func _on_day_changed(day: int, month: int, year: int) -> void:
 	if date_label != null:
@@ -342,6 +358,12 @@ func _build_ui():
 	load_btn.pressed.connect(_load_game)
 	top.add_child(load_btn)
 
+	var menu_btn := Button.new()
+	menu_btn.text = "Menu"
+	menu_btn.custom_minimum_size.y = 38
+	menu_btn.pressed.connect(_open_system_menu)
+	top.add_child(menu_btn)
+
 	var nav_panel := _card(APP_SHELL, 12, 6)
 	root_box.add_child(nav_panel)
 	var nav_scroll := ScrollContainer.new()
@@ -378,6 +400,7 @@ func _build_ui():
 	_build_month_layer()
 	_build_game_over_layer()
 	_build_research_event_layer()
+	_build_system_menu_layer()
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -1927,6 +1950,136 @@ func _build_month_layer():
 	cont.custom_minimum_size.y = 48
 	cont.pressed.connect(_close_month_report)
 	box.add_child(cont)
+
+func _build_system_menu_layer() -> void:
+	system_menu_layer = ColorRect.new()
+	system_menu_layer.name = "SystemMenuLayer"
+	system_menu_layer.color = Color(0.0, 0.0, 0.0, 0.78)
+	system_menu_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	system_menu_layer.visible = false
+	system_menu_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(system_menu_layer)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	system_menu_layer.add_child(center)
+
+	system_menu_panel = _card(Color(0.035, 0.060, 0.095, 0.99), 16, 20)
+	system_menu_panel.custom_minimum_size = Vector2(460, 0)
+	center.add_child(system_menu_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	system_menu_panel.add_child(box)
+
+	box.add_child(_eyebrow("MENU DU JEU"))
+	var title := _label("Tech Empire", 26)
+	box.add_child(title)
+	var hint := _muted_label("La partie est en pause tant que ce menu est ouvert.", 12)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+
+	var continue_btn := Button.new()
+	continue_btn.text = "Continuer"
+	continue_btn.custom_minimum_size.y = 46
+	continue_btn.pressed.connect(_close_system_menu)
+	box.add_child(continue_btn)
+
+	var save_btn := Button.new()
+	save_btn.text = "Sauvegarder la partie"
+	save_btn.custom_minimum_size.y = 46
+	save_btn.pressed.connect(_system_menu_save)
+	box.add_child(save_btn)
+
+	var load_btn := Button.new()
+	load_btn.text = "Charger la sauvegarde actuelle"
+	load_btn.custom_minimum_size.y = 44
+	load_btn.pressed.connect(_system_menu_load)
+	box.add_child(load_btn)
+
+	if not OS.has_feature("mobile"):
+		system_menu_fullscreen = CheckButton.new()
+		system_menu_fullscreen.text = "Plein écran"
+		system_menu_fullscreen.button_pressed = bool(SettingsManager.get_setting("display", "fullscreen"))
+		system_menu_fullscreen.custom_minimum_size.y = 42
+		system_menu_fullscreen.toggled.connect(func(enabled: bool): SettingsManager.set_fullscreen(enabled))
+		box.add_child(system_menu_fullscreen)
+
+	var main_menu_btn := Button.new()
+	main_menu_btn.text = "Sauvegarder et revenir au menu principal"
+	main_menu_btn.custom_minimum_size.y = 46
+	main_menu_btn.pressed.connect(_save_and_return_to_main_menu)
+	box.add_child(main_menu_btn)
+
+	if not OS.has_feature("mobile"):
+		var quit_btn := Button.new()
+		quit_btn.text = "Sauvegarder et quitter le jeu"
+		quit_btn.custom_minimum_size.y = 46
+		quit_btn.add_theme_color_override("font_color", APP_AMBER)
+		quit_btn.pressed.connect(_save_and_quit_game)
+		box.add_child(quit_btn)
+
+	system_menu_status_label = _muted_label("", 12)
+	system_menu_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(system_menu_status_label)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	if system_menu_layer != null and system_menu_layer.visible:
+		_close_system_menu()
+		return
+	if month_layer != null and month_layer.visible:
+		return
+	if research_event_layer != null and research_event_layer.visible:
+		return
+	if game_over_layer != null and game_over_layer.visible:
+		return
+	if setup_layer != null and setup_layer.visible:
+		return
+	_open_system_menu()
+
+func _open_system_menu() -> void:
+	if system_menu_layer == null or system_menu_layer.visible:
+		return
+	_system_menu_previous_time_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	if system_menu_fullscreen != null:
+		system_menu_fullscreen.set_pressed_no_signal(bool(SettingsManager.get_setting("display", "fullscreen")))
+	system_menu_status_label.text = ""
+	system_menu_layer.visible = true
+
+func _close_system_menu() -> void:
+	if system_menu_layer == null:
+		return
+	system_menu_layer.visible = false
+	if not SimulationManager.is_game_over:
+		TimeManager.time_scale = _system_menu_previous_time_scale
+
+func _system_menu_save() -> void:
+	var ok := SaveManager.save_game()
+	system_menu_status_label.text = "✓ Partie sauvegardée." if ok else "⚠ Impossible de sauvegarder cette partie."
+
+func _system_menu_load() -> void:
+	if SaveManager.load_game():
+		system_menu_status_label.text = "✓ Sauvegarde chargée."
+		_refresh_all()
+	else:
+		system_menu_status_label.text = "⚠ Aucune sauvegarde valide à charger."
+
+func _save_and_return_to_main_menu() -> void:
+	if CompanyManager.created and not SaveManager.save_game():
+		system_menu_status_label.text = "⚠ Sauvegarde impossible : retour au menu annulé."
+		return
+	TimeManager.time_scale = 0.0
+	get_tree().change_scene_to_file("res://ui/MainMenuV031.tscn")
+
+func _save_and_quit_game() -> void:
+	if CompanyManager.created and not SaveManager.save_game():
+		system_menu_status_label.text = "⚠ Sauvegarde impossible : fermeture annulée."
+		return
+	get_tree().quit()
 
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
