@@ -11,7 +11,7 @@ const SAVE_VERSION := 23
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
 const STATE_SECTIONS := [
-	"time", "balance", "economy", "company", "divisions", "personnel",
+	"time", "balance", "startup", "economy", "company", "divisions", "personnel",
 	"executive", "research", "foundry", "production", "patents",
 	"products", "after_sales", "market", "media"
 ]
@@ -302,6 +302,7 @@ func _build_state(slot_id: String, slot_name: String) -> Dictionary:
 		},
 		"time": TimeManager.get_state(),
 		"balance": BalanceManager.get_state(),
+		"startup": StartupManager.get_state(),
 		"economy": Economy.get_state(),
 		"company": CompanyManager.get_state(),
 		"divisions": DivisionManager.get_state(),
@@ -359,6 +360,7 @@ func _apply_state(state: Dictionary) -> bool:
 	CompanyManager.load_state(state.get("company", {}))
 	TimeManager.load_state(state.get("time", {}))
 	BalanceManager.load_state(state.get("balance", {"active_profile":"STANDARD"}))
+	StartupManager.load_state(state.get("startup", {}))
 	DivisionManager.load_state(state.get("divisions", {}))
 	Economy.load_state(state.get("economy", {}))
 	PersonnelManager.load_state(state.get("personnel", {}))
