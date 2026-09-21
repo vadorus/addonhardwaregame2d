@@ -20,6 +20,63 @@ func _ready() -> void:
 	if DivisionManager.delegation_available("CPU"):
 		_fail("Division delegation should stay hidden during the initial garage phase")
 		return
+	if not PersonnelManager.staff.is_empty():
+		_fail("A new garage game must start with the founder alone")
+		return
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("QG") or ExecutiveManager.is_interface_feature_unlocked("LAB"):
+		_fail("The garage must expose only the QG before electronics milestones")
+		return
+	if Economy.money != BalanceManager.starting_capital():
+		_fail("Garage starting cash does not match the selected difficulty")
+		return
+
+	if not StartupManager.start_software_contract("STOCK"):
+		_fail("Could not start the first garage software contract")
+		return
+	SimulationManager.process_month_end()
+	SimulationManager.process_month_end()
+	if StartupManager.software_contracts_completed != 1:
+		_fail("First garage software contract did not complete")
+		return
+	if not StartupManager.start_software_contract("INVOICING"):
+		_fail("Could not start the second garage software contract")
+		return
+	SimulationManager.process_month_end()
+	SimulationManager.process_month_end()
+	if StartupManager.stage != StartupManager.STAGE_FIRST_HIRE:
+		_fail("Two delivered software contracts did not unlock the first hire")
+		return
+	if not StartupManager.hire_first_engineer() or PersonnelManager.staff.size() != 1:
+		_fail("First startup engineer could not be hired")
+		return
+	if not StartupManager.start_electronics_project():
+		_fail("Electronics prototype could not start")
+		return
+	for _month in range(3):
+		SimulationManager.process_month_end()
+	if not StartupManager.cpu_program_unlocked:
+		_fail("Electronics prototype did not unlock the CPU program")
+		return
+	ExecutiveManager.sync_interface_unlocks()
+	if not ExecutiveManager.is_interface_feature_unlocked("LAB"):
+		_fail("CPU Lab did not unlock after the electronics prototype")
+		return
+
+	# À partir d'ici, le smoke test prépare une équipe mûre afin de conserver
+	# la couverture des anciens systèmes de management, production et marché.
+	PersonnelManager._add_employee("CI R&D 2", "Ingénieur R&D", "R&D", 65, 4.0, "cpu", 48, 3200)
+	PersonnelManager._add_employee("CI Dev 1", "Ingénieur développement", "Développement", 62, 3.0, "product", 46, 3000)
+	PersonnelManager._add_employee("CI Dev 2", "Ingénieur validation", "Développement", 60, 2.5, "validation", 42, 2900)
+	PersonnelManager._add_employee("CI Production", "Responsable production", "Production", 63, 5.0, "manufacturing", 60, 3300)
+	PersonnelManager._add_employee("CI Marketing", "Responsable marketing", "Marketing", 58, 4.0, "marketing", 55, 3000)
+	PersonnelManager._add_employee("CI Support", "Responsable support", "Support", 57, 4.0, "support", 52, 2900)
+	CompanyManager.set_department_leader("R&D", str(PersonnelManager.staff[0].id))
+	CompanyManager.set_department_leader("Développement", str(PersonnelManager.staff[2].id))
+	CompanyManager.set_department_leader("Production", str(PersonnelManager.staff[4].id))
+	CompanyManager.set_department_leader("Marketing", str(PersonnelManager.staff[5].id))
+	CompanyManager.set_department_leader("Support", str(PersonnelManager.staff[6].id))
+	Economy.reset(500000)
 
 	var division_initial_state := DivisionManager.get_state().duplicate(true)
 	var delegation_company_state := CompanyManager.get_state().duplicate(true)
@@ -141,8 +198,8 @@ func _ready() -> void:
 	if not (accessible_market_units > standard_market_units and standard_market_units > realistic_market_units):
 		_fail("Difficulty profiles do not change available market demand")
 		return
-	if accessible_capital <= 500000 or realistic_capital >= 500000:
-		_fail("Difficulty profiles do not change starting liquidity")
+	if not (accessible_capital > standard_capital and standard_capital > realistic_capital):
+		_fail("Difficulty profiles do not change garage starting liquidity")
 		return
 	if accessible_runway <= standard_runway or realistic_runway >= standard_runway:
 		_fail("Difficulty profiles do not create distinct starting runway pressure")
@@ -190,7 +247,7 @@ func _ready() -> void:
 	ResearchManager.load_state(market_research_probe)
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
-		_fail("Garage onboarding did not expose QG and CPU Lab")
+		_fail("Progressed startup did not expose QG and CPU Lab")
 		return
 	for locked_feature in ["COMPANY","TEAM","PRODUCTS","MARKET","PRESS"]:
 		if ExecutiveManager.is_interface_feature_unlocked(locked_feature):
