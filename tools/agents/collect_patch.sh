@@ -4,6 +4,12 @@ set -Eeuo pipefail
 workspace="${GITHUB_WORKSPACE:-$(pwd)}"
 cd "$workspace"
 
+# L'agent ne doit jamais pouvoir transformer une configuration Git locale
+# en exécution de code sur le runner lors de la collecte.
+g() {
+  command git -c core.fsmonitor=false -c core.hooksPath=/dev/null "$@"
+}
+
 output_dir=".agent-output"
 mkdir -p "$output_dir"
 : > "$output_dir/validation.txt"
@@ -16,7 +22,7 @@ fail_validation() {
   exit 2
 }
 
-actual_base="$(git rev-parse HEAD)"
+actual_base="$(g rev-parse HEAD)"
 expected_base="${EXPECTED_BASE_SHA:-${GITHUB_SHA:-}}"
 if [[ -z "$expected_base" || ! "$expected_base" =~ ^[0-9a-f]{40}$ ]]; then
   fail_validation "SHA de départ absent ou invalide"
@@ -26,17 +32,17 @@ if [[ "$actual_base" != "$expected_base" ]]; then
 fi
 
 # Ignore tout changement d'index laissé par l'agent sans toucher aux fichiers de travail.
-git reset --quiet
+g reset --quiet
 
 # Rend les nouveaux fichiers visibles dans git diff sans ajouter leur contenu à l'index.
 while IFS= read -r -d '' file; do
   case "$file" in
     .agent-output/*|.agent-runtime/*) continue ;;
   esac
-  git add --intent-to-add -- "$file"
-done < <(git ls-files --others --exclude-standard -z)
+  g add --intent-to-add -- "$file"
+done < <(g ls-files --others --exclude-standard -z)
 
-mapfile -d '' changed_files < <(git diff --name-only --no-ext-diff -z)
+mapfile -d '' changed_files < <(g diff --name-only --no-ext-diff -z)
 if [[ ${#changed_files[@]} -eq 0 ]]; then
   fail_validation "aucune modification de projet n'a été produite"
 fi
@@ -64,12 +70,12 @@ for file in "${changed_files[@]}"; do
   printf '%s\n' "$file" >> "$output_dir/changed-files.txt"
 done
 
-if ! git diff --check --no-ext-diff; then
+if ! g diff --check --no-ext-diff; then
   fail_validation "le patch contient des erreurs d'espaces ou des marqueurs de conflit"
 fi
 
-git diff --stat --no-ext-diff > "$output_dir/diff-stat.txt"
-git diff --binary --full-index --no-ext-diff > "$output_dir/changes.patch"
+g diff --stat --no-ext-diff > "$output_dir/diff-stat.txt"
+g diff --binary --full-index --no-ext-diff > "$output_dir/changes.patch"
 
 {
   printf 'base_sha=%s\n' "$actual_base"
