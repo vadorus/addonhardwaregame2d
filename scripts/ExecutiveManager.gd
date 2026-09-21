@@ -59,7 +59,7 @@ var _next_hr_issue_id := 1
 var months_operated := 0
 var interface_unlocks := {
 	"QG":true,
-	"LAB":true,
+	"LAB":false,
 	"COMPANY":false,
 	"TEAM":false,
 	"PRODUCTS":false,
@@ -76,7 +76,7 @@ func reset():
 	months_operated = 0
 	interface_unlocks = {
 		"QG":true,
-		"LAB":true,
+		"LAB":false,
 		"COMPANY":false,
 		"TEAM":false,
 		"PRODUCTS":false,
@@ -117,8 +117,9 @@ func sync_interface_unlocks() -> Array:
 				has_market_history = true
 
 	var rules := {
-		"TEAM":has_project or has_production or has_products,
-		"COMPANY":months_operated >= 1 or not get_open_hr_issues().is_empty() or int(workplace.get("tier", 0)) > 0,
+		"LAB":StartupManager.cpu_program_unlocked,
+		"TEAM":StartupManager.first_engineer_hired or has_project or has_production or has_products,
+		"COMPANY":StartupManager.first_engineer_hired or months_operated >= 1 or not get_open_hr_issues().is_empty() or int(workplace.get("tier", 0)) > 0,
 		"PRODUCTS":has_production or has_products,
 		"MARKET":has_launched_product,
 		"PRESS":has_public_product_feedback or has_market_history
@@ -150,11 +151,11 @@ func interface_feature_info(feature: String) -> Dictionary:
 		"QG":
 			return {"label":"QG","message":"Votre point d'entrée : une priorité à la fois."}
 		"LAB":
-			return {"label":"Laboratoire CPU","message":"Commencez par construire et comprendre votre premier processeur."}
+			return {"label":"Laboratoire CPU","message":"Votre atelier électronique est prêt : vous pouvez désormais concevoir un processeur."}
 		"TEAM":
-			return {"label":"Équipe","message":"Le projet est lancé : les compétences et l'organisation humaine ont maintenant un impact concret."}
+			return {"label":"Équipe","message":"Vous n'êtes plus seul : compétences, salaire et progression humaine deviennent visibles."}
 		"COMPANY":
-			return {"label":"Entreprise","message":"Après vos premiers mois, budgets, avantages, locaux et conseil financier deviennent utiles."}
+			return {"label":"Entreprise","message":"Votre premier recrutement transforme le garage en véritable petite entreprise."}
 		"PRODUCTS":
 			return {"label":"Production & Produits","message":"Votre CPU quitte le laboratoire : industrialisation, binning et préparation commerciale entrent en jeu."}
 		"MARKET":
@@ -164,20 +165,16 @@ func interface_feature_info(feature: String) -> Dictionary:
 	return {"label":feature,"message":""}
 
 func next_interface_unlock_hint() -> Dictionary:
-	for feature in ["TEAM","COMPANY","PRODUCTS","MARKET","PRESS"]:
-		if is_interface_feature_unlocked(feature):
-			continue
-		match feature:
-			"TEAM":
-				return {"feature":feature,"text":"Lancez votre premier projet CPU pour ouvrir la gestion de l'équipe."}
-			"COMPANY":
-				return {"feature":feature,"text":"Faites tourner l'entreprise un premier mois pour ouvrir budgets, RH et locaux."}
-			"PRODUCTS":
-				return {"feature":feature,"text":"Terminez le développement d'un CPU pour ouvrir l'industrialisation et les produits."}
-			"MARKET":
-				return {"feature":feature,"text":"Commercialisez un CPU pour ouvrir l'analyse du marché."}
-			"PRESS":
-				return {"feature":feature,"text":"Obtenez vos premiers retours publics pour ouvrir la presse."}
+	if not is_interface_feature_unlocked("TEAM"):
+		return {"feature":"TEAM","text":"Livrez deux contrats logiciels puis recrutez votre première ingénieure."}
+	if not is_interface_feature_unlocked("LAB"):
+		return {"feature":"LAB","text":"Validez votre premier prototype électronique pour ouvrir le programme CPU."}
+	if not is_interface_feature_unlocked("PRODUCTS"):
+		return {"feature":"PRODUCTS","text":"Terminez le développement d'un CPU pour ouvrir l'industrialisation et les produits."}
+	if not is_interface_feature_unlocked("MARKET"):
+		return {"feature":"MARKET","text":"Commercialisez un CPU pour ouvrir l'analyse du marché."}
+	if not is_interface_feature_unlocked("PRESS"):
+		return {"feature":"PRESS","text":"Obtenez vos premiers retours publics pour ouvrir la presse."}
 	return {}
 
 func get_right_hand() -> Dictionary:
