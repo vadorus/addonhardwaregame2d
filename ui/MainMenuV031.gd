@@ -3,7 +3,6 @@ extends Control
 const MENU_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.webp")
 const GAME_LOGO: Texture2D = preload("res://assets/ui/runtime/branding/tech_empire_logo.webp")
 const GAME_SCENE := "res://main.tscn"
-const CURRENT_SAVE := "user://tech_empire_save.json"
 
 const NAVY := Color("#081624")
 const NAVY_SOFT := Color("#0d2234")
@@ -200,27 +199,111 @@ func _disabled_button_style() -> StyleBoxFlat:
 	return style
 
 func _refresh_save_status() -> void:
-	var has_save := FileAccess.file_exists(CURRENT_SAVE)
+	var has_save := SaveManager.has_any_save()
 	_continue_button.disabled = not has_save
 	if has_save:
-		_status_label.text = "Une sauvegarde est disponible. Reprenez votre entreprise là où vous l'avez laissée."
+		var latest := SaveManager.get_latest_slot_id()
+		_status_label.text = "Sauvegardes disponibles • Continuer reprendra la partie la plus récente (%s)." % latest
 	else:
 		_status_label.text = "Aucune sauvegarde pour le moment. Commencez votre aventure en 1971."
 
 func _new_game() -> void:
+	var empty_slot := SaveManager.first_empty_slot()
+	if SaveManager.slot_exists(empty_slot):
+		_show_message("Nouvelle partie", "Les 5 emplacements sont utilisés. Chargez une partie existante ou libérez un emplacement avant de recommencer.")
+		return
+	SaveManager.set_current_slot(empty_slot)
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 func _continue_game() -> void:
-	if SaveManager.load_game():
+	if SaveManager.load_latest_game():
 		get_tree().change_scene_to_file(GAME_SCENE)
 	else:
 		_refresh_save_status()
 
 func _load_game() -> void:
-	if FileAccess.file_exists(CURRENT_SAVE):
-		_continue_game()
+	_show_save_slots()
+
+func _show_save_slots() -> void:
+	_clear_modal_content()
+	_modal_title.text = "Charger une partie"
+	var found := false
+	for slot_value in SaveManager.list_slots():
+		var slot: Dictionary = slot_value
+		if not bool(slot.get("exists", false)):
+			continue
+		found = true
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		_modal_body.add_child(row)
+
+		var label := str(slot.get("company_name", slot.get("slot_name", "Entreprise")))
+		var slot_id := str(slot.get("slot_id", "slot_1"))
+		var load := _menu_button("%s  •  %d/%d/%d  •  %s €" % [
+			label,
+			int(slot.get("day", 1)),
+			int(slot.get("month", 1)),
+			int(slot.get("year", 1971)),
+			_format_money(int(slot.get("money", 0)))
+		])
+		load.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		load.pressed.connect(func(): _load_slot(slot_id))
+		row.add_child(load)
+
+		if slot_id != "legacy":
+			var delete := Button.new()
+			delete.text = "Supprimer"
+			delete.custom_minimum_size = Vector2(100, 48)
+			delete.pressed.connect(func(): _confirm_delete_slot(slot_id, label))
+			row.add_child(delete)
+
+	if not found:
+		var empty := Label.new()
+		empty.text = "Aucune sauvegarde disponible."
+		empty.add_theme_color_override("font_color", MUTED)
+		_modal_body.add_child(empty)
+
+	var close := _menu_button("Fermer")
+	close.pressed.connect(_close_modal)
+	_modal_body.add_child(close)
+	_modal_layer.visible = true
+
+func _load_slot(slot_id: String) -> void:
+	if SaveManager.load_game(slot_id):
+		get_tree().change_scene_to_file(GAME_SCENE)
 	else:
-		_show_message("Charger une partie", "Aucune sauvegarde n'est encore disponible.")
+		_show_message("Chargement", "Impossible de charger cet emplacement.")
+
+func _confirm_delete_slot(slot_id: String, label: String) -> void:
+	_clear_modal_content()
+	_modal_title.text = "Supprimer la sauvegarde ?"
+	var warning := Label.new()
+	warning.text = "%s sera définitivement supprimée." % label
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	warning.add_theme_color_override("font_color", TEXT)
+	_modal_body.add_child(warning)
+	var confirm := _menu_button("Supprimer définitivement")
+	confirm.pressed.connect(func():
+		SaveManager.delete_slot(slot_id)
+		_refresh_save_status()
+		_show_save_slots()
+	)
+	_modal_body.add_child(confirm)
+	var cancel := _menu_button("Annuler", true)
+	cancel.pressed.connect(_show_save_slots)
+	_modal_body.add_child(cancel)
+	_modal_layer.visible = true
+
+func _format_money(value: int) -> String:
+	var raw := str(abs(value))
+	var result := ""
+	var count := 0
+	for i in range(raw.length() - 1, -1, -1):
+		if count > 0 and count % 3 == 0:
+			result = " " + result
+		result = raw.substr(i, 1) + result
+		count += 1
+	return ("-" if value < 0 else "") + result
 
 func _build_modal() -> void:
 	_modal_layer = CanvasLayer.new()
