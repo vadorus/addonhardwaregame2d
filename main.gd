@@ -103,8 +103,13 @@ var rd_frequency: HSlider
 var rd_cache: HSlider
 var rd_node: OptionButton
 var rd_tdp: HSlider
+var lab_scroll: ScrollContainer
 var lab_layout_grid: GridContainer
 var lab_stats_grid: GridContainer
+var lab_wizard_status_label: Label
+var lab_advanced_container: VBoxContainer
+var lab_deep_details_container: VBoxContainer
+var lab_start_button: Button
 var lab_chip: Control
 var lab_profile_label: Label
 var lab_summary_label: Label
@@ -692,8 +697,8 @@ func _create_personnel_tab():
 	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
 
 func _create_research_tab():
-	var scroll := _tab_scroll("Laboratoire CPU")
-	var box: VBoxContainer = scroll.get_child(0)
+	lab_scroll = _tab_scroll("Laboratoire CPU")
+	var box: VBoxContainer = lab_scroll.get_child(0)
 
 	var heading := VBoxContainer.new()
 	box.add_child(heading)
@@ -702,6 +707,22 @@ func _create_research_tab():
 	var intro := _muted_label("Chaque choix technique change les performances, le coût, la consommation, le risque et le temps de développement.", 13)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_child(intro)
+
+	var wizard_bar := HFlowContainer.new()
+	wizard_bar.add_theme_constant_override("h_separation", 8)
+	wizard_bar.add_theme_constant_override("v_separation", 8)
+	box.add_child(wizard_bar)
+	for step_data in [["1  Identité", 1], ["2  Technique", 2], ["3  Validation", 3], ["4  Lancer", 4]]:
+		var step_button := Button.new()
+		step_button.text = str(step_data[0])
+		step_button.custom_minimum_size = Vector2(128, 40)
+		var step_index := int(step_data[1])
+		step_button.pressed.connect(func(): _lab_go_to_step(step_index))
+		wizard_bar.add_child(step_button)
+
+	lab_wizard_status_label = _muted_label("Étape 1/4 • Donnez un nom au CPU, choisissez sa cible et l'intention de l'équipe.", 12)
+	lab_wizard_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(lab_wizard_status_label)
 
 	lab_layout_grid = GridContainer.new()
 	lab_layout_grid.columns = 2
@@ -742,18 +763,31 @@ func _create_research_tab():
 	rd_budget.value_changed.connect(func(_value): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
 
-	configuration_box.add_child(_eyebrow("RECHERCHE CONTINUE CPU"))
+	var advanced_toggle := Button.new()
+	advanced_toggle.text = "Afficher les outils R&D avancés"
+	advanced_toggle.custom_minimum_size.y = 40
+	configuration_box.add_child(advanced_toggle)
+	lab_advanced_container = VBoxContainer.new()
+	lab_advanced_container.visible = false
+	lab_advanced_container.add_theme_constant_override("separation", 11)
+	configuration_box.add_child(lab_advanced_container)
+	advanced_toggle.pressed.connect(func():
+		lab_advanced_container.visible = not lab_advanced_container.visible
+		advanced_toggle.text = "Masquer les outils R&D avancés" if lab_advanced_container.visible else "Afficher les outils R&D avancés"
+	)
+
+	lab_advanced_container.add_child(_eyebrow("RECHERCHE CONTINUE CPU"))
 	var research_intro := _muted_label("L’équipe Recherche prépare les générations suivantes pendant que l’équipe Développement transforme les connaissances en produit. Les deux équipes sont désormais indépendantes.", 12)
 	research_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(research_intro)
+	lab_advanced_container.add_child(research_intro)
 	research_overview_label = _muted_label("", 12)
 	research_overview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(research_overview_label)
+	lab_advanced_container.add_child(research_overview_label)
 	var research_grid := GridContainer.new()
 	research_grid.columns = 2
 	research_grid.add_theme_constant_override("h_separation", 8)
 	research_grid.add_theme_constant_override("v_separation", 6)
-	configuration_box.add_child(research_grid)
+	lab_advanced_container.add_child(research_grid)
 	for research_key in ResearchManager.get_cpu_research_domain_keys():
 		research_grid.add_child(_muted_label(ResearchManager.get_cpu_research_label(str(research_key)), 12))
 		var allocation := _spin(0, 30, 1, 0)
@@ -761,64 +795,64 @@ func _create_research_tab():
 		research_grid.add_child(allocation)
 		research_alloc_controls[str(research_key)] = allocation
 	research_budget = _spin(0, 100000, 1000, 12000)
-	_add_labeled_control(configuration_box, "Budget mensuel recherche fondamentale", research_budget)
+	_add_labeled_control(lab_advanced_container, "Budget mensuel recherche fondamentale", research_budget)
 	var apply_research := Button.new()
 	apply_research.text = "Appliquer cette répartition de recherche"
 	apply_research.custom_minimum_size.y = 42
 	apply_research.pressed.connect(_apply_research_plan)
-	configuration_box.add_child(apply_research)
+	lab_advanced_container.add_child(apply_research)
 
-	configuration_box.add_child(_eyebrow("R&D CONCEPT CPU"))
+	lab_advanced_container.add_child(_eyebrow("R&D CONCEPT CPU"))
 	var concept_intro := _muted_label("Ces programmes ne visent pas forcément un produit immédiat. Ils servent de laboratoire avancé pour créer des technologies transférables aux générations futures.", 12)
 	concept_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(concept_intro)
+	lab_advanced_container.add_child(concept_intro)
 	concept_axis = OptionButton.new()
 	for axis_value in ResearchManager.get_cpu_concept_axis_keys():
 		var axis := str(axis_value)
 		concept_axis.add_item(ResearchManager.get_cpu_concept_axis_label(axis))
 		concept_axis.set_item_metadata(concept_axis.item_count - 1, axis)
-	_add_labeled_control(configuration_box, "Axe expérimental", concept_axis)
+	_add_labeled_control(lab_advanced_container, "Axe expérimental", concept_axis)
 	concept_budget = _spin(5000, 150000, 2500, 15000)
-	_add_labeled_control(configuration_box, "Budget mensuel du programme", concept_budget)
+	_add_labeled_control(lab_advanced_container, "Budget mensuel du programme", concept_budget)
 	concept_ambition = OptionButton.new()
 	for data in [["Prudent",1],["Ambitieux",2],["Rupture",3]]:
 		concept_ambition.add_item(str(data[0]))
 		concept_ambition.set_item_metadata(concept_ambition.item_count - 1, int(data[1]))
 	concept_ambition.select(1)
-	_add_labeled_control(configuration_box, "Ambition", concept_ambition)
+	_add_labeled_control(lab_advanced_container, "Ambition", concept_ambition)
 	var concept_start := Button.new()
 	concept_start.text = "Lancer un programme Concept"
 	concept_start.custom_minimum_size.y = 42
 	concept_start.pressed.connect(_start_cpu_concept_program)
-	configuration_box.add_child(concept_start)
+	lab_advanced_container.add_child(concept_start)
 	concept_status_label = _muted_label("Aucun programme Concept actif.", 12)
 	concept_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(concept_status_label)
+	lab_advanced_container.add_child(concept_status_label)
 
-	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
+	lab_advanced_container.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
 	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
 	generation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(generation_intro)
+	lab_advanced_container.add_child(generation_intro)
 	var request_generation := Button.new()
 	request_generation.text = "Préparer 3 plans de génération"
 	request_generation.custom_minimum_size.y = 44
 	request_generation.pressed.connect(_request_cpu_generation_plans)
-	configuration_box.add_child(request_generation)
+	lab_advanced_container.add_child(request_generation)
 	cpu_generation_select = OptionButton.new()
 	cpu_generation_select.item_selected.connect(func(_index): _refresh_generation_plan_summary())
-	_add_labeled_control(configuration_box, "Plans proposés", cpu_generation_select)
+	_add_labeled_control(lab_advanced_container, "Plans proposés", cpu_generation_select)
 	var generation_panel := PanelContainer.new()
 	generation_panel.add_theme_stylebox_override("panel", _stylebox(APP_CYAN_DARK, 10, 1, APP_CYAN, 11))
 	cpu_generation_summary_label = _muted_label("Aucun plan préparé. Définissez le brief puis lancez la réunion d'architecture.", 12)
 	cpu_generation_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cpu_generation_summary_label.custom_minimum_size.y = 155
 	generation_panel.add_child(cpu_generation_summary_label)
-	configuration_box.add_child(generation_panel)
+	lab_advanced_container.add_child(generation_panel)
 	var apply_generation := Button.new()
 	apply_generation.text = "Appliquer le plan sélectionné"
 	apply_generation.custom_minimum_size.y = 44
 	apply_generation.pressed.connect(_apply_selected_generation_plan)
-	configuration_box.add_child(apply_generation)
+	lab_advanced_container.add_child(apply_generation)
 
 	configuration_box.add_child(_eyebrow("ARCHITECTURE CPU"))
 	var preset_row := HFlowContainer.new()
@@ -888,13 +922,13 @@ func _create_research_tab():
 	lab_remediation_accept_button.pressed.connect(_accept_cpu_remediation)
 	configuration_box.add_child(lab_remediation_accept_button)
 
-	var start := Button.new()
-	start.text = "Lancer ce CPU en développement"
-	start.custom_minimum_size.y = 50
-	start.pressed.connect(_start_project)
-	configuration_box.add_child(start)
+	lab_start_button = Button.new()
+	lab_start_button.text = "Lancer ce CPU en développement"
+	lab_start_button.custom_minimum_size.y = 50
+	lab_start_button.pressed.connect(_start_project)
+	configuration_box.add_child(lab_start_button)
 
-	var preview_card := _card(APP_PANEL, 14, 16)
+	var preview_card := _card(Color(0.045, 0.085, 0.125, 0.94), 14, 16)
 	preview_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab_layout_grid.add_child(preview_card)
 	var preview_box := VBoxContainer.new()
@@ -956,26 +990,39 @@ func _create_research_tab():
 	warning_panel.add_child(lab_warning_label)
 	preview_box.add_child(warning_panel)
 
-	box.add_child(_section("Savoir-faire de l'entreprise"))
+	var deep_toggle := Button.new()
+	deep_toggle.text = "Afficher savoir-faire, rapports et brevets"
+	deep_toggle.custom_minimum_size.y = 40
+	box.add_child(deep_toggle)
+	lab_deep_details_container = VBoxContainer.new()
+	lab_deep_details_container.visible = false
+	lab_deep_details_container.add_theme_constant_override("separation", 10)
+	box.add_child(lab_deep_details_container)
+	deep_toggle.pressed.connect(func():
+		lab_deep_details_container.visible = not lab_deep_details_container.visible
+		deep_toggle.text = "Masquer savoir-faire, rapports et brevets" if lab_deep_details_container.visible else "Afficher savoir-faire, rapports et brevets"
+	)
+
+	lab_deep_details_container.add_child(_section("Savoir-faire de l'entreprise"))
 	var tech_card := _card(APP_SHELL, 12, 12)
 	tech_label = _rich_label()
 	tech_card.add_child(tech_label)
-	box.add_child(tech_card)
+	lab_deep_details_container.add_child(tech_card)
 
-	box.add_child(_section("Pipeline R&D et rapports de Camille"))
+	lab_deep_details_container.add_child(_section("Pipeline R&D et rapports de Camille"))
 	var projects_card := _card(APP_SHELL, 12, 12)
 	projects_label = _rich_label()
 	projects_card.add_child(projects_label)
-	box.add_child(projects_card)
+	lab_deep_details_container.add_child(projects_card)
 
-	box.add_child(_section("Brevets"))
+	lab_deep_details_container.add_child(_section("Brevets"))
 	var patent_card := _card(APP_SHELL, 12, 12)
 	var patent_box := VBoxContainer.new()
 	patent_card.add_child(patent_box)
 	patents_label = _rich_label()
-	patent_box.add_child(patents_label)
+	patent_lab_deep_details_container.add_child(patents_label)
 	var patent_actions := HFlowContainer.new()
-	patent_box.add_child(patent_actions)
+	patent_lab_deep_details_container.add_child(patent_actions)
 	var file_pat := Button.new()
 	file_pat.text = "Déposer le premier brevet candidat (8 000 €)"
 	file_pat.pressed.connect(_file_patent)
@@ -984,11 +1031,33 @@ func _create_research_tab():
 	license_pat.text = "Activer / désactiver la licence"
 	license_pat.pressed.connect(_toggle_patent_license)
 	patent_actions.add_child(license_pat)
-	box.add_child(patent_card)
+	lab_deep_details_container.add_child(patent_card)
 
 	lab_reference_design = CPU_DESIGN.default_design()
 	lab_reference_name = "Design équilibré"
 	_refresh_cpu_preview()
+
+func _lab_go_to_step(step: int):
+	if lab_scroll == null:
+		return
+	var target: Control = null
+	match step:
+		1:
+			lab_wizard_status_label.text = "Étape 1/4 • Identité : nom, marché cible, méthode et priorité."
+			target = rd_name
+		2:
+			lab_wizard_status_label.text = "Étape 2/4 • Technique : choisissez l'architecture et observez immédiatement les compromis."
+			target = rd_cores
+		3:
+			lab_wizard_status_label.text = "Étape 3/4 • Validation : l'équipe traduit les chiffres en conséquences, risques et solutions."
+			target = lab_team_guidance_label
+		4:
+			lab_wizard_status_label.text = "Étape 4/4 • Lancement : vérifiez coût, délai et adéquation au marché avant de démarrer."
+			target = lab_start_button
+	if target != null:
+		lab_scroll.ensure_control_visible(target)
+		if target.focus_mode != Control.FOCUS_NONE:
+			target.grab_focus()
 
 func _add_labeled_control(parent: VBoxContainer, title: String, control: Control):
 	var field := VBoxContainer.new()
