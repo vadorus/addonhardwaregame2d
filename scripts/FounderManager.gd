@@ -81,6 +81,7 @@ const PROGRAMMING_TREE := [
 
 var programming_level := 1
 var programming_xp := 0
+var developer_tools_level := 0
 
 var level := 1
 var level_xp := 0
@@ -110,6 +111,7 @@ func reset() -> void:
 	total_xp = 0
 	programming_level = 1
 	programming_xp = 0
+	developer_tools_level = 0
 	skills = _default_skills()
 	_reset_branches()
 	founder_changed.emit()
@@ -153,9 +155,20 @@ func _programming_bonus(key: String) -> float:
 			total += float(node.get(key, 0.0))
 	return total
 
+func improve_developer_tools() -> bool:
+	if developer_tools_level >= 10:
+		return false
+	developer_tools_level += 1
+	add_programming_mastery(12 + developer_tools_level * 2)
+	add_multi_experience(8, {SKILL_PROGRAMMING:0.8, SKILL_MANAGEMENT:0.2})
+	return true
+
+func developer_tools_multiplier() -> float:
+	return 1.0 + float(developer_tools_level) * 0.015
+
 func software_programming_speed_multiplier() -> float:
 	var skill_bonus := lerpf(1.0, 1.18, skill_value(SKILL_PROGRAMMING) / 100.0)
-	return clampf(skill_bonus + _programming_bonus("software_speed") + _programming_bonus("global_speed"), 1.0, 1.65)
+	return clampf((skill_bonus + _programming_bonus("software_speed") + _programming_bonus("global_speed")) * developer_tools_multiplier(), 1.0, 1.75)
 
 func software_programming_quality_bonus() -> float:
 	return skill_value(SKILL_PROGRAMMING) * 0.05 + _programming_bonus("software_quality")
@@ -164,10 +177,10 @@ func software_programming_cost_discount() -> float:
 	return clampf(_programming_bonus("software_cost"), 0.0, 0.20)
 
 func hardware_programming_multiplier() -> float:
-	return clampf(1.0 + _programming_bonus("hardware_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 800.0, 1.0, 1.45)
+	return clampf((1.0 + _programming_bonus("hardware_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 800.0) * developer_tools_multiplier(), 1.0, 1.55)
 
 func cpu_development_multiplier() -> float:
-	return clampf(1.0 + _programming_bonus("cpu_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 1000.0, 1.0, 1.35)
+	return clampf((1.0 + _programming_bonus("cpu_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 1000.0) * developer_tools_multiplier(), 1.0, 1.45)
 
 func cpu_programming_confidence_bonus() -> float:
 	return clampf(_programming_bonus("cpu_confidence") * 100.0 + skill_value(SKILL_PROGRAMMING) * 0.04, 0.0, 10.0)
@@ -298,6 +311,7 @@ func get_state() -> Dictionary:
 		"total_xp":total_xp,
 		"programming_level":programming_level,
 		"programming_xp":programming_xp,
+		"developer_tools_level":developer_tools_level,
 		"skills":skills.duplicate(true),
 		"branch_levels":branch_levels.duplicate(true),
 		"branch_xp":branch_xp.duplicate(true)
@@ -312,6 +326,7 @@ func load_state(state: Dictionary) -> void:
 	total_xp = maxi(int(state.get("total_xp", level_xp)), 0)
 	programming_level = maxi(int(state.get("programming_level", 1)), 1)
 	programming_xp = maxi(int(state.get("programming_xp", 0)), 0)
+	developer_tools_level = clampi(int(state.get("developer_tools_level", 0)), 0, 10)
 	skills = _default_skills()
 	var loaded_skills: Dictionary = state.get("skills", {})
 	for skill in SKILL_LABELS.keys():
