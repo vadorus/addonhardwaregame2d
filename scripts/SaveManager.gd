@@ -2,13 +2,22 @@ extends Node
 
 signal save_completed(ok, message)
 signal slots_changed
+signal loading_started
+signal loading_finished(ok)
 
 const SAVE_DIR := "user://saves"
 const LEGACY_SAVE_PATH := "user://tech_empire_save.json"
 const SAVE_VERSION := 23
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
+const STATE_SECTIONS := [
+	"time", "balance", "economy", "company", "divisions", "personnel",
+	"executive", "research", "foundry", "production", "patents",
+	"products", "after_sales", "market", "media"
+]
+
 var current_slot_id := "slot_1"
+var _legacy_loaded_pending := false
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -16,7 +25,9 @@ func _ready() -> void:
 func _ensure_save_dir() -> void:
 	var absolute_path := ProjectSettings.globalize_path(SAVE_DIR)
 	if not DirAccess.dir_exists_absolute(absolute_path):
-		DirAccess.make_dir_recursive_absolute(absolute_path)
+		var error := DirAccess.make_dir_recursive_absolute(absolute_path)
+		if error != OK:
+			push_error("SaveManager: impossible de créer le dossier de sauvegarde (%s)." % error_string(error))
 
 func _valid_slot(slot_id: String) -> String:
 	return slot_id if SLOT_IDS.has(slot_id) else "slot_1"
@@ -24,20 +35,167 @@ func _valid_slot(slot_id: String) -> String:
 func _slot_path(slot_id: String) -> String:
 	return "%s/%s.json" % [SAVE_DIR, _valid_slot(slot_id)]
 
+func _backup_path(path: String) -> String:
+	return path + ".bak"
+
+func _temp_path(path: String) -> String:
+	return path + ".tmp"
+
 func set_current_slot(slot_id: String) -> void:
 	current_slot_id = _valid_slot(slot_id)
 
 func get_current_slot() -> String:
 	return current_slot_id
 
+func _read_json_dictionary(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		push_warning("SaveManager: lecture impossible pour %s (%s)." % [path, error_string(FileAccess.get_open_error())])
+		return {}
+	var text := file.get_as_text()
+	var read_error := file.get_error()
+	file.close()
+	if read_error != OK:
+		push_warning("SaveManager: erreur de lecture pour %s (%s)." % [path, error_string(read_error)])
+		return {}
+	var json := JSON.new()
+	var parse_error := json.parse(text)
+	if parse_error != OK:
+		push_warning("SaveManager: JSON invalide dans %s (ligne %d : %s)." % [path, json.get_error_line(), json.get_error_message()])
+		return {}
+	var parsed = json.data
+	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}
+
+func _validate_state(state: Dictionary) -> String:
+	if state.is_empty():
+		return "Sauvegarde vide ou illisible."
+	var version := int(state.get("version", 0))
+	if version > SAVE_VERSION:
+		return "Sauvegarde créée par une version plus récente du jeu (v%d)." % version
+	for section in STATE_SECTIONS:
+		if state.has(section) and typeof(state[section]) != TYPE_DICTIONARY:
+			return "Sauvegarde corrompue : section « %s » invalide." % section
+	if state.has("meta") and typeof(state["meta"]) != TYPE_DICTIONARY:
+		return "Sauvegarde corrompue : métadonnées invalides."
+	return ""
+
+func _migrate_state(raw_state: Dictionary) -> Dictionary:
+	var state := raw_state.duplicate(true)
+	var version := int(state.get("version", 0))
+	if version > SAVE_VERSION:
+		return {}
+	if version <= 22:
+		var meta_value = state.get("meta", {})
+		var meta: Dictionary = meta_value if typeof(meta_value) == TYPE_DICTIONARY else {}
+		var company_value = state.get("company", {})
+		var company: Dictionary = company_value if typeof(company_value) == TYPE_DICTIONARY else {}
+		var time_value = state.get("time", {})
+		var game_time: Dictionary = time_value if typeof(time_value) == TYPE_DICTIONARY else {}
+		var economy_value = state.get("economy", {})
+		var economy: Dictionary = economy_value if typeof(economy_value) == TYPE_DICTIONARY else {}
+		if not meta.has("company_name"):
+			meta["company_name"] = str(company.get("company_name", "Entreprise"))
+		if not meta.has("year"):
+			meta["year"] = int(game_time.get("year", 1971))
+		if not meta.has("month"):
+			meta["month"] = int(game_time.get("month", 1))
+		if not meta.has("day"):
+			meta["day"] = int(game_time.get("day", 1))
+		if not meta.has("money"):
+			meta["money"] = int(economy.get("money", 0))
+		state["meta"] = meta
+		state["version"] = 23
+	return state
+
+func _read_valid_state(path: String) -> Dictionary:
+	var raw := _read_json_dictionary(path)
+	if raw.is_empty():
+		return {}
+	var validation_error := _validate_state(raw)
+	if not validation_error.is_empty():
+		push_warning("SaveManager: %s (%s)" % [validation_error, path])
+		return {}
+	var migrated := _migrate_state(raw)
+	if migrated.is_empty():
+		return {}
+	validation_error = _validate_state(migrated)
+	if not validation_error.is_empty():
+		push_warning("SaveManager: migration refusée pour %s : %s" % [path, validation_error])
+		return {}
+	return migrated
+
+func _read_with_backup(path: String) -> Dictionary:
+	var state := _read_valid_state(path)
+	if not state.is_empty():
+		return state
+	var backup := _backup_path(path)
+	state = _read_valid_state(backup)
+	if not state.is_empty():
+		push_warning("SaveManager: sauvegarde principale invalide, récupération depuis %s." % backup)
+	return state
+
+func _write_atomic(path: String, state: Dictionary) -> bool:
+	var temp := _temp_path(path)
+	var backup := _backup_path(path)
+	var temp_abs := ProjectSettings.globalize_path(temp)
+	var path_abs := ProjectSettings.globalize_path(path)
+	var backup_abs := ProjectSettings.globalize_path(backup)
+
+	if FileAccess.file_exists(temp):
+		DirAccess.remove_absolute(temp_abs)
+
+	var file := FileAccess.open(temp, FileAccess.WRITE)
+	if file == null:
+		push_error("SaveManager: ouverture temporaire impossible (%s)." % error_string(FileAccess.get_open_error()))
+		return false
+	file.store_string(JSON.stringify(state))
+	file.flush()
+	var write_error := file.get_error()
+	file.close()
+	if write_error != OK:
+		push_error("SaveManager: écriture temporaire échouée (%s)." % error_string(write_error))
+		DirAccess.remove_absolute(temp_abs)
+		return false
+
+	var written := _read_valid_state(temp)
+	if written.is_empty():
+		push_error("SaveManager: la sauvegarde temporaire n'est pas relisible.")
+		DirAccess.remove_absolute(temp_abs)
+		return false
+
+	if FileAccess.file_exists(backup):
+		var remove_error := DirAccess.remove_absolute(backup_abs)
+		if remove_error != OK:
+			push_error("SaveManager: impossible de remplacer la sauvegarde de secours (%s)." % error_string(remove_error))
+			DirAccess.remove_absolute(temp_abs)
+			return false
+
+	if FileAccess.file_exists(path):
+		var backup_error := DirAccess.rename_absolute(path_abs, backup_abs)
+		if backup_error != OK:
+			push_error("SaveManager: impossible de créer la sauvegarde de secours (%s)." % error_string(backup_error))
+			DirAccess.remove_absolute(temp_abs)
+			return false
+
+	var promote_error := DirAccess.rename_absolute(temp_abs, path_abs)
+	if promote_error != OK:
+		push_error("SaveManager: impossible d'activer la nouvelle sauvegarde (%s)." % error_string(promote_error))
+		if not FileAccess.file_exists(path) and FileAccess.file_exists(backup):
+			DirAccess.rename_absolute(backup_abs, path_abs)
+		DirAccess.remove_absolute(temp_abs)
+		return false
+	return true
+
 func slot_exists(slot_id: String) -> bool:
-	return FileAccess.file_exists(_slot_path(slot_id))
+	return not _read_with_backup(_slot_path(slot_id)).is_empty()
 
 func has_any_save() -> bool:
 	for slot_id in SLOT_IDS:
 		if slot_exists(slot_id):
 			return true
-	return FileAccess.file_exists(LEGACY_SAVE_PATH)
+	return not _read_valid_state(LEGACY_SAVE_PATH).is_empty()
 
 func first_empty_slot() -> String:
 	for slot_id in SLOT_IDS:
@@ -45,18 +203,8 @@ func first_empty_slot() -> String:
 			return slot_id
 	return "slot_1"
 
-func _read_state(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {}
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return {}
-	var parsed = JSON.parse_string(file.get_as_text())
-	file.close()
-	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}
-
 func _slot_metadata(slot_id: String) -> Dictionary:
-	var state := _read_state(_slot_path(slot_id))
+	var state := _read_with_backup(_slot_path(slot_id))
 	if state.is_empty():
 		return {
 			"slot_id": slot_id,
@@ -92,13 +240,15 @@ func list_slots() -> Array:
 		slots.append(metadata)
 		if bool(metadata.get("exists", false)):
 			has_modern_save = true
-	if not has_modern_save and FileAccess.file_exists(LEGACY_SAVE_PATH):
-		var legacy_state := _read_state(LEGACY_SAVE_PATH)
+	if not has_modern_save:
+		var legacy_state := _read_valid_state(LEGACY_SAVE_PATH)
 		if not legacy_state.is_empty():
 			var company_state = legacy_state.get("company", {})
 			var company: Dictionary = company_state if typeof(company_state) == TYPE_DICTIONARY else {}
 			var time_state = legacy_state.get("time", {})
 			var game_time: Dictionary = time_state if typeof(time_state) == TYPE_DICTIONARY else {}
+			var economy_state = legacy_state.get("economy", {})
+			var economy: Dictionary = economy_state if typeof(economy_state) == TYPE_DICTIONARY else {}
 			slots.append({
 				"slot_id": "legacy",
 				"exists": true,
@@ -108,7 +258,7 @@ func list_slots() -> Array:
 				"year": int(game_time.get("year", 1971)),
 				"month": int(game_time.get("month", 1)),
 				"day": int(game_time.get("day", 1)),
-				"money": int(legacy_state.get("economy", {}).get("money", 0)),
+				"money": int(economy.get("money", 0)),
 				"saved_unix": 0,
 				"version": int(legacy_state.get("version", 0))
 			})
@@ -160,13 +310,26 @@ func _build_state(slot_id: String, slot_name: String) -> Dictionary:
 		"media": MediaManager.get_state()
 	}
 
+func _archive_legacy_after_migration() -> void:
+	if not _legacy_loaded_pending or not FileAccess.file_exists(LEGACY_SAVE_PATH):
+		return
+	var migrated_path := LEGACY_SAVE_PATH + ".migrated"
+	var source_abs := ProjectSettings.globalize_path(LEGACY_SAVE_PATH)
+	var target_abs := ProjectSettings.globalize_path(migrated_path)
+	if FileAccess.file_exists(migrated_path):
+		DirAccess.remove_absolute(target_abs)
+	var error := DirAccess.rename_absolute(source_abs, target_abs)
+	if error == OK:
+		_legacy_loaded_pending = false
+	else:
+		push_warning("SaveManager: ancienne sauvegarde conservée, archivage impossible (%s)." % error_string(error))
+
 func save_game(slot_id: String = "", slot_name: String = "") -> bool:
 	if not CompanyManager.created:
 		save_completed.emit(false, "Aucune partie à sauvegarder.")
 		return false
 	_ensure_save_dir()
 	var target_slot := current_slot_id if slot_id.is_empty() else _valid_slot(slot_id)
-	current_slot_id = target_slot
 	var existing := _slot_metadata(target_slot)
 	var display_name := slot_name.strip_edges()
 	if display_name.is_empty():
@@ -174,12 +337,11 @@ func save_game(slot_id: String = "", slot_name: String = "") -> bool:
 	if display_name.is_empty() or display_name.begins_with("Emplacement "):
 		display_name = CompanyManager.company_name
 	var state := _build_state(target_slot, display_name)
-	var file := FileAccess.open(_slot_path(target_slot), FileAccess.WRITE)
-	if file == null:
-		save_completed.emit(false, "Impossible d'ouvrir l'emplacement de sauvegarde.")
+	if not _write_atomic(_slot_path(target_slot), state):
+		save_completed.emit(false, "Écriture de la sauvegarde échouée.")
 		return false
-	file.store_string(JSON.stringify(state))
-	file.close()
+	current_slot_id = target_slot
+	_archive_legacy_after_migration()
 	save_completed.emit(true, "Partie sauvegardée — %s." % display_name)
 	slots_changed.emit()
 	return true
@@ -206,28 +368,42 @@ func _apply_state(state: Dictionary) -> bool:
 
 func load_game(slot_id: String = "") -> bool:
 	var requested := current_slot_id if slot_id.is_empty() else slot_id
+	var target_slot := current_slot_id
 	var path := ""
-	if requested == "legacy":
+	var is_legacy := requested == "legacy"
+	if is_legacy:
 		path = LEGACY_SAVE_PATH
 	else:
-		current_slot_id = _valid_slot(requested)
-		path = _slot_path(current_slot_id)
-		if not FileAccess.file_exists(path) and FileAccess.file_exists(LEGACY_SAVE_PATH):
-			path = LEGACY_SAVE_PATH
-	if not FileAccess.file_exists(path):
-		save_completed.emit(false, "Aucune sauvegarde trouvée.")
-		return false
-	var state := _read_state(path)
+		target_slot = _valid_slot(requested)
+		path = _slot_path(target_slot)
+
+	var state := _read_valid_state(path) if is_legacy else _read_with_backup(path)
+	if state.is_empty() and not is_legacy and FileAccess.file_exists(LEGACY_SAVE_PATH):
+		state = _read_valid_state(LEGACY_SAVE_PATH)
+		is_legacy = not state.is_empty()
 	if state.is_empty():
-		save_completed.emit(false, "Sauvegarde invalide.")
+		save_completed.emit(false, "Aucune sauvegarde valide trouvée.")
 		return false
-	if not _apply_state(state):
+
+	var validation_error := _validate_state(state)
+	if not validation_error.is_empty():
+		save_completed.emit(false, validation_error)
+		return false
+
+	loading_started.emit()
+	var loaded := _apply_state(state)
+	loading_finished.emit(loaded)
+	if not loaded:
 		save_completed.emit(false, "Impossible de charger la sauvegarde.")
 		return false
-	if path == LEGACY_SAVE_PATH:
+
+	if is_legacy:
 		current_slot_id = first_empty_slot()
+		_legacy_loaded_pending = true
 		save_completed.emit(true, "Ancienne sauvegarde chargée. Elle sera migrée au prochain enregistrement.")
 	else:
+		current_slot_id = target_slot
+		_legacy_loaded_pending = false
 		save_completed.emit(true, "Partie chargée.")
 	return true
 
@@ -242,11 +418,13 @@ func delete_slot(slot_id: String) -> bool:
 	if not SLOT_IDS.has(slot_id):
 		return false
 	var path := _slot_path(slot_id)
-	if not FileAccess.file_exists(path):
-		return true
-	var error := DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	if error != OK:
-		return false
+	var paths := [path, _backup_path(path), _temp_path(path)]
+	for candidate in paths:
+		if FileAccess.file_exists(candidate):
+			var error := DirAccess.remove_absolute(ProjectSettings.globalize_path(candidate))
+			if error != OK:
+				push_error("SaveManager: suppression impossible pour %s (%s)." % [candidate, error_string(error)])
+				return false
 	if current_slot_id == slot_id:
 		current_slot_id = first_empty_slot()
 	slots_changed.emit()
