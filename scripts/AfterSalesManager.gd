@@ -341,7 +341,7 @@ func get_state() -> Dictionary:
 		"field_experience":field_experience,
 		"next_case_id":_next_case_id,
 		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_state":str(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -358,6 +358,10 @@ func load_state(state: Dictionary):
 			field_experience[key] = clampf(float(saved_exp.get(key, 0.0)), 0.0, 100.0)
 	_next_case_id = int(state.get("next_case_id", cases.size() + 1))
 	rng.seed = int(state.get("rng_seed", 91421))
-	rng.state = int(state.get("rng_state", rng.state))
+	var saved_rng_state = state.get("rng_state", null)
+	if saved_rng_state is String:
+		rng.state = saved_rng_state.to_int()
+	elif saved_rng_state != null:
+		rng.state = int(saved_rng_state)
 	cases_changed.emit()
 	field_experience_changed.emit()
