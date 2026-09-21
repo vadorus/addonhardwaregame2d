@@ -10,6 +10,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	var active_sector := starting_sector if GameData.is_sector_active(starting_sector) else "CPU"
 	TimeManager.reset()
 	BalanceManager.reset(difficulty)
+	StartupManager.reset()
 	CompanyManager.reset(company_name, active_sector, BalanceManager.starting_capital())
 	DivisionManager.reset(active_sector)
 	PersonnelManager.reset(active_sector)
@@ -27,6 +28,7 @@ func process_month_end() -> Dictionary:
 	if is_game_over:
 		return {}
 	CompanyManager.process_month()
+	StartupManager.process_month()
 	DivisionManager.process_month()
 	var active := ResearchManager.active_departments()
 	for dept in FoundryManager.active_departments():
