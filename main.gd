@@ -154,6 +154,8 @@ var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
 var dashboard_stats_grid: GridContainer
 var dashboard_lower_grid: GridContainer
+var dashboard_details_container: VBoxContainer
+var dashboard_details_toggle: Button
 var dashboard_chip: Control
 var dashboard_project_meta_label: Label
 var dashboard_project_phase_label: Label
@@ -349,10 +351,10 @@ func _create_dashboard_tab():
 	var heading_copy := VBoxContainer.new()
 	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(heading_copy)
-	heading_copy.add_child(_eyebrow("CENTRE DE COMMANDEMENT"))
-	var title := _label("Votre entreprise, en un coup d'œil", 27)
+	heading_copy.add_child(_eyebrow("BUREAU DU FONDATEUR"))
+	var title := _label("Votre prochaine décision", 27)
 	heading_copy.add_child(title)
-	heading_copy.add_child(_muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+	heading_copy.add_child(_muted_label("Le bureau reste au centre. Nora et votre projet vous montrent seulement ce qui mérite votre attention maintenant.", 13))
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -360,7 +362,7 @@ func _create_dashboard_tab():
 	dashboard_grid.add_theme_constant_override("v_separation", 12)
 	box.add_child(dashboard_grid)
 
-	var project_card := _card(APP_PANEL, 14, 16)
+	var project_card := _card(Color(0.035, 0.090, 0.135, 0.93), 14, 16)
 	project_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(project_card)
 	var project_box := VBoxContainer.new()
@@ -368,7 +370,7 @@ func _create_dashboard_tab():
 	project_card.add_child(project_box)
 	var project_head := HBoxContainer.new()
 	project_box.add_child(project_head)
-	var project_kicker := _eyebrow("PROJET PRIORITAIRE")
+	var project_kicker := _eyebrow("OBJECTIF ACTUEL")
 	project_kicker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	project_head.add_child(project_kicker)
 	var phase_badge := PanelContainer.new()
@@ -384,7 +386,7 @@ func _create_dashboard_tab():
 	dashboard_project_grid.add_theme_constant_override("v_separation", 12)
 	project_box.add_child(dashboard_project_grid)
 	var chip_frame := PanelContainer.new()
-	chip_frame.custom_minimum_size = Vector2(175, 175)
+	chip_frame.custom_minimum_size = Vector2(150, 150)
 	chip_frame.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 13, 0, APP_PANEL_ALT, 0))
 	var chip_script: Script = load("res://ui/ChipPreview.gd")
 	dashboard_chip = chip_script.new() as Control
@@ -420,7 +422,7 @@ func _create_dashboard_tab():
 	dashboard_action_button.pressed.connect(_dashboard_primary_action)
 	project_box.add_child(dashboard_action_button)
 
-	var advisor_card := _card(APP_PANEL, 14, 16)
+	var advisor_card := _card(Color(0.050, 0.085, 0.115, 0.94), 14, 16)
 	advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(advisor_card)
 	var advisor_box := VBoxContainer.new()
@@ -431,7 +433,7 @@ func _create_dashboard_tab():
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(46, 46)
 	avatar.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 12, 0, APP_AMBER_DARK, 0))
-	var avatar_label := _label("CD", 15)
+	var avatar_label := _label("NB", 15)
 	avatar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	avatar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	avatar_label.add_theme_color_override("font_color", APP_AMBER)
@@ -447,16 +449,27 @@ func _create_dashboard_tab():
 	dashboard_cto_label.add_theme_font_size_override("font_size", 15)
 	advisor_box.add_child(dashboard_cto_label)
 	dashboard_cto_button = Button.new()
-	dashboard_cto_button.text = "Ouvrir le comité de direction"
+	dashboard_cto_button.text = "Voir avec Nora"
 	dashboard_cto_button.custom_minimum_size.y = 44
 	dashboard_cto_button.pressed.connect(func(): _show_tab(1))
 	advisor_box.add_child(dashboard_cto_button)
+
+	dashboard_details_toggle = Button.new()
+	dashboard_details_toggle.text = "Voir les détails de l'entreprise"
+	dashboard_details_toggle.custom_minimum_size.y = 40
+	dashboard_details_toggle.pressed.connect(_toggle_dashboard_details)
+	box.add_child(dashboard_details_toggle)
+
+	dashboard_details_container = VBoxContainer.new()
+	dashboard_details_container.visible = false
+	dashboard_details_container.add_theme_constant_override("separation", 12)
+	box.add_child(dashboard_details_container)
 
 	dashboard_stats_grid = GridContainer.new()
 	dashboard_stats_grid.columns = 4
 	dashboard_stats_grid.add_theme_constant_override("h_separation", 10)
 	dashboard_stats_grid.add_theme_constant_override("v_separation", 10)
-	box.add_child(dashboard_stats_grid)
+	dashboard_details_container.add_child(dashboard_stats_grid)
 	dashboard_cash_value = _add_stat_card(dashboard_stats_grid, "TRÉSORERIE")
 	dashboard_result_value = _add_stat_card(dashboard_stats_grid, "DERNIER RÉSULTAT")
 	dashboard_staff_value = _add_stat_card(dashboard_stats_grid, "ÉQUIPE")
@@ -466,7 +479,7 @@ func _create_dashboard_tab():
 	dashboard_lower_grid.columns = 2
 	dashboard_lower_grid.add_theme_constant_override("h_separation", 12)
 	dashboard_lower_grid.add_theme_constant_override("v_separation", 12)
-	box.add_child(dashboard_lower_grid)
+	dashboard_details_container.add_child(dashboard_lower_grid)
 
 	var activity_card := _card(APP_PANEL, 14, 16)
 	activity_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1925,6 +1938,12 @@ func _add_stat_card(parent: GridContainer, title: String) -> Label:
 
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)
+
+func _toggle_dashboard_details():
+	if dashboard_details_container == null or dashboard_details_toggle == null:
+		return
+	dashboard_details_container.visible = not dashboard_details_container.visible
+	dashboard_details_toggle.text = "Masquer les détails" if dashboard_details_container.visible else "Voir les détails de l'entreprise"
 
 func _update_responsive_layout():
 	var compact := size.x < 900.0
