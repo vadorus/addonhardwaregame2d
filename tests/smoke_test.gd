@@ -47,6 +47,12 @@ func _ready() -> void:
 	if StartupManager.stage != StartupManager.STAGE_FIRST_HIRE:
 		_fail("Two delivered software contracts did not unlock the first hire")
 		return
+	if FounderManager.branch_level(FounderManager.BRANCH_BUSINESS) < 2:
+		_fail("Repeated business-software work did not level the founder specialization")
+		return
+	if not StartupManager.available_contract_ids().has("PAYROLL"):
+		_fail("Business software level 2 did not unlock the advanced payroll contract")
+		return
 	if not StartupManager.hire_first_engineer() or PersonnelManager.staff.size() != 1:
 		_fail("First startup engineer could not be hired")
 		return
