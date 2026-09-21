@@ -73,11 +73,18 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		industrialization
 	)
 	var generation: Dictionary = built.get("generation", {})
+	var identity_value = project.get("product_identity", {})
+	var product_identity: Dictionary = identity_value.duplicate(true) if typeof(identity_value) == TYPE_DICTIONARY else {}
+	generation["product_identity"] = product_identity.duplicate(true)
 	var model_ids: Array = []
 	for template_value in built.get("products", []):
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
+		product["product_identity"] = product_identity.duplicate(true)
+		product["family_name"] = str(product_identity.get("family_name", project.get("name", "CPU")))
+		product["package_style"] = str(product_identity.get("package_style", "CLASSIC"))
+		product["brand_accent"] = str(product_identity.get("accent", "CYAN"))
 		_ensure_lifecycle_fields(product)
 		_next_id += 1
 		products.append(product)
@@ -100,6 +107,10 @@ func _create_single_product(project: Dictionary) -> void:
 		"company":CompanyManager.company_name,"sector":sector,"target_segment":str(project.get("segment", "MAINSTREAM")),
 		"approach":str(project.get("approach", "INTERNAL")),"internal_ratio":float(approach.internal_ratio),
 		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
+		"product_identity":project.get("product_identity", {}).duplicate(true),
+		"family_name":str(project.get("product_identity", {}).get("family_name", project.get("name", "Produit"))),
+		"package_style":str(project.get("product_identity", {}).get("package_style", "CLASSIC")),
+		"brand_accent":str(project.get("product_identity", {}).get("accent", "CYAN")),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
@@ -542,6 +553,12 @@ func load_state(state: Dictionary):
 			product["generation_id"] = str(legacy_generation_by_project[project_id])
 		product["generation_index"] = maxi(int(product.get("generation_index", 1)), 1)
 		product["generation_name"] = str(product.get("generation_name", product.get("name", "CPU historique")))
+		var identity_value = product.get("product_identity", {})
+		var product_identity: Dictionary = identity_value if typeof(identity_value) == TYPE_DICTIONARY else {}
+		product["product_identity"] = product_identity.duplicate(true)
+		product["family_name"] = str(product.get("family_name", product_identity.get("family_name", product.get("name", "CPU historique"))))
+		product["package_style"] = str(product.get("package_style", product_identity.get("package_style", "CLASSIC")))
+		product["brand_accent"] = str(product.get("brand_accent", product_identity.get("accent", "CYAN")))
 		product["sku_tier"] = str(product.get("sku_tier", "LEGACY"))
 		product["sku_label"] = str(product.get("sku_label", "Héritage"))
 		product["sku_order"] = int(product.get("sku_order", 0))
@@ -604,6 +621,7 @@ func _legacy_generation_from_product(product: Dictionary) -> Dictionary:
 		"architecture":product.get("cpu_design", {}).duplicate(true),
 		"architecture_estimate":product.get("design_estimate", {}).duplicate(true),
 		"generation_plan":{},
+		"product_identity":product.get("product_identity", {}).duplicate(true),
 		"metrics":product.get("metrics", {}).duplicate(true),
 		"yield_rate":float(product.get("yield_rate", 0.72)),
 		"industrialization":{
