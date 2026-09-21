@@ -677,10 +677,10 @@ func normalize_cpu_product_identity(identity: Dictionary, fallback_name: String 
 	if family_name.is_empty():
 		family_name = fallback_name
 	var package_style := str(identity.get("package_style", "CLASSIC")).to_upper()
-	if not package_style in ["CLASSIC", "TECHNICAL", "PREMIUM", "INDUSTRIAL"]:
+	if not ["CLASSIC", "TECHNICAL", "PREMIUM", "INDUSTRIAL"].has(package_style):
 		package_style = "CLASSIC"
 	var accent := str(identity.get("accent", "CYAN")).to_upper()
-	if not accent in ["CYAN", "AMBER", "GREEN", "STEEL"]:
+	if not ["CYAN", "AMBER", "GREEN", "STEEL"].has(accent):
 		accent = "CYAN"
 	return {
 		"family_name": family_name,
