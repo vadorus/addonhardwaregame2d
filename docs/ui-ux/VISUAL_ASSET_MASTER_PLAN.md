@@ -329,3 +329,49 @@ Avant de créer un nouvel asset :
 7. éviter les variantes inutiles.
 
 Le but est d'avoir une bibliothèque cohérente, réutilisable et maintenable.
+
+
+---
+
+## 14. Règle officielle — intérieur en jeu, extérieur pour la progression
+
+### En jeu
+Le joueur doit principalement se sentir **à l'intérieur de son entreprise**.
+
+Les fonds de gameplay doivent donc montrer en priorité :
+- bureau du fondateur / direction ;
+- laboratoire ;
+- open space ;
+- espace RH ;
+- production ;
+- showroom ;
+- salle de réunion ;
+- centre R&D ;
+- datacenter ou atelier spécialisé selon la branche.
+
+À chaque palier, l'intérieur évolue avec la taille et les moyens de l'entreprise.
+
+### Façades / bâtiments extérieurs
+Les vues extérieures servent surtout à :
+- l'écran d'accueil ;
+- le menu principal ;
+- l'écran d'évolution de l'entreprise ;
+- les changements de palier ;
+- les transitions / chargements ;
+- les cartes de progression ;
+- éventuellement une vue "campus" ou "monde".
+
+Elles ne doivent pas remplacer les fonds intérieurs des écrans de gestion.
+
+### Conséquence pour les saisons
+Halloween, Noël et les futurs thèmes saisonniers doivent être produits d'abord comme **variantes des intérieurs de gameplay**.
+Les façades saisonnières restent secondaires et pourront être utilisées pour le menu ou les transitions.
+
+### Règle de cohérence
+Même lieu, même architecture de base, même angle de lecture autant que possible :
+- version normale ;
+- version Halloween ;
+- version Noël ;
+- futures variantes.
+
+Le décor change, mais le joueur doit reconnaître immédiatement son entreprise et son palier.
