@@ -250,9 +250,12 @@ func _ready() -> void:
 	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
 		_fail("Progressed startup did not expose QG and CPU Lab")
 		return
-	for locked_feature in ["COMPANY","TEAM","PRODUCTS","MARKET","PRESS"]:
+	if not ExecutiveManager.is_interface_feature_unlocked("COMPANY") or not ExecutiveManager.is_interface_feature_unlocked("TEAM"):
+		_fail("First recruitment did not expose Company and Team management")
+		return
+	for locked_feature in ["PRODUCTS","MARKET","PRESS"]:
 		if ExecutiveManager.is_interface_feature_unlocked(locked_feature):
-			_fail("Garage onboarding exposed advanced feature too early: %s" % locked_feature)
+			_fail("Post-CPU feature unlocked too early: %s" % locked_feature)
 			return
 
 	var executive_initial_state := ExecutiveManager.get_state().duplicate(true)
