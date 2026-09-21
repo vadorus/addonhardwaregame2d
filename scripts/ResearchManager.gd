@@ -403,7 +403,12 @@ func get_total_cpu_research_allocation() -> int:
 	return total
 
 func get_development_team_size() -> int:
-	return PersonnelManager.count_department("Développement")
+	var dedicated := PersonnelManager.count_department("Développement")
+	if dedicated > 0:
+		return dedicated
+	if StartupManager.cpu_program_unlocked:
+		return PersonnelManager.count_department("R&D")
+	return 0
 
 func get_active_development_project_count() -> int:
 	var total := 0
@@ -426,6 +431,8 @@ func development_capacity_factor() -> float:
 	return clampf(1.04 - workload * 0.24, 0.55, 1.02)
 
 func development_team_score() -> float:
+	if PersonnelManager.count_department("Développement") <= 0 and StartupManager.cpu_program_unlocked:
+		return clampf(PersonnelManager.team_score("R&D", "cpu"), 20.0, 100.0)
 	var product_score := PersonnelManager.team_score("Développement", "product")
 	var validation_score := PersonnelManager.team_score("Développement", "validation")
 	return clampf(product_score * 0.62 + validation_score * 0.38, 20.0, 100.0)
@@ -697,7 +704,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		if not MarketManager.is_segment_available(market_segment):
 			return false
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
-	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
+	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 5000), "Développement — %s" % project_name)
 	if remediation_upfront > 0:
 		first_month_commitment += Economy.quoted_expense(remediation_upfront, "Programme technique")
 	if Economy.money < first_month_commitment:
