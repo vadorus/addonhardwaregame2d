@@ -1,6 +1,7 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const QG_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.webp")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
@@ -212,11 +213,21 @@ func _connect_signals():
 func _build_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var background := ColorRect.new()
-	background.color = APP_BG
+	var background := TextureRect.new()
+	background.name = "QGBackground1971"
+	background.texture = QG_BACKGROUND
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+
+	var background_tint := ColorRect.new()
+	background_tint.name = "QGBackgroundTint"
+	background_tint.color = Color(0.01, 0.02, 0.035, 0.34)
+	background_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background_tint)
 
 	var root_box := VBoxContainer.new()
 	root_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
