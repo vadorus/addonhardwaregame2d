@@ -247,14 +247,14 @@ func _show_save_slots() -> void:
 			_format_money(int(slot.get("money", 0)))
 		])
 		load.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		load.pressed.connect(func(): _load_slot(slot_id))
+		load.pressed.connect(_load_slot.bind(slot_id))
 		row.add_child(load)
 
 		if slot_id != "legacy":
 			var delete := Button.new()
 			delete.text = "Supprimer"
 			delete.custom_minimum_size = Vector2(100, 48)
-			delete.pressed.connect(func(): _confirm_delete_slot(slot_id, label))
+			delete.pressed.connect(_confirm_delete_slot.bind(slot_id, label))
 			row.add_child(delete)
 
 	if not found:
