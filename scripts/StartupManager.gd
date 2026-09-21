@@ -250,7 +250,7 @@ func load_state(state: Dictionary) -> void:
 		software_contracts_completed = 2
 		completed_contract_ids = ["LEGACY_A", "LEGACY_B"]
 		active_contract = {}
-		first_engineer_hired = PersonnelManager.staff.size() > 0
+		first_engineer_hired = true
 		electronics_project = {}
 		cpu_program_unlocked = true
 		startup_changed.emit()
