@@ -5,6 +5,8 @@ var _launched := false
 var _cores := 1
 var _node_nm := 10000
 var _tdp_w := 2
+var _package_style := "CLASSIC"
+var _accent := "CYAN"
 
 const CHIP_CASE := Color(0.157, 0.220, 0.282, 1.0)
 const CHIP_SUBSTRATE_COOL := Color(0.055, 0.204, 0.176, 1.0)
@@ -32,6 +34,33 @@ func set_design(design: Dictionary, progress: float = 0.0, launched: bool = fals
 	_tdp_w = clampi(int(design.get("tdp_w", 2)), 1, 400)
 	set_progress(progress, launched)
 
+func set_identity(identity: Dictionary) -> void:
+	_package_style = str(identity.get("package_style", "CLASSIC")).to_upper()
+	_accent = str(identity.get("accent", "CYAN")).to_upper()
+	queue_redraw()
+
+func _identity_accent_color() -> Color:
+	match _accent:
+		"AMBER":
+			return CHIP_GOLD
+		"GREEN":
+			return Color(0.361, 0.878, 0.643, 1.0)
+		"STEEL":
+			return Color(0.670, 0.730, 0.790, 1.0)
+		_:
+			return CHIP_CYAN
+
+func _identity_case_color() -> Color:
+	match _package_style:
+		"PREMIUM":
+			return Color(0.105, 0.125, 0.155, 1.0)
+		"INDUSTRIAL":
+			return Color(0.200, 0.200, 0.185, 1.0)
+		"TECHNICAL":
+			return Color(0.105, 0.180, 0.235, 1.0)
+		_:
+			return CHIP_CASE
+
 func _draw() -> void:
 	var side: float = minf(size.x, size.y) * 0.58
 	var origin := (size - Vector2(side, side)) * 0.5
@@ -49,9 +78,15 @@ func _draw() -> void:
 		draw_line(Vector2(vertical_x, origin.y - 10.0), Vector2(vertical_x, origin.y), CHIP_GOLD, 3.0)
 		draw_line(Vector2(vertical_x, origin.y + side), Vector2(vertical_x, origin.y + side + 10.0), CHIP_GOLD, 3.0)
 
-	draw_rect(chip_rect, CHIP_CASE, true)
-	var border_color := CHIP_CYAN if _node_nm <= 180 else CHIP_GOLD
+	draw_rect(chip_rect, _identity_case_color(), true)
+	var border_color := _identity_accent_color()
 	draw_rect(chip_rect, border_color, false, 4.0)
+	if _package_style == "PREMIUM":
+		draw_rect(chip_rect.grow(-6.0), CHIP_GOLD, false, 2.0)
+	elif _package_style == "TECHNICAL":
+		draw_rect(chip_rect.grow(-5.0), CHIP_CYAN, false, 1.5)
+	elif _package_style == "INDUSTRIAL":
+		draw_rect(chip_rect.grow(-7.0), Color(0.70, 0.66, 0.52, 0.85), false, 2.0)
 	var substrate := chip_rect.grow(-12.0)
 	var heat := clampf(remap(float(_tdp_w), 1.0, 220.0, 0.0, 1.0), 0.0, 1.0)
 	draw_rect(substrate, CHIP_SUBSTRATE_COOL.lerp(CHIP_SUBSTRATE_HOT, heat * 0.72), true)
@@ -75,4 +110,4 @@ func _draw() -> void:
 	var ring_radius: float = side * 0.68
 	draw_arc(center, ring_radius, -PI * 0.5, PI * 1.5, 64, CHIP_TRACK, 4.0, true)
 	var end_angle: float = -PI * 0.5 + TAU * _progress / 100.0
-	draw_arc(center, ring_radius, -PI * 0.5, end_angle, 64, CHIP_GOLD if _launched else CHIP_CYAN, 4.0, true)
+	draw_arc(center, ring_radius, -PI * 0.5, end_angle, 64, CHIP_GOLD if _launched else _identity_accent_color(), 4.0, true)
