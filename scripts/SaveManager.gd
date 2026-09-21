@@ -7,7 +7,7 @@ signal loading_finished(ok)
 
 const SAVE_DIR := "user://saves"
 const LEGACY_SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 23
+const SAVE_VERSION := 24
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
 const STATE_SECTIONS := [
@@ -107,6 +107,11 @@ func _migrate_state(raw_state: Dictionary) -> Dictionary:
 			meta["money"] = int(economy.get("money", 0))
 		state["meta"] = meta
 		state["version"] = 23
+		version = 23
+	if version <= 23:
+		# V24 introduit le parcours garage. Les anciennes sauvegardes sans section
+		# startup sont reconnues par StartupManager comme des parties déjà avancées.
+		state["version"] = 24
 	return state
 
 func _read_valid_state(path: String) -> Dictionary:
