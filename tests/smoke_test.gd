@@ -181,6 +181,7 @@ func _ready() -> void:
 	var balance_state := BalanceManager.get_state().duplicate(true)
 	var standard_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
 	var standard_market_units := MarketManager.segment_market_units("EMBEDDED")
+	var standard_capital := BalanceManager.starting_capital()
 	var standard_runway := BalanceManager.starting_runway_months()
 	BalanceManager.reset("ACCESSIBLE")
 	var accessible_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
