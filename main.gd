@@ -18,6 +18,8 @@ const APP_AMBER_DARK := Color(0.224, 0.165, 0.086, 1.0)
 const APP_GREEN := Color(0.361, 0.878, 0.643, 1.0)
 const APP_RED := Color(1.000, 0.482, 0.482, 1.0)
 
+var qg_background: TextureRect
+var qg_background_tint: ColorRect
 var company_label: Label
 var date_label: Label
 var money_label: Label
@@ -240,21 +242,32 @@ func _connect_signals():
 func _build_ui():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var background := TextureRect.new()
-	background.name = "QGBackground1971"
-	background.texture = QG_BACKGROUND
-	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	var base_background := ColorRect.new()
+	base_background.name = "BaseBackground"
+	base_background.color = APP_BG
+	base_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	base_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(base_background)
 
-	var background_tint := ColorRect.new()
-	background_tint.name = "QGBackgroundTint"
-	background_tint.color = Color(0.01, 0.02, 0.035, 0.34)
-	background_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background_tint)
+	var qg_crop := AtlasTexture.new()
+	qg_crop.atlas = QG_BACKGROUND
+	qg_crop.region = Rect2(380, 35, 640, 360)
+
+	qg_background = TextureRect.new()
+	qg_background.name = "QGWorkshop1971"
+	qg_background.texture = qg_crop
+	qg_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	qg_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	qg_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	qg_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(qg_background)
+
+	qg_background_tint = ColorRect.new()
+	qg_background_tint.name = "QGBackgroundTint"
+	qg_background_tint.color = Color(0.01, 0.02, 0.035, 0.30)
+	qg_background_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	qg_background_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(qg_background_tint)
 
 	var root_box := VBoxContainer.new()
 	root_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -351,7 +364,7 @@ func _build_ui():
 	tabs.tabs_visible = false
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tabs.tab_changed.connect(func(_index): _update_nav_state())
+	tabs.tab_changed.connect(_on_tab_changed)
 	root_box.add_child(tabs)
 	_create_dashboard_tab()
 	_create_company_tab()
@@ -360,7 +373,7 @@ func _build_ui():
 	_create_products_tab()
 	_create_market_tab()
 	_create_media_tab()
-	_update_nav_state()
+	_on_tab_changed(tabs.current_tab)
 	_build_setup_layer()
 	_build_month_layer()
 	_build_game_over_layer()
@@ -383,11 +396,11 @@ func _create_dashboard_tab():
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
-	dashboard_grid.add_theme_constant_override("h_separation", 12)
-	dashboard_grid.add_theme_constant_override("v_separation", 12)
+	dashboard_grid.add_theme_constant_override("h_separation", 16)
+	dashboard_grid.add_theme_constant_override("v_separation", 16)
 	box.add_child(dashboard_grid)
 
-	var project_card := _card(Color(0.035, 0.090, 0.135, 0.93), 14, 16)
+	var project_card := _card(Color(0.035, 0.090, 0.135, 0.96), 14, 18)
 	project_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(project_card)
 	var project_box := VBoxContainer.new()
@@ -447,7 +460,7 @@ func _create_dashboard_tab():
 	dashboard_action_button.pressed.connect(_dashboard_primary_action)
 	project_box.add_child(dashboard_action_button)
 
-	var advisor_card := _card(Color(0.050, 0.085, 0.115, 0.94), 14, 16)
+	var advisor_card := _card(Color(0.050, 0.085, 0.115, 0.96), 14, 18)
 	advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(advisor_card)
 	var advisor_box := VBoxContainer.new()
@@ -2123,6 +2136,14 @@ func _build_navigation(parent: HBoxContainer):
 		parent.add_child(button)
 		nav_buttons.append(button)
 
+func _on_tab_changed(index: int) -> void:
+	_update_nav_state()
+	var is_qg := index == 0
+	if qg_background != null:
+		qg_background.visible = is_qg
+	if qg_background_tint != null:
+		qg_background_tint.visible = is_qg
+
 func _show_tab(index: int):
 	if tabs == null:
 		return
@@ -2134,7 +2155,7 @@ func _show_tab(index: int):
 			status_label.text = "Nora : cette fonction viendra plus tard. %s" % str(hint.get("text", "Continuez la progression de l'entreprise."))
 			return
 	tabs.current_tab = safe_index
-	_update_nav_state()
+	_on_tab_changed(safe_index)
 
 func _update_nav_state():
 	if tabs == null:
