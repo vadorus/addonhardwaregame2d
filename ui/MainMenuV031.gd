@@ -1,6 +1,7 @@
 extends Control
 
-const EmbeddedMenuArt = preload("res://ui/EmbeddedMenuArt.gd")
+const MENU_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.webp")
+const GAME_LOGO: Texture2D = preload("res://assets/ui/runtime/branding/tech_empire_logo.webp")
 const GAME_SCENE := "res://main.tscn"
 const CURRENT_SAVE := "user://tech_empire_save.json"
 
@@ -31,7 +32,7 @@ func _ready() -> void:
 func _build_background() -> void:
 	var background := TextureRect.new()
 	background.name = "WorkshopBackground"
-	background.texture = EmbeddedMenuArt.menu_background()
+	background.texture = MENU_BACKGROUND
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -78,7 +79,7 @@ func _build_menu() -> void:
 
 	_logo = TextureRect.new()
 	_logo.name = "TechEmpireLogo"
-	_logo.texture = EmbeddedMenuArt.game_logo()
+	_logo.texture = GAME_LOGO
 	_logo.custom_minimum_size = Vector2(360, 205)
 	_logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
