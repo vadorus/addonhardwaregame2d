@@ -119,7 +119,7 @@ func sync_interface_unlocks() -> Array:
 	var rules := {
 		"LAB":StartupManager.cpu_program_unlocked,
 		"TEAM":StartupManager.first_engineer_hired or has_project or has_production or has_products,
-		"COMPANY":StartupManager.first_engineer_hired or months_operated >= 1 or not get_open_hr_issues().is_empty() or int(workplace.get("tier", 0)) > 0,
+		"COMPANY":StartupManager.first_engineer_hired or has_project or has_production or has_products,
 		"PRODUCTS":has_production or has_products,
 		"MARKET":has_launched_product,
 		"PRESS":has_public_product_feedback or has_market_history
