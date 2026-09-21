@@ -345,6 +345,7 @@ func _build_modal() -> void:
 func _clear_modal_content() -> void:
 	for child in _modal_body.get_children():
 		if child != _modal_title:
+			_modal_body.remove_child(child)
 			child.queue_free()
 
 func _show_message(title: String, message: String) -> void:
