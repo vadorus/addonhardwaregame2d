@@ -264,7 +264,7 @@ func _build_ui():
 
 	qg_background_tint = ColorRect.new()
 	qg_background_tint.name = "QGBackgroundTint"
-	qg_background_tint.color = Color(0.01, 0.02, 0.035, 0.30)
+	qg_background_tint.color = Color(0.015, 0.025, 0.045, 0.46)
 	qg_background_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	qg_background_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(qg_background_tint)
@@ -278,15 +278,15 @@ func _build_ui():
 	root_box.add_theme_constant_override("separation", 8)
 	add_child(root_box)
 
-	var header := _card(APP_SHELL, 13, 12)
+	var header := _card(Color(0.040, 0.060, 0.095, 0.97), 12, 8)
 	root_box.add_child(header)
 	var top := HFlowContainer.new()
-	top.add_theme_constant_override("h_separation", 12)
-	top.add_theme_constant_override("v_separation", 8)
+	top.add_theme_constant_override("h_separation", 10)
+	top.add_theme_constant_override("v_separation", 6)
 	header.add_child(top)
 
 	var mark := PanelContainer.new()
-	mark.custom_minimum_size = Vector2(44, 44)
+	mark.custom_minimum_size = Vector2(40, 40)
 	mark.add_theme_stylebox_override("panel", _stylebox(APP_CYAN, 11, 0, APP_CYAN, 0))
 	var mark_label := _label("TE", 17)
 	mark_label.add_theme_color_override("font_color", APP_BG)
@@ -296,11 +296,11 @@ func _build_ui():
 	top.add_child(mark)
 
 	var brand_box := VBoxContainer.new()
-	brand_box.custom_minimum_size.x = 180
+	brand_box.custom_minimum_size.x = 168
 	top.add_child(brand_box)
-	company_label = _label("Tech Empire", 18)
+	company_label = _label("Tech Empire", 17)
 	brand_box.add_child(company_label)
-	var era_label := _muted_label("Vertical slice • CPU • débuts du microprocesseur", 12)
+	var era_label := _muted_label("CPU • débuts du microprocesseur", 11)
 	brand_box.add_child(era_label)
 
 	var spacer := Control.new()
@@ -309,16 +309,16 @@ func _build_ui():
 	top.add_child(spacer)
 
 	var date_box := VBoxContainer.new()
-	date_box.custom_minimum_size.x = 125
+	date_box.custom_minimum_size.x = 116
 	date_box.add_child(_eyebrow("CALENDRIER"))
-	date_label = _label("Jour 1 • Mois 1 • 1971", 14)
+	date_label = _label("Jour 1 • Mois 1 • 1971", 13)
 	date_box.add_child(date_label)
 	top.add_child(date_box)
 
 	var money_box := VBoxContainer.new()
-	money_box.custom_minimum_size.x = 120
+	money_box.custom_minimum_size.x = 112
 	money_box.add_child(_eyebrow("TRÉSORERIE"))
-	money_label = _label("500 000 €", 16)
+	money_label = _label("500 000 €", 15)
 	money_label.add_theme_color_override("font_color", APP_GREEN)
 	money_box.add_child(money_label)
 	top.add_child(money_box)
@@ -326,19 +326,19 @@ func _build_ui():
 	for data in [["Ⅱ",0.0],["x1",1.0],["x2",2.0],["x3",3.0]]:
 		var speed_button := Button.new()
 		speed_button.text = str(data[0])
-		speed_button.custom_minimum_size = Vector2(44, 42)
+		speed_button.custom_minimum_size = Vector2(42, 38)
 		var speed := float(data[1])
 		speed_button.pressed.connect(func(): TimeManager.time_scale = speed)
 		top.add_child(speed_button)
 
 	var save_btn := Button.new()
 	save_btn.text = "Sauver"
-	save_btn.custom_minimum_size.y = 42
+	save_btn.custom_minimum_size.y = 38
 	save_btn.pressed.connect(func(): SaveManager.save_game())
 	top.add_child(save_btn)
 	var load_btn := Button.new()
 	load_btn.text = "Charger"
-	load_btn.custom_minimum_size.y = 42
+	load_btn.custom_minimum_size.y = 38
 	load_btn.pressed.connect(_load_game)
 	top.add_child(load_btn)
 
@@ -390,7 +390,7 @@ func _create_dashboard_tab():
 	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(heading_copy)
 	heading_copy.add_child(_eyebrow("BUREAU DU FONDATEUR"))
-	var title := _label("Votre prochaine décision", 27)
+	var title := _label("Votre prochaine décision", 29)
 	heading_copy.add_child(title)
 	heading_copy.add_child(_muted_label("Le bureau reste au centre. Nora et votre projet vous montrent seulement ce qui mérite votre attention maintenant.", 13))
 
@@ -400,7 +400,7 @@ func _create_dashboard_tab():
 	dashboard_grid.add_theme_constant_override("v_separation", 16)
 	box.add_child(dashboard_grid)
 
-	var project_card := _card(Color(0.035, 0.090, 0.135, 0.96), 14, 18)
+	var project_card := _card(Color(0.030, 0.080, 0.125, 0.99), 15, 20)
 	project_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(project_card)
 	var project_box := VBoxContainer.new()
@@ -455,12 +455,19 @@ func _create_dashboard_tab():
 	dashboard_metric_c = _add_inline_metric(project_metrics, "Approche", "—")
 
 	dashboard_action_button = Button.new()
-	dashboard_action_button.text = "Ouvrir le laboratoire CPU"
-	dashboard_action_button.custom_minimum_size.y = 44
+	dashboard_action_button.text = "Concevoir le premier CPU"
+	dashboard_action_button.custom_minimum_size.y = 48
+	dashboard_action_button.add_theme_font_size_override("font_size", 16)
+	dashboard_action_button.add_theme_color_override("font_color", APP_BG)
+	dashboard_action_button.add_theme_color_override("font_hover_color", APP_BG)
+	dashboard_action_button.add_theme_color_override("font_pressed_color", APP_BG)
+	dashboard_action_button.add_theme_stylebox_override("normal", _stylebox(APP_CYAN, 10, 1, Color(0.55, 0.94, 1.0, 1.0), 12))
+	dashboard_action_button.add_theme_stylebox_override("hover", _stylebox(Color(0.48, 0.90, 0.96, 1.0), 10, 1, Color(0.75, 0.98, 1.0, 1.0), 12))
+	dashboard_action_button.add_theme_stylebox_override("pressed", _stylebox(Color(0.24, 0.68, 0.76, 1.0), 10, 1, APP_CYAN, 12))
 	dashboard_action_button.pressed.connect(_dashboard_primary_action)
 	project_box.add_child(dashboard_action_button)
 
-	var advisor_card := _card(Color(0.050, 0.085, 0.115, 0.96), 14, 18)
+	var advisor_card := _card(Color(0.040, 0.070, 0.105, 0.99), 15, 20)
 	advisor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_grid.add_child(advisor_card)
 	var advisor_box := VBoxContainer.new()
@@ -488,7 +495,11 @@ func _create_dashboard_tab():
 	advisor_box.add_child(dashboard_cto_label)
 	dashboard_cto_button = Button.new()
 	dashboard_cto_button.text = "Voir avec Nora"
-	dashboard_cto_button.custom_minimum_size.y = 44
+	dashboard_cto_button.custom_minimum_size.y = 42
+	dashboard_cto_button.add_theme_color_override("font_color", APP_MUTED)
+	dashboard_cto_button.add_theme_color_override("font_hover_color", APP_TEXT)
+	dashboard_cto_button.add_theme_stylebox_override("normal", _stylebox(Color(0.06, 0.085, 0.12, 0.92), 9, 1, APP_LINE, 10))
+	dashboard_cto_button.add_theme_stylebox_override("hover", _stylebox(APP_CYAN_DARK, 9, 1, APP_CYAN, 10))
 	dashboard_cto_button.pressed.connect(func(): _show_tab(1))
 	advisor_box.add_child(dashboard_cto_button)
 
