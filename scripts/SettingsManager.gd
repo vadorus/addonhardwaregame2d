@@ -3,6 +3,7 @@ extends Node
 signal settings_changed(section, key, value)
 
 const SETTINGS_PATH := "user://tech_empire_settings.cfg"
+const SETTINGS_SCHEMA_VERSION := 2
 
 const DEFAULTS := {
 	"display": {
@@ -25,18 +26,22 @@ var _config := ConfigFile.new()
 
 func _ready() -> void:
 	load_settings()
-	apply_runtime_settings()
+	call_deferred("apply_runtime_settings")
 
 func load_settings() -> void:
 	_config = ConfigFile.new()
 	var error := _config.load(SETTINGS_PATH)
 	if error != OK and error != ERR_FILE_NOT_FOUND:
 		push_warning("Tech Empire : impossible de lire les paramètres (%s)." % error)
+	var previous_schema := int(_config.get_value("meta", "schema_version", 0))
 	for section in DEFAULTS.keys():
 		var section_defaults: Dictionary = DEFAULTS[section]
 		for key in section_defaults.keys():
 			if not _config.has_section_key(str(section), str(key)):
 				_config.set_value(str(section), str(key), section_defaults[key])
+	if previous_schema < 2 and not OS.has_feature("mobile"):
+		_config.set_value("display", "fullscreen", true)
+	_config.set_value("meta", "schema_version", SETTINGS_SCHEMA_VERSION)
 	save_settings()
 
 func save_settings() -> bool:
@@ -54,6 +59,7 @@ func set_setting(section: String, key: String, value) -> void:
 
 func reset_to_defaults() -> void:
 	_config = ConfigFile.new()
+	_config.set_value("meta", "schema_version", SETTINGS_SCHEMA_VERSION)
 	for section in DEFAULTS.keys():
 		var section_defaults: Dictionary = DEFAULTS[section]
 		for key in section_defaults.keys():
@@ -64,21 +70,21 @@ func reset_to_defaults() -> void:
 
 func apply_runtime_settings() -> void:
 	if not OS.has_feature("mobile"):
-		var fullscreen := bool(get_setting("display", "fullscreen"))
-		DisplayServer.window_set_mode(
-			DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
-		)
+		_apply_window_mode(bool(get_setting("display", "fullscreen")))
 	var ui_scale := clampf(float(get_setting("display", "ui_scale")), 0.85, 1.35)
 	var window := get_window()
 	if window != null:
 		window.content_scale_factor = ui_scale
 
+func _apply_window_mode(fullscreen: bool) -> void:
+	var desired_mode := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
+	if DisplayServer.window_get_mode() != desired_mode:
+		DisplayServer.window_set_mode(desired_mode)
+
 func set_fullscreen(enabled: bool) -> void:
 	set_setting("display", "fullscreen", enabled)
 	if not OS.has_feature("mobile"):
-		DisplayServer.window_set_mode(
-			DisplayServer.WINDOW_MODE_FULLSCREEN if enabled else DisplayServer.WINDOW_MODE_WINDOWED
-		)
+		_apply_window_mode(enabled)
 
 func set_ui_scale(value: float) -> void:
 	var scale := clampf(value, 0.85, 1.35)
