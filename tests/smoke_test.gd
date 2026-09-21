@@ -1252,6 +1252,28 @@ func _ready() -> void:
 		_fail("Legacy company save did not receive the Development department")
 		return
 	var legacy_personnel_state := PersonnelManager.get_state().duplicate(true)
+	var legacy_staff: Array = legacy_personnel_state.get("staff", [])
+	var has_legacy_samira := false
+	for existing_emp in legacy_staff:
+		if str(existing_emp.get("name", "")) == "Samira Lefèvre":
+			has_legacy_samira = true
+			break
+	if not has_legacy_samira:
+		legacy_staff.append({
+			"id":"EMP-LEGACY-SAMIRA",
+			"name":"Samira Lefèvre",
+			"role":"Ingénieure produit",
+			"department":"R&D",
+			"skill":64,
+			"aptitude":66,
+			"experience_years":4.0,
+			"specialization":"product",
+			"domain_experience":{"product":4.0},
+			"leadership":58,
+			"salary":4400,
+			"morale":75.0
+		})
+		legacy_personnel_state["staff"] = legacy_staff
 	for legacy_emp in legacy_personnel_state.get("staff", []):
 		if str(legacy_emp.get("name", "")) == "Samira Lefèvre":
 			legacy_emp["department"] = "R&D"
