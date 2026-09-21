@@ -8,7 +8,7 @@ const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
 		"description":"Plus de marge de trésorerie et un marché un peu plus permissif. La simulation reste complète.",
-		"starting_capital":600000,
+		"starting_capital":22000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
 		"research_cost":0.88,
@@ -20,7 +20,7 @@ const PROFILES := {
 	"STANDARD":{
 		"label":"Standard",
 		"description":"Équilibre de référence : chaque mauvais choix coûte, sans exiger une optimisation parfaite.",
-		"starting_capital":500000,
+		"starting_capital":16000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
 		"research_cost":1.00,
@@ -32,7 +32,7 @@ const PROFILES := {
 	"REALISTIC":{
 		"label":"Réaliste",
 		"description":"Trésorerie plus tendue, coûts plus lourds, demande moins tolérante et concurrents plus rapides.",
-		"starting_capital":420000,
+		"starting_capital":12000,
 		"operating_cost":1.10,
 		"salary_cost":1.08,
 		"research_cost":1.12,
@@ -63,7 +63,7 @@ func profile_description(profile_key: String = "") -> String:
 	return str(profile_data(profile_key).get("description", ""))
 
 func starting_capital() -> int:
-	return int(profile_data().get("starting_capital", 500000))
+	return int(profile_data().get("starting_capital", 16000))
 
 func expense_amount(base_amount: int, category: String) -> int:
 	if base_amount <= 0:
@@ -111,11 +111,10 @@ func first_generation_runway_target() -> float:
 	return float(profile_data().get("first_generation_runway_target", 7.5))
 
 func projected_starting_monthly_burn() -> int:
-	# Base de départ : locaux/politiques + les sept salaires initiaux + recherche continue.
-	var company_base := expense_amount(7500 + 6000 + 5000 + 2500, "Bureaux et infrastructure")
-	var payroll_base := expense_amount(32800, "Salaires")
-	var research_base := expense_amount(12000, "Recherche CPU")
-	return company_base + payroll_base + research_base
+	# Départ 1971 : vous êtes seul dans votre garage. Pas de payroll ni de laboratoire CPU.
+	var garage_overhead := expense_amount(500, "Garage et fournitures")
+	var typical_contract := expense_amount(900, "Développement logiciel")
+	return garage_overhead + typical_contract
 
 func starting_runway_months() -> float:
 	return float(starting_capital()) / maxf(float(projected_starting_monthly_burn()), 1.0)
