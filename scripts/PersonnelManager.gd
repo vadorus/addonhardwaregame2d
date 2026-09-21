@@ -14,24 +14,33 @@ const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon",
 func _ready():
 	rng.seed = 1947
 
-func reset(starting_sector: String):
+func reset(_starting_sector: String):
 	staff = []
+	candidate = {}
 	_next_id = 1
-	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
-	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
-	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 4400)
-	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 3700)
-	_add_employee("Thomas Girard", "Responsable production", "Production", 63, 7.0, "manufacturing", 72, 5100)
-	_add_employee("Julie Fontaine", "Responsable marketing", "Marketing", 58, 6.0, "marketing", 70, 4600)
-	_add_employee("Mehdi Colin", "Responsable support", "Support", 57, 5.0, "support", 65, 4100)
-	CompanyManager.set_department_leader("R&D", str(staff[0].id))
-	CompanyManager.set_department_leader("Développement", str(staff[2].id))
-	CompanyManager.set_department_leader("Production", str(staff[4].id))
-	CompanyManager.set_department_leader("Marketing", str(staff[5].id))
-	CompanyManager.set_department_leader("Support", str(staff[6].id))
-	generate_candidate("R&D")
 	staff_changed.emit()
+
+func hire_startup_engineer() -> bool:
+	if not staff.is_empty():
+		return false
+	var signing_cost := 3500
+	if not Economy.can_afford(signing_cost, "Premier recrutement"):
+		return false
+	Economy.add_expense(signing_cost, "Premier recrutement")
+	_add_employee(
+		"Élise Martin",
+		"Ingénieure électronique",
+		"R&D",
+		54,
+		1.5,
+		"cpu",
+		38,
+		1600,
+		{"rigor":62.0,"problem_solving":66.0,"teamwork":70.0,"stress_tolerance":58.0,"creativity":64.0,"process_quality":60.0}
+	)
+	CompanyManager.set_department_leader("R&D", str(staff[0].id))
+	staff_changed.emit()
+	return true
 
 func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}):
 	var resolved_profile := profile.duplicate(true)
