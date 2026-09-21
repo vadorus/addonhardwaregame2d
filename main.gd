@@ -1020,9 +1020,9 @@ func _create_research_tab():
 	var patent_box := VBoxContainer.new()
 	patent_card.add_child(patent_box)
 	patents_label = _rich_label()
-	patent_lab_deep_details_container.add_child(patents_label)
+	patent_box.add_child(patents_label)
 	var patent_actions := HFlowContainer.new()
-	patent_lab_deep_details_container.add_child(patent_actions)
+	patent_box.add_child(patent_actions)
 	var file_pat := Button.new()
 	file_pat.text = "Déposer le premier brevet candidat (8 000 €)"
 	file_pat.pressed.connect(_file_patent)
