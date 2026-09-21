@@ -374,15 +374,62 @@ func _show_settings() -> void:
 	if not OS.has_feature("mobile"):
 		var fullscreen := CheckButton.new()
 		fullscreen.text = "Plein écran"
-		fullscreen.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+		fullscreen.button_pressed = bool(SettingsManager.get_setting("display", "fullscreen"))
 		fullscreen.toggled.connect(_toggle_fullscreen)
 		_modal_body.add_child(fullscreen)
 
+	var scale_label := Label.new()
+	scale_label.text = "Échelle de l'interface"
+	scale_label.add_theme_color_override("font_color", TEXT)
+	_modal_body.add_child(scale_label)
+
+	var ui_scale := OptionButton.new()
+	var scale_values := [0.90, 1.00, 1.10, 1.25]
+	for value in scale_values:
+		ui_scale.add_item("%d %%" % int(round(float(value) * 100.0)))
+		ui_scale.set_item_metadata(ui_scale.item_count - 1, float(value))
+	var current_scale := float(SettingsManager.get_setting("display", "ui_scale"))
+	var best_index := 0
+	var best_delta := 999.0
+	for i in range(ui_scale.item_count):
+		var delta := absf(float(ui_scale.get_item_metadata(i)) - current_scale)
+		if delta < best_delta:
+			best_delta = delta
+			best_index = i
+	ui_scale.select(best_index)
+	ui_scale.item_selected.connect(func(index: int):
+		SettingsManager.set_ui_scale(float(ui_scale.get_item_metadata(index)))
+	)
+	_modal_body.add_child(ui_scale)
+
+	var reduce_motion := CheckButton.new()
+	reduce_motion.text = "Réduire les animations"
+	reduce_motion.button_pressed = bool(SettingsManager.get_setting("display", "reduce_motion"))
+	reduce_motion.toggled.connect(func(enabled: bool):
+		SettingsManager.set_setting("display", "reduce_motion", enabled)
+	)
+	_modal_body.add_child(reduce_motion)
+
+	var tutorial := CheckButton.new()
+	tutorial.text = "Guidage de Nora / tutoriel progressif"
+	tutorial.button_pressed = bool(SettingsManager.get_setting("gameplay", "tutorial_enabled"))
+	tutorial.toggled.connect(func(enabled: bool):
+		SettingsManager.set_setting("gameplay", "tutorial_enabled", enabled)
+	)
+	_modal_body.add_child(tutorial)
+
 	var responsive := Label.new()
-	responsive.text = "L'interface s'adapte automatiquement à la taille disponible. Les paramètres graphiques complets seront ajoutés ici progressivement."
+	responsive.text = "Ces réglages sont enregistrés séparément des parties et restent identiques quel que soit le profil chargé."
 	responsive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	responsive.add_theme_color_override("font_color", MUTED)
 	_modal_body.add_child(responsive)
+
+	var reset := _menu_button("Réinitialiser les paramètres")
+	reset.pressed.connect(func():
+		SettingsManager.reset_to_defaults()
+		_show_settings()
+	)
+	_modal_body.add_child(reset)
 
 	var close := _menu_button("Fermer", true)
 	close.pressed.connect(_close_modal)
@@ -396,9 +443,7 @@ func _show_credits() -> void:
 	)
 
 func _toggle_fullscreen(enabled: bool) -> void:
-	DisplayServer.window_set_mode(
-		DisplayServer.WINDOW_MODE_FULLSCREEN if enabled else DisplayServer.WINDOW_MODE_WINDOWED
-	)
+	SettingsManager.set_fullscreen(enabled)
 
 func _close_modal() -> void:
 	_modal_layer.visible = false
