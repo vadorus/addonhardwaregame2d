@@ -70,6 +70,18 @@ const BRANCH_DEFS := {
 	}
 }
 
+const PROGRAMMING_TREE := [
+	{"level":2,"title":"Code structuré","effect":"Tous les logiciels +5% vitesse","software_speed":0.05},
+	{"level":3,"title":"Tests & débogage","effect":"Qualité logiciel +6 • validation CPU +2%","software_quality":6.0,"cpu_confidence":0.02},
+	{"level":4,"title":"Bas niveau & assembleur","effect":"Embarqué/électronique +8% • CPU +3% vitesse","hardware_speed":0.08,"cpu_speed":0.03},
+	{"level":5,"title":"Outillage de développement","effect":"Tous les projets +5% vitesse • coûts logiciel -3%","global_speed":0.05,"software_cost":0.03},
+	{"level":6,"title":"Simulation numérique","effect":"CPU +5% vitesse • validation CPU +3%","cpu_speed":0.05,"cpu_confidence":0.03},
+	{"level":7,"title":"Microcode & compilation","effect":"CPU +6% vitesse • qualité CPU +5","cpu_speed":0.06,"cpu_quality":5.0}
+]
+
+var programming_level := 1
+var programming_xp := 0
+
 var level := 1
 var level_xp := 0
 var total_xp := 0
@@ -96,9 +108,72 @@ func reset() -> void:
 	level = 1
 	level_xp = 0
 	total_xp = 0
+	programming_level = 1
+	programming_xp = 0
 	skills = _default_skills()
 	_reset_branches()
 	founder_changed.emit()
+
+func programming_xp_to_next() -> int:
+	return 80 + (programming_level - 1) * 65
+
+func programming_xp_ratio() -> float:
+	return clampf(float(programming_xp) / maxf(float(programming_xp_to_next()), 1.0), 0.0, 1.0)
+
+func add_programming_mastery(xp_amount: int) -> void:
+	if xp_amount <= 0:
+		return
+	programming_xp += xp_amount
+	while programming_xp >= programming_xp_to_next():
+		programming_xp -= programming_xp_to_next()
+		programming_level += 1
+		founder_changed.emit()
+	founder_changed.emit()
+
+func programming_tree() -> Array:
+	var rows: Array = []
+	for node_value in PROGRAMMING_TREE:
+		var node: Dictionary = node_value.duplicate(true)
+		node["unlocked"] = programming_level >= int(node.get("level", 99))
+		rows.append(node)
+	return rows
+
+func next_programming_perk() -> Dictionary:
+	for node_value in programming_tree():
+		var node: Dictionary = node_value
+		if not bool(node.get("unlocked", false)):
+			return node
+	return {}
+
+func _programming_bonus(key: String) -> float:
+	var total := 0.0
+	for node_value in programming_tree():
+		var node: Dictionary = node_value
+		if bool(node.get("unlocked", false)):
+			total += float(node.get(key, 0.0))
+	return total
+
+func software_programming_speed_multiplier() -> float:
+	var skill_bonus := lerpf(1.0, 1.18, skill_value(SKILL_PROGRAMMING) / 100.0)
+	return clampf(skill_bonus + _programming_bonus("software_speed") + _programming_bonus("global_speed"), 1.0, 1.65)
+
+func software_programming_quality_bonus() -> float:
+	return skill_value(SKILL_PROGRAMMING) * 0.05 + _programming_bonus("software_quality")
+
+func software_programming_cost_discount() -> float:
+	return clampf(_programming_bonus("software_cost"), 0.0, 0.20)
+
+func hardware_programming_multiplier() -> float:
+	return clampf(1.0 + _programming_bonus("hardware_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 800.0, 1.0, 1.45)
+
+func cpu_development_multiplier() -> float:
+	return clampf(1.0 + _programming_bonus("cpu_speed") + _programming_bonus("global_speed") + skill_value(SKILL_PROGRAMMING) / 1000.0, 1.0, 1.35)
+
+func cpu_programming_confidence_bonus() -> float:
+	return clampf(_programming_bonus("cpu_confidence") * 100.0 + skill_value(SKILL_PROGRAMMING) * 0.04, 0.0, 10.0)
+
+func cpu_programming_quality_bonus() -> float:
+	return clampf(_programming_bonus("cpu_quality") + skill_value(SKILL_PROGRAMMING) * 0.03, 0.0, 9.0)
 
 func xp_to_next_level() -> int:
 	return 100 + (level - 1) * 60
@@ -205,7 +280,7 @@ func branch_reward_bonus(branch: String) -> float:
 	return clampf(_branch_bonus(branch, "reward"), 0.0, 0.30)
 
 func programming_multiplier() -> float:
-	return lerpf(0.88, 1.28, skill_value(SKILL_PROGRAMMING) / 100.0)
+	return software_programming_speed_multiplier()
 
 func electronics_multiplier() -> float:
 	return lerpf(0.85, 1.32, skill_value(SKILL_ELECTRONICS) / 100.0)
@@ -221,6 +296,8 @@ func get_state() -> Dictionary:
 		"level":level,
 		"level_xp":level_xp,
 		"total_xp":total_xp,
+		"programming_level":programming_level,
+		"programming_xp":programming_xp,
 		"skills":skills.duplicate(true),
 		"branch_levels":branch_levels.duplicate(true),
 		"branch_xp":branch_xp.duplicate(true)
@@ -233,6 +310,8 @@ func load_state(state: Dictionary) -> void:
 	level = maxi(int(state.get("level", 1)), 1)
 	level_xp = maxi(int(state.get("level_xp", 0)), 0)
 	total_xp = maxi(int(state.get("total_xp", level_xp)), 0)
+	programming_level = maxi(int(state.get("programming_level", 1)), 1)
+	programming_xp = maxi(int(state.get("programming_xp", 0)), 0)
 	skills = _default_skills()
 	var loaded_skills: Dictionary = state.get("skills", {})
 	for skill in SKILL_LABELS.keys():
