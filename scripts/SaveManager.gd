@@ -86,9 +86,13 @@ func _slot_metadata(slot_id: String) -> Dictionary:
 
 func list_slots() -> Array:
 	var slots: Array = []
+	var has_modern_save := false
 	for slot_id in SLOT_IDS:
-		slots.append(_slot_metadata(slot_id))
-	if FileAccess.file_exists(LEGACY_SAVE_PATH):
+		var metadata := _slot_metadata(slot_id)
+		slots.append(metadata)
+		if bool(metadata.get("exists", false)):
+			has_modern_save = true
+	if not has_modern_save and FileAccess.file_exists(LEGACY_SAVE_PATH):
 		var legacy_state := _read_state(LEGACY_SAVE_PATH)
 		if not legacy_state.is_empty():
 			var company_state = legacy_state.get("company", {})
