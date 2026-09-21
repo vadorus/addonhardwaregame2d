@@ -323,8 +323,8 @@ func _apply_layout() -> void:
 	if _left_panel == null:
 		return
 	var viewport_size := get_viewport_rect().size
-	var ratio := viewport_size.x / max(viewport_size.y, 1.0)
-	var compact := viewport_size.y < 620.0 or ratio > 2.05
+	var ratio: float = viewport_size.x / maxf(viewport_size.y, 1.0)
+	var compact: bool = viewport_size.y < 620.0 or ratio > 2.05
 	if compact:
 		_left_panel.custom_minimum_size.x = 340
 		_logo.custom_minimum_size = Vector2(290, 150)
