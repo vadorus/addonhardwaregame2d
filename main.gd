@@ -227,6 +227,19 @@ var startup_founder_branch_label: Label
 var startup_roadmap_card: PanelContainer
 var startup_roadmap_label: Label
 var lab_startup_roadmap_label: Label
+
+var tutorial_overlay: Control
+var tutorial_dim_top: ColorRect
+var tutorial_dim_bottom: ColorRect
+var tutorial_dim_left: ColorRect
+var tutorial_dim_right: ColorRect
+var tutorial_highlight: PanelContainer
+var tutorial_bubble: PanelContainer
+var tutorial_bubble_title: Label
+var tutorial_bubble_text: Label
+var _tutorial_target: Control
+var _tutorial_step_id := ""
+
 var _refresh_pending := false
 
 func _ready():
@@ -235,6 +248,7 @@ func _ready():
 	_build_ui()
 	_connect_signals()
 	resized.connect(_update_responsive_layout)
+	resized.connect(func(): call_deferred("_refresh_tutorial_overlay"))
 	_refresh_all()
 	setup_layer.visible = not CompanyManager.created
 	call_deferred("_update_responsive_layout")
@@ -439,6 +453,205 @@ func _build_ui():
 	_build_game_over_layer()
 	_build_research_event_layer()
 	_build_system_menu_layer()
+	_build_tutorial_overlay()
+
+func _build_tutorial_overlay() -> void:
+	tutorial_overlay = Control.new()
+	tutorial_overlay.name = "TutorialOverlay"
+	tutorial_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tutorial_overlay.visible = false
+	add_child(tutorial_overlay)
+
+	var dims: Array[ColorRect] = []
+	for _index in range(4):
+		var dim := ColorRect.new()
+		dim.color = Color(0.0, 0.0, 0.0, 0.64)
+		dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tutorial_overlay.add_child(dim)
+		dims.append(dim)
+	tutorial_dim_top = dims[0]
+	tutorial_dim_bottom = dims[1]
+	tutorial_dim_left = dims[2]
+	tutorial_dim_right = dims[3]
+
+	tutorial_highlight = PanelContainer.new()
+	tutorial_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var glow := _stylebox(Color(1.0, 0.74, 0.35, 0.05), 12, 3, APP_AMBER, 0)
+	glow.shadow_color = Color(1.0, 0.65, 0.20, 0.48)
+	glow.shadow_size = 10
+	tutorial_highlight.add_theme_stylebox_override("panel", glow)
+	tutorial_overlay.add_child(tutorial_highlight)
+
+	tutorial_bubble = _card(Color(0.035, 0.055, 0.075, 0.995), 15, 16)
+	tutorial_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_overlay.add_child(tutorial_bubble)
+	var bubble_box := VBoxContainer.new()
+	bubble_box.add_theme_constant_override("separation", 7)
+	tutorial_bubble.add_child(bubble_box)
+	tutorial_bubble_title = _label("Nora • Tutoriel", 17)
+	tutorial_bubble_title.add_theme_color_override("font_color", APP_AMBER)
+	bubble_box.add_child(tutorial_bubble_title)
+	tutorial_bubble_text = _muted_label("", 13)
+	tutorial_bubble_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bubble_box.add_child(tutorial_bubble_text)
+	var pointer := _label("↓  Regardez la zone éclairée", 12)
+	pointer.add_theme_color_override("font_color", APP_CYAN)
+	bubble_box.add_child(pointer)
+
+func _tutorial_state() -> Dictionary:
+	if not CompanyManager.created or not StartupManager.is_pre_cpu_phase():
+		return {}
+	if setup_layer != null and setup_layer.visible:
+		return {}
+	if startup_intro_layer != null and startup_intro_layer.visible:
+		return {}
+	if month_layer != null and month_layer.visible:
+		return {}
+	if game_over_layer != null and game_over_layer.visible:
+		return {}
+	if system_menu_layer != null and system_menu_layer.visible:
+		return {}
+	if research_event_layer != null and research_event_layer.visible:
+		return {}
+
+	var first_not_started := StartupManager.software_contracts_completed == 0 and StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty()
+	if first_not_started:
+		return {
+			"id":"FIRST_CONTRACT",
+			"target":startup_contract_action_button,
+			"title":"Nora • Première étape",
+			"text":"Pour commencer, une seule chose compte : acceptez ce petit contrat. Je vous expliquerai les jauges seulement quand elles deviendront utiles."
+		}
+
+	if StartupManager.is_first_contract_tutorial():
+		var project := StartupManager.active_contract
+		if bool(project.get("deadline_pending", false)):
+			return {
+				"id":"DEADLINE",
+				"target":startup_work_actions,
+				"title":"Nora • Échéance atteinte",
+				"text":"Le projet n'est pas fini à temps. Choisissez maintenant comment réagir : heures supplémentaires, périmètre réduit ou abandon."
+			}
+		if bool(project.get("milestone_pending", false)):
+			return {
+				"id":"MILESTONE",
+				"target":startup_work_actions,
+				"title":"Nora • Le client change d'avis",
+				"text":"Voilà votre première vraie décision. Chaque réponse change l'argent, la relation client ou la quantité de travail restante."
+			}
+
+		var progress := float(project.get("progress", 0.0))
+		if progress < 30.0:
+			return {
+				"id":"DEVELOPMENT",
+				"target":startup_work_meter_bar,
+				"title":"Nora • Développement",
+				"text":"Cette jauge se remplit sans cliquer. Votre compétence Programmation détermine les points produits chaque jour. L'objectif est d'atteindre la cible avant la date limite."
+			}
+		if progress < 60.0:
+			return {
+				"id":"ROBUSTNESS",
+				"target":startup_quality_meter_bar,
+				"title":"Nora • Robustesse et défauts",
+				"text":"Aller vite ne suffit pas. Le client exige aussi une robustesse minimale. Les défauts réduisent la qualité et peuvent diminuer votre paiement."
+			}
+		return {
+			"id":"PROJECTION",
+			"target":startup_project_meter_box,
+			"title":"Nora • Lisez le projet, pas seulement le pourcentage",
+			"text":"Comparez travail produit, jours restants, robustesse et défauts. Vous devez apprendre à prévoir si le projet terminera correctement avant l'échéance."
+		}
+
+	if not StartupManager.last_contract_result.is_empty() and StartupManager.software_contracts_completed == 1:
+		return {
+			"id":"FIRST_RESULT",
+			"target":startup_action_button,
+			"title":"Nora • Premier paiement",
+			"text":"Le contrat est terminé. Regardez le résultat, puis continuez : les contrats deviennent optionnels et l'argent gagné ouvre maintenant la route vers le hardware."
+		}
+
+	if StartupManager.stage == StartupManager.STAGE_FIRST_HIRE:
+		return {
+			"id":"FIRST_HIRE",
+			"target":startup_action_button,
+			"title":"Nora • Vous ne pouvez plus tout faire seul",
+			"text":"Votre prochaine progression n'est pas un autre petit logiciel. Recrutez une compétence électronique pour transformer le garage en véritable atelier."
+		}
+
+	if StartupManager.stage == StartupManager.STAGE_ELECTRONICS and StartupManager.electronics_project.is_empty():
+		return {
+			"id":"ELECTRONICS",
+			"target":startup_action_button,
+			"title":"Nora • Du logiciel au matériel",
+			"text":"Lancez votre premier prototype électronique. C'est cette étape concrète qui vous donnera les bases nécessaires pour attaquer ensuite un processeur."
+		}
+
+	if StartupManager.stage == StartupManager.STAGE_CPU_READY:
+		return {
+			"id":"CPU_READY",
+			"target":startup_action_button,
+			"title":"Nora • Votre premier CPU",
+			"text":"Le laboratoire CPU est enfin disponible. À partir d'ici, vous allez choisir un usage, assembler les premières décisions techniques et apprendre les réglages progressivement."
+		}
+	return {}
+
+func _refresh_tutorial_overlay() -> void:
+	if tutorial_overlay == null:
+		return
+	var state := _tutorial_state()
+	if state.is_empty():
+		tutorial_overlay.visible = false
+		_tutorial_target = null
+		_tutorial_step_id = ""
+		if startup_nora_card != null:
+			startup_nora_card.visible = not _startup_nora_guidance().is_empty()
+		return
+
+	var target := state.get("target") as Control
+	if target == null or not target.is_visible_in_tree():
+		tutorial_overlay.visible = false
+		return
+
+	tutorial_overlay.visible = true
+	_tutorial_target = target
+	_tutorial_step_id = str(state.get("id", ""))
+	tutorial_bubble_title.text = str(state.get("title", "Nora • Tutoriel"))
+	tutorial_bubble_text.text = str(state.get("text", ""))
+	if startup_nora_card != null:
+		startup_nora_card.visible = false
+
+	var own_rect := get_global_rect()
+	var target_rect := target.get_global_rect()
+	var focus := Rect2(target_rect.position - own_rect.position, target_rect.size).grow(10.0)
+	var screen_size := size
+	focus.position.x = clampf(focus.position.x, 4.0, maxf(screen_size.x - 8.0, 4.0))
+	focus.position.y = clampf(focus.position.y, 4.0, maxf(screen_size.y - 8.0, 4.0))
+	focus.size.x = minf(focus.size.x, maxf(screen_size.x - focus.position.x - 4.0, 1.0))
+	focus.size.y = minf(focus.size.y, maxf(screen_size.y - focus.position.y - 4.0, 1.0))
+
+	tutorial_highlight.position = focus.position
+	tutorial_highlight.size = focus.size
+
+	tutorial_dim_top.position = Vector2.ZERO
+	tutorial_dim_top.size = Vector2(screen_size.x, maxf(focus.position.y, 0.0))
+	tutorial_dim_bottom.position = Vector2(0.0, focus.end.y)
+	tutorial_dim_bottom.size = Vector2(screen_size.x, maxf(screen_size.y - focus.end.y, 0.0))
+	tutorial_dim_left.position = Vector2(0.0, focus.position.y)
+	tutorial_dim_left.size = Vector2(maxf(focus.position.x, 0.0), focus.size.y)
+	tutorial_dim_right.position = Vector2(focus.end.x, focus.position.y)
+	tutorial_dim_right.size = Vector2(maxf(screen_size.x - focus.end.x, 0.0), focus.size.y)
+
+	var bubble_width := minf(420.0, maxf(screen_size.x - 24.0, 260.0))
+	var bubble_height := 170.0
+	tutorial_bubble.size = Vector2(bubble_width, bubble_height)
+	var bubble_x := clampf(focus.get_center().x - bubble_width * 0.5, 12.0, maxf(screen_size.x - bubble_width - 12.0, 12.0))
+	var bubble_y := focus.end.y + 16.0
+	if bubble_y + bubble_height > screen_size.y - 12.0:
+		bubble_y = focus.position.y - bubble_height - 16.0
+	if bubble_y < 12.0:
+		bubble_y = 12.0
+	tutorial_bubble.position = Vector2(bubble_x, bubble_y)
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
@@ -1003,6 +1216,7 @@ func _refresh_startup_dashboard() -> void:
 			startup_action_button.visible = false
 
 	startup_roadmap_label.text = _startup_roadmap_text()
+	call_deferred("_refresh_tutorial_overlay")
 
 func _startup_contract_action() -> void:
 	if startup_contract_select == null or startup_contract_select.item_count <= 0:
@@ -3178,6 +3392,7 @@ func _perform_full_refresh():
 	_refresh_products()
 	_refresh_market()
 	_refresh_media()
+	call_deferred("_refresh_tutorial_overlay")
 
 func _refresh_navigation_progression():
 	if tabs == null:
