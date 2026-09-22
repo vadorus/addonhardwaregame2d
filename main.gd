@@ -203,6 +203,9 @@ var startup_intro_text: Label
 var startup_dashboard_panel: PanelContainer
 var startup_summary_label: Label
 var startup_progress_label: Label
+var startup_nora_card: PanelContainer
+var startup_nora_title: Label
+var startup_nora_text: Label
 var startup_project_meter_box: VBoxContainer
 var startup_work_meter_label: Label
 var startup_work_meter_bar: ProgressBar
@@ -628,6 +631,18 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(startup_progress_label)
 
+	startup_nora_card = _card(Color(0.075, 0.055, 0.025, 0.97), 12, 12)
+	box.add_child(startup_nora_card)
+	var nora_box := VBoxContainer.new()
+	nora_box.add_theme_constant_override("separation", 5)
+	startup_nora_card.add_child(nora_box)
+	startup_nora_title = _label("Nora • Guide", 14)
+	startup_nora_title.add_theme_color_override("font_color", APP_AMBER)
+	nora_box.add_child(startup_nora_title)
+	startup_nora_text = _muted_label("", 12)
+	startup_nora_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nora_box.add_child(startup_nora_text)
+
 	startup_project_meter_box = VBoxContainer.new()
 	startup_project_meter_box.add_theme_constant_override("separation", 4)
 	startup_project_meter_box.visible = false
@@ -705,7 +720,7 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	box.add_child(startup_contract_hint)
 
 	startup_contract_action_button = Button.new()
-	startup_contract_action_button.text = "Accepter ce contrat"
+	startup_contract_action_button.text = "Accepter le contrat et commencer"
 	startup_contract_action_button.custom_minimum_size.y = 48
 	startup_contract_action_button.pressed.connect(_startup_contract_action)
 	box.add_child(startup_contract_action_button)
@@ -833,6 +848,38 @@ func _startup_roadmap_text() -> String:
 		lines.append("• %s — %s\n  %s" % [str(row.get("title", "")), badge, str(row.get("condition", ""))])
 	return "\n".join(lines)
 
+func _startup_nora_guidance() -> Dictionary:
+	var tutorial := StartupManager.first_contract_tutorial_message()
+	if not tutorial.is_empty():
+		return tutorial
+	if not StartupManager.last_contract_result.is_empty() and StartupManager.software_contracts_completed == 1:
+		return {
+			"title":"Nora • Votre premier vrai paiement",
+			"text":"Vous avez prouvé que le garage peut rapporter de l'argent. À partir de maintenant, les contrats sont optionnels : ils servent à financer et améliorer l'entreprise, mais ils ne bloquent plus votre route vers le hardware."
+		}
+	match StartupManager.stage:
+		StartupManager.STAGE_GARAGE:
+			return {
+				"title":"Nora • Commencez simple",
+				"text":"La Quincaillerie Morel a besoin d'un petit logiciel de stock. C'est votre contrat tutoriel : acceptez-le, puis observez comment votre niveau de Programmation transforme le temps en points de développement."
+			}
+		StartupManager.STAGE_FIRST_HIRE:
+			return {
+				"title":"Nora • Le garage peut grandir",
+				"text":"Le premier contrat a payé. Votre prochaine étape n'est pas de collectionner les petits logiciels : utilisez ce capital pour recruter une compétence que vous n'avez pas encore et préparer l'électronique."
+			}
+		StartupManager.STAGE_ELECTRONICS:
+			return {
+				"title":"Nora • Du code au matériel",
+				"text":"Avec une ingénieure à vos côtés, construisez un premier contrôleur logique. C'est le pont concret entre ce que vous savez programmer et le futur processeur."
+			}
+		StartupManager.STAGE_CPU_READY:
+			return {
+				"title":"Nora • Le vrai défi commence",
+				"text":"Le programme CPU est prêt. Je vais vous guider génération après génération : d'abord l'usage et les compromis fondamentaux, puis les réglages avancés apparaîtront quand ils auront un sens."
+			}
+	return {}
+
 func _refresh_startup_dashboard() -> void:
 	if startup_dashboard_panel == null:
 		return
@@ -845,6 +892,11 @@ func _refresh_startup_dashboard() -> void:
 	var objective := StartupManager.current_objective()
 	startup_summary_label.text = str(objective.get("title", "Votre garage"))
 	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
+	var guidance := _startup_nora_guidance()
+	startup_nora_card.visible = not guidance.is_empty()
+	if not guidance.is_empty():
+		startup_nora_title.text = str(guidance.get("title", "Nora • Guide"))
+		startup_nora_text.text = str(guidance.get("text", ""))
 	var action := str(objective.get("action", ""))
 	var has_contract := not StartupManager.active_contract.is_empty()
 	startup_project_meter_box.visible = has_contract
