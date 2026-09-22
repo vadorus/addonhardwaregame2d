@@ -1271,7 +1271,7 @@ func _refresh_startup_dashboard() -> void:
 		var robustness_required := float(project.get("robustness_required", 0.0))
 		var tutorial_progress := float(project.get("progress", 0.0))
 		startup_work_meter_bar.max_value = work_required
-		startup_work_meter_bar.value = work_done
+		_animate_progress_bar(startup_work_meter_bar, work_done)
 		startup_work_meter_label.text = "DÉVELOPPEMENT  %.0f / %.0f pts  •  +%.1f/jour  •  %d jours restants" % [work_done, work_required, float(projection.get("points_per_day", 0.0)), int(projection.get("days_left", 0))]
 		if first_contract_running and tutorial_progress >= 30.0:
 			startup_quality_meter_label.visible = true
@@ -1279,7 +1279,15 @@ func _refresh_startup_dashboard() -> void:
 			startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d" % [robustness, robustness_required, int(project.get("defects", 0))]
 		else:
 			startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d  •  projection %s" % [robustness, robustness_required, int(project.get("defects", 0)), "OK" if bool(projection.get("on_track", false)) else "RETARD"]
-		startup_quality_meter_bar.value = robustness
+		_animate_progress_bar(startup_quality_meter_bar, robustness, 0.24)
+		if first_contract_running:
+			_update_tutorial_work_feedback(project)
+		else:
+			_reset_tutorial_work_feedback()
+	else:
+		_reset_tutorial_work_feedback()
+
+	_update_result_feedback()
 
 	var contract_choices_visible := StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and not StartupManager.available_contract_ids().is_empty()
 	startup_contract_select.visible = contract_choices_visible and not first_contract_not_started
@@ -1352,6 +1360,7 @@ func _startup_contract_action() -> void:
 	if startup_approach_select != null and startup_approach_select.item_count > 0:
 		approach = str(startup_approach_select.get_item_metadata(startup_approach_select.selected))
 	if StartupManager.start_software_contract(_meta(startup_contract_select), approach):
+		SoundManager.play_ui("accept")
 		status_label.text = "Le travail commence. Regardez la jauge Développement : Nora vous guide étape par étape."
 	else:
 		status_label.text = "Impossible d'accepter ce contrat : vérifiez la trésorerie et la capacité disponible."
@@ -1389,12 +1398,14 @@ func _startup_work_action(action: String) -> void:
 	if objective_action == "CONTRACT_MILESTONE":
 		var choice: String = str({"BUILD":"SCOPE", "TEST":"EXTRA", "CLIENT":"REFUSE"}.get(action, ""))
 		if StartupManager.resolve_contract_milestone(choice):
+			SoundManager.play_ui("decision")
 			status_label.text = "Décision enregistrée. Le projet reprend avec ses nouvelles contraintes."
 			_refresh_all()
 			return
 	if objective_action == "CONTRACT_DEADLINE":
 		var deadline_choice: String = str({"BUILD":"OVERTIME", "TEST":"REDUCE_SCOPE", "CLIENT":"ABANDON"}.get(action, ""))
 		if StartupManager.resolve_contract_deadline(deadline_choice):
+			SoundManager.play_ui("decision")
 			status_label.text = "Décision de crise enregistrée. La projection et la récompense ont été recalculées."
 			_refresh_all()
 			return
@@ -1411,6 +1422,7 @@ func _startup_work_action(action: String) -> void:
 		status_label.text = "Aucune action manuelle nécessaire pour ce projet."
 
 func _on_startup_milestone(title: String, message: String) -> void:
+	SoundManager.play_ui("unlock")
 	status_label.text = "%s — %s" % [title, message]
 	_refresh_all()
 
@@ -1462,6 +1474,8 @@ func _close_startup_intro() -> void:
 	if startup_intro_layer != null:
 		startup_intro_layer.visible = false
 	StartupManager.mark_intro_seen()
+	SoundManager.set_garage_ambience_enabled(true)
+	SoundManager.play_ui("unlock")
 	if not SimulationManager.is_game_over:
 		TimeManager.time_scale = 1.0
 
@@ -3518,6 +3532,7 @@ func _perform_full_refresh():
 	_refresh_products()
 	_refresh_market()
 	_refresh_media()
+	_update_audio_context()
 	call_deferred("_refresh_tutorial_overlay")
 
 func _refresh_navigation_progression():
