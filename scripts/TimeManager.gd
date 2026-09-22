@@ -30,6 +30,7 @@ func _process(delta):
 
 func _next_day():
 	day += 1
+	SimulationManager.process_day()
 	if day > 30:
 		SimulationManager.process_month_end()
 		day = 1
