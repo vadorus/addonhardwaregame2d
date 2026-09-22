@@ -219,10 +219,12 @@ var startup_action_button: Button
 var startup_work_actions: HFlowContainer
 var startup_work_hint: Label
 var startup_work_buttons: Array[Button] = []
+var startup_founder_card: PanelContainer
 var startup_founder_level_label: Label
 var startup_founder_xp_bar: ProgressBar
 var startup_founder_skill_bars: Dictionary = {}
 var startup_founder_branch_label: Label
+var startup_roadmap_card: PanelContainer
 var startup_roadmap_label: Label
 var lab_startup_roadmap_label: Label
 var _refresh_pending := false
@@ -664,11 +666,11 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_quality_meter_bar.custom_minimum_size.y = 14
 	startup_project_meter_box.add_child(startup_quality_meter_bar)
 
-	var founder_card := _card(Color(0.025, 0.050, 0.078, 0.98), 12, 12)
-	box.add_child(founder_card)
+	startup_founder_card = _card(Color(0.025, 0.050, 0.078, 0.98), 12, 12)
+	box.add_child(startup_founder_card)
 	var founder_box := VBoxContainer.new()
 	founder_box.add_theme_constant_override("separation", 6)
-	founder_card.add_child(founder_box)
+	startup_founder_card.add_child(founder_box)
 	var founder_head := HBoxContainer.new()
 	founder_box.add_child(founder_head)
 	founder_head.add_child(_eyebrow("VOTRE PERSONNAGE"))
@@ -720,8 +722,9 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	box.add_child(startup_contract_hint)
 
 	startup_contract_action_button = Button.new()
-	startup_contract_action_button.text = "Accepter le contrat et commencer"
-	startup_contract_action_button.custom_minimum_size.y = 48
+	startup_contract_action_button.text = "COMMENCER LE PREMIER CONTRAT"
+	startup_contract_action_button.custom_minimum_size.y = 62
+	startup_contract_action_button.add_theme_font_size_override("font_size", 18)
 	startup_contract_action_button.pressed.connect(_startup_contract_action)
 	box.add_child(startup_contract_action_button)
 
@@ -746,11 +749,11 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_work_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(startup_work_hint)
 
-	var roadmap_card := _card(Color(0.025, 0.045, 0.070, 0.96), 11, 11)
-	box.add_child(roadmap_card)
+	startup_roadmap_card = _card(Color(0.025, 0.045, 0.070, 0.96), 11, 11)
+	box.add_child(startup_roadmap_card)
 	var roadmap_box := VBoxContainer.new()
 	roadmap_box.add_theme_constant_override("separation", 5)
-	roadmap_card.add_child(roadmap_box)
+	startup_roadmap_card.add_child(roadmap_box)
 	roadmap_box.add_child(_eyebrow("ROADMAP TECHNOLOGIQUE"))
 	startup_roadmap_label = _muted_label("", 12)
 	startup_roadmap_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -818,7 +821,18 @@ func _refresh_startup_contract_hint() -> void:
 	if startup_approach_select != null and startup_approach_select.item_count > 0:
 		approach = str(startup_approach_select.get_item_metadata(startup_approach_select.selected))
 	var preview := StartupManager.contract_preview(contract_id, approach)
-	var deadline_fit := "✓ faisable à ce rythme" if bool(preview.get("fits_deadline", false)) else "⚠ risque de retard"
+	var deadline_fit := "✓ Vous devriez réussir dans les temps" if bool(preview.get("fits_deadline", false)) else "⚠ Ce contrat dépasse votre capacité actuelle"
+	if StartupManager.software_contracts_completed == 0 and contract_id == "STOCK":
+		startup_contract_hint.text = "QUINCAILLERIE MOREL\n%s\n\nDifficulté  %s     Travail  %.0f pts     Délai  %d jours\nVotre rythme  +%.1f pts/jour     %s\n\nPaiement prévu  %s €" % [
+			str(data.get("description", "")),
+			"★".repeat(int(preview.get("difficulty", 1))),
+			float(preview.get("work_required", 0.0)),
+			int(preview.get("deadline_days", 0)),
+			float(preview.get("points_per_day", 0.0)),
+			deadline_fit,
+			_money(int(data.get("reward", 0)))
+		]
+		return
 	startup_contract_hint.text = "%s\n%s • %s • difficulté %s\n%.0f points à produire • délai %d jours • %.1f pts/jour\nProjection : %.0f/%.0f points — %s\n%s €/mois • paiement de base %s € • robustesse exigée %d" % [
 		str(data.get("client", "Client")),
 		str(data.get("description", "")),
@@ -890,8 +904,10 @@ func _refresh_startup_dashboard() -> void:
 
 	_refresh_founder_panel()
 	var objective := StartupManager.current_objective()
-	startup_summary_label.text = str(objective.get("title", "Votre garage"))
-	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
+	var first_contract_not_started := StartupManager.software_contracts_completed == 0 and StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty()
+	var first_contract_running := StartupManager.is_first_contract_tutorial()
+	startup_summary_label.text = "PREMIER OBJECTIF" if first_contract_not_started else str(objective.get("title", "Votre garage"))
+	startup_progress_label.text = "Gagnez votre premier vrai paiement. Nora vous explique le reste au fur et à mesure." if first_contract_not_started else "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
 	var guidance := _startup_nora_guidance()
 	startup_nora_card.visible = not guidance.is_empty()
 	if not guidance.is_empty():
@@ -899,7 +915,14 @@ func _refresh_startup_dashboard() -> void:
 		startup_nora_text.text = str(guidance.get("text", ""))
 	var action := str(objective.get("action", ""))
 	var has_contract := not StartupManager.active_contract.is_empty()
+
+	# Le tutoriel révèle les systèmes au moment où ils deviennent utiles.
+	startup_founder_card.visible = not first_contract_not_started and not first_contract_running
+	startup_roadmap_card.visible = StartupManager.software_contracts_completed >= 1
 	startup_project_meter_box.visible = has_contract
+	startup_quality_meter_label.visible = not first_contract_running
+	startup_quality_meter_bar.visible = not first_contract_running
+
 	if has_contract:
 		var project := StartupManager.active_contract
 		var projection := StartupManager.contract_projection()
@@ -907,17 +930,24 @@ func _refresh_startup_dashboard() -> void:
 		var work_required := maxf(float(project.get("work_required", 1.0)), 1.0)
 		var robustness := float(project.get("robustness", 0.0))
 		var robustness_required := float(project.get("robustness_required", 0.0))
+		var tutorial_progress := float(project.get("progress", 0.0))
 		startup_work_meter_bar.max_value = work_required
 		startup_work_meter_bar.value = work_done
-		startup_work_meter_label.text = "DÉVELOPPEMENT  %.0f / %.0f pts  •  +%.1f/jour  •  J-%d" % [work_done, work_required, float(projection.get("points_per_day", 0.0)), int(projection.get("days_left", 0))]
+		startup_work_meter_label.text = "DÉVELOPPEMENT  %.0f / %.0f pts  •  +%.1f/jour  •  %d jours restants" % [work_done, work_required, float(projection.get("points_per_day", 0.0)), int(projection.get("days_left", 0))]
+		if first_contract_running and tutorial_progress >= 30.0:
+			startup_quality_meter_label.visible = true
+			startup_quality_meter_bar.visible = true
+		startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d" % [robustness, robustness_required, int(project.get("defects", 0))]
+		else:
+			startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d  •  projection %s" % [robustness, robustness_required, int(project.get("defects", 0)), "OK" if bool(projection.get("on_track", false)) else "RETARD"]
 		startup_quality_meter_bar.value = robustness
-		startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d  •  projection %s" % [robustness, robustness_required, int(project.get("defects", 0)), "OK" if bool(projection.get("on_track", false)) else "RETARD"]
 
 	var contract_choices_visible := StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and not StartupManager.available_contract_ids().is_empty()
-	startup_contract_select.visible = contract_choices_visible
-	startup_approach_select.visible = contract_choices_visible
+	startup_contract_select.visible = contract_choices_visible and not first_contract_not_started
+	startup_approach_select.visible = contract_choices_visible and not first_contract_not_started
 	startup_contract_hint.visible = contract_choices_visible
 	startup_contract_action_button.visible = contract_choices_visible
+	startup_contract_action_button.text = "COMMENCER LE PREMIER CONTRAT" if first_contract_not_started else "Accepter ce contrat"
 	if contract_choices_visible:
 		_refresh_startup_contract_options()
 		_refresh_startup_contract_hint()
@@ -982,7 +1012,7 @@ func _startup_contract_action() -> void:
 	if startup_approach_select != null and startup_approach_select.item_count > 0:
 		approach = str(startup_approach_select.get_item_metadata(startup_approach_select.selected))
 	if StartupManager.start_software_contract(_meta(startup_contract_select), approach):
-		status_label.text = "Contrat accepté. Le projet avance maintenant avec le temps : vous n'intervenez qu'aux décisions importantes."
+		status_label.text = "Le travail commence. Regardez la jauge Développement : Nora vous guide étape par étape."
 	else:
 		status_label.text = "Impossible d'accepter ce contrat : vérifiez la trésorerie et la capacité disponible."
 	_refresh_all()
@@ -2379,8 +2409,8 @@ func _build_setup_layer():
 	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); setup_layer.add_child(center)
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
-	var title:=_label("Créer votre projet technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("1971. Vous partez seul depuis votre garage. Les premiers mois servent à décrocher des contrats logiciels, constituer une trésorerie et gagner le droit d'attaquer le matériel.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var title:=_label("Votre aventure commence en 1971",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
+	var desc:=_label("Choisissez simplement un nom. Vous commencerez seul dans un garage ; Nora vous guidera vers votre premier contrat, puis vers l'électronique et votre premier CPU.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
 	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); setup_sector.visible=false; box.add_child(setup_sector)
 	setup_difficulty = OptionButton.new()
@@ -2987,7 +3017,7 @@ func _start_new_game():
 	SimulationManager.reset_all(setup_name.text,_meta(setup_sector),_meta(setup_difficulty))
 	setup_layer.visible=false
 	game_over_layer.visible=false
-	status_label.text="Objectif : décrochez vos premiers contrats logiciels depuis le garage."
+	status_label.text="Objectif : suivez Nora et décrochez votre premier paiement."
 	_refresh_all()
 	_show_startup_intro()
 
