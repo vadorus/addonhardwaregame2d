@@ -296,9 +296,11 @@ func _complete_active_contract() -> void:
 		verdict = "Contrat correct, mais certains compromis restent visibles."
 	elif stars >= 5:
 		verdict = "Excellent travail : le client veut retravailler avec vous."
+	var delivery_resume_speed := maxf(TimeManager.time_scale, 1.0)
 	last_contract_result = {
 		"client":client,
 		"title":title,
+		"resume_time_scale":delivery_resume_speed,
 		"stars":stars,
 		"verdict":verdict,
 		"reward":reward,
@@ -312,6 +314,7 @@ func _complete_active_contract() -> void:
 	}
 	CompanyManager.add_alert("Contrat livré : %s pour %s • %d/5 • paiement %d €." % [title, client, stars, reward])
 	active_contract = {}
+	TimeManager.time_scale = 0.0
 	if software_contracts_completed >= 2 and stage == STAGE_GARAGE and not first_engineer_hired:
 		stage = STAGE_FIRST_HIRE
 		milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre. Les contrats logiciels restent disponibles pour financer la suite.")
@@ -546,6 +549,8 @@ func resolve_contract_milestone(choice: String) -> bool:
 	return true
 
 func dismiss_last_contract_result() -> void:
+	if not last_contract_result.is_empty():
+		TimeManager.time_scale = maxf(float(last_contract_result.get("resume_time_scale", 1.0)), 1.0)
 	last_contract_result = {}
 	startup_changed.emit()
 
