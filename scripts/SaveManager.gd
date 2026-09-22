@@ -7,7 +7,7 @@ signal loading_finished(ok)
 
 const SAVE_DIR := "user://saves"
 const LEGACY_SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 26
+const SAVE_VERSION := 27
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
 const STATE_SECTIONS := [
@@ -121,6 +121,11 @@ func _migrate_state(raw_state: Dictionary) -> Dictionary:
 		# V26 introduit le moteur quotidien des contrats (brief, jauges, jalon, verdict).
 		# StartupManager complète les champs absents des contrats V25 lors du chargement.
 		state["version"] = 26
+		version = 26
+	if version <= 26:
+		# V27 ajoute difficulté, points de travail, échéance et crise de retard.
+		# Les contrats V26 en cours sont complétés par StartupManager au chargement.
+		state["version"] = 27
 	return state
 
 func _read_valid_state(path: String) -> Dictionary:
