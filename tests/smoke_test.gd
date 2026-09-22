@@ -9,10 +9,10 @@ func _ready() -> void:
 		_fail("main.tscn could not be loaded")
 		return
 	var main_instance: Node = (main_scene as PackedScene).instantiate()
-	if main_instance == null or not main_instance.has_method("_refresh_startup_dashboard"):
+	if main_instance == null or not main_instance.has_method("_refresh_startup_dashboard") or not main_instance.has_method("_refresh_tutorial_overlay"):
 		if main_instance != null:
 			main_instance.free()
-		_fail("main.tscn instantiated without its gameplay script")
+		_fail("main.tscn instantiated without its gameplay/tutorial script")
 		return
 	main_instance.free()
 
