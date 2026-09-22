@@ -25,6 +25,11 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	MarketManager.reset()
 	MediaManager.reset()
 
+func process_day() -> void:
+	if is_game_over:
+		return
+	StartupManager.process_day()
+
 func process_month_end() -> Dictionary:
 	if is_game_over:
 		return {}
