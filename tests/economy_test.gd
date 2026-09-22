@@ -9,19 +9,14 @@ func _ready() -> void:
 
 	for month_index in range(1, 25):
 		# Les décisions passent par les API de gameplay. Aucun argent n'est injecté
-		# et aucun manager mensuel n'est appelé directement.
-		if StartupManager.stage == StartupManager.STAGE_FIRST_HIRE and not StartupManager.first_engineer_hired:
-			if StartupManager.can_hire_first_engineer():
-				StartupManager.hire_first_engineer()
-
-		if StartupManager.stage == StartupManager.STAGE_ELECTRONICS and StartupManager.first_engineer_hired and StartupManager.electronics_project.is_empty():
-			if StartupManager.can_start_electronics_project():
-				StartupManager.start_electronics_project()
-
-		if StartupManager.active_contract.is_empty():
-			var selected_contract := _best_affordable_contract()
-			if selected_contract != "":
-				StartupManager.start_software_contract(selected_contract)
+		# et aucun manager métier n'est appelé directement.
+		for _day in range(30):
+			_take_startup_decisions()
+			SimulationManager.process_day()
+			if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("milestone_pending", false)):
+				StartupManager.resolve_contract_milestone("EXTRA")
+			if not StartupManager.last_contract_result.is_empty():
+				StartupManager.dismiss_last_contract_result()
 
 		var report := SimulationManager.process_month_end()
 		lowest_money = mini(lowest_money, Economy.money)
@@ -56,6 +51,23 @@ func _ready() -> void:
 		StartupManager.software_contracts_completed
 	])
 	get_tree().quit(0)
+
+func _take_startup_decisions() -> void:
+	if not StartupManager.last_contract_result.is_empty():
+		StartupManager.dismiss_last_contract_result()
+
+	if StartupManager.stage == StartupManager.STAGE_FIRST_HIRE and not StartupManager.first_engineer_hired:
+		if StartupManager.can_hire_first_engineer():
+			StartupManager.hire_first_engineer()
+
+	if StartupManager.stage == StartupManager.STAGE_ELECTRONICS and StartupManager.first_engineer_hired and StartupManager.electronics_project.is_empty():
+		if StartupManager.can_start_electronics_project():
+			StartupManager.start_electronics_project()
+
+	if StartupManager.active_contract.is_empty():
+		var selected_contract := _best_affordable_contract()
+		if selected_contract != "":
+			StartupManager.start_software_contract(selected_contract, "SOLID")
 
 func _best_affordable_contract() -> String:
 	var best_id := ""
