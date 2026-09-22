@@ -239,6 +239,13 @@ var tutorial_bubble_title: Label
 var tutorial_bubble_text: Label
 var _tutorial_target: Control
 var _tutorial_step_id := ""
+var _tutorial_pulse_tween: Tween
+var _tutorial_bubble_tween: Tween
+var _bar_tweens: Dictionary = {}
+var _last_tutorial_work_done := -1.0
+var _last_tutorial_defects := -1
+var _last_feedback_day_key := -1
+var _last_contract_result_signature := ""
 
 var _refresh_pending := false
 
@@ -274,6 +281,7 @@ func _on_day_changed(day: int, month: int, year: int) -> void:
 		date_label.text = "Jour %d • Mois %d • %d" % [day, month, year]
 	if StartupManager.is_pre_cpu_phase():
 		_refresh_startup_dashboard()
+	_update_audio_context()
 
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
@@ -652,6 +660,121 @@ func _refresh_tutorial_overlay() -> void:
 	if bubble_y < 12.0:
 		bubble_y = 12.0
 	tutorial_bubble.position = Vector2(bubble_x, bubble_y)
+
+func _update_audio_context() -> void:
+	var enabled := CompanyManager.created and StartupManager.is_pre_cpu_phase() and not SimulationManager.is_game_over
+	SoundManager.set_garage_ambience_enabled(enabled)
+
+func _animate_progress_bar(bar: ProgressBar, target_value: float, duration := 0.28) -> void:
+	if bar == null:
+		return
+	if bool(SettingsManager.get_setting("display", "reduce_motion")):
+		bar.value = target_value
+		return
+	var key := bar.get_instance_id()
+	var previous: Tween = _bar_tweens.get(key) as Tween
+	if previous != null and previous.is_valid():
+		previous.kill()
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(bar, "value", target_value, duration)
+	_bar_tweens[key] = tween
+
+func _animate_tutorial_step() -> void:
+	if tutorial_highlight == null or tutorial_bubble == null:
+		return
+	if _tutorial_pulse_tween != null and _tutorial_pulse_tween.is_valid():
+		_tutorial_pulse_tween.kill()
+	if _tutorial_bubble_tween != null and _tutorial_bubble_tween.is_valid():
+		_tutorial_bubble_tween.kill()
+	tutorial_highlight.modulate.a = 1.0
+	tutorial_bubble.modulate.a = 1.0
+	if bool(SettingsManager.get_setting("display", "reduce_motion")):
+		return
+
+	tutorial_highlight.modulate.a = 0.48
+	_tutorial_pulse_tween = create_tween()
+	_tutorial_pulse_tween.set_loops()
+	_tutorial_pulse_tween.tween_property(tutorial_highlight, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tutorial_pulse_tween.tween_property(tutorial_highlight, "modulate:a", 0.48, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var final_position := tutorial_bubble.position
+	tutorial_bubble.position = final_position + Vector2(0.0, 14.0)
+	tutorial_bubble.modulate.a = 0.0
+	_tutorial_bubble_tween = create_tween()
+	_tutorial_bubble_tween.set_parallel(true)
+	_tutorial_bubble_tween.tween_property(tutorial_bubble, "position", final_position, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tutorial_bubble_tween.tween_property(tutorial_bubble, "modulate:a", 1.0, 0.20)
+
+func _tutorial_day_key() -> int:
+	return (TimeManager.year - 1971) * 360 + (TimeManager.month - 1) * 30 + TimeManager.day
+
+func _update_tutorial_work_feedback(project: Dictionary) -> void:
+	var work_done := float(project.get("work_done", 0.0))
+	var defects := int(project.get("defects", 0))
+	var day_key := _tutorial_day_key()
+	if _last_tutorial_work_done < 0.0:
+		_last_tutorial_work_done = work_done
+		_last_tutorial_defects = defects
+		_last_feedback_day_key = day_key
+		return
+
+	var work_delta := work_done - _last_tutorial_work_done
+	if work_delta > 0.05 and day_key != _last_feedback_day_key:
+		_spawn_floating_feedback("+%.1f Code" % work_delta, APP_CYAN, startup_work_meter_bar)
+		if day_key % 3 == 0:
+			SoundManager.play_ui("tick")
+		_last_feedback_day_key = day_key
+
+	if defects > _last_tutorial_defects:
+		_spawn_floating_feedback("▲ Défaut", APP_RED, startup_quality_meter_bar)
+		SoundManager.play_ui("bug")
+
+	_last_tutorial_work_done = work_done
+	_last_tutorial_defects = defects
+
+func _reset_tutorial_work_feedback() -> void:
+	_last_tutorial_work_done = -1.0
+	_last_tutorial_defects = -1
+	_last_feedback_day_key = -1
+
+func _spawn_floating_feedback(text_value: String, color: Color, target: Control) -> void:
+	if target == null or not target.is_visible_in_tree():
+		return
+	if bool(SettingsManager.get_setting("display", "reduce_motion")):
+		return
+	var feedback := _label(text_value, 14)
+	feedback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	feedback.add_theme_color_override("font_color", color)
+	feedback.z_index = 120
+	add_child(feedback)
+	var target_rect := target.get_global_rect()
+	var own_rect := get_global_rect()
+	feedback.position = target_rect.get_center() - own_rect.position + Vector2(-28.0, -8.0)
+	feedback.modulate.a = 1.0
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(feedback, "position:y", feedback.position.y - 42.0, 0.82).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(feedback, "modulate:a", 0.0, 0.82)
+	tween.finished.connect(func():
+		if is_instance_valid(feedback):
+			feedback.queue_free()
+	)
+
+func _update_result_feedback() -> void:
+	if StartupManager.last_contract_result.is_empty():
+		_last_contract_result_signature = ""
+		return
+	var result := StartupManager.last_contract_result
+	var signature := "%s|%s|%s" % [str(result.get("client", "")), str(result.get("title", "")), str(result.get("reward", 0))]
+	if signature == _last_contract_result_signature:
+		return
+	_last_contract_result_signature = signature
+	if bool(result.get("failed", false)):
+		SoundManager.play_ui("bug")
+	else:
+		SoundManager.play_ui("success")
 
 func _create_dashboard_tab():
 	var scroll := _tab_scroll("Tableau de bord")
