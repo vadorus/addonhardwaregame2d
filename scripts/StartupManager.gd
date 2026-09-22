@@ -15,7 +15,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Suivre entrées, sorties et inventaire depuis un terminal.",
 		"branch":FounderManager.BRANCH_BUSINESS,
 		"required_branch_level":1,
-		"duration_months":2,"monthly_cost":700,"reward":6500,"reputation":1.5,"branch_xp":70
+		"duration_months":2,"deadline_days":60,"difficulty":1,"work_required":80.0,"monthly_cost":700,"reward":6500,"reputation":1.5,"branch_xp":70
 	},
 	"INVOICING": {
 		"title":"Facturation pour un atelier",
@@ -23,7 +23,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Clients, factures et historique pour une petite entreprise.",
 		"branch":FounderManager.BRANCH_BUSINESS,
 		"required_branch_level":1,
-		"duration_months":2,"monthly_cost":900,"reward":8500,"reputation":2.0,"branch_xp":85
+		"duration_months":2,"deadline_days":50,"difficulty":2,"work_required":120.0,"monthly_cost":900,"reward":8500,"reputation":2.0,"branch_xp":85
 	},
 	"PAYROLL": {
 		"title":"Paie et heures travaillées",
@@ -31,7 +31,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Un outil métier plus complexe, réservé aux développeurs déjà habitués aux logiciels de gestion.",
 		"branch":FounderManager.BRANCH_BUSINESS,
 		"required_branch_level":2,
-		"duration_months":3,"monthly_cost":1100,"reward":10500,"reputation":2.4,"branch_xp":105
+		"duration_months":3,"deadline_days":75,"difficulty":3,"work_required":180.0,"monthly_cost":1100,"reward":10500,"reputation":2.4,"branch_xp":105
 	},
 	"INDUSTRIAL_LOG": {
 		"title":"Journal de production industriel",
@@ -39,7 +39,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Enregistrer incidents, arrêts et temps de cycle d'un atelier.",
 		"branch":FounderManager.BRANCH_INDUSTRIAL,
 		"required_branch_level":1,
-		"duration_months":3,"monthly_cost":1200,"reward":12000,"reputation":3.0,"branch_xp":100
+		"duration_months":3,"deadline_days":75,"difficulty":3,"work_required":190.0,"monthly_cost":1200,"reward":12000,"reputation":3.0,"branch_xp":100
 	},
 	"MACHINE_CONTROL": {
 		"title":"Supervision d'une machine-outil",
@@ -47,7 +47,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Surveillance et commandes simples pour un équipement industriel.",
 		"branch":FounderManager.BRANCH_INDUSTRIAL,
 		"required_branch_level":2,
-		"duration_months":3,"monthly_cost":1600,"reward":15500,"reputation":3.4,"branch_xp":125
+		"duration_months":3,"deadline_days":90,"difficulty":4,"work_required":250.0,"monthly_cost":1600,"reward":15500,"reputation":3.4,"branch_xp":125
 	},
 	"SCIENTIFIC_TABLES": {
 		"title":"Calculs pour un laboratoire",
@@ -55,7 +55,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Automatiser des tables de calcul et réduire les erreurs manuelles.",
 		"branch":FounderManager.BRANCH_SCIENTIFIC,
 		"required_branch_level":1,
-		"duration_months":2,"monthly_cost":900,"reward":8000,"reputation":1.8,"branch_xp":75
+		"duration_months":2,"deadline_days":60,"difficulty":2,"work_required":135.0,"monthly_cost":900,"reward":8000,"reputation":1.8,"branch_xp":75
 	},
 	"LAB_ANALYSIS": {
 		"title":"Analyse de mesures expérimentales",
@@ -63,7 +63,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Traitement de séries de mesures et génération de résultats comparables.",
 		"branch":FounderManager.BRANCH_SCIENTIFIC,
 		"required_branch_level":2,
-		"duration_months":3,"monthly_cost":1400,"reward":13500,"reputation":3.0,"branch_xp":115
+		"duration_months":3,"deadline_days":85,"difficulty":3,"work_required":205.0,"monthly_cost":1400,"reward":13500,"reputation":3.0,"branch_xp":115
 	},
 	"ROM_CONTROL": {
 		"title":"Programme de commande en ROM",
@@ -71,7 +71,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Une petite logique de commande destinée à un équipement électronique.",
 		"branch":FounderManager.BRANCH_EMBEDDED,
 		"required_branch_level":1,
-		"duration_months":3,"monthly_cost":1300,"reward":12500,"reputation":3.0,"branch_xp":105
+		"duration_months":3,"deadline_days":85,"difficulty":3,"work_required":210.0,"monthly_cost":1300,"reward":12500,"reputation":3.0,"branch_xp":105
 	},
 	"DEVICE_DIAGNOSTIC": {
 		"title":"Diagnostic d'un équipement électronique",
@@ -79,7 +79,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Logiciel de test et de diagnostic pour une carte spécialisée.",
 		"branch":FounderManager.BRANCH_EMBEDDED,
 		"required_branch_level":2,
-		"duration_months":3,"monthly_cost":1600,"reward":15000,"reputation":3.5,"branch_xp":125
+		"duration_months":3,"deadline_days":90,"difficulty":4,"work_required":265.0,"monthly_cost":1600,"reward":15000,"reputation":3.5,"branch_xp":125
 	},
 	"WEB_CATALOG": {
 		"title":"Catalogue sur le World Wide Web",
@@ -88,7 +88,7 @@ const SOFTWARE_CONTRACTS := {
 		"branch":FounderManager.BRANCH_WEB,
 		"required_branch_level":1,
 		"min_year":1991,
-		"duration_months":2,"monthly_cost":1100,"reward":9000,"reputation":2.2,"branch_xp":80
+		"duration_months":2,"deadline_days":60,"difficulty":2,"work_required":145.0,"monthly_cost":1100,"reward":9000,"reputation":2.2,"branch_xp":80
 	}
 }
 
@@ -149,6 +149,23 @@ func _ensure_contract_runtime_fields() -> void:
 		active_contract["bonus_reward"] = 0
 	if not active_contract.has("resume_time_scale"):
 		active_contract["resume_time_scale"] = 1.0
+	var contract_data_value: Dictionary = SOFTWARE_CONTRACTS.get(str(active_contract.get("id", "")), {})
+	if not active_contract.has("difficulty"):
+		active_contract["difficulty"] = int(contract_data_value.get("difficulty", 1))
+	if not active_contract.has("work_required"):
+		active_contract["work_required"] = float(contract_data_value.get("work_required", 80.0))
+	if not active_contract.has("work_done"):
+		active_contract["work_done"] = float(active_contract.get("progress", 0.0)) / 100.0 * float(active_contract.get("work_required", 80.0))
+	if not active_contract.has("deadline_days"):
+		active_contract["deadline_days"] = int(contract_data_value.get("deadline_days", total_months * 30))
+	if not active_contract.has("deadline_pending"):
+		active_contract["deadline_pending"] = false
+	if not active_contract.has("deadline_crisis_used"):
+		active_contract["deadline_crisis_used"] = false
+	if not active_contract.has("crunch_mode"):
+		active_contract["crunch_mode"] = false
+	if not active_contract.has("reward_penalty"):
+		active_contract["reward_penalty"] = 0.0
 
 func _ensure_electronics_runtime_fields() -> void:
 	if electronics_project.is_empty():
@@ -262,6 +279,7 @@ func _complete_active_contract() -> void:
 	var functions_required := float(active_contract.get("functions_required", 40.0))
 	var bonus_reward := int(active_contract.get("bonus_reward", 0))
 	reward_multiplier *= clampf(1.0 - float(defects) * 0.035, 0.72, 1.0)
+	reward_multiplier *= clampf(1.0 - float(active_contract.get("reward_penalty", 0.0)), 0.40, 1.0)
 	var reward := int(round(float(active_contract.get("reward", 0)) * reward_multiplier)) + bonus_reward
 	var reputation_gain := float(active_contract.get("reputation", 0.0)) * lerpf(0.85, 1.25, quality / 100.0)
 	var contract_id := str(active_contract.get("id", ""))
@@ -415,10 +433,18 @@ func start_software_contract(contract_id: String, approach: String = "SOLID") ->
 		"reward":int(data.reward),
 		"reputation":float(data.reputation),
 		"approach":safe_approach,
+		"difficulty":int(data.get("difficulty", required_level)),
+		"deadline_days":int(data.get("deadline_days", int(data.duration_months) * 30)),
+		"deadline_pending":false,
+		"deadline_crisis_used":false,
+		"crunch_mode":false,
+		"reward_penalty":0.0,
 		"project_day":0,
 		"progress":0.0,
+		"work_done":0.0,
+		"work_required":float(data.get("work_required", 80.0)),
 		"functions":0.0,
-		"functions_required":40.0 + float(maxi(required_level - 1, 0) * 5),
+		"functions_required":float(data.get("work_required", 80.0)),
 		"robustness":32.0 if safe_approach == "FAST" else 38.0,
 		"robustness_required":50.0 + float(required_level * 5),
 		"quality":50.0,
@@ -468,35 +494,90 @@ func start_electronics_project() -> bool:
 	startup_changed.emit()
 	return true
 
+func contract_work_points_per_day(approach: String = "") -> float:
+	var selected_approach := approach
+	var branch := FounderManager.BRANCH_BUSINESS
+	var crunch := false
+	if not active_contract.is_empty():
+		if selected_approach.is_empty():
+			selected_approach = str(active_contract.get("approach", "SOLID"))
+		branch = str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
+		crunch = bool(active_contract.get("crunch_mode", false))
+	if selected_approach.is_empty():
+		selected_approach = "SOLID"
+	var programming := FounderManager.skill_value(FounderManager.SKILL_PROGRAMMING)
+	var base_points := 1.55 + programming * 0.055
+	var approach_multiplier := 1.15 if selected_approach == "FAST" else 0.93
+	var crunch_multiplier := 1.25 if crunch else 1.0
+	return maxf(base_points * FounderManager.branch_speed_multiplier(branch) * approach_multiplier * crunch_multiplier, 0.5)
+
+func contract_preview(contract_id: String, approach: String = "SOLID") -> Dictionary:
+	if not SOFTWARE_CONTRACTS.has(contract_id):
+		return {}
+	var data: Dictionary = SOFTWARE_CONTRACTS[contract_id]
+	var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
+	var programming := FounderManager.skill_value(FounderManager.SKILL_PROGRAMMING)
+	var base_points := 1.55 + programming * 0.055
+	var approach_multiplier := 1.15 if approach == "FAST" else 0.93
+	var points_per_day := maxf(base_points * FounderManager.branch_speed_multiplier(branch) * approach_multiplier, 0.5)
+	var work_required := float(data.get("work_required", 80.0))
+	var deadline_days := maxi(int(data.get("deadline_days", int(data.get("duration_months", 2)) * 30)), 1)
+	var days_needed := int(ceil(work_required / points_per_day))
+	return {
+		"difficulty":int(data.get("difficulty", 1)),
+		"work_required":work_required,
+		"deadline_days":deadline_days,
+		"points_per_day":points_per_day,
+		"days_needed":days_needed,
+		"projected_work":points_per_day * float(deadline_days),
+		"margin_days":deadline_days - days_needed,
+		"fits_deadline":days_needed <= deadline_days
+	}
+
+func contract_projection() -> Dictionary:
+	if active_contract.is_empty():
+		return {}
+	_ensure_contract_runtime_fields()
+	var work_done := float(active_contract.get("work_done", 0.0))
+	var work_required := float(active_contract.get("work_required", 80.0))
+	var project_day := int(active_contract.get("project_day", 0))
+	var deadline_days := int(active_contract.get("deadline_days", 60))
+	var days_left := maxi(deadline_days - project_day, 0)
+	var points_per_day := contract_work_points_per_day()
+	var projected := work_done + points_per_day * float(days_left)
+	return {
+		"points_per_day":points_per_day,
+		"days_left":days_left,
+		"projected_work":projected,
+		"work_required":work_required,
+		"on_track":projected >= work_required
+	}
+
 func process_day() -> void:
 	if active_contract.is_empty():
 		return
 	_ensure_contract_runtime_fields()
-	if bool(active_contract.get("milestone_pending", false)):
+	if bool(active_contract.get("milestone_pending", false)) or bool(active_contract.get("deadline_pending", false)):
 		return
 
-	var total_days := maxi(int(active_contract.get("total_months", 1)) * 30, 1)
 	var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
-	var speed := FounderManager.branch_speed_multiplier(branch) * maxf(FounderManager.programming_multiplier(), 1.0)
 	var approach := str(active_contract.get("approach", "SOLID"))
-	var progress_factor := 1.10 if approach == "FAST" else 0.96
-	var functions_factor := 1.16 if approach == "FAST" else 0.96
+	var points_per_day := contract_work_points_per_day()
 	var robustness_factor := 0.72 if approach == "FAST" else 1.22
+	var work_required := float(active_contract.get("work_required", 80.0))
 
 	active_contract["project_day"] = int(active_contract.get("project_day", 0)) + 1
-	active_contract["progress"] = minf(float(active_contract.get("progress", 0.0)) + (100.0 / float(total_days)) * speed * progress_factor, 100.0)
-	active_contract["functions"] = minf(
-		float(active_contract.get("functions", 0.0)) + (float(active_contract.get("functions_required", 40.0)) / float(total_days)) * speed * functions_factor,
-		float(active_contract.get("functions_required", 40.0)) + 12.0
-	)
-	active_contract["robustness"] = minf(
-		float(active_contract.get("robustness", 38.0)) + (42.0 / float(total_days)) * speed * robustness_factor,
-		100.0
-	)
+	active_contract["work_done"] = minf(float(active_contract.get("work_done", 0.0)) + points_per_day, work_required + 20.0)
+	active_contract["functions"] = float(active_contract.get("work_done", 0.0))
+	active_contract["functions_required"] = work_required
+	active_contract["progress"] = clampf(float(active_contract.get("work_done", 0.0)) / maxf(work_required, 1.0) * 100.0, 0.0, 100.0)
+	active_contract["robustness"] = minf(float(active_contract.get("robustness", 38.0)) + 0.62 * robustness_factor * FounderManager.branch_speed_multiplier(branch), 100.0)
 	active_contract["quality"] = float(active_contract.get("robustness", 50.0))
 
 	var project_day := int(active_contract.get("project_day", 0))
-	var defect_period := 9 if approach == "FAST" else 16
+	var defect_period := 8 if approach == "FAST" else 15
+	if bool(active_contract.get("crunch_mode", false)):
+		defect_period = maxi(defect_period - 3, 4)
 	if project_day > 0 and project_day % defect_period == 0:
 		active_contract["defects"] = int(active_contract.get("defects", 0)) + 1
 	if float(active_contract.get("progress", 0.0)) >= 68.0 and int(active_contract.get("defects", 0)) > 0 and project_day % 7 == 0:
@@ -510,8 +591,22 @@ func process_day() -> void:
 		return
 
 	_update_contract_remaining_months()
-	if float(active_contract.get("progress", 0.0)) >= 100.0:
+	if float(active_contract.get("work_done", 0.0)) >= work_required:
 		_complete_active_contract()
+		startup_changed.emit()
+		return
+
+	if project_day >= int(active_contract.get("deadline_days", 60)):
+		if bool(active_contract.get("deadline_crisis_used", false)):
+			_fail_active_contract("Échéance dépassée malgré le plan de rattrapage.")
+			startup_changed.emit()
+			return
+		active_contract["deadline_pending"] = true
+		active_contract["resume_time_scale"] = maxf(TimeManager.time_scale, 1.0)
+		TimeManager.time_scale = 0.0
+		startup_changed.emit()
+		return
+
 	startup_changed.emit()
 
 func contract_phase_label() -> String:
@@ -547,6 +642,62 @@ func resolve_contract_milestone(choice: String) -> bool:
 	TimeManager.time_scale = resume_speed
 	startup_changed.emit()
 	return true
+
+func resolve_contract_deadline(choice: String) -> bool:
+	if active_contract.is_empty() or not bool(active_contract.get("deadline_pending", false)):
+		return false
+	match choice:
+		"OVERTIME":
+			active_contract["deadline_days"] = int(active_contract.get("deadline_days", 60)) + 10
+			active_contract["crunch_mode"] = true
+			active_contract["defects"] = int(active_contract.get("defects", 0)) + 2
+			active_contract["reward_penalty"] = minf(float(active_contract.get("reward_penalty", 0.0)) + 0.10, 0.60)
+			active_contract["client_confidence"] = clampf(float(active_contract.get("client_confidence", 50.0)) - 5.0, 0.0, 100.0)
+		"REDUCE_SCOPE":
+			var work_done := float(active_contract.get("work_done", 0.0))
+			var previous_required := float(active_contract.get("work_required", 80.0))
+			active_contract["work_required"] = maxf(work_done + 6.0, previous_required * 0.84)
+			active_contract["functions_required"] = float(active_contract["work_required"])
+			active_contract["deadline_days"] = int(active_contract.get("deadline_days", 60)) + 7
+			active_contract["reward_penalty"] = minf(float(active_contract.get("reward_penalty", 0.0)) + 0.25, 0.60)
+			active_contract["client_confidence"] = clampf(float(active_contract.get("client_confidence", 50.0)) - 12.0, 0.0, 100.0)
+		"ABANDON":
+			_fail_active_contract("Contrat abandonné à l'échéance.")
+			return true
+		_:
+			return false
+	active_contract["deadline_pending"] = false
+	active_contract["deadline_crisis_used"] = true
+	var resume_speed := maxf(float(active_contract.get("resume_time_scale", 1.0)), 1.0)
+	TimeManager.time_scale = resume_speed
+	startup_changed.emit()
+	return true
+
+func _fail_active_contract(reason: String) -> void:
+	if active_contract.is_empty():
+		return
+	var client := str(active_contract.get("client", "Client"))
+	var title := str(active_contract.get("title", "Contrat logiciel"))
+	var resume_speed := maxf(float(active_contract.get("resume_time_scale", 1.0)), 1.0)
+	last_contract_result = {
+		"client":client,
+		"title":title,
+		"resume_time_scale":resume_speed,
+		"stars":0,
+		"verdict":reason,
+		"reward":0,
+		"robustness":float(active_contract.get("robustness", 0.0)),
+		"robustness_required":int(active_contract.get("robustness_required", 0)),
+		"functions":float(active_contract.get("work_done", 0.0)),
+		"functions_required":int(active_contract.get("work_required", 0)),
+		"defects":int(active_contract.get("defects", 0)),
+		"relation_delta":-2,
+		"failed":true
+	}
+	CompanyManager.change_reputation({"professional":-1.5, "reliability":-2.0})
+	CompanyManager.add_alert("Contrat échoué : %s — %s" % [title, reason])
+	active_contract = {}
+	TimeManager.time_scale = 0.0
 
 func dismiss_last_contract_result() -> void:
 	if not last_contract_result.is_empty():
@@ -595,11 +746,13 @@ func current_objective() -> Dictionary:
 		var robustness := float(active_contract.get("robustness", 50.0))
 		var robustness_required := float(active_contract.get("robustness_required", 55.0))
 		var defects := int(active_contract.get("defects", 0))
-		var action := "CONTRACT_MILESTONE" if bool(active_contract.get("milestone_pending", false)) else "WAIT_CONTRACT"
+		var projection := contract_projection()
+		var action := "CONTRACT_DEADLINE" if bool(active_contract.get("deadline_pending", false)) else ("CONTRACT_MILESTONE" if bool(active_contract.get("milestone_pending", false)) else "WAIT_CONTRACT")
+		var track_label := "DANS LES TEMPS" if bool(projection.get("on_track", false)) else "EN RETARD PRÉVU"
 		return {
 			"title":"%s — %s" % [str(active_contract.get("client", "Client")), str(active_contract.get("title", "Contrat logiciel"))],
-			"text":"%s • approche %s • le projet avance tout seul ; intervenez uniquement quand une vraie décision se présente." % [phase, "rapide" if str(active_contract.get("approach", "SOLID")) == "FAST" else "solide"],
-			"progress":"Fonctions %.0f/%.0f • Robustesse %.0f/%.0f • Défauts %d • avancement %.0f%%" % [functions_value, functions_required, robustness, robustness_required, defects, float(active_contract.get("progress", 0.0))],
+			"text":"%s • difficulté %s • %.1f pts/jour • %s" % [phase, "★".repeat(int(active_contract.get("difficulty", 1))), float(projection.get("points_per_day", 0.0)), track_label],
+			"progress":"Développement %.0f/%.0f pts • projection %.0f/%.0f • délai %d j • Robustesse %.0f/%.0f • Défauts %d" % [float(active_contract.get("work_done", functions_value)), float(active_contract.get("work_required", functions_required)), float(projection.get("projected_work", 0.0)), float(active_contract.get("work_required", functions_required)), int(projection.get("days_left", 0)), robustness, robustness_required, defects],
 			"action":action
 		}
 	if not electronics_project.is_empty():
