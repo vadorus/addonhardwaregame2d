@@ -204,6 +204,7 @@ var startup_dashboard_panel: PanelContainer
 var startup_summary_label: Label
 var startup_progress_label: Label
 var startup_contract_select: OptionButton
+var startup_approach_select: OptionButton
 var startup_contract_hint: Label
 var startup_contract_action_button: Button
 var startup_action_button: Button
@@ -665,6 +666,13 @@ func _build_startup_dashboard(parent: VBoxContainer) -> void:
 	startup_contract_select.item_selected.connect(func(_index): _refresh_startup_contract_hint())
 	box.add_child(startup_contract_select)
 
+	startup_approach_select = OptionButton.new()
+	startup_approach_select.add_item("Approche solide — plus robuste, un peu plus lente")
+	startup_approach_select.set_item_metadata(0, "SOLID")
+	startup_approach_select.add_item("Approche rapide — avance vite, davantage de défauts")
+	startup_approach_select.set_item_metadata(1, "FAST")
+	box.add_child(startup_approach_select)
+
 	startup_contract_hint = _muted_label("", 12)
 	startup_contract_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(startup_contract_hint)
@@ -716,7 +724,7 @@ func _refresh_startup_contract_options() -> void:
 		var contract_id := str(contract_id_value)
 		var data := StartupManager.contract_data(contract_id)
 		var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
-		var label := "[%s Niv.%d] %s" % [FounderManager.branch_label(branch), FounderManager.branch_level(branch), str(data.get("title", contract_id))]
+		var label := "%s — %s" % [str(data.get("client", "Client")), str(data.get("title", contract_id))]
 		startup_contract_select.add_item(label)
 		startup_contract_select.set_item_metadata(startup_contract_select.item_count - 1, contract_id)
 		if contract_id == previous:
@@ -762,15 +770,16 @@ func _refresh_startup_contract_hint() -> void:
 	var branch := str(data.get("branch", FounderManager.BRANCH_BUSINESS))
 	var base_cost := int(data.get("monthly_cost", 0))
 	var effective_cost := int(round(float(base_cost) * (1.0 - FounderManager.branch_cost_discount(branch))))
-	startup_contract_hint.text = "%s\nBranche : %s • niveau %d • vitesse x%.2f\n%d mois • %s €/mois • paiement de base %s €\nProchain savoir-faire : %s" % [
+	var required_level := int(data.get("required_branch_level", 1))
+	var robustness_required := 50 + required_level * 5
+	startup_contract_hint.text = "%s\n%s • %s\n%d mois • %s €/mois • paiement de base %s €\nExigence principale : robustesse ≥ %d" % [
+		str(data.get("client", "Client")),
 		str(data.get("description", "")),
 		FounderManager.branch_label(branch),
-		FounderManager.branch_level(branch),
-		FounderManager.branch_speed_multiplier(branch),
 		int(data.get("duration_months", 0)),
 		_money(effective_cost),
 		_money(int(data.get("reward", 0))),
-		_next_branch_perk_text(branch)
+		robustness_required
 	]
 
 func _startup_roadmap_text() -> String:
@@ -800,8 +809,9 @@ func _refresh_startup_dashboard() -> void:
 	startup_progress_label.text = "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
 	var action := str(objective.get("action", ""))
 
-	var contract_choices_visible := StartupManager.active_contract.is_empty() and not StartupManager.available_contract_ids().is_empty()
+	var contract_choices_visible := StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and not StartupManager.available_contract_ids().is_empty()
 	startup_contract_select.visible = contract_choices_visible
+	startup_approach_select.visible = contract_choices_visible
 	startup_contract_hint.visible = contract_choices_visible
 	startup_contract_action_button.visible = contract_choices_visible
 	if contract_choices_visible:
@@ -812,26 +822,35 @@ func _refresh_startup_dashboard() -> void:
 		else:
 			startup_contract_action_button.disabled = true
 
-	var work_mode := action in ["WORK_CONTRACT", "WORK_ELECTRONICS"]
+	var work_mode := action in ["CONTRACT_MILESTONE", "WORK_ELECTRONICS"]
 	startup_work_actions.visible = work_mode
-	startup_work_hint.visible = work_mode
-	if work_mode:
+	startup_work_hint.visible = action in ["WAIT_CONTRACT", "CONTRACT_MILESTONE", "WORK_ELECTRONICS"]
+	if action == "WAIT_CONTRACT":
+		startup_work_hint.text = "Le projet avance automatiquement. Regardez les jauges : vous interviendrez au prochain jalon."
+	elif action == "CONTRACT_MILESTONE":
+		for index in range(startup_work_buttons.size()):
+			var milestone_btn: Button = startup_work_buttons[index]
+			milestone_btn.disabled = false
+			milestone_btn.text = ["Accepter la demande", "Facturer +800 €", "Refuser le changement"][index]
+		startup_work_hint.text = "Le client veut ajouter une fonction. Choisissez le compromis : relation, argent ou périmètre."
+	elif action == "WORK_ELECTRONICS":
 		var available := StartupManager.work_session_available()
 		var wait_days := StartupManager.days_until_next_work_session()
 		for index in range(startup_work_buttons.size()):
 			var work_btn: Button = startup_work_buttons[index]
 			work_btn.disabled = not available
-			if action == "WORK_ELECTRONICS":
-				work_btn.text = ["Assembler le prototype","Mesurer et tester","Documenter le montage"][index]
-			else:
-				work_btn.text = ["Coder une fonctionnalité","Tester et corriger","Revoir avec le client"][index]
-		startup_work_hint.text = "Session disponible : choisissez votre priorité." if available else "Prochaine grosse session dans %d jour(s). Le projet continue d'avancer avec le temps." % wait_days
+			work_btn.text = ["Assembler le prototype","Mesurer et tester","Documenter le montage"][index]
+		startup_work_hint.text = "Session disponible : choisissez votre priorité." if available else "Prochaine grosse session dans %d jour(s). Le prototype continue d'avancer avec le temps." % wait_days
 
 	startup_action_button.visible = not action.is_empty() and not work_mode
 	startup_action_button.disabled = false
 	match action:
 		"START_SOFTWARE":
 			startup_action_button.visible = false
+		"WAIT_CONTRACT", "CONTRACT_MILESTONE":
+			startup_action_button.visible = false
+		"DISMISS_RESULT":
+			startup_action_button.text = "Continuer"
 		"HIRE_ENGINEER":
 			startup_action_button.text = "Recruter Élise • 3 500 €"
 			startup_action_button.disabled = not StartupManager.can_hire_first_engineer()
@@ -849,8 +868,11 @@ func _startup_contract_action() -> void:
 	if startup_contract_select == null or startup_contract_select.item_count <= 0:
 		status_label.text = "Aucun contrat disponible pour le moment."
 		return
-	if StartupManager.start_software_contract(_meta(startup_contract_select)):
-		status_label.text = "Contrat accepté. Le logiciel reste une activité de l'entreprise pendant sa montée vers le hardware."
+	var approach := "SOLID"
+	if startup_approach_select != null and startup_approach_select.item_count > 0:
+		approach = str(startup_approach_select.get_item_metadata(startup_approach_select.selected))
+	if StartupManager.start_software_contract(_meta(startup_contract_select), approach):
+		status_label.text = "Contrat accepté. Le projet avance maintenant avec le temps : vous n'intervenez qu'aux décisions importantes."
 	else:
 		status_label.text = "Impossible d'accepter ce contrat : vérifiez la trésorerie et la capacité disponible."
 	_refresh_all()
@@ -862,7 +884,14 @@ func _startup_primary_action() -> void:
 	match action:
 		"START_SOFTWARE":
 			if startup_contract_select != null and startup_contract_select.item_count > 0:
-				ok = StartupManager.start_software_contract(_meta(startup_contract_select))
+				var approach := "SOLID"
+				if startup_approach_select != null and startup_approach_select.item_count > 0:
+					approach = str(startup_approach_select.get_item_metadata(startup_approach_select.selected))
+				ok = StartupManager.start_software_contract(_meta(startup_contract_select), approach)
+		"DISMISS_RESULT":
+			StartupManager.dismiss_last_contract_result()
+			_refresh_all()
+			return
 		"HIRE_ENGINEER":
 			ok = StartupManager.hire_first_engineer()
 		"START_ELECTRONICS":
@@ -875,6 +904,13 @@ func _startup_primary_action() -> void:
 	_refresh_all()
 
 func _startup_work_action(action: String) -> void:
+	var objective := StartupManager.current_objective()
+	if str(objective.get("action", "")) == "CONTRACT_MILESTONE":
+		var choice := {"BUILD":"SCOPE", "TEST":"EXTRA", "CLIENT":"REFUSE"}.get(action, "")
+		if StartupManager.resolve_contract_milestone(str(choice)):
+			status_label.text = "Décision enregistrée. Le projet reprend avec ses nouvelles contraintes."
+			_refresh_all()
+			return
 	if StartupManager.perform_work_session(action):
 		match action:
 			"BUILD":
@@ -885,7 +921,7 @@ func _startup_work_action(action: String) -> void:
 				status_label.text = "Échange client terminé : confiance, commercial et XP progressent."
 		_refresh_all()
 	else:
-		status_label.text = "Cette semaine est déjà bien remplie. Laissez quelques jours passer avant une nouvelle grosse session."
+		status_label.text = "Aucune action manuelle nécessaire pour ce projet."
 
 func _on_startup_milestone(title: String, message: String) -> void:
 	status_label.text = "%s — %s" % [title, message]
