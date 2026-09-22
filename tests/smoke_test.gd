@@ -31,19 +31,15 @@ func _ready() -> void:
 		_fail("Garage starting cash does not match the selected difficulty")
 		return
 
-	if not StartupManager.start_software_contract("STOCK"):
-		_fail("Could not start the first garage software contract")
+	if not _run_startup_contract("STOCK"):
+		_fail("First garage software contract did not complete through the daily project engine")
 		return
-	SimulationManager.process_month_end()
-	SimulationManager.process_month_end()
 	if StartupManager.software_contracts_completed != 1:
 		_fail("First garage software contract did not complete")
 		return
-	if not StartupManager.start_software_contract("INVOICING"):
-		_fail("Could not start the second garage software contract")
+	if not _run_startup_contract("INVOICING"):
+		_fail("Second garage software contract did not complete through the daily project engine")
 		return
-	SimulationManager.process_month_end()
-	SimulationManager.process_month_end()
 	if StartupManager.stage != StartupManager.STAGE_FIRST_HIRE:
 		_fail("Two delivered software contracts did not unlock the first hire")
 		return
@@ -1325,6 +1321,18 @@ func _ready() -> void:
 
 	print("[CI] Smoke test passed")
 	get_tree().quit(0)
+
+func _run_startup_contract(contract_id: String) -> bool:
+	if not StartupManager.start_software_contract(contract_id, "SOLID"):
+		return false
+	for _day in range(120):
+		SimulationManager.process_day()
+		if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("milestone_pending", false)):
+			StartupManager.resolve_contract_milestone("EXTRA")
+		if not StartupManager.last_contract_result.is_empty():
+			StartupManager.dismiss_last_contract_result()
+			return true
+	return false
 
 func _fail(message: String) -> void:
 	push_error("[CI] " + message)
