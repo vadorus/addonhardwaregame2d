@@ -15,7 +15,7 @@ const SOFTWARE_CONTRACTS := {
 		"description":"Suivre entrées, sorties et inventaire depuis un terminal.",
 		"branch":FounderManager.BRANCH_BUSINESS,
 		"required_branch_level":1,
-		"duration_months":2,"deadline_days":60,"difficulty":1,"work_required":80.0,"monthly_cost":700,"reward":6500,"reputation":1.5,"branch_xp":70
+		"duration_months":2,"deadline_days":60,"difficulty":1,"work_required":80.0,"monthly_cost":700,"reward":9500,"reputation":1.5,"branch_xp":70
 	},
 	"INVOICING": {
 		"title":"Facturation pour un atelier",
@@ -333,9 +333,9 @@ func _complete_active_contract() -> void:
 	CompanyManager.add_alert("Contrat livré : %s pour %s • %d/5 • paiement %d €." % [title, client, stars, reward])
 	active_contract = {}
 	TimeManager.time_scale = 0.0
-	if software_contracts_completed >= 2 and stage == STAGE_GARAGE and not first_engineer_hired:
+	if software_contracts_completed >= 1 and stage == STAGE_GARAGE and not first_engineer_hired:
 		stage = STAGE_FIRST_HIRE
-		milestone_unlocked.emit("Premier recrutement disponible", "Vous avez assez de références pour convaincre une ingénieure de vous rejoindre. Les contrats logiciels restent disponibles pour financer la suite.")
+		milestone_unlocked.emit("Le vrai départ", "Votre premier contrat est payé. Les contrats restent disponibles, mais ils deviennent optionnels : utilisez maintenant cet argent pour passer du logiciel au matériel.")
 
 func _complete_electronics_project() -> void:
 	if electronics_project.is_empty():
@@ -372,6 +372,8 @@ func is_pre_cpu_phase() -> bool:
 	return not cpu_program_unlocked
 
 func available_contract_ids() -> Array:
+	if software_contracts_completed == 0 and active_contract.is_empty() and SOFTWARE_CONTRACTS.has("STOCK"):
+		return ["STOCK"]
 	var result: Array = []
 	for contract_id_value in SOFTWARE_CONTRACTS.keys():
 		var contract_id := str(contract_id_value)
@@ -609,6 +611,54 @@ func process_day() -> void:
 
 	startup_changed.emit()
 
+func is_first_contract_tutorial() -> bool:
+	return software_contracts_completed == 0 and not active_contract.is_empty() and str(active_contract.get("id", "")) == "STOCK"
+
+func first_contract_tutorial_message() -> Dictionary:
+	if not is_first_contract_tutorial():
+		return {}
+	var progress := float(active_contract.get("progress", 0.0))
+	var project_day := int(active_contract.get("project_day", 0))
+	if bool(active_contract.get("deadline_pending", false)):
+		return {
+			"title":"Nora • Une échéance, ça se gère",
+			"text":"Le délai est arrivé avant la fin du travail. C'est volontaire : Tech Empire ne garantit pas la réussite. Vous pouvez sacrifier de l'argent, réduire le périmètre ou abandonner."
+		}
+	if bool(active_contract.get("milestone_pending", false)):
+		return {
+			"title":"Nora • Premier imprévu client",
+			"text":"Un vrai projet change en cours de route. Cette fois, choisissez entre satisfaire le client, facturer le changement ou protéger votre planning."
+		}
+	if progress < 12.0:
+		return {
+			"title":"Nora • Votre premier vrai travail",
+			"text":"Regardez la jauge Développement. Chaque jour, votre niveau en Programmation produit des points. Le contrat demande 80 points avant l'échéance."
+		}
+	if progress < 32.0:
+		return {
+			"title":"Nora • La projection compte plus que la barre",
+			"text":"Ne regardez pas seulement le pourcentage. La projection estime ce que vous aurez produit à la date limite. Verte : vous êtes dans les temps. Rouge : il faudra réagir."
+		}
+	if progress < 55.0:
+		return {
+			"title":"Nora • La vitesse a un prix",
+			"text":"Une approche rapide produit davantage de points par jour, mais augmente les défauts. Une approche solide protège mieux la robustesse."
+		}
+	if progress < 78.0:
+		return {
+			"title":"Nora • Les défauts coûtent de l'argent",
+			"text":"Les défauts réduisent la qualité finale et peuvent réduire votre paiement. Sur les futurs projets, vos techniques et vos outils permettront de mieux les maîtriser."
+		}
+	if progress < 96.0:
+		return {
+			"title":"Nora • Presque votre premier client",
+			"text":"Si vous livrez correctement, ce paiement financera la prochaine étape : ne plus rester seulement programmeur dans un garage, mais commencer à construire du matériel."
+		}
+	return {
+		"title":"Nora • Livraison imminente",
+		"text":"Le premier contrat n'était qu'un prologue. Après son paiement, les contrats resteront disponibles, mais ils ne bloqueront plus votre progression vers le hardware."
+	}
+
 func contract_phase_label() -> String:
 	if active_contract.is_empty():
 		return ""
@@ -766,9 +816,9 @@ func current_objective() -> Dictionary:
 	match stage:
 		STAGE_GARAGE:
 			return {
-				"title":"Décrocher vos premiers contrats",
-				"text":"Commencez petit : livrez deux logiciels utiles avant de penser au matériel.",
-				"progress":"%d / 2 contrats livrés" % mini(software_contracts_completed, 2),
+				"title":"Votre premier contrat",
+				"text":"Ce premier projet sert de prologue : apprenez à lire développement, délai, projection et robustesse. Après sa livraison, Tech Empire s'ouvre réellement.",
+				"progress":"0 / 1 contrat tutoriel livré",
 				"action":"START_SOFTWARE"
 			}
 		STAGE_FIRST_HIRE:
@@ -797,8 +847,8 @@ func current_objective() -> Dictionary:
 func roadmap() -> Array:
 	var rows: Array = []
 	rows.append(_roadmap_row("Programmation sur terminal", "ACQUIRED", "Votre compétence de départ."))
-	rows.append(_roadmap_row("Contrats logiciels", "ACQUIRED" if software_contracts_completed >= 2 else ("IN_PROGRESS" if not active_contract.is_empty() else "AVAILABLE"), "Livrer 2 contrats logiciels."))
-	rows.append(_roadmap_row("Premier recrutement", "ACQUIRED" if first_engineer_hired else ("AVAILABLE" if stage == STAGE_FIRST_HIRE else "LOCKED"), "Livrer 2 contrats et disposer de 3 500 €."))
+	rows.append(_roadmap_row("Premier contrat", "ACQUIRED" if software_contracts_completed >= 1 else ("IN_PROGRESS" if not active_contract.is_empty() else "AVAILABLE"), "Réussir le contrat tutoriel de la Quincaillerie Morel."))
+	rows.append(_roadmap_row("Premier recrutement", "ACQUIRED" if first_engineer_hired else ("AVAILABLE" if stage == STAGE_FIRST_HIRE else "LOCKED"), "Livrer le premier contrat et disposer de 3 500 €."))
 	rows.append(_roadmap_row("Électronique numérique", "ACQUIRED" if cpu_program_unlocked else ("IN_PROGRESS" if not electronics_project.is_empty() else ("AVAILABLE" if stage == STAGE_ELECTRONICS else "LOCKED")), "Recruter puis valider un prototype électronique."))
 	rows.append(_roadmap_row("Conception CPU", "AVAILABLE" if cpu_program_unlocked else "LOCKED", "Valider le prototype électronique."))
 	return rows
