@@ -508,6 +508,8 @@ func _build_tutorial_overlay() -> void:
 	bubble_box.add_child(pointer)
 
 func _tutorial_state() -> Dictionary:
+	if not bool(SettingsManager.get_setting("gameplay", "tutorial_enabled")):
+		return {}
 	if not CompanyManager.created or not StartupManager.is_pre_cpu_phase():
 		return {}
 	if setup_layer != null and setup_layer.visible:
