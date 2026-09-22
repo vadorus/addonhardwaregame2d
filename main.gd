@@ -965,14 +965,14 @@ func _startup_work_action(action: String) -> void:
 	var objective := StartupManager.current_objective()
 	var objective_action := str(objective.get("action", ""))
 	if objective_action == "CONTRACT_MILESTONE":
-		var choice := {"BUILD":"SCOPE", "TEST":"EXTRA", "CLIENT":"REFUSE"}.get(action, "")
-		if StartupManager.resolve_contract_milestone(str(choice)):
+		var choice: String = str({"BUILD":"SCOPE", "TEST":"EXTRA", "CLIENT":"REFUSE"}.get(action, ""))
+		if StartupManager.resolve_contract_milestone(choice):
 			status_label.text = "Décision enregistrée. Le projet reprend avec ses nouvelles contraintes."
 			_refresh_all()
 			return
 	if objective_action == "CONTRACT_DEADLINE":
-		var deadline_choice := {"BUILD":"OVERTIME", "TEST":"REDUCE_SCOPE", "CLIENT":"ABANDON"}.get(action, "")
-		if StartupManager.resolve_contract_deadline(str(deadline_choice)):
+		var deadline_choice: String = str({"BUILD":"OVERTIME", "TEST":"REDUCE_SCOPE", "CLIENT":"ABANDON"}.get(action, ""))
+		if StartupManager.resolve_contract_deadline(deadline_choice):
 			status_label.text = "Décision de crise enregistrée. La projection et la récompense ont été recalculées."
 			_refresh_all()
 			return
