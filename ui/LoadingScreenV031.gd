@@ -16,41 +16,39 @@ const TIPS: Array[String] = [
 var _progress_bar: ProgressBar
 var _status_label: Label
 var _tip_label: Label
-var _requested := false
 var _switching := false
 
 func _ready() -> void:
 	_build_loading_screen()
-	var error: Error = ResourceLoader.load_threaded_request(MAIN_SCENE, "", true)
-	if error != OK:
-		_show_error("Impossible de préparer la scène principale.")
-		return
-	_requested = true
-	set_process(true)
+	set_process(false)
+	call_deferred("_begin_loading")
 
-func _process(_delta: float) -> void:
-	if not _requested or _switching:
+func _begin_loading() -> void:
+	if _switching:
 		return
-	var progress: Array = []
-	var status: ResourceLoader.ThreadLoadStatus = ResourceLoader.load_threaded_get_status(MAIN_SCENE, progress)
-	if not progress.is_empty():
-		_progress_bar.value = clampf(float(progress[0]) * 100.0, 4.0, 96.0)
-	match status:
-		ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-			_status_label.text = _loading_status_for_progress(_progress_bar.value)
-		ResourceLoader.THREAD_LOAD_LOADED:
-			_switching = true
-			_progress_bar.value = 100.0
-			_status_label.text = "Ouverture du garage…"
-			var loaded: Resource = ResourceLoader.load_threaded_get(MAIN_SCENE)
-			var packed: PackedScene = loaded as PackedScene
-			if packed == null:
-				_show_error("La scène principale est invalide.")
-				return
-			await get_tree().process_frame
-			get_tree().change_scene_to_packed(packed)
-		ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			_show_error("Le chargement de Tech Empire a échoué.")
+	_progress_bar.value = 14.0
+	_status_label.text = "Préparation des systèmes…"
+	await get_tree().process_frame
+
+	_progress_bar.value = 38.0
+	_status_label.text = "Chargement de l'atelier…"
+	await get_tree().process_frame
+
+	var loaded: Resource = load(MAIN_SCENE)
+	var packed: PackedScene = loaded as PackedScene
+	if packed == null:
+		_show_error("La scène principale est invalide.")
+		return
+
+	_progress_bar.value = 78.0
+	_status_label.text = "Installation de l'interface…"
+	await get_tree().process_frame
+
+	_switching = true
+	_progress_bar.value = 100.0
+	_status_label.text = "Ouverture du garage…"
+	await get_tree().process_frame
+	get_tree().change_scene_to_packed(packed)
 
 func _build_loading_screen() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -142,7 +140,6 @@ func _loading_status_for_progress(value: float) -> String:
 	return "Presque prêt…"
 
 func _show_error(message: String) -> void:
-	_requested = false
 	_switching = false
 	set_process(false)
 	_progress_bar.value = 0.0
