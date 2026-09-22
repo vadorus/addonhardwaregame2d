@@ -15,6 +15,8 @@ func _ready() -> void:
 			SimulationManager.process_day()
 			if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("milestone_pending", false)):
 				StartupManager.resolve_contract_milestone("EXTRA")
+			if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("deadline_pending", false)):
+				StartupManager.resolve_contract_deadline("OVERTIME")
 			if not StartupManager.last_contract_result.is_empty():
 				StartupManager.dismiss_last_contract_result()
 
