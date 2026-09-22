@@ -5,13 +5,28 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	var main_scene: Resource = load("res://main.tscn")
-	if main_scene == null:
+	if main_scene == null or not (main_scene is PackedScene):
 		_fail("main.tscn could not be loaded")
 		return
+	var main_instance: Node = (main_scene as PackedScene).instantiate()
+	if main_instance == null or not main_instance.has_method("_refresh_startup_dashboard"):
+		if main_instance != null:
+			main_instance.free()
+		_fail("main.tscn instantiated without its gameplay script")
+		return
+	main_instance.free()
+
 	var loading_scene: Resource = load("res://ui/LoadingScreenV031.tscn")
-	if loading_scene == null:
+	if loading_scene == null or not (loading_scene is PackedScene):
 		_fail("LoadingScreenV031.tscn could not be loaded")
 		return
+	var loading_instance: Node = (loading_scene as PackedScene).instantiate()
+	if loading_instance == null or not loading_instance.has_method("_loading_status_for_progress"):
+		if loading_instance != null:
+			loading_instance.free()
+		_fail("LoadingScreenV031.tscn instantiated without its loading script")
+		return
+	loading_instance.free()
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
