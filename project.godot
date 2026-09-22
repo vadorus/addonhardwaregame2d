@@ -42,6 +42,7 @@ SimulationManager="*res://scripts/SimulationManager.gd"
 TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
 SettingsManager="*res://scripts/SettingsManager.gd"
+SoundManager="*res://scripts/SoundManager.gd"
 
 [display]
 
