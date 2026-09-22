@@ -3,6 +3,7 @@ extends Control
 const MENU_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.png")
 const GAME_LOGO: Texture2D = preload("res://assets/ui/runtime/branding/tech_empire_logo.png")
 const GAME_SCENE := "res://main.tscn"
+const LOADING_SCENE := "res://ui/LoadingScreenV031.tscn"
 
 const NAVY := Color("#081624")
 const NAVY_SOFT := Color("#0d2234")
@@ -213,11 +214,11 @@ func _new_game() -> void:
 		_show_message("Nouvelle partie", "Les 5 emplacements sont utilisés. Chargez une partie existante ou libérez un emplacement avant de recommencer.")
 		return
 	SaveManager.set_current_slot(empty_slot)
-	get_tree().change_scene_to_file(GAME_SCENE)
+	get_tree().change_scene_to_file(LOADING_SCENE)
 
 func _continue_game() -> void:
 	if SaveManager.load_latest_game():
-		get_tree().change_scene_to_file(GAME_SCENE)
+		get_tree().change_scene_to_file(LOADING_SCENE)
 	else:
 		_refresh_save_status()
 
@@ -270,7 +271,7 @@ func _show_save_slots() -> void:
 
 func _load_slot(slot_id: String) -> void:
 	if SaveManager.load_game(slot_id):
-		get_tree().change_scene_to_file(GAME_SCENE)
+		get_tree().change_scene_to_file(LOADING_SCENE)
 	else:
 		_show_message("Chargement", "Impossible de charger cet emplacement.")
 
