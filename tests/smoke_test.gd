@@ -54,11 +54,14 @@ func _ready() -> void:
 	if StartupManager.software_contracts_completed != 1:
 		_fail("First garage software contract did not complete")
 		return
-	if not _run_startup_contract("INVOICING"):
-		_fail("Second garage software contract did not complete through the daily project engine")
-		return
 	if StartupManager.stage != StartupManager.STAGE_FIRST_HIRE:
-		_fail("Two delivered software contracts did not unlock the first hire")
+		_fail("The first tutorial contract did not unlock the next hardware step")
+		return
+	if not StartupManager.available_contract_ids().has("INVOICING"):
+		_fail("Software contracts should remain available after the tutorial contract")
+		return
+	if not _run_startup_contract("INVOICING"):
+		_fail("Optional software work no longer functions after the tutorial")
 		return
 	if FounderManager.branch_level(FounderManager.BRANCH_BUSINESS) < 2:
 		_fail("Repeated business-software work did not level the founder specialization")
