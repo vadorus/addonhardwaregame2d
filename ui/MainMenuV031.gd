@@ -418,41 +418,9 @@ func _show_settings() -> void:
 	audio_title.add_theme_font_size_override("font_size", 17)
 	_modal_body.add_child(audio_title)
 
-	for audio_data in [
-		["Volume général", "master_volume"],
-		["Ambiance / musique", "music_volume"],
-		["Effets et interface", "sfx_volume"]
-	]:
-		var audio_row := HBoxContainer.new()
-		audio_row.add_theme_constant_override("separation", 10)
-		_modal_body.add_child(audio_row)
-
-		var audio_label := Label.new()
-		audio_label.text = str(audio_data[0])
-		audio_label.custom_minimum_size.x = 150
-		audio_label.add_theme_color_override("font_color", TEXT)
-		audio_row.add_child(audio_label)
-
-		var audio_slider := HSlider.new()
-		audio_slider.min_value = 0.0
-		audio_slider.max_value = 1.0
-		audio_slider.step = 0.05
-		audio_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var audio_key := str(audio_data[1])
-		audio_slider.value = float(SettingsManager.get_setting("audio", audio_key))
-		audio_row.add_child(audio_slider)
-
-		var audio_value := Label.new()
-		audio_value.custom_minimum_size.x = 52
-		audio_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		audio_value.text = "%d %%" % int(round(audio_slider.value * 100.0))
-		audio_value.add_theme_color_override("font_color", MUTED)
-		audio_row.add_child(audio_value)
-
-		audio_slider.value_changed.connect(func(value: float):
-			SettingsManager.set_setting("audio", audio_key, value)
-			audio_value.text = "%d %%" % int(round(value * 100.0))
-		)
+	_add_audio_slider("Volume général", "master_volume")
+	_add_audio_slider("Ambiance / musique", "music_volume")
+	_add_audio_slider("Effets et interface", "sfx_volume")
 
 	var tutorial := CheckButton.new()
 	tutorial.text = "Guidage de Nora / tutoriel progressif"
@@ -479,6 +447,37 @@ func _show_settings() -> void:
 	close.pressed.connect(_close_modal)
 	_modal_body.add_child(close)
 	_modal_layer.visible = true
+
+func _add_audio_slider(label_text: String, audio_key: String) -> void:
+	var audio_row := HBoxContainer.new()
+	audio_row.add_theme_constant_override("separation", 10)
+	_modal_body.add_child(audio_row)
+
+	var audio_label := Label.new()
+	audio_label.text = label_text
+	audio_label.custom_minimum_size.x = 150
+	audio_label.add_theme_color_override("font_color", TEXT)
+	audio_row.add_child(audio_label)
+
+	var audio_slider := HSlider.new()
+	audio_slider.min_value = 0.0
+	audio_slider.max_value = 1.0
+	audio_slider.step = 0.05
+	audio_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	audio_slider.value = float(SettingsManager.get_setting("audio", audio_key))
+	audio_row.add_child(audio_slider)
+
+	var audio_value := Label.new()
+	audio_value.custom_minimum_size.x = 52
+	audio_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	audio_value.text = "%d %%" % int(round(audio_slider.value * 100.0))
+	audio_value.add_theme_color_override("font_color", MUTED)
+	audio_row.add_child(audio_value)
+
+	audio_slider.value_changed.connect(func(value: float):
+		SettingsManager.set_setting("audio", audio_key, value)
+		audio_value.text = "%d %%" % int(round(value * 100.0))
+	)
 
 func _show_credits() -> void:
 	_show_message(
