@@ -31,6 +31,15 @@ func _ready() -> void:
 		_fail("Garage starting cash does not match the selected difficulty")
 		return
 
+	var easy_preview := StartupManager.contract_preview("STOCK", "SOLID")
+	var hard_preview := StartupManager.contract_preview("INDUSTRIAL_LOG", "SOLID")
+	if not bool(easy_preview.get("fits_deadline", false)):
+		_fail("The introductory contract should be achievable with the founder's initial programming skill")
+		return
+	if bool(hard_preview.get("fits_deadline", true)):
+		_fail("A harder industrial contract should visibly exceed the founder's initial capacity")
+		return
+
 	if not _run_startup_contract("STOCK"):
 		_fail("First garage software contract did not complete through the daily project engine")
 		return
@@ -1325,13 +1334,16 @@ func _ready() -> void:
 func _run_startup_contract(contract_id: String) -> bool:
 	if not StartupManager.start_software_contract(contract_id, "SOLID"):
 		return false
-	for _day in range(120):
+	for _day in range(140):
 		SimulationManager.process_day()
 		if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("milestone_pending", false)):
 			StartupManager.resolve_contract_milestone("EXTRA")
+		if not StartupManager.active_contract.is_empty() and bool(StartupManager.active_contract.get("deadline_pending", false)):
+			StartupManager.resolve_contract_deadline("OVERTIME")
 		if not StartupManager.last_contract_result.is_empty():
+			var failed := bool(StartupManager.last_contract_result.get("failed", false))
 			StartupManager.dismiss_last_contract_result()
-			return true
+			return not failed
 	return false
 
 func _fail(message: String) -> void:
