@@ -937,7 +937,7 @@ func _refresh_startup_dashboard() -> void:
 		if first_contract_running and tutorial_progress >= 30.0:
 			startup_quality_meter_label.visible = true
 			startup_quality_meter_bar.visible = true
-		startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d" % [robustness, robustness_required, int(project.get("defects", 0))]
+			startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d" % [robustness, robustness_required, int(project.get("defects", 0))]
 		else:
 			startup_quality_meter_label.text = "ROBUSTESSE  %.0f / %.0f exigé  •  défauts : %d  •  projection %s" % [robustness, robustness_required, int(project.get("defects", 0)), "OK" if bool(projection.get("on_track", false)) else "RETARD"]
 		startup_quality_meter_bar.value = robustness
