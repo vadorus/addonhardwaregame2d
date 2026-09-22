@@ -623,6 +623,7 @@ func _refresh_tutorial_overlay() -> void:
 
 	tutorial_overlay.visible = true
 	_tutorial_target = target
+	var previous_step := _tutorial_step_id
 	_tutorial_step_id = str(state.get("id", ""))
 	tutorial_bubble_title.text = str(state.get("title", "Nora • Tutoriel"))
 	tutorial_bubble_text.text = str(state.get("text", ""))
@@ -660,6 +661,8 @@ func _refresh_tutorial_overlay() -> void:
 	if bubble_y < 12.0:
 		bubble_y = 12.0
 	tutorial_bubble.position = Vector2(bubble_x, bubble_y)
+	if _tutorial_step_id != previous_step:
+		_animate_tutorial_step()
 
 func _update_audio_context() -> void:
 	var enabled := CompanyManager.created and StartupManager.is_pre_cpu_phase() and not SimulationManager.is_game_over
