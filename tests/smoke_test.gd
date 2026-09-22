@@ -4,6 +4,14 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
+	var main_scene: Resource = load("res://main.tscn")
+	if main_scene == null:
+		_fail("main.tscn could not be loaded")
+		return
+	var loading_scene: Resource = load("res://ui/LoadingScreenV031.tscn")
+	if loading_scene == null:
+		_fail("LoadingScreenV031.tscn could not be loaded")
+		return
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
