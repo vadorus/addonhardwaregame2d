@@ -443,7 +443,10 @@ func renegotiate_contract(contract_id: String, negotiation: String, term_key: St
 		current[key] = proposed[key]
 	for key in preserved.keys():
 		current[key] = preserved[key]
-	current["remaining_months"] = maxi(int(current.get("remaining_months", current.get("duration_months", 48))), 1)
+	if str(current.get("status", "")) == "COMMERCIAL":
+		current["remaining_months"] = maxi(int(current.get("duration_months", 48)), 1)
+	else:
+		current["remaining_months"] = maxi(int(current.get("remaining_months", current.get("duration_months", 48))), 1)
 	contracts[contract_id] = current
 	var supplier: Dictionary = suppliers[str(current.get("supplier_id", ""))]
 	supplier["trust"] = clampf(float(supplier.get("trust", 50.0)) + 0.5, 0.0, 100.0)
