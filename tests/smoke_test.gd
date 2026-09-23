@@ -1449,7 +1449,7 @@ func _ready() -> void:
 	var market_round_trip := MarketManager.get_state().duplicate(true)
 	var saved_market_age := MarketManager.market_age_months
 	var saved_competitor_generation := int(competitor_after.get("generation_index", 1))
-	var saved_ai_history_size := competitor_after.get("ai_decision_history", []).size()
+	var saved_ai_history_size: int = int(competitor_after.get("ai_decision_history", []).size())
 	var saved_known_markets := MarketManager.known_segments.size()
 	MarketManager.reset()
 	MarketManager.load_state(market_round_trip)
