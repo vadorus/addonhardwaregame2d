@@ -7,19 +7,24 @@ const PROFILE_ORDER := ["ACCESSIBLE", "STANDARD", "REALISTIC"]
 const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
-		"description":"Plus de marge de trésorerie et un marché un peu plus permissif. La simulation reste complète.",
+		"description":"Simulation complète, avec davantage de marge financière et des entreprises concurrentes moins réactives et plus imparfaites.",
 		"starting_capital":600000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
 		"research_cost":0.88,
 		"industrial_cost":0.90,
 		"market_demand":1.14,
-		"competitor_pressure":0.90,
+		"competitor_pressure":1.00,
+		"ai_decision_quality":0.58,
+		"ai_decision_noise":14.0,
+		"ai_decision_interval_months":3,
+		"ai_action_threshold":56.0,
+		"ai_commercial_aggression":0.82,
 		"first_generation_runway_target":9.5
 	},
 	"STANDARD":{
 		"label":"Standard",
-		"description":"Équilibre de référence : chaque mauvais choix coûte, sans exiger une optimisation parfaite.",
+		"description":"Équilibre de référence : entreprises autonomes cohérentes, réactives sans être omniscientes.",
 		"starting_capital":500000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
@@ -27,18 +32,28 @@ const PROFILES := {
 		"industrial_cost":1.00,
 		"market_demand":1.00,
 		"competitor_pressure":1.00,
+		"ai_decision_quality":0.74,
+		"ai_decision_noise":9.0,
+		"ai_decision_interval_months":2,
+		"ai_action_threshold":52.0,
+		"ai_commercial_aggression":1.00,
 		"first_generation_runway_target":7.5
 	},
 	"REALISTIC":{
 		"label":"Réaliste",
-		"description":"Trésorerie plus tendue, coûts plus lourds, demande moins tolérante et concurrents plus rapides.",
+		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
 		"starting_capital":420000,
 		"operating_cost":1.10,
 		"salary_cost":1.08,
 		"research_cost":1.12,
 		"industrial_cost":1.12,
 		"market_demand":0.92,
-		"competitor_pressure":1.10,
+		"competitor_pressure":1.00,
+		"ai_decision_quality":0.90,
+		"ai_decision_noise":5.0,
+		"ai_decision_interval_months":1,
+		"ai_action_threshold":49.0,
+		"ai_commercial_aggression":1.14,
 		"first_generation_runway_target":5.8
 	}
 }
@@ -106,6 +121,16 @@ func market_demand_factor() -> float:
 
 func competitor_pressure_factor() -> float:
 	return float(profile_data().get("competitor_pressure", 1.0))
+
+func company_ai_profile() -> Dictionary:
+	var profile := profile_data()
+	return {
+		"decision_quality":float(profile.get("ai_decision_quality", 0.74)),
+		"decision_noise":float(profile.get("ai_decision_noise", 9.0)),
+		"decision_interval_months":maxi(int(profile.get("ai_decision_interval_months", 2)), 1),
+		"action_threshold":float(profile.get("ai_action_threshold", 52.0)),
+		"commercial_aggression":float(profile.get("ai_commercial_aggression", 1.0))
+	}
 
 func first_generation_runway_target() -> float:
 	return float(profile_data().get("first_generation_runway_target", 7.5))
