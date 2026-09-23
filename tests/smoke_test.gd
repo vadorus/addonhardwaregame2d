@@ -1,41 +1,15 @@
 extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
+const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
-	var garage_hub_script: Script = load("res://ui/GarageHub.gd")
-	if garage_hub_script == null:
-		_fail("Interactive garage HQ script could not be loaded")
+	var garage_error := GARAGE_SCENARIO.run(self)
+	if garage_error != "":
+		_fail(garage_error)
 		return
-	var garage_hub: Control = garage_hub_script.new() as Control
-	add_child(garage_hub)
-	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
-		_fail("Interactive garage HQ did not expose the expected five management zones")
-		return
-	if not garage_hub.has_method("background_resource_path") or str(garage_hub.call("background_resource_path")) != "res://assets/ui/garage_stage0.webp":
-		_fail("Garage HQ did not load the furnished stage-zero isometric artwork")
-		return
-	var expected_workplace_art := [
-		"res://assets/ui/garage_stage0.webp",
-		"res://assets/ui/garage_stage1.webp",
-		"res://assets/ui/garage_stage2.webp",
-		"res://assets/ui/garage_stage3.webp"
-	]
-	for visual_tier in range(4):
-		garage_hub.call("set_workplace", {"tier":visual_tier,"condition":80.0,"name":"Test tier %d" % visual_tier})
-		if str(garage_hub.call("background_resource_path")) != expected_workplace_art[visual_tier]:
-			_fail("Garage HQ did not switch to the expected artwork for workplace tier %d" % visual_tier)
-			return
-		if not garage_hub.has_method("workplace_visual_tier") or int(garage_hub.call("workplace_visual_tier")) != visual_tier:
-			_fail("Garage HQ visual tier did not track the simulated workplace tier")
-			return
-	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
-	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":false,"PRODUCTS":false,"MARKET":false,"PRESS":false})
-	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
-		_fail("Garage onboarding exposed advanced management zones too early")
-		return
-	garage_hub.queue_free()
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
@@ -150,65 +124,9 @@ func _ready() -> void:
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
-	if BalanceManager.active_profile != "STANDARD":
-		_fail("Default CI game did not start on Standard economic balance")
-		return
-	var balance_state := BalanceManager.get_state().duplicate(true)
-	var standard_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
-	var standard_market_units := MarketManager.segment_market_units("EMBEDDED")
-	var standard_runway := BalanceManager.starting_runway_months()
-	BalanceManager.reset("ACCESSIBLE")
-	var accessible_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
-	var accessible_market_units := MarketManager.segment_market_units("EMBEDDED")
-	var accessible_capital := BalanceManager.starting_capital()
-	var accessible_runway := BalanceManager.starting_runway_months()
-	BalanceManager.reset("REALISTIC")
-	var realistic_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
-	var realistic_market_units := MarketManager.segment_market_units("EMBEDDED")
-	var realistic_capital := BalanceManager.starting_capital()
-	var realistic_runway := BalanceManager.starting_runway_months()
-	if not (accessible_salary_cost < standard_salary_cost and standard_salary_cost < realistic_salary_cost):
-		_fail("Difficulty profiles do not change real payroll costs in the expected direction")
-		return
-	if not (accessible_market_units > standard_market_units and standard_market_units > realistic_market_units):
-		_fail("Difficulty profiles do not change available market demand")
-		return
-	if accessible_capital <= 500000 or realistic_capital >= 500000:
-		_fail("Difficulty profiles do not change starting liquidity")
-		return
-	if accessible_runway <= standard_runway or realistic_runway >= standard_runway:
-		_fail("Difficulty profiles do not create distinct starting runway pressure")
-		return
-	var realistic_ai := BalanceManager.company_ai_profile()
-	BalanceManager.reset("STANDARD")
-	var standard_ai := BalanceManager.company_ai_profile()
-	BalanceManager.reset("ACCESSIBLE")
-	var accessible_ai := BalanceManager.company_ai_profile()
-	if not (
-		float(accessible_ai.get("decision_quality", 1.0)) < float(standard_ai.get("decision_quality", 0.0))
-		and float(standard_ai.get("decision_quality", 1.0)) < float(realistic_ai.get("decision_quality", 0.0))
-	):
-		_fail("Difficulty does not scale competitor decision quality progressively")
-		return
-	if not (
-		int(accessible_ai.get("decision_interval_months", 0)) > int(standard_ai.get("decision_interval_months", 0))
-		and int(standard_ai.get("decision_interval_months", 0)) > int(realistic_ai.get("decision_interval_months", 0))
-	):
-		_fail("Difficulty does not scale competitor reaction cadence progressively")
-		return
-	BalanceManager.reset("REALISTIC")
-	if absf(BalanceManager.competitor_pressure_factor() - 1.0) > 0.001:
-		_fail("Realistic difficulty still gives competitors a hidden market/stat multiplier")
-		return
-	if BalanceManager.expense_amount(10000, "Production — test CPU") != 10000:
-		_fail("Difficulty changed literal per-unit production economics")
-		return
-	if BalanceManager.expense_amount(10000, "SAV garanties — test CPU") != 10000:
-		_fail("Difficulty changed literal warranty unit economics")
-		return
-	BalanceManager.load_state(balance_state)
-	if BalanceManager.active_profile != "STANDARD":
-		_fail("Economic difficulty did not survive a state round-trip")
+	var difficulty_error := DIFFICULTY_SCENARIO.run()
+	if difficulty_error != "":
+		_fail(difficulty_error)
 		return
 	if TimeManager.year != 1971:
 		_fail("New companies must start in the early microprocessor era")
