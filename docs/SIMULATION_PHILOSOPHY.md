@@ -92,6 +92,17 @@ Une réservation rivale peut donc réduire la capacité libre visible par le jou
 
 Les partenariats explicitement publics peuvent être observés sur le marché. Les contrats privés, leurs prix exacts et leurs arbitrages internes restent cachés.
 
+
+### Les appels d'offres sont disputés par tout le marché
+
+Un appel d'offres B2B n'est pas une opportunité réservée au joueur. Les entreprises concurrentes évaluent elles aussi le cahier des charges avec leur CPU réel, leur capacité disponible, leur réputation simulée et leur structure de coût. Elles peuvent décider de répondre, calibrer leur prix et remporter le contrat.
+
+Le client applique le même principe d'évaluation aux offres crédibles : adéquation à l'usage, respect des exigences, prix et réputation. La difficulté ne donne pas de points gratuits aux entreprises IA ; elle réduit seulement l'imprécision de leur décision tarifaire.
+
+Un contrat remporté par un rival devient une charge industrielle réelle : les unités B2B consomment sa capacité avant le marché grand public, génèrent une marge selon son coût unitaire et occupent la durée prévue. Une exclusivité peut l'empêcher de courir plusieurs programmes incompatibles en parallèle.
+
+Avant la décision, le joueur peut connaître une estimation du nombre d'entreprises susceptibles de répondre, mais jamais leurs prix d'offre exacts. Après attribution, l'identité du gagnant n'est révélée que si le niveau de confidentialité du programme le permet.
+
 ## 5. La fiabilité compte autant que la performance
 
 Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.
