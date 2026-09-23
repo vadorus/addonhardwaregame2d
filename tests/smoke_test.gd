@@ -13,6 +13,9 @@ func _ready() -> void:
 	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
 		_fail("Interactive garage HQ did not expose the expected five management zones")
 		return
+	if not garage_hub.has_method("background_resource_path") or str(garage_hub.call("background_resource_path")) != "res://assets/ui/garage_shell.webp":
+		_fail("Garage HQ did not load the approved optimized isometric artwork")
+		return
 	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":false,"PRODUCTS":false,"MARKET":false,"PRESS":false})
 	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
 		_fail("Garage onboarding exposed advanced management zones too early")
