@@ -53,6 +53,8 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"architecture_estimate":architecture_estimate,
 		"generation_plan":generation_plan,
 		"application_profile":str(project.get("application_profile", "GENERAL")),
+		"approach":str(project.get("approach", "INTERNAL")),
+		"sourcing":project.get("sourcing", GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))).duplicate(true),
 		"metrics":project_metrics,
 		"yield_rate":yield_rate,
 		"base_yield_rate":base_yield,
@@ -140,7 +142,8 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var base_name := str(project.get("name", "Nova CPU"))
 	var product_name := base_name if suffix.is_empty() else "%s %s" % [base_name, suffix]
 	var approach := str(project.get("approach", "INTERNAL"))
-	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
+	var approach_data: Dictionary = GameData.approach_data(approach)
+	var sourcing := project.get("sourcing", GameData.sourcing_profile(approach)).duplicate(true)
 	return {
 		"project_id":str(project.get("id", "")),
 		"generation_id":generation_id,
@@ -153,6 +156,11 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"application_profile":str(project.get("application_profile", "GENERAL")),
 		"approach":approach,
 		"internal_ratio":float(approach_data.internal_ratio),
+		"sourcing":sourcing,
+		"royalty_rate":float(sourcing.get("royalty_rate", 0.0)),
+		"vendor_dependency":float(sourcing.get("dependency", 0.0)),
+		"customization_freedom":float(sourcing.get("customization", 100.0)),
+		"ip_ownership":float(sourcing.get("ip_ownership", 100.0)),
 		"sku_tier":tier_key,
 		"sku_label":str(tier.label),
 		"sku_order":tier_index,
