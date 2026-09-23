@@ -1419,7 +1419,13 @@ func estimated_rival_tender_interest(tender: Dictionary) -> int:
 		if _competitor_has_exclusive_b2b(competitor):
 			continue
 		var capacity := maxi(int(competitor.get("capacity", 0)), 1)
-		if capacity < int(tender.get("units_per_month", 0)):
+		var committed_units := 0
+		for contract_value in competitor.get("b2b_contracts", []):
+			var contract: Dictionary = contract_value
+			if str(contract.get("status", "ACTIVE")) == "ACTIVE" and int(contract.get("remaining_months", 0)) > 0:
+				committed_units += int(contract.get("units_per_month", 0))
+		var free_capacity := maxi(capacity - committed_units, 0)
+		if free_capacity < int(tender.get("units_per_month", 0)):
 			continue
 		var reference_bid := maxi(int(competitor.get("unit_cost", 1)) + 4, mini(int(competitor.get("price", 1)), int(tender.get("max_unit_price", 1))))
 		var fit := _rival_tender_fit(tender, competitor, reference_bid)
