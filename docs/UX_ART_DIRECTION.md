@@ -206,6 +206,16 @@ Le premier asset de production est désormais `assets/ui/garage_shell.webp` : un
 
 Le **niveau 0 jouable** utilise ensuite `assets/ui/garage_stage0.webp`, qui ajoute directement les trois postes disponibles au démarrage : établi CPU, banc de test et poste du fondateur. Les fonctions encore verrouillées ne reçoivent pas encore de mobilier dédié. Cela permet au décor de suivre le même apprentissage progressif que l'interface : le joueur voit d'abord uniquement ce qu'il peut réellement utiliser.
 
+
+La progression visuelle est désormais liée directement au palier de locaux simulé :
+
+- **Tier 0 — Garage aménagé** : `garage_stage0.webp`, trois postes essentiels ;
+- **Tier 1 — Atelier + bureaux** : `garage_stage1.webp`, planification et stockage deviennent visiblement structurés ;
+- **Tier 2 — Siège technique** : `garage_stage2.webp`, espace plus dense et professionnalisé ;
+- **Tier 3 — Campus R&D** : `garage_stage3.webp`, zone de démonstration CPU et présentation plus prestigieuse.
+
+Le changement de décor est immédiat après une amélioration de locaux : le joueur reste sur le QG et voit physiquement la croissance de son entreprise. Les hotspots continuent d'être positionnés relativement à l'illustration pour conserver leur alignement sur PC et Android.
+
 ## Évolution visuelle des locaux
 
 La progression de l'interface doit être soutenue par l'évolution visible du lieu de travail. Le système de locaux possède maintenant quatre paliers de simulation : garage aménagé, atelier + bureaux, siège technique et campus R&D.
