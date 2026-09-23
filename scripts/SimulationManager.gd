@@ -48,6 +48,7 @@ func process_month_end() -> Dictionary:
 	FoundryManager.process_month()
 	ProductionManager.process_month()
 	ProductManager.process_month()
+	SupplierManager.process_month()
 	AfterSalesManager.process_month()
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()

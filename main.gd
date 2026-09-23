@@ -89,7 +89,15 @@ var rd_application: OptionButton
 var rd_approach: OptionButton
 var rd_supplier: OptionButton
 var rd_negotiation: OptionButton
+var rd_contract_term: OptionButton
+var rd_exclusivity: OptionButton
+var rd_ip_term: OptionButton
+var rd_volume_term: OptionButton
 var rd_supplier_label: Label
+var supplier_contract_select: OptionButton
+var supplier_contract_label: Label
+var supplier_contract_renegotiate_button: Button
+var supplier_contract_break_button: Button
 var rd_focus: OptionButton
 var rd_budget: SpinBox
 var research_overview_label: Label
@@ -221,6 +229,7 @@ func _connect_signals():
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
 	SupplierManager.suppliers_changed.connect(_refresh_research)
+	SupplierManager.contracts_changed.connect(_refresh_research)
 	ProductionManager.jobs_changed.connect(_refresh_all)
 	FoundryManager.foundries_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
@@ -820,10 +829,67 @@ func _create_research_tab():
 	rd_negotiation.item_selected.connect(func(_index): _refresh_cpu_preview())
 	_add_labeled_control(configuration_box, "Priorité de négociation", rd_negotiation)
 
+	rd_contract_term = OptionButton.new()
+	for contract_term_value in SupplierManager.contract_term_keys():
+		var contract_term_key := str(contract_term_value)
+		rd_contract_term.add_item(SupplierManager.contract_term_label(contract_term_key))
+		rd_contract_term.set_item_metadata(rd_contract_term.item_count - 1, contract_term_key)
+	_select_meta(rd_contract_term, "STANDARD")
+	rd_contract_term.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Durée du contrat", rd_contract_term)
+
+	rd_exclusivity = OptionButton.new()
+	for exclusivity_value in SupplierManager.exclusivity_keys():
+		var exclusivity_key := str(exclusivity_value)
+		rd_exclusivity.add_item(SupplierManager.exclusivity_label(exclusivity_key))
+		rd_exclusivity.set_item_metadata(rd_exclusivity.item_count - 1, exclusivity_key)
+	_select_meta(rd_exclusivity, "NONE")
+	rd_exclusivity.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Exclusivité", rd_exclusivity)
+
+	rd_ip_term = OptionButton.new()
+	for ip_value in SupplierManager.ip_term_keys():
+		var ip_key := str(ip_value)
+		rd_ip_term.add_item(SupplierManager.ip_term_label(ip_key))
+		rd_ip_term.set_item_metadata(rd_ip_term.item_count - 1, ip_key)
+	_select_meta(rd_ip_term, "SHARED")
+	rd_ip_term.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Propriété intellectuelle", rd_ip_term)
+
+	rd_volume_term = OptionButton.new()
+	for volume_value in SupplierManager.volume_term_keys():
+		var volume_key := str(volume_value)
+		rd_volume_term.add_item(SupplierManager.volume_term_label(volume_key))
+		rd_volume_term.set_item_metadata(rd_volume_term.item_count - 1, volume_key)
+	_select_meta(rd_volume_term, "NONE")
+	rd_volume_term.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Engagement commercial", rd_volume_term)
+
 	rd_supplier_label = _muted_label("", 11)
 	rd_supplier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(rd_supplier_label)
 	_refresh_supplier_options()
+
+	configuration_box.add_child(_eyebrow("CONTRATS FOURNISSEURS"))
+	supplier_contract_select = OptionButton.new()
+	supplier_contract_select.item_selected.connect(func(_index): _refresh_selected_supplier_contract())
+	_add_labeled_control(configuration_box, "Contrat actif", supplier_contract_select)
+	supplier_contract_label = _muted_label("Aucun contrat fournisseur actif.", 11)
+	supplier_contract_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(supplier_contract_label)
+	var supplier_contract_actions := HFlowContainer.new()
+	supplier_contract_actions.add_theme_constant_override("h_separation", 8)
+	supplier_contract_actions.add_theme_constant_override("v_separation", 6)
+	configuration_box.add_child(supplier_contract_actions)
+	supplier_contract_renegotiate_button = Button.new()
+	supplier_contract_renegotiate_button.text = "Renégocier avec les conditions ci-dessus"
+	supplier_contract_renegotiate_button.pressed.connect(_renegotiate_selected_supplier_contract)
+	supplier_contract_actions.add_child(supplier_contract_renegotiate_button)
+	supplier_contract_break_button = Button.new()
+	supplier_contract_break_button.text = "Rompre le contrat"
+	supplier_contract_break_button.pressed.connect(_break_selected_supplier_contract)
+	supplier_contract_actions.add_child(supplier_contract_break_button)
+	_refresh_supplier_contracts()
 
 	rd_focus = OptionButton.new()
 	_fill_focus_options(rd_focus)
@@ -1367,13 +1433,21 @@ func _refresh_cpu_preview():
 		if approach_key == "INTERNAL":
 			rd_supplier_label.text = "Équipe interne : aucune dépendance fournisseur, IP et personnalisation maximales."
 		else:
-			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nAccès %s € • coût unitaire x%.2f • négociation : %s" % [
+			var acceptance_text := "OFFRE ACCEPTABLE"
+			if not bool(sourcing.get("accepted", false)):
+				acceptance_text = "CONTRE-PROPOSITION : %s" % str(sourcing.get("counter_text", "conditions à revoir"))
+			var volume_commitment := int(sourcing.get("guaranteed_units", 0))
+			var volume_text := "aucun volume garanti" if volume_commitment <= 0 else "%s unités garanties" % _money(volume_commitment)
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\n%s — score d'acceptation %.0f/100" % [
 				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
 				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
 				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
 				int(sourcing.get("available_capacity_slots", 0)), int(sourcing.get("supplier_capacity_slots", 0)),
-				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("unit_cost_factor", 1.0)),
-				str(sourcing.get("negotiation_label", "Équilibré"))
+				str(sourcing.get("contract_term_label", "")), str(sourcing.get("exclusivity_label", "")),
+				str(sourcing.get("ip_term_label", "")), volume_text,
+				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("royalty_rate", 0.0)) * 100.0,
+				float(sourcing.get("unit_cost_factor", 1.0)), _money(int(sourcing.get("termination_penalty", 0))),
+				acceptance_text, float(sourcing.get("acceptance_score", 0.0))
 			]
 	lab_dev_time_value.text = "~%d mois" % months
 	lab_fit_value.text = "%.0f / 100" % fit
@@ -2286,16 +2360,25 @@ func _refresh_supplier_options():
 	var approach := _meta(rd_approach)
 	var previous := _meta(rd_supplier) if rd_supplier.item_count > 0 else ""
 	rd_supplier.clear()
+	var contract_controls := [rd_contract_term, rd_exclusivity, rd_ip_term, rd_volume_term]
 	if approach == "INTERNAL":
 		rd_supplier.add_item("Équipe interne — aucun fournisseur")
 		rd_supplier.set_item_metadata(0, "")
 		rd_supplier.disabled = true
 		if rd_negotiation != null:
 			rd_negotiation.disabled = true
+		for control_value in contract_controls:
+			var control: OptionButton = control_value
+			if control != null:
+				control.disabled = true
 	else:
 		rd_supplier.disabled = false
 		if rd_negotiation != null:
 			rd_negotiation.disabled = false
+		for control_value in contract_controls:
+			var control: OptionButton = control_value
+			if control != null:
+				control.disabled = false
 		for supplier_id_value in SupplierManager.supplier_keys_for_mode(approach):
 			var supplier_id := str(supplier_id_value)
 			var supplier := SupplierManager.get_supplier(supplier_id)
@@ -2312,7 +2395,92 @@ func _selected_supplier_quote() -> Dictionary:
 	var approach := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
 	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
-	return SupplierManager.quote(approach, supplier_id, negotiation)
+	if approach == "INTERNAL":
+		return SupplierManager.quote(approach, supplier_id, negotiation)
+	var term_key := _meta(rd_contract_term) if rd_contract_term != null and rd_contract_term.item_count > 0 else "STANDARD"
+	var exclusivity := _meta(rd_exclusivity) if rd_exclusivity != null and rd_exclusivity.item_count > 0 else "NONE"
+	var ip_term := _meta(rd_ip_term) if rd_ip_term != null and rd_ip_term.item_count > 0 else "SHARED"
+	var volume_term := _meta(rd_volume_term) if rd_volume_term != null and rd_volume_term.item_count > 0 else "NONE"
+	return SupplierManager.contract_quote(approach, supplier_id, negotiation, term_key, exclusivity, ip_term, volume_term)
+
+func _refresh_supplier_contracts():
+	if supplier_contract_select == null:
+		return
+	var previous := _meta(supplier_contract_select) if supplier_contract_select.item_count > 0 else ""
+	supplier_contract_select.clear()
+	for contract_value in SupplierManager.active_contracts():
+		var contract: Dictionary = contract_value
+		supplier_contract_select.add_item("%s — %s — %s" % [
+			str(contract.get("id", "")),
+			str(contract.get("supplier_name", "Partenaire")),
+			"R&D" if str(contract.get("status", "")) == "RND" else "%d mois" % int(contract.get("remaining_months", 0))
+		])
+		supplier_contract_select.set_item_metadata(supplier_contract_select.item_count - 1, str(contract.get("id", "")))
+	if previous != "":
+		_select_meta(supplier_contract_select, previous)
+	if supplier_contract_select.selected < 0 and supplier_contract_select.item_count > 0:
+		supplier_contract_select.select(0)
+	_refresh_selected_supplier_contract()
+
+func _refresh_selected_supplier_contract():
+	if supplier_contract_label == null:
+		return
+	if supplier_contract_select == null or supplier_contract_select.item_count == 0:
+		supplier_contract_label.text = "Aucun contrat fournisseur actif."
+		if supplier_contract_renegotiate_button != null:
+			supplier_contract_renegotiate_button.disabled = true
+		if supplier_contract_break_button != null:
+			supplier_contract_break_button.disabled = true
+		return
+	var contract := SupplierManager.get_contract(_meta(supplier_contract_select))
+	if contract.is_empty():
+		return
+	var status := str(contract.get("status", "RND"))
+	var status_text := "R&D en cours" if status == "RND" else "Commercial — %d mois restants" % int(contract.get("remaining_months", 0))
+	var guaranteed := int(contract.get("guaranteed_units", 0))
+	var volume_text := "aucun volume garanti"
+	if guaranteed > 0:
+		volume_text = "%s / %s unités réalisées" % [_money(int(contract.get("units_delivered", 0))), _money(guaranteed)]
+	supplier_contract_label.text = "%s • %s\n%s • %s • %s • %s\nRoyalty %.1f%% • IP entreprise %.0f%% • %s • rupture %s €" % [
+		str(contract.get("supplier_name", "Partenaire")), status_text,
+		str(contract.get("contract_term_label", "")), str(contract.get("exclusivity_label", "")),
+		str(contract.get("ip_term_label", "")), str(contract.get("volume_term_label", "")),
+		float(contract.get("royalty_rate", 0.0)) * 100.0, float(contract.get("ip_ownership", 0.0)),
+		volume_text, _money(int(contract.get("termination_penalty", 0)))
+	]
+	if supplier_contract_renegotiate_button != null:
+		supplier_contract_renegotiate_button.disabled = false
+	if supplier_contract_break_button != null:
+		supplier_contract_break_button.disabled = status != "COMMERCIAL"
+
+func _renegotiate_selected_supplier_contract():
+	if supplier_contract_select == null or supplier_contract_select.item_count == 0:
+		return
+	var contract_id := _meta(supplier_contract_select)
+	var negotiation := _meta(rd_negotiation) if rd_negotiation != null else "BALANCED"
+	var term_key := _meta(rd_contract_term) if rd_contract_term != null else "STANDARD"
+	var exclusivity := _meta(rd_exclusivity) if rd_exclusivity != null else "NONE"
+	var ip_term := _meta(rd_ip_term) if rd_ip_term != null else "SHARED"
+	var volume_term := _meta(rd_volume_term) if rd_volume_term != null else "NONE"
+	var result := SupplierManager.renegotiate_contract(contract_id, negotiation, term_key, exclusivity, ip_term, volume_term)
+	if result.is_empty():
+		status_label.text = "Renégociation impossible."
+	elif bool(result.get("accepted", false)):
+		status_label.text = "Contrat %s renégocié avec %s." % [contract_id, str(result.get("supplier_name", "le partenaire"))]
+	else:
+		status_label.text = "Contre-proposition : %s" % str(result.get("counter_text", "conditions refusées"))
+	_refresh_all()
+
+func _break_selected_supplier_contract():
+	if supplier_contract_select == null or supplier_contract_select.item_count == 0:
+		return
+	var contract_id := _meta(supplier_contract_select)
+	var contract := SupplierManager.get_contract(contract_id)
+	if SupplierManager.break_contract(contract_id):
+		status_label.text = "Contrat rompu. Pénalité payée : %s €." % _money(int(contract.get("termination_penalty", 0)))
+	else:
+		status_label.text = "Rupture impossible : contrat encore en R&D ou trésorerie insuffisante."
+	_refresh_all()
 
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
@@ -2956,6 +3124,7 @@ func _refresh_research():
 	_refresh_cpu_node_options()
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
+	_refresh_supplier_contracts()
 	var capacity := ResearchManager.get_cpu_research_capacity()
 	var allocated := ResearchManager.get_total_cpu_research_allocation()
 	var dev_size := ResearchManager.get_development_team_size()
@@ -3051,6 +3220,17 @@ func _refresh_research():
 			str(GameData.APPROACHES[str(project.approach)].label),
 			str(project.get("focus_label", "Équilibré"))
 		])
+		var supplier_contract_id := str(project.get("supplier_contract_id", ""))
+		if supplier_contract_id != "":
+			var supplier_contract := SupplierManager.get_contract(supplier_contract_id)
+			lines.append("  Contrat %s • %s • %s • %s • royalty %.1f%% • IP %.0f%%" % [
+				supplier_contract_id,
+				str(supplier_contract.get("supplier_name", project.get("supplier_name", "Partenaire"))),
+				str(supplier_contract.get("contract_term_label", "")),
+				str(supplier_contract.get("exclusivity_label", "")),
+				float(supplier_contract.get("royalty_rate", 0.0)) * 100.0,
+				float(supplier_contract.get("ip_ownership", 0.0))
+			])
 		var generation_plan: Dictionary = project.get("generation_plan", {})
 		if not generation_plan.is_empty():
 			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
@@ -3086,7 +3266,15 @@ func _start_project():
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
 	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
 	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation):
+	var contract_term := _meta(rd_contract_term) if rd_contract_term != null and rd_contract_term.item_count > 0 else "STANDARD"
+	var exclusivity := _meta(rd_exclusivity) if rd_exclusivity != null and rd_exclusivity.item_count > 0 else "NONE"
+	var ip_term := _meta(rd_ip_term) if rd_ip_term != null and rd_ip_term.item_count > 0 else "SHARED"
+	var volume_term := _meta(rd_volume_term) if rd_volume_term != null and rd_volume_term.item_count > 0 else "NONE"
+	var proposal := _selected_supplier_quote()
+	if _meta(rd_approach) != "INTERNAL" and not bool(proposal.get("accepted", false)):
+		status_label.text = "Le partenaire refuse ces conditions. %s" % str(proposal.get("counter_text", "Ajustez le contrat."))
+		return
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""

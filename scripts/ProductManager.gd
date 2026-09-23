@@ -102,6 +102,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"id":"PROD-%03d" % _next_id,"project_id":str(project.get("id", "")),"name":str(project.get("name", "Produit")),
 		"company":CompanyManager.company_name,"sector":sector,"target_segment":str(project.get("segment", "MAINSTREAM")),
 		"approach":approach_key,"internal_ratio":float(approach.internal_ratio),"sourcing":sourcing,
+		"supplier_contract_id":str(project.get("supplier_contract_id", sourcing.get("id", ""))),
 		"royalty_rate":float(sourcing.get("royalty_rate", 0.0)),"vendor_dependency":float(sourcing.get("dependency", 0.0)),
 		"customization_freedom":float(sourcing.get("customization", 100.0)),"ip_ownership":float(sourcing.get("ip_ownership", 100.0)),
 		"application_profile":str(project.get("application_profile", "GENERAL")),
@@ -472,7 +473,9 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var production_cost := total_units * int(product.unit_cost)
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
-	var royalty_rate := clampf(float(product.get("royalty_rate", product.get("sourcing", {}).get("royalty_rate", 0.0))), 0.0, 0.50)
+	var supplier_contract_id := str(product.get("supplier_contract_id", ""))
+	var fallback_royalty := float(product.get("royalty_rate", product.get("sourcing", {}).get("royalty_rate", 0.0)))
+	var royalty_rate := clampf(SupplierManager.effective_royalty_rate(supplier_contract_id, fallback_royalty), 0.0, 0.50)
 	var royalty_cost := int(round(float(revenue) * royalty_rate))
 	if royalty_cost > 0:
 		Economy.add_expense(royalty_cost, "Royalties technologie — %s" % str(product.name))
@@ -485,6 +488,8 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	Economy.add_expense(warranty_cost, "SAV garanties — %s" % str(product.name))
 	product.last_month_sales = total_units
 	product.units_sold_total = int(product.units_sold_total) + total_units
+	if supplier_contract_id != "":
+		SupplierManager.record_product_sales(supplier_contract_id, total_units)
 	product.months_on_market = int(product.months_on_market) + 1
 	product.last_month_score = float(demand.get("score", 0.0))
 	product.last_month_age_penalty = float(demand.get("age_penalty", 0.0))
@@ -558,6 +563,7 @@ func load_state(state: Dictionary):
 		if saved_sourcing.is_empty():
 			saved_sourcing = GameData.sourcing_profile(saved_approach)
 		product["sourcing"] = saved_sourcing
+		product["supplier_contract_id"] = str(product.get("supplier_contract_id", saved_sourcing.get("id", "")))
 		product["royalty_rate"] = float(product.get("royalty_rate", saved_sourcing.get("royalty_rate", 0.0)))
 		product["vendor_dependency"] = float(product.get("vendor_dependency", saved_sourcing.get("dependency", 0.0)))
 		product["customization_freedom"] = float(product.get("customization_freedom", saved_sourcing.get("customization", 100.0)))

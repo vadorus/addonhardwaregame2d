@@ -152,6 +152,18 @@ Avant signature, le CEO choisit également une priorité de négociation :
 
 La capacité du partenaire est réelle : un fournisseur déjà saturé ne peut pas accepter un nouveau projet tant qu'un créneau ne se libère pas. Les retards restent probabilistes et dépendent notamment de la fiabilité et de la confiance ; ils réduisent la progression du mois sans annuler arbitrairement le projet.
 
+
+Les relations fournisseurs passent désormais par de **vrais contrats négociés**. Avant de lancer un projet externe, le CEO choisit quatre axes contractuels supplémentaires :
+
+- **durée** : 2 ans, 4 ans ou 5 ans ;
+- **exclusivité** : aucune, limitée à la technologie concernée, ou partenariat stratégique exclusif ;
+- **propriété intellectuelle** : majoritairement fournisseur, partagée, ou renforcée côté entreprise ;
+- **engagement commercial** : aucun volume garanti ou un volume contractuel donnant accès à un meilleur coût unitaire.
+
+Chaque concession modifie réellement les conditions. Une durée longue, de l'exclusivité ou un volume garanti peuvent améliorer prix et royalties ; exiger davantage d'IP augmente le coût et rend l'accord plus difficile à accepter. Le partenaire évalue l'ensemble selon sa confiance, la relation passée et sa flexibilité. Une proposition trop agressive est refusée et produit une contre-proposition lisible au lieu d'un échec opaque.
+
+Le contrat reste attaché au projet puis aux produits issus de cette génération. Sa période commerciale commence lorsque la R&D se termine. Les ventes alimentent le volume garanti et les royalties négociées. À échéance, un volume non atteint peut déclencher une pénalité. Le joueur peut renégocier un contrat actif contre des frais ; une renégociation commerciale relance la durée prévue par les nouvelles conditions. Une rupture anticipée n'est possible qu'après la R&D, coûte une pénalité explicite et détériore fortement la confiance et la relation avec le partenaire.
+
 ## 9. Diversification organique
 
 Le joueur ne suit pas une séquence imposée CPU → GPU → RAM → téléphone.

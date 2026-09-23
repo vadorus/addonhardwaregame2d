@@ -672,7 +672,7 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED") -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE") -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	var market_segment := segment
@@ -684,10 +684,10 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	var resolved_supplier_id := supplier_id
 	if approach != "INTERNAL" and resolved_supplier_id.is_empty():
 		resolved_supplier_id = SupplierManager.recommended_supplier(approach)
-	var sourcing_profile: Dictionary = SupplierManager.quote(approach, resolved_supplier_id, negotiation)
+	var sourcing_profile: Dictionary = GameData.sourcing_profile("INTERNAL") if approach == "INTERNAL" else SupplierManager.contract_quote(approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
 	if sourcing_profile.is_empty():
 		return false
-	if approach != "INTERNAL" and not SupplierManager.can_accept_project(approach, resolved_supplier_id):
+	if approach != "INTERNAL" and (not bool(sourcing_profile.get("accepted", false)) or not SupplierManager.can_accept_project(approach, resolved_supplier_id)):
 		return false
 	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
 	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
@@ -770,6 +770,11 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"approach":approach,"sourcing":sourcing_profile.duplicate(true),
 		"supplier_id":resolved_supplier_id,"supplier_name":str(sourcing_profile.get("supplier_name", "Équipe interne")),
 		"negotiation":str(sourcing_profile.get("negotiation", negotiation)),
+		"contract_term":str(sourcing_profile.get("contract_term", contract_term)),
+		"exclusivity":str(sourcing_profile.get("exclusivity", exclusivity)),
+		"ip_term":str(sourcing_profile.get("ip_term", ip_term)),
+		"volume_term":str(sourcing_profile.get("volume_term", volume_term)),
+		"supplier_contract_id":"",
 		"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
@@ -793,8 +798,12 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		} if sector == "CPU" else {},
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
-	if approach != "INTERNAL" and not SupplierManager.commit_project(project_id, approach, resolved_supplier_id):
-		return false
+	if approach != "INTERNAL":
+		var signed_contract := SupplierManager.sign_contract(project_id, approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
+		if signed_contract.is_empty():
+			return false
+		project["supplier_contract_id"] = str(signed_contract.get("id", ""))
+		project["sourcing"] = signed_contract.duplicate(true)
 	if sector == "CPU" and not stored_remediation.is_empty():
 		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
 	if sourcing_setup_cost > 0:
@@ -996,6 +1005,11 @@ func load_state(state: Dictionary):
 		project["supplier_id"] = str(project.get("supplier_id", saved_sourcing.get("supplier_id", "")))
 		project["supplier_name"] = str(project.get("supplier_name", saved_sourcing.get("supplier_name", "Équipe interne")))
 		project["negotiation"] = str(project.get("negotiation", saved_sourcing.get("negotiation", "BALANCED")))
+		project["contract_term"] = str(project.get("contract_term", saved_sourcing.get("contract_term", "STANDARD")))
+		project["exclusivity"] = str(project.get("exclusivity", saved_sourcing.get("exclusivity", "NONE")))
+		project["ip_term"] = str(project.get("ip_term", saved_sourcing.get("ip_term", "SHARED")))
+		project["volume_term"] = str(project.get("volume_term", saved_sourcing.get("volume_term", "NONE")))
+		project["supplier_contract_id"] = str(project.get("supplier_contract_id", saved_sourcing.get("id", "")))
 		if str(project.get("sector", "")) == "CPU":
 			var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 			var saved_capability_snapshot = project.get("technical_capabilities_snapshot", {})
