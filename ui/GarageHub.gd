@@ -2,22 +2,25 @@ extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
 
-const GARAGE_ART_PATH := "res://assets/ui/garage_stage0.webp"
+const GARAGE_STAGE0_ART_PATH := "res://assets/ui/garage_stage0.webp"
+const GARAGE_STAGE1_ART_PATH := "res://assets/ui/garage_stage1.webp"
+const GARAGE_STAGE2_ART_PATH := "res://assets/ui/garage_stage2.webp"
 const GARAGE_EMPTY_ART_PATH := "res://assets/ui/garage_shell.webp"
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
 
 const ZONES := [
 	{"name":"Établi CPU","subtitle":"Concevoir et améliorer","tab":3,"feature":"LAB","rect":Rect2(0.17,0.56,0.25,0.14)},
 	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.43,0.49,0.24,0.14)},
-	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"feature":"COMPANY","rect":Rect2(0.69,0.31,0.21,0.14)},
+	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"feature":"COMPANY","rect":Rect2(0.68,0.24,0.22,0.15)},
 	{"name":"Poste du fondateur","subtitle":"Vue dirigeant","tab":0,"feature":"QG","rect":Rect2(0.61,0.67,0.25,0.14)},
-	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.48,0.18,0.20,0.15)}
+	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.73,0.47,0.18,0.16)}
 ]
 
 var _background: TextureRect
 var _title_label: Label
 var _subtitle_label: Label
 var _zone_buttons: Array[Button] = []
+var _active_art_path := GARAGE_STAGE0_ART_PATH
 var _workplace_tier := 0
 var _workplace_condition := 62.0
 
@@ -38,14 +41,8 @@ func _build_background() -> void:
 
 	_background = TextureRect.new()
 	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var preferred_texture: Texture2D = null
-	if ResourceLoader.exists(GARAGE_ART_PATH):
-		preferred_texture = load(GARAGE_ART_PATH) as Texture2D
-	elif ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
-		preferred_texture = load(GARAGE_EMPTY_ART_PATH) as Texture2D
-	elif ResourceLoader.exists(GARAGE_FALLBACK_PATH):
-		preferred_texture = load(GARAGE_FALLBACK_PATH) as Texture2D
-	_background.texture = preferred_texture
+	_active_art_path = _resolve_art_path(GARAGE_STAGE0_ART_PATH)
+	_background.texture = load(_active_art_path) as Texture2D
 	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -155,6 +152,33 @@ func set_progression(unlocks: Dictionary) -> void:
 	for button in _zone_buttons:
 		var feature := str(button.get_meta("feature", "QG"))
 		button.visible = bool(unlocks.get(feature, feature in ["QG", "LAB"]))
+	_select_art_for_progression(unlocks)
+
+func _select_art_for_progression(unlocks: Dictionary) -> void:
+	var preferred := GARAGE_STAGE0_ART_PATH
+	if bool(unlocks.get("PRODUCTS", false)):
+		preferred = GARAGE_STAGE2_ART_PATH
+	elif bool(unlocks.get("COMPANY", false)):
+		preferred = GARAGE_STAGE1_ART_PATH
+	_set_background_art(preferred)
+
+func _set_background_art(preferred_path: String) -> void:
+	var resolved := _resolve_art_path(preferred_path)
+	if resolved == _active_art_path:
+		return
+	_active_art_path = resolved
+	if _background != null:
+		_background.texture = load(_active_art_path) as Texture2D
+		call_deferred("_layout_zones")
+
+func _resolve_art_path(preferred_path: String) -> String:
+	if ResourceLoader.exists(preferred_path):
+		return preferred_path
+	if ResourceLoader.exists(GARAGE_STAGE0_ART_PATH):
+		return GARAGE_STAGE0_ART_PATH
+	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
+		return GARAGE_EMPTY_ART_PATH
+	return GARAGE_FALLBACK_PATH
 
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = int(data.get("tier", 0))
@@ -178,8 +202,4 @@ func visible_zone_count() -> int:
 
 
 func background_resource_path() -> String:
-	if ResourceLoader.exists(GARAGE_ART_PATH):
-		return GARAGE_ART_PATH
-	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
-		return GARAGE_EMPTY_ART_PATH
-	return GARAGE_FALLBACK_PATH
+	return _active_art_path
