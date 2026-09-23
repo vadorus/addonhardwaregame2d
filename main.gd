@@ -1433,13 +1433,21 @@ func _refresh_cpu_preview():
 		if approach_key == "INTERNAL":
 			rd_supplier_label.text = "Équipe interne : aucune dépendance fournisseur, IP et personnalisation maximales."
 		else:
-			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nAccès %s € • coût unitaire x%.2f • négociation : %s" % [
+			var acceptance_text := "OFFRE ACCEPTABLE"
+			if not bool(sourcing.get("accepted", false)):
+				acceptance_text = "CONTRE-PROPOSITION : %s" % str(sourcing.get("counter_text", "conditions à revoir"))
+			var volume_commitment := int(sourcing.get("guaranteed_units", 0))
+			var volume_text := "aucun volume garanti" if volume_commitment <= 0 else "%s unités garanties" % _money(volume_commitment)
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\n%s — score d'acceptation %.0f/100" % [
 				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
 				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
 				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
 				int(sourcing.get("available_capacity_slots", 0)), int(sourcing.get("supplier_capacity_slots", 0)),
-				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("unit_cost_factor", 1.0)),
-				str(sourcing.get("negotiation_label", "Équilibré"))
+				str(sourcing.get("contract_term_label", "")), str(sourcing.get("exclusivity_label", "")),
+				str(sourcing.get("ip_term_label", "")), volume_text,
+				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("royalty_rate", 0.0)) * 100.0,
+				float(sourcing.get("unit_cost_factor", 1.0)), _money(int(sourcing.get("termination_penalty", 0))),
+				acceptance_text, float(sourcing.get("acceptance_score", 0.0))
 			]
 	lab_dev_time_value.text = "~%d mois" % months
 	lab_fit_value.text = "%.0f / 100" % fit
@@ -3116,6 +3124,7 @@ func _refresh_research():
 	_refresh_cpu_node_options()
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
+	_refresh_supplier_contracts()
 	var capacity := ResearchManager.get_cpu_research_capacity()
 	var allocated := ResearchManager.get_total_cpu_research_allocation()
 	var dev_size := ResearchManager.get_development_team_size()
@@ -3211,6 +3220,17 @@ func _refresh_research():
 			str(GameData.APPROACHES[str(project.approach)].label),
 			str(project.get("focus_label", "Équilibré"))
 		])
+		var supplier_contract_id := str(project.get("supplier_contract_id", ""))
+		if supplier_contract_id != "":
+			var supplier_contract := SupplierManager.get_contract(supplier_contract_id)
+			lines.append("  Contrat %s • %s • %s • %s • royalty %.1f%% • IP %.0f%%" % [
+				supplier_contract_id,
+				str(supplier_contract.get("supplier_name", project.get("supplier_name", "Partenaire"))),
+				str(supplier_contract.get("contract_term_label", "")),
+				str(supplier_contract.get("exclusivity_label", "")),
+				float(supplier_contract.get("royalty_rate", 0.0)) * 100.0,
+				float(supplier_contract.get("ip_ownership", 0.0))
+			])
 		var generation_plan: Dictionary = project.get("generation_plan", {})
 		if not generation_plan.is_empty():
 			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
@@ -3246,7 +3266,15 @@ func _start_project():
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
 	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
 	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation):
+	var contract_term := _meta(rd_contract_term) if rd_contract_term != null and rd_contract_term.item_count > 0 else "STANDARD"
+	var exclusivity := _meta(rd_exclusivity) if rd_exclusivity != null and rd_exclusivity.item_count > 0 else "NONE"
+	var ip_term := _meta(rd_ip_term) if rd_ip_term != null and rd_ip_term.item_count > 0 else "SHARED"
+	var volume_term := _meta(rd_volume_term) if rd_volume_term != null and rd_volume_term.item_count > 0 else "NONE"
+	var proposal := _selected_supplier_quote()
+	if _meta(rd_approach) != "INTERNAL" and not bool(proposal.get("accepted", false)):
+		status_label.text = "Le partenaire refuse ces conditions. %s" % str(proposal.get("counter_text", "Ajustez le contrat."))
+		return
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
