@@ -652,6 +652,120 @@ func competitor_summaries() -> Array:
 		})
 	return result
 
+func cpu_competitor_public_profiles() -> Array:
+	var result: Array = []
+	for competitor_value in competitors.get("CPU", []):
+		var competitor: Dictionary = competitor_value
+		var metrics: Dictionary = competitor.get("metrics", {})
+		var target := normalize_segment(str(competitor.get("target_segment", default_segment())))
+		var market_units := maxi(segment_market_units(target), 1)
+		var observed_share := clampf(float(competitor.get("last_month_units", 0)) / float(market_units), 0.0, 1.0)
+		var market_signal := "Présence limitée"
+		if observed_share >= 0.20:
+			market_signal = "Très forte présence"
+		elif observed_share >= 0.11:
+			market_signal = "Présence solide"
+		elif observed_share >= 0.05:
+			market_signal = "Présence visible"
+		result.append({
+			"id":str(competitor.get("id", "")),
+			"company":str(competitor.get("company", "")),
+			"product":str(competitor.get("name", "")),
+			"generation":int(competitor.get("generation_index", 1)),
+			"node_nm":int(competitor.get("node_nm", 10000)),
+			"target_segment":target,
+			"price":int(competitor.get("price", 0)),
+			"months_on_market":int(competitor.get("months_on_market", 0)),
+			"benchmark_score":benchmark_score(competitor),
+			"market_signal":market_signal,
+			"metrics":{
+				"performance":float(metrics.get("performance", 50.0)),
+				"efficiency":float(metrics.get("efficiency", 50.0)),
+				"reliability":float(metrics.get("reliability", 50.0)),
+				"innovation":float(metrics.get("innovation", 50.0)),
+				"sustainability":float(metrics.get("sustainability", 50.0))
+			}
+		})
+	return result
+
+func cpu_competitor_public_profile(competitor_id: String) -> Dictionary:
+	for profile_value in cpu_competitor_public_profiles():
+		var profile: Dictionary = profile_value
+		if str(profile.get("id", "")) == competitor_id:
+			return profile
+	return {}
+
+func _cpu_competitor_internal(competitor_id: String) -> Dictionary:
+	for competitor_value in competitors.get("CPU", []):
+		var competitor: Dictionary = competitor_value
+		if str(competitor.get("id", "")) == competitor_id:
+			return competitor
+	return {}
+
+func compare_cpu_public(product: Dictionary, competitor_id: String) -> Dictionary:
+	var competitor := _cpu_competitor_internal(competitor_id)
+	if competitor.is_empty():
+		return {}
+	var target := normalize_segment(str(product.get("target_segment", default_segment())))
+	var player_metrics: Dictionary = product.get("metrics", {})
+	var competitor_metrics: Dictionary = competitor.get("metrics", {})
+	var rows: Array = []
+	var metric_labels := {
+		"performance":"Performance",
+		"efficiency":"Efficacité",
+		"reliability":"Fiabilité",
+		"innovation":"Innovation",
+		"sustainability":"Durabilité"
+	}
+	for metric in ["performance","efficiency","reliability","innovation","sustainability"]:
+		var player_value := float(player_metrics.get(metric, 50.0))
+		var competitor_value := float(competitor_metrics.get(metric, 50.0))
+		rows.append({
+			"key":metric,
+			"label":str(metric_labels[metric]),
+			"player":player_value,
+			"competitor":competitor_value,
+			"delta":player_value - competitor_value
+		})
+	var player_price := int(product.get("price", 0))
+	var competitor_price := int(competitor.get("price", 0))
+	var player_fit := evaluate_product(product, target)
+	var competitor_fit := _evaluate_competitor(competitor, target)
+	var player_benchmark := benchmark_score(product)
+	var competitor_benchmark := benchmark_score(competitor)
+	var premium_pct := 0.0
+	if competitor_price > 0:
+		premium_pct = (float(player_price) / float(competitor_price) - 1.0) * 100.0
+	var summary := "Les deux produits sont proches sur la cible %s." % segment_label(target)
+	if player_fit >= competitor_fit + 7.0:
+		summary = "Votre CPU présente un avantage net sur la cible %s." % segment_label(target)
+	elif player_fit <= competitor_fit - 7.0:
+		summary = "%s garde un avantage net sur la cible %s." % [str(competitor.get("name", "Le concurrent")), segment_label(target)]
+	if premium_pct >= 15.0:
+		if player_fit >= competitor_fit + 6.0:
+			summary += " Son avance technique peut soutenir un prix supérieur, mais le public jugera si l'écart de valeur justifie le premium."
+		else:
+			summary += " Le prix supérieur est peu soutenu par l'écart technique actuel et peut peser sur la demande."
+	elif premium_pct <= -12.0:
+		summary += " Votre prix plus bas renforce la proposition de valeur, à condition de préserver une marge suffisante."
+	if float(player_metrics.get("reliability", 50.0)) + 6.0 < float(competitor_metrics.get("reliability", 50.0)):
+		summary += " La fiabilité reste un point faible visible face à ce concurrent."
+	return {
+		"competitor_id":competitor_id,
+		"competitor_name":str(competitor.get("name", "")),
+		"competitor_company":str(competitor.get("company", "")),
+		"target_segment":target,
+		"player_price":player_price,
+		"competitor_price":competitor_price,
+		"price_premium_pct":premium_pct,
+		"player_fit":player_fit,
+		"competitor_fit":competitor_fit,
+		"player_benchmark":player_benchmark,
+		"competitor_benchmark":competitor_benchmark,
+		"rows":rows,
+		"summary":summary
+	}
+
 func maybe_generate_b2b(product: Dictionary):
 	if str(product.get("status", "")) != "LAUNCHED":
 		return
