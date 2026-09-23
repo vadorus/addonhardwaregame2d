@@ -126,7 +126,10 @@ func _base_unit_cost(project: Dictionary) -> int:
 		var estimate := CPU_DESIGN.evaluate(design)
 		var design_cost := int(estimate.get("unit_cost", unit_cost))
 		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
-	var sourcing: Dictionary = GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))
+	var sourcing_value = project.get("sourcing", {})
+	var sourcing: Dictionary = sourcing_value if typeof(sourcing_value) == TYPE_DICTIONARY else {}
+	if sourcing.is_empty():
+		sourcing = GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))
 	unit_cost = int(round(float(unit_cost) * float(sourcing.get("unit_cost_factor", 1.0))))
 	return maxi(unit_cost, 1)
 
