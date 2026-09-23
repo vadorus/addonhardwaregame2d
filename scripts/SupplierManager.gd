@@ -252,7 +252,9 @@ func request_rival_capacity(company_id: String, company_name: String, mode: Stri
 		return {}
 	var supplier: Dictionary = suppliers[best_supplier_id]
 	var external_load := maxi(int(supplier.get("external_load", 0)), 0)
-	if not _rival_capacity_available(supplier) and external_load > 0:
+	var capacity := maxi(int(supplier.get("capacity_slots", 1)), 1)
+	var non_player_load := _rival_count(supplier) + external_load
+	if non_player_load >= maxi(capacity - 1, 0) and external_load > 0:
 		supplier["external_load"] = external_load - 1
 	var reservations: Array = supplier.get("rival_reservations", [])
 	reservations.append(best_terms.duplicate(true))
@@ -680,7 +682,7 @@ func _apply_supplier_ai_decision(supplier: Dictionary, decision: Dictionary) -> 
 		"SOFTEN_TERMS":
 			supplier["market_cost_factor"] = 0.94
 			supplier["market_royalty_factor"] = 0.96
-			var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+			var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1 - _rival_count(supplier), 0)
 			if int(supplier.get("external_load", 0)) < max_external:
 				supplier["external_load"] = int(supplier.get("external_load", 0)) + 1
 			public_text = "%s cherche de nouveaux projets et assouplit temporairement ses conditions commerciales." % str(supplier.get("name", "Un partenaire"))
@@ -730,7 +732,7 @@ func _process_supplier_businesses() -> bool:
 			var decision := CompanyAIManager.choose_supplier_action(supplier, _supplier_ai_context(supplier), rng)
 			_apply_supplier_ai_decision(supplier, decision)
 			changed = true
-		var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+		var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1 - _rival_count(supplier), 0)
 		supplier["external_load"] = clampi(int(supplier.get("external_load", 0)), 0, max_external)
 	return changed
 
