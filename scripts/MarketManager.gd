@@ -229,7 +229,10 @@ func _make_competitors(sector: String) -> Array:
 			"ai_supplier_knowledge_factor":1.0,
 			"ai_supplier_monthly_fee":0,
 			"ai_supplier_public":false,
-			"public_generation_partner":""
+			"public_generation_partner":"",
+			"b2b_contracts":[],
+			"last_month_b2b_units":0,
+			"last_month_b2b_profit":0
 		}
 		CompanyAIManager.ensure_company_state(competitor)
 		_configure_competitor_product(competitor, true)
@@ -772,6 +775,44 @@ func _ensure_competitor_sourcing(competitor: Dictionary) -> void:
 		if market_events.size() > 24:
 			market_events.pop_back()
 
+func _process_competitor_b2b(competitor: Dictionary) -> Dictionary:
+	var capacity := maxi(int(competitor.get("capacity", 0)), 0)
+	var unit_cost := maxi(int(competitor.get("unit_cost", 1)), 1)
+	var used_capacity := 0
+	var b2b_profit := 0
+	var active_contracts: Array = []
+	for contract_value in competitor.get("b2b_contracts", []):
+		var contract: Dictionary = contract_value
+		if str(contract.get("status", "ACTIVE")) != "ACTIVE" or int(contract.get("remaining_months", 0)) <= 0:
+			continue
+		var promised := maxi(int(contract.get("units_per_month", 0)), 0)
+		var delivered := mini(promised, maxi(capacity - used_capacity, 0))
+		used_capacity += delivered
+		var unit_margin := int(contract.get("unit_price", 1)) - unit_cost
+		b2b_profit += delivered * unit_margin
+		contract["last_delivered_units"] = delivered
+		contract["remaining_months"] = maxi(int(contract.get("remaining_months", 0)) - 1, 0)
+		if delivered < promised:
+			var shortfall_ratio := float(promised - delivered) / maxf(float(promised), 1.0)
+			competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) - shortfall_ratio * 0.7, 20.0, 95.0)
+		if int(contract.get("remaining_months", 0)) > 0:
+			active_contracts.append(contract)
+		else:
+			contract["status"] = "COMPLETED"
+	competitor["b2b_contracts"] = active_contracts
+	competitor["last_month_b2b_units"] = used_capacity
+	competitor["last_month_b2b_profit"] = b2b_profit
+	return {"units":used_capacity,"profit":b2b_profit}
+
+func _active_competitor_b2b_customer(competitor: Dictionary) -> String:
+	for contract_value in competitor.get("b2b_contracts", []):
+		var contract: Dictionary = contract_value
+		if str(contract.get("status", "ACTIVE")) != "ACTIVE" or int(contract.get("remaining_months", 0)) <= 0:
+			continue
+		if float(contract.get("confidentiality", 100.0)) <= 75.0:
+			return str(contract.get("customer", ""))
+	return ""
+
 func _advance_cpu_competitor(competitor: Dictionary):
 	CompanyAIManager.tick_company_state(competitor)
 	competitor["months_on_market"] = int(competitor.get("months_on_market", 0)) + 1
@@ -788,12 +829,16 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	_ensure_competitor_sourcing(competitor)
 
 	var target := normalize_segment(str(competitor.get("target_segment", current_target)))
+	var b2b_result := _process_competitor_b2b(competitor)
+	var b2b_units := maxi(int(b2b_result.get("units", 0)), 0)
+	var b2b_profit := int(b2b_result.get("profit", 0))
+	var remaining_capacity := maxi(int(competitor.get("capacity", 5000)) - b2b_units, 0)
 	var market_units := segment_market_units(target)
 	var score := _evaluate_competitor(competitor, target)
 	var share := clampf(0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015, 0.012, 0.31)
-	var units := mini(int(competitor.get("capacity", 5000)), int(float(market_units) * share))
+	var units := mini(remaining_capacity, int(float(market_units) * share))
 	var margin := maxi(int(competitor.get("price", 1)) - int(competitor.get("unit_cost", 1)), 1)
-	var operating_profit := units * margin
+	var operating_profit := units * margin + b2b_profit
 	var cash := int(competitor.get("cash", 200000))
 	var base_rd_budget := clampi(int(float(maxi(cash, 0)) * 0.035), 3500, 24000)
 	var rd_budget := clampi(int(round(float(base_rd_budget) * float(competitor.get("ai_rd_multiplier", 1.0)))), 1800, 34000)
@@ -987,7 +1032,10 @@ func competitor_summaries() -> Array:
 			"sourcing_mode":str(competitor.get("ai_sourcing_mode", "")),
 			"supplier_id":str(competitor.get("ai_supplier_id", "")),
 			"supplier_name":str(competitor.get("ai_supplier_name", "")),
-			"supplier_monthly_fee":int(competitor.get("ai_supplier_monthly_fee", 0))
+			"supplier_monthly_fee":int(competitor.get("ai_supplier_monthly_fee", 0)),
+			"b2b_contracts":competitor.get("b2b_contracts", []).duplicate(true),
+			"last_month_b2b_units":int(competitor.get("last_month_b2b_units", 0)),
+			"last_month_b2b_profit":int(competitor.get("last_month_b2b_profit", 0))
 		})
 	return result
 
@@ -1019,6 +1067,7 @@ func cpu_competitor_public_profiles() -> Array:
 			"market_signal":market_signal,
 			"recent_public_action":str(competitor.get("ai_public_action", "")),
 			"technology_partner":str(competitor.get("ai_supplier_name", "")) if bool(competitor.get("ai_supplier_public", false)) else str(competitor.get("public_generation_partner", "")),
+			"public_b2b_customer":_active_competitor_b2b_customer(competitor),
 			"metrics":{
 				"performance":float(metrics.get("performance", 50.0)),
 				"efficiency":float(metrics.get("efficiency", 50.0)),
@@ -1665,6 +1714,10 @@ func _migrate_competitor(competitor: Dictionary, sector: String) -> Dictionary:
 	competitor["ai_supplier_monthly_fee"] = maxi(int(competitor.get("ai_supplier_monthly_fee", 0)), 0)
 	competitor["ai_supplier_public"] = bool(competitor.get("ai_supplier_public", false))
 	competitor["public_generation_partner"] = str(competitor.get("public_generation_partner", ""))
+	var saved_b2b = competitor.get("b2b_contracts", [])
+	competitor["b2b_contracts"] = saved_b2b.duplicate(true) if typeof(saved_b2b) == TYPE_ARRAY else []
+	competitor["last_month_b2b_units"] = maxi(int(competitor.get("last_month_b2b_units", 0)), 0)
+	competitor["last_month_b2b_profit"] = int(competitor.get("last_month_b2b_profit", 0))
 	return competitor
 
 func load_state(state: Dictionary):
