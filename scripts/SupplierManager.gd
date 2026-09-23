@@ -95,6 +95,9 @@ func reset():
 		data["completed_projects"] = 0
 		data["active_project_ids"] = []
 		data["delay_events"] = 0
+		data["supplier_cash"] = 180000 + int(round(float(data.get("quality", 70.0)) * 1800.0))
+		data["external_load"] = maxi(int(data.get("capacity_slots", 1)) - 1, 0)
+		CompanyAIManager.ensure_supplier_state(data)
 		suppliers[supplier_id] = data
 	rng.seed = 19471
 	suppliers_changed.emit()
