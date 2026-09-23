@@ -186,8 +186,9 @@ func _free_capacity(supplier: Dictionary) -> int:
 
 func _rival_capacity_available(supplier: Dictionary) -> bool:
 	var capacity := maxi(int(supplier.get("capacity_slots", 1)), 1)
-	var non_player_load := _rival_count(supplier) + maxi(int(supplier.get("external_load", 0)), 0)
-	return non_player_load < maxi(capacity - 1, 0)
+	var external_load := maxi(int(supplier.get("external_load", 0)), 0)
+	var non_player_load := _rival_count(supplier) + external_load
+	return non_player_load < maxi(capacity - 1, 0) or external_load > 0
 
 func rival_reservation_for(company_id: String) -> Dictionary:
 	for supplier_id_value in suppliers.keys():
