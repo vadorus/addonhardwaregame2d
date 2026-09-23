@@ -79,6 +79,9 @@ const PROGRAMMING_TREE := [
 	{"level":7,"title":"Microcode & compilation","effect":"CPU +6% vitesse • qualité CPU +5","cpu_speed":0.06,"cpu_quality":5.0}
 ]
 
+var founder_name := "Alex"
+var portrait_style := 0
+
 var programming_level := 1
 var programming_xp := 0
 var developer_tools_level := 0
@@ -106,6 +109,8 @@ func _reset_branches() -> void:
 		branch_xp[str(branch)] = 0
 
 func reset() -> void:
+	founder_name = "Alex"
+	portrait_style = 0
 	level = 1
 	level_xp = 0
 	total_xp = 0
@@ -306,6 +311,8 @@ func management_multiplier() -> float:
 
 func get_state() -> Dictionary:
 	return {
+		"founder_name":founder_name,
+		"portrait_style":portrait_style,
 		"level":level,
 		"level_xp":level_xp,
 		"total_xp":total_xp,
@@ -321,6 +328,10 @@ func load_state(state: Dictionary) -> void:
 	if state.is_empty():
 		reset()
 		return
+	founder_name = str(state.get("founder_name", "Alex")).strip_edges().substr(0, 24)
+	if founder_name.is_empty():
+		founder_name = "Alex"
+	portrait_style = clampi(int(state.get("portrait_style", 0)), 0, 2)
 	level = maxi(int(state.get("level", 1)), 1)
 	level_xp = maxi(int(state.get("level_xp", 0)), 0)
 	total_xp = maxi(int(state.get("total_xp", level_xp)), 0)

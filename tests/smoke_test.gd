@@ -28,6 +28,18 @@ func _ready() -> void:
 		return
 	loading_instance.free()
 	SimulationManager.reset_all("CI Test", "GPU")
+	FounderManager.founder_name = "Maya"
+	FounderManager.portrait_style = 2
+	var custom_founder := FounderManager.get_state()
+	FounderManager.reset()
+	FounderManager.load_state(custom_founder)
+	if FounderManager.founder_name != "Maya" or FounderManager.portrait_style != 2:
+		_fail("Founder identity was not restored from the saved state")
+		return
+	FounderManager.load_state({"level":1})
+	if FounderManager.founder_name.is_empty() or FounderManager.portrait_style != 0:
+		_fail("Older saves did not receive a default founder portrait")
+		return
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
 		return
@@ -62,6 +74,25 @@ func _ready() -> void:
 	if bool(hard_preview.get("fits_deadline", true)):
 		_fail("A harder industrial contract should visibly exceed the founder's initial capacity")
 		return
+
+	if not StartupManager.start_software_contract("STOCK", "SOLID"):
+		_fail("The founder could not accept the first garage contract")
+		return
+	if not StartupManager.work_session_available() or not StartupManager.perform_work_session("BUILD"):
+		_fail("The founder cannot work on the first contract immediately")
+		return
+	var session_work := float(StartupManager.active_contract.get("work_done", 0.0))
+	if session_work <= 0.0 or float(StartupManager.active_contract.get("progress", 0.0)) <= 0.0:
+		_fail("A work session did not update actual saved contract progress")
+		return
+	if StartupManager.perform_work_session("BUILD"):
+		_fail("Work sessions bypassed their short cooldown")
+		return
+	SimulationManager.process_day()
+	if float(StartupManager.active_contract.get("work_done", 0.0)) <= session_work:
+		_fail("Daily simulation erased the founder's manual work")
+		return
+	SimulationManager.reset_all("CI Test", "GPU")
 
 	if not _run_startup_contract("STOCK"):
 		_fail("First garage software contract did not complete through the daily project engine")

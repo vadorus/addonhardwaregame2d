@@ -110,6 +110,7 @@ var electronics_project: Dictionary = {}
 var cpu_program_unlocked := false
 
 const WORK_SESSION_COOLDOWN_DAYS := 7
+const CONTRACT_SESSION_COOLDOWN_DAYS := 3
 
 func _absolute_day() -> int:
 	return maxi((TimeManager.year - 1971) * 360 + (TimeManager.month - 1) * 30 + TimeManager.day, 1)
@@ -126,7 +127,7 @@ func _ensure_contract_runtime_fields() -> void:
 	if not active_contract.has("client_confidence"):
 		active_contract["client_confidence"] = 50.0
 	if not active_contract.has("last_work_day"):
-		active_contract["last_work_day"] = _absolute_day() - WORK_SESSION_COOLDOWN_DAYS
+		active_contract["last_work_day"] = _absolute_day() - CONTRACT_SESSION_COOLDOWN_DAYS
 	if not active_contract.has("approach"):
 		active_contract["approach"] = "SOLID"
 	if not active_contract.has("project_day"):
@@ -181,17 +182,19 @@ func _ensure_electronics_runtime_fields() -> void:
 
 func work_session_available() -> bool:
 	var data: Dictionary = active_contract if not active_contract.is_empty() else electronics_project
-	if data.is_empty():
+	if data.is_empty() or (not active_contract.is_empty() and (bool(active_contract.get("milestone_pending", false)) or bool(active_contract.get("deadline_pending", false)))):
 		return false
-	var last_work_day := int(data.get("last_work_day", _absolute_day() - WORK_SESSION_COOLDOWN_DAYS))
-	return _absolute_day() - last_work_day >= WORK_SESSION_COOLDOWN_DAYS
+	var cooldown := CONTRACT_SESSION_COOLDOWN_DAYS if not active_contract.is_empty() else WORK_SESSION_COOLDOWN_DAYS
+	var last_work_day := int(data.get("last_work_day", _absolute_day() - cooldown))
+	return _absolute_day() - last_work_day >= cooldown
 
 func days_until_next_work_session() -> int:
 	var data: Dictionary = active_contract if not active_contract.is_empty() else electronics_project
 	if data.is_empty():
 		return 0
-	var last_work_day := int(data.get("last_work_day", _absolute_day() - WORK_SESSION_COOLDOWN_DAYS))
-	return maxi(WORK_SESSION_COOLDOWN_DAYS - (_absolute_day() - last_work_day), 0)
+	var cooldown := CONTRACT_SESSION_COOLDOWN_DAYS if not active_contract.is_empty() else WORK_SESSION_COOLDOWN_DAYS
+	var last_work_day := int(data.get("last_work_day", _absolute_day() - cooldown))
+	return maxi(cooldown - (_absolute_day() - last_work_day), 0)
 
 func perform_work_session(action: String) -> bool:
 	if not work_session_available():
@@ -201,28 +204,39 @@ func perform_work_session(action: String) -> bool:
 		var branch := str(active_contract.get("branch", FounderManager.BRANCH_BUSINESS))
 		var speed := FounderManager.branch_speed_multiplier(branch) * FounderManager.programming_multiplier()
 		var quality_bonus := FounderManager.branch_quality_bonus(branch) * 0.15
+		var gained_points := 0.0
 		match action:
 			"BUILD":
-				active_contract["progress"] = minf(float(active_contract.progress) + 18.0 * speed, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 1.5 + quality_bonus, 0.0, 100.0)
+				gained_points = 8.0 * speed
+				active_contract["robustness"] = clampf(float(active_contract.get("robustness", 38.0)) + 0.5 + quality_bonus, 0.0, 100.0)
 				FounderManager.add_multi_experience(10, {FounderManager.SKILL_PROGRAMMING:1.1, FounderManager.SKILL_MANAGEMENT:0.2})
 				FounderManager.add_branch_experience(branch, 10)
 			"TEST":
-				active_contract["progress"] = minf(float(active_contract.progress) + 9.0 * speed, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 8.0 + quality_bonus, 0.0, 100.0)
+				gained_points = 3.0 * speed
+				active_contract["robustness"] = clampf(float(active_contract.get("robustness", 38.0)) + 7.0 + quality_bonus, 0.0, 100.0)
+				active_contract["defects"] = maxi(int(active_contract.get("defects", 0)) - 1, 0)
 				FounderManager.add_multi_experience(8, {FounderManager.SKILL_PROGRAMMING:0.8, FounderManager.SKILL_MANAGEMENT:0.3})
 				FounderManager.add_branch_experience(branch, 8)
 			"CLIENT":
-				active_contract["progress"] = minf(float(active_contract.progress) + 6.0 * speed, 100.0)
+				gained_points = 2.0 * speed
 				active_contract["client_confidence"] = clampf(float(active_contract.client_confidence) + 10.0 * FounderManager.commercial_multiplier(), 0.0, 100.0)
-				active_contract["quality"] = clampf(float(active_contract.quality) + 3.0 + quality_bonus, 0.0, 100.0)
+				active_contract["robustness"] = clampf(float(active_contract.get("robustness", 38.0)) + 1.5 + quality_bonus, 0.0, 100.0)
 				FounderManager.add_multi_experience(8, {FounderManager.SKILL_COMMERCIAL:1.0, FounderManager.SKILL_MANAGEMENT:0.4})
 				FounderManager.add_branch_experience(branch, 7)
 			_:
 				return false
+		var work_required := maxf(float(active_contract.get("work_required", 80.0)), 1.0)
+		active_contract["work_done"] = minf(float(active_contract.get("work_done", 0.0)) + gained_points, work_required)
+		active_contract["functions"] = float(active_contract["work_done"])
+		active_contract["progress"] = clampf(float(active_contract["work_done"]) / work_required * 100.0, 0.0, 100.0)
+		active_contract["quality"] = float(active_contract["robustness"])
 		active_contract["last_work_day"] = _absolute_day()
 		_update_contract_remaining_months()
-		if float(active_contract.progress) >= 100.0:
+		if not bool(active_contract.get("milestone_resolved", false)) and float(active_contract["progress"]) >= 48.0:
+			active_contract["milestone_pending"] = true
+			active_contract["resume_time_scale"] = maxf(TimeManager.time_scale, 1.0)
+			TimeManager.time_scale = 0.0
+		elif float(active_contract["work_done"]) >= work_required:
 			_complete_active_contract()
 		startup_changed.emit()
 		return true
@@ -456,7 +470,7 @@ func start_software_contract(contract_id: String, approach: String = "SOLID") ->
 		"milestone_resolved":false,
 		"bonus_reward":0,
 		"resume_time_scale":1.0,
-		"last_work_day":_absolute_day() - WORK_SESSION_COOLDOWN_DAYS
+		"last_work_day":_absolute_day() - CONTRACT_SESSION_COOLDOWN_DAYS
 	}
 	CompanyManager.add_alert("Garage : %s confie « %s » à votre atelier." % [str(active_contract.client), str(data.title)])
 	startup_changed.emit()
