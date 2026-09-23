@@ -3109,6 +3109,18 @@ func _refresh_launch_intel():
 			_money(unit_cost), _money(planned_price), _money(gross_margin), gross_margin_pct
 		]
 	]
+	var forecast := MarketManager.forecast_cpu_launch(candidate, planned_price)
+	if not forecast.is_empty():
+		lines.append("Prévision Marketing • confiance %.0f%% • %s • %s" % [
+			float(forecast.get("confidence", 0.0)), str(forecast.get("perception", "")), str(forecast.get("positioning", ""))
+		])
+		lines.append("Premier mois estimé : %s–%s unités (centre ~%s) • part %.1f–%.1f%%" % [
+			_money(int(forecast.get("min_units", 0))), _money(int(forecast.get("max_units", 0))),
+			_money(int(forecast.get("expected_units", 0))),
+			float(forecast.get("min_share", 0.0)) * 100.0, float(forecast.get("max_share", 0.0)) * 100.0
+		])
+		lines.append(str(forecast.get("value_signal", "")))
+		lines.append(str(forecast.get("trust_signal", "")))
 	var best_comparison: Dictionary = {}
 	var best_fit := -1.0
 	for profile_value in MarketManager.cpu_competitor_public_profiles():
