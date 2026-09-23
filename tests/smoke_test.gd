@@ -13,6 +13,10 @@ func _ready() -> void:
 	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
 		_fail("Interactive garage HQ did not expose the expected five management zones")
 		return
+	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":false,"PRODUCTS":false,"MARKET":false,"PRESS":false})
+	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
+		_fail("Garage onboarding exposed advanced management zones too early")
+		return
 	garage_hub.queue_free()
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":
