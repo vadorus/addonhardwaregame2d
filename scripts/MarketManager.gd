@@ -218,7 +218,18 @@ func _make_competitors(sector: String) -> Array:
 			"history":[],
 			"last_month_units":0,
 			"last_month_profit":0,
-			"restructurings":0
+			"restructurings":0,
+			"ai_sourcing_generation":-1,
+			"ai_sourcing_mode":"",
+			"ai_supplier_id":"",
+			"ai_supplier_name":"",
+			"ai_supplier_speed_factor":1.0,
+			"ai_supplier_quality_factor":1.0,
+			"ai_supplier_unit_cost_factor":1.0,
+			"ai_supplier_knowledge_factor":1.0,
+			"ai_supplier_monthly_fee":0,
+			"ai_supplier_public":false,
+			"public_generation_partner":""
 		}
 		CompanyAIManager.ensure_company_state(competitor)
 		_configure_competitor_product(competitor, true)
@@ -663,6 +674,104 @@ func _apply_competitor_ai_decision(competitor: Dictionary, decision: Dictionary,
 		if market_events.size() > 24:
 			market_events.pop_back()
 
+func _clear_competitor_sourcing(competitor: Dictionary, release_capacity: bool = true) -> void:
+	if release_capacity:
+		SupplierManager.release_rival_capacity(str(competitor.get("id", "")))
+	competitor["ai_sourcing_generation"] = -1
+	competitor["ai_sourcing_mode"] = ""
+	competitor["ai_supplier_id"] = ""
+	competitor["ai_supplier_name"] = ""
+	competitor["ai_supplier_speed_factor"] = 1.0
+	competitor["ai_supplier_quality_factor"] = 1.0
+	competitor["ai_supplier_unit_cost_factor"] = 1.0
+	competitor["ai_supplier_knowledge_factor"] = 1.0
+	competitor["ai_supplier_monthly_fee"] = 0
+	competitor["ai_supplier_public"] = false
+
+func _set_internal_competitor_sourcing(competitor: Dictionary, generation_target: int) -> void:
+	var profile := GameData.approach_data("INTERNAL")
+	competitor["ai_sourcing_generation"] = generation_target
+	competitor["ai_sourcing_mode"] = "INTERNAL"
+	competitor["ai_supplier_id"] = ""
+	competitor["ai_supplier_name"] = ""
+	competitor["ai_supplier_speed_factor"] = float(profile.get("speed", 1.0))
+	competitor["ai_supplier_quality_factor"] = float(profile.get("quality", 1.0))
+	competitor["ai_supplier_unit_cost_factor"] = float(GameData.sourcing_profile("INTERNAL").get("unit_cost_factor", 1.0))
+	competitor["ai_supplier_knowledge_factor"] = float(profile.get("knowledge", 1.0))
+	competitor["ai_supplier_monthly_fee"] = 0
+	competitor["ai_supplier_public"] = false
+
+func _ensure_competitor_sourcing(competitor: Dictionary) -> void:
+	var generation_target := int(competitor.get("generation_index", 1)) + 1
+	var current_mode := str(competitor.get("ai_sourcing_mode", ""))
+	if int(competitor.get("ai_sourcing_generation", -1)) == generation_target and current_mode != "":
+		if current_mode == "INTERNAL":
+			return
+		var existing := SupplierManager.rival_reservation_for(str(competitor.get("id", "")))
+		if not existing.is_empty():
+			competitor["ai_supplier_monthly_fee"] = int(existing.get("monthly_fee", competitor.get("ai_supplier_monthly_fee", 0)))
+			return
+		_clear_competitor_sourcing(competitor, false)
+
+	var mode := CompanyAIManager.choose_sourcing_mode(competitor, rng)
+	if mode == "INTERNAL":
+		_set_internal_competitor_sourcing(competitor, generation_target)
+		return
+
+	var duration := 12
+	match mode:
+		"PURCHASE":
+			duration = 7
+		"LICENSE":
+			duration = 12
+		"SUBCONTRACT":
+			duration = 10
+		"PARTNER":
+			duration = 14
+	var cash := maxi(int(competitor.get("cash", 0)), 0)
+	var max_setup_cost := maxi(12000, int(round(float(cash) * 0.22)))
+	var reservation := SupplierManager.request_rival_capacity(
+		str(competitor.get("id", "")),
+		str(competitor.get("company", "")),
+		mode,
+		duration,
+		max_setup_cost
+	)
+	if reservation.is_empty():
+		_set_internal_competitor_sourcing(competitor, generation_target)
+		return
+
+	var setup_cost := int(reservation.get("setup_cost", 0))
+	if int(competitor.get("cash", 0)) < setup_cost:
+		SupplierManager.release_rival_capacity(str(competitor.get("id", "")))
+		_set_internal_competitor_sourcing(competitor, generation_target)
+		return
+	competitor["cash"] = int(competitor.get("cash", 0)) - setup_cost
+	competitor["ai_sourcing_generation"] = generation_target
+	competitor["ai_sourcing_mode"] = mode
+	competitor["ai_supplier_id"] = str(reservation.get("supplier_id", ""))
+	competitor["ai_supplier_name"] = str(reservation.get("supplier_name", ""))
+	competitor["ai_supplier_speed_factor"] = float(reservation.get("speed_factor", 1.0))
+	competitor["ai_supplier_quality_factor"] = float(reservation.get("quality_factor", 1.0))
+	competitor["ai_supplier_unit_cost_factor"] = float(reservation.get("unit_cost_factor", 1.0))
+	competitor["ai_supplier_knowledge_factor"] = float(reservation.get("knowledge_factor", 1.0))
+	competitor["ai_supplier_monthly_fee"] = int(reservation.get("monthly_fee", 0))
+	competitor["ai_supplier_public"] = bool(reservation.get("public", false))
+	if bool(reservation.get("public", false)):
+		var public_text := "%s annonce un co-développement avec %s pour sa prochaine génération CPU." % [
+			str(competitor.get("company", "")), str(reservation.get("supplier_name", "un partenaire"))
+		]
+		competitor["ai_public_action"] = public_text
+		market_events.push_front({
+			"type":"COMPETITOR_PARTNERSHIP",
+			"company":str(competitor.get("company", "")),
+			"year":TimeManager.year,
+			"month":TimeManager.month,
+			"text":public_text
+		})
+		if market_events.size() > 24:
+			market_events.pop_back()
+
 func _advance_cpu_competitor(competitor: Dictionary):
 	CompanyAIManager.tick_company_state(competitor)
 	competitor["months_on_market"] = int(competitor.get("months_on_market", 0)) + 1
@@ -676,6 +785,8 @@ func _advance_cpu_competitor(competitor: Dictionary):
 		var decision := CompanyAIManager.choose_action(competitor, ai_context, rng)
 		_apply_competitor_ai_decision(competitor, decision, ai_context)
 
+	_ensure_competitor_sourcing(competitor)
+
 	var target := normalize_segment(str(competitor.get("target_segment", current_target)))
 	var market_units := segment_market_units(target)
 	var score := _evaluate_competitor(competitor, target)
@@ -686,7 +797,8 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	var cash := int(competitor.get("cash", 200000))
 	var base_rd_budget := clampi(int(float(maxi(cash, 0)) * 0.035), 3500, 24000)
 	var rd_budget := clampi(int(round(float(base_rd_budget) * float(competitor.get("ai_rd_multiplier", 1.0)))), 1800, 34000)
-	var fixed_cost := 7000 + int(competitor.get("generation_index", 1)) * 600
+	var supplier_fee := maxi(int(competitor.get("ai_supplier_monthly_fee", 0)), 0)
+	var fixed_cost := 7000 + int(competitor.get("generation_index", 1)) * 600 + supplier_fee
 	cash += operating_profit - rd_budget - fixed_cost
 	competitor["last_month_units"] = units
 	competitor["last_month_profit"] = operating_profit - rd_budget - fixed_cost
@@ -699,6 +811,12 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	var mini_gain := 0.11 * budget_factor
 	var manufacturing_gain := 0.12 * budget_factor
 	var integration_gain := 0.08 * budget_factor
+	var sourcing_knowledge := clampf(float(competitor.get("ai_supplier_knowledge_factor", 1.0)), 0.25, 1.40)
+	arch_gain *= sourcing_knowledge
+	layout_gain *= sourcing_knowledge
+	mini_gain *= sourcing_knowledge
+	manufacturing_gain *= sourcing_knowledge
+	integration_gain *= sourcing_knowledge
 	match strategy:
 		"PERFORMANCE":
 			arch_gain *= 1.55
@@ -717,6 +835,7 @@ func _advance_cpu_competitor(competitor: Dictionary):
 
 	var progress_gain := 4.8 + float(competitor.get("architecture_skill", 20.0)) * 0.035 + float(competitor.get("integration_skill", 20.0)) * 0.015
 	progress_gain *= clampf(0.82 + budget_factor * 0.18, 0.62, 1.28)
+	progress_gain *= clampf(float(competitor.get("ai_supplier_speed_factor", 1.0)), 0.75, 1.65)
 	progress_gain += rng.randf_range(-0.45, 0.65)
 	competitor["development_progress"] = clampf(float(competitor.get("development_progress", 0.0)) + progress_gain, 0.0, 100.0)
 	var generation_cost := 24000 + int(competitor.get("generation_index", 1)) * 4500
@@ -725,6 +844,7 @@ func _advance_cpu_competitor(competitor: Dictionary):
 		_launch_competitor_generation(competitor)
 
 	if int(competitor.cash) < -120000:
+		_clear_competitor_sourcing(competitor)
 		competitor["cash"] = 90000
 		competitor["restructurings"] = int(competitor.get("restructurings", 0)) + 1
 		competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) - 3.0, 20.0, 90.0)
@@ -741,18 +861,26 @@ func _launch_competitor_generation(competitor: Dictionary):
 	competitor["generation_index"] = int(competitor.get("generation_index", 1)) + 1
 	competitor["development_progress"] = rng.randf_range(0.0, 8.0)
 	competitor["months_on_market"] = 0
+	var completed_sourcing_mode := str(competitor.get("ai_sourcing_mode", "INTERNAL"))
+	var completed_supplier_name := str(competitor.get("ai_supplier_name", ""))
+	var completed_supplier_public := bool(competitor.get("ai_supplier_public", false))
 	_configure_competitor_product(competitor, false)
+	if completed_supplier_public and completed_supplier_name != "":
+		competitor["public_generation_partner"] = completed_supplier_name
 	var history: Array = competitor.get("history", [])
 	history.push_front({
 		"generation":int(competitor.generation_index),
 		"node_nm":node_nm,
 		"target_segment":str(competitor.target_segment),
+		"sourcing_mode":completed_sourcing_mode,
+		"supplier_name":completed_supplier_name,
 		"year":TimeManager.year,
 		"month":TimeManager.month
 	})
 	if history.size() > 12:
 		history.pop_back()
 	competitor["history"] = history
+	_clear_competitor_sourcing(competitor)
 
 func _configure_competitor_product(competitor: Dictionary, initial: bool):
 	var arch := float(competitor.get("architecture_skill", 20.0))
@@ -775,6 +903,11 @@ func _configure_competitor_product(competitor: Dictionary, initial: bool):
 		efficiency += 5.0
 		reliability += 1.5
 		performance -= 1.5
+	var sourcing_quality := clampf(float(competitor.get("ai_supplier_quality_factor", 1.0)), 0.88, 1.16)
+	performance += (sourcing_quality - 1.0) * 18.0
+	efficiency += (sourcing_quality - 1.0) * 15.0
+	reliability += (sourcing_quality - 1.0) * 28.0
+	innovation += (sourcing_quality - 1.0) * 16.0
 	var generation := int(competitor.get("generation_index", 1))
 	var usability := 42.0 + integration * 0.22 + generation * 0.45
 	var ecosystem := 38.0 + integration * 0.31 + float(competitor.get("brand", 50.0)) * 0.10
@@ -794,6 +927,7 @@ func _configure_competitor_product(competitor: Dictionary, initial: bool):
 		unit_cost *= 0.94
 	elif strategy == "PERFORMANCE":
 		unit_cost *= 1.10
+	unit_cost *= clampf(float(competitor.get("ai_supplier_unit_cost_factor", 1.0)), 0.75, 1.75)
 	competitor["unit_cost"] = maxi(20, int(round(unit_cost)))
 	competitor["capacity"] = maxi(2500, int(round(6500.0 + manufacturing * 230.0 + yield_rate * 4200.0)))
 	var target := _choose_competitor_segment(competitor)
@@ -849,7 +983,11 @@ func competitor_summaries() -> Array:
 			"restructurings":int(competitor.get("restructurings", 0)),
 			"current_action":str(competitor.get("ai_current_action", "HOLD")),
 			"decision_cooldown":int(competitor.get("ai_decision_cooldown", 0)),
-			"last_reason":str(competitor.get("ai_last_reason", ""))
+			"last_reason":str(competitor.get("ai_last_reason", "")),
+			"sourcing_mode":str(competitor.get("ai_sourcing_mode", "")),
+			"supplier_id":str(competitor.get("ai_supplier_id", "")),
+			"supplier_name":str(competitor.get("ai_supplier_name", "")),
+			"supplier_monthly_fee":int(competitor.get("ai_supplier_monthly_fee", 0))
 		})
 	return result
 
@@ -880,6 +1018,7 @@ func cpu_competitor_public_profiles() -> Array:
 			"benchmark_score":benchmark_score(competitor),
 			"market_signal":market_signal,
 			"recent_public_action":str(competitor.get("ai_public_action", "")),
+			"technology_partner":str(competitor.get("ai_supplier_name", "")) if bool(competitor.get("ai_supplier_public", false)) else str(competitor.get("public_generation_partner", "")),
 			"metrics":{
 				"performance":float(metrics.get("performance", 50.0)),
 				"efficiency":float(metrics.get("efficiency", 50.0)),
@@ -1429,6 +1568,17 @@ func _migrate_competitor(competitor: Dictionary, sector: String) -> Dictionary:
 	competitor["last_month_units"] = maxi(int(competitor.get("last_month_units", 0)), 0)
 	competitor["last_month_profit"] = int(competitor.get("last_month_profit", 0))
 	competitor["restructurings"] = maxi(int(competitor.get("restructurings", 0)), 0)
+	competitor["ai_sourcing_generation"] = int(competitor.get("ai_sourcing_generation", -1))
+	competitor["ai_sourcing_mode"] = str(competitor.get("ai_sourcing_mode", ""))
+	competitor["ai_supplier_id"] = str(competitor.get("ai_supplier_id", ""))
+	competitor["ai_supplier_name"] = str(competitor.get("ai_supplier_name", ""))
+	competitor["ai_supplier_speed_factor"] = float(competitor.get("ai_supplier_speed_factor", 1.0))
+	competitor["ai_supplier_quality_factor"] = float(competitor.get("ai_supplier_quality_factor", 1.0))
+	competitor["ai_supplier_unit_cost_factor"] = float(competitor.get("ai_supplier_unit_cost_factor", 1.0))
+	competitor["ai_supplier_knowledge_factor"] = float(competitor.get("ai_supplier_knowledge_factor", 1.0))
+	competitor["ai_supplier_monthly_fee"] = maxi(int(competitor.get("ai_supplier_monthly_fee", 0)), 0)
+	competitor["ai_supplier_public"] = bool(competitor.get("ai_supplier_public", false))
+	competitor["public_generation_partner"] = str(competitor.get("public_generation_partner", ""))
 	return competitor
 
 func load_state(state: Dictionary):
