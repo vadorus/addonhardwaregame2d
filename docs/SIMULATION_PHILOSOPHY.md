@@ -141,6 +141,17 @@ Pour le CPU, ce choix est désormais jouable dès le brief R&D avec cinq modes d
 
 Le choix suit le produit après la R&D : coût unitaire, royalties, dépendance fournisseur, liberté de personnalisation et part d'IP restent attachés à la génération et aux références commerciales. Il n'existe donc pas de solution universellement optimale : le CEO arbitre entre vitesse, contrôle, risque, marge et accumulation de capacités internes.
 
+
+Le fournisseur n'est pas abstrait. Pour les modes externes, le joueur choisit une entreprise technologique réelle dans la simulation. Chaque partenaire a sa spécialité, sa qualité, sa fiabilité, sa capacité simultanée, sa confidentialité, sa flexibilité et sa structure de coût. Une relation conserve aussi une **confiance** et un **historique** : les projets réussis améliorent progressivement les conditions, tandis que les retards peuvent dégrader la confiance.
+
+Avant signature, le CEO choisit également une priorité de négociation :
+- **Équilibré** : conditions standards ;
+- **Prix prioritaire** : baisse du coût au prix d'un délai ou d'une flexibilité moindre ;
+- **Flexibilité & IP** : plus de personnalisation et de transfert de savoir-faire contre un coût supérieur ;
+- **Délais prioritaires** : exécution accélérée contre un prix et une dépendance plus élevés.
+
+La capacité du partenaire est réelle : un fournisseur déjà saturé ne peut pas accepter un nouveau projet tant qu'un créneau ne se libère pas. Les retards restent probabilistes et dépendent notamment de la fiabilité et de la confiance ; ils réduisent la progression du mois sans annuler arbitrairement le projet.
+
 ## 9. Diversification organique
 
 Le joueur ne suit pas une séquence imposée CPU → GPU → RAM → téléphone.

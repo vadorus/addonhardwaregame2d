@@ -87,6 +87,9 @@ var rd_sector: OptionButton
 var rd_segment: OptionButton
 var rd_application: OptionButton
 var rd_approach: OptionButton
+var rd_supplier: OptionButton
+var rd_negotiation: OptionButton
+var rd_supplier_label: Label
 var rd_focus: OptionButton
 var rd_budget: SpinBox
 var research_overview_label: Label
@@ -217,6 +220,7 @@ func _connect_signals():
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
+	SupplierManager.suppliers_changed.connect(_refresh_research)
 	ProductionManager.jobs_changed.connect(_refresh_all)
 	FoundryManager.foundries_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
@@ -800,8 +804,26 @@ func _create_research_tab():
 
 	rd_approach = OptionButton.new()
 	_fill_approach_options(rd_approach)
-	rd_approach.item_selected.connect(func(_index): _refresh_cpu_preview())
+	rd_approach.item_selected.connect(func(_index): _on_sourcing_approach_changed())
 	_add_labeled_control(configuration_box, "Méthode de développement", rd_approach)
+
+	rd_supplier = OptionButton.new()
+	rd_supplier.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Fournisseur / partenaire technologique", rd_supplier)
+
+	rd_negotiation = OptionButton.new()
+	for negotiation_value in SupplierManager.negotiation_keys():
+		var negotiation_key := str(negotiation_value)
+		rd_negotiation.add_item(SupplierManager.negotiation_label(negotiation_key))
+		rd_negotiation.set_item_metadata(rd_negotiation.item_count - 1, negotiation_key)
+	_select_meta(rd_negotiation, "BALANCED")
+	rd_negotiation.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Priorité de négociation", rd_negotiation)
+
+	rd_supplier_label = _muted_label("", 11)
+	rd_supplier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(rd_supplier_label)
+	_refresh_supplier_options()
 
 	rd_focus = OptionButton.new()
 	_fill_focus_options(rd_focus)
@@ -1288,12 +1310,15 @@ func _refresh_cpu_preview():
 	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var approach_data: Dictionary = GameData.approach_data(approach_key)
-	var sourcing: Dictionary = GameData.sourcing_profile(approach_key)
-	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
+	var sourcing: Dictionary = _selected_supplier_quote()
+	if sourcing.is_empty():
+		sourcing = GameData.sourcing_profile(approach_key)
+	var effective_speed := float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0))
+	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / maxf(effective_speed, 0.10))))
 	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
 	var months := base_months + extra_months
 	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
-	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost)) + int(active_cpu_remediation.get("upfront_cost", 0)) + int(sourcing.get("setup_cost", 0))
+	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0))) + int(active_cpu_remediation.get("upfront_cost", 0)) + int(sourcing.get("setup_cost", 0))
 	var risk := float(evaluation.risk)
 	var risk_label := "faible"
 	if risk >= 60.0:
@@ -1303,7 +1328,7 @@ func _refresh_cpu_preview():
 	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
 	var reference_design := lab_reference_design if not lab_reference_design.is_empty() else CPU_DESIGN.default_design()
 	var reference_evaluation := CPU_DESIGN.evaluate(reference_design, ResearchManager.get_cpu_capabilities())
-	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / float(approach_data.speed))))
+	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / maxf(effective_speed, 0.10))))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
 	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
 	var focus_key := _meta(rd_focus) if rd_focus != null else "BALANCED"
@@ -1336,7 +1361,20 @@ func _refresh_cpu_preview():
 		str(application_assessment.get("label", "Polyvalent")), float(application_assessment.get("fit", 0.0)),
 		str(application_assessment.get("summary", "")), application_gap_text
 	]
-	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
+	var projected_unit_cost := int(round(float(evaluation.unit_cost) * float(sourcing.get("unit_cost_factor", 1.0))))
+	lab_unit_cost_value.text = "%s €" % _money(projected_unit_cost)
+	if rd_supplier_label != null:
+		if approach_key == "INTERNAL":
+			rd_supplier_label.text = "Équipe interne : aucune dépendance fournisseur, IP et personnalisation maximales."
+		else:
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nAccès %s € • coût unitaire x%.2f • négociation : %s" % [
+				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
+				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
+				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
+				int(sourcing.get("available_capacity_slots", 0)), int(sourcing.get("supplier_capacity_slots", 0)),
+				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("unit_cost_factor", 1.0)),
+				str(sourcing.get("negotiation_label", "Équilibré"))
+			]
 	lab_dev_time_value.text = "~%d mois" % months
 	lab_fit_value.text = "%.0f / 100" % fit
 	lab_warning_label.text = str(evaluation.tradeoff)
@@ -2238,6 +2276,44 @@ func _fill_approach_options(option: OptionButton):
 func _fill_focus_options(option: OptionButton):
 	option.clear(); for key in GameData.get_focus_keys(): option.add_item(str(GameData.FOCUS_OPTIONS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
 
+func _on_sourcing_approach_changed():
+	_refresh_supplier_options()
+	_refresh_cpu_preview()
+
+func _refresh_supplier_options():
+	if rd_supplier == null or rd_approach == null:
+		return
+	var approach := _meta(rd_approach)
+	var previous := _meta(rd_supplier) if rd_supplier.item_count > 0 else ""
+	rd_supplier.clear()
+	if approach == "INTERNAL":
+		rd_supplier.add_item("Équipe interne — aucun fournisseur")
+		rd_supplier.set_item_metadata(0, "")
+		rd_supplier.disabled = true
+		if rd_negotiation != null:
+			rd_negotiation.disabled = true
+	else:
+		rd_supplier.disabled = false
+		if rd_negotiation != null:
+			rd_negotiation.disabled = false
+		for supplier_id_value in SupplierManager.supplier_keys_for_mode(approach):
+			var supplier_id := str(supplier_id_value)
+			var supplier := SupplierManager.get_supplier(supplier_id)
+			rd_supplier.add_item("%s — %s" % [str(supplier.get("name", supplier_id)), str(supplier.get("specialty", "Technologie"))])
+			rd_supplier.set_item_metadata(rd_supplier.item_count - 1, supplier_id)
+		if previous != "":
+			_select_meta(rd_supplier, previous)
+		if rd_supplier.selected < 0 and rd_supplier.item_count > 0:
+			_select_meta(rd_supplier, SupplierManager.recommended_supplier(approach))
+	if rd_supplier.item_count > 0 and rd_supplier.selected < 0:
+		rd_supplier.select(0)
+
+func _selected_supplier_quote() -> Dictionary:
+	var approach := _meta(rd_approach) if rd_approach != null else "INTERNAL"
+	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
+	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
+	return SupplierManager.quote(approach, supplier_id, negotiation)
+
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
 	return str(option.get_item_metadata(option.selected))
@@ -3008,15 +3084,20 @@ func _start_project():
 	var generation_plan := active_cpu_generation_plan.duplicate(true)
 	var remediation := active_cpu_remediation.duplicate(true)
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key):
+	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
+	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
-		status_label.text = "%s entre en développement — %s • usage %s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text]
+		var supplier_text := ""
+		if _meta(rd_approach) != "INTERNAL":
+			supplier_text = " • partenaire %s" % SupplierManager.supplier_label(supplier_id)
+		status_label.text = "%s entre en développement — %s • usage %s%s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text, supplier_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
 	else:
-		status_label.text = "Impossible de lancer le projet : trésorerie ou capacité R&D insuffisante."
+		status_label.text = "Impossible de lancer le projet : vérifiez la trésorerie, la capacité R&D et la disponibilité du partenaire."
 	_refresh_all()
 
 func _file_patent(): status_label.text="Brevet déposé." if PatentManager.file_first_candidate() else "Aucun brevet candidat ou trésorerie insuffisante."; _refresh_all()
