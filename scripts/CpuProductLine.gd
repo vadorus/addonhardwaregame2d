@@ -143,7 +143,8 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var product_name := base_name if suffix.is_empty() else "%s %s" % [base_name, suffix]
 	var approach := str(project.get("approach", "INTERNAL"))
 	var approach_data: Dictionary = GameData.approach_data(approach)
-	var sourcing := project.get("sourcing", GameData.sourcing_profile(approach)).duplicate(true)
+	var sourcing_value = project.get("sourcing", GameData.sourcing_profile(approach))
+	var sourcing: Dictionary = sourcing_value.duplicate(true) if typeof(sourcing_value) == TYPE_DICTIONARY else GameData.sourcing_profile(approach)
 	return {
 		"project_id":str(project.get("id", "")),
 		"generation_id":generation_id,
