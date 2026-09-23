@@ -651,6 +651,7 @@ func _apply_competitor_ai_decision(competitor: Dictionary, decision: Dictionary,
 			pass
 	CompanyAIManager.apply_decision_state(competitor, decision)
 	if public_text != "":
+		competitor["ai_public_action"] = public_text
 		var event := {
 			"type":"COMPETITOR_ACTION",
 			"company":str(competitor.get("company", "")),
@@ -878,6 +879,7 @@ func cpu_competitor_public_profiles() -> Array:
 			"months_on_market":int(competitor.get("months_on_market", 0)),
 			"benchmark_score":benchmark_score(competitor),
 			"market_signal":market_signal,
+			"recent_public_action":str(competitor.get("ai_public_action", "")),
 			"metrics":{
 				"performance":float(metrics.get("performance", 50.0)),
 				"efficiency":float(metrics.get("efficiency", 50.0)),
