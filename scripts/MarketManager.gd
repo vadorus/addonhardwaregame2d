@@ -1275,8 +1275,12 @@ func create_tender_from_template(template_id: String) -> Dictionary:
 		"status":"OPEN",
 		"created_market_month":market_age_months,
 		"bid":{},
+		"rival_bids":[],
 		"resolution_market_month":-1,
 		"result_score":0.0,
+		"winning_company":"",
+		"winning_product":"",
+		"winning_score":0.0,
 		"result_text":""
 	}
 	_next_tender_id += 1
@@ -1449,31 +1453,68 @@ func submit_tender_bid(tender_id: String, product_id: String, bid_price: int) ->
 	market_changed.emit()
 	return true
 
+func _award_tender_to_rival(tender: Dictionary, rival_bid: Dictionary) -> bool:
+	var competitor := _cpu_competitor_internal(str(rival_bid.get("company_id", "")))
+	if competitor.is_empty():
+		return false
+	var contract := {
+		"id":"RIVAL-B2B-%s-%s" % [str(tender.get("id", "")), str(competitor.get("id", ""))],
+		"tender_id":str(tender.get("id", "")),
+		"customer":str(tender.get("customer", "")),
+		"title":str(tender.get("title", "")),
+		"product_name":str(competitor.get("name", "CPU")),
+		"application_profile":str(tender.get("application_profile", "GENERAL")),
+		"segment":str(tender.get("segment", default_segment())),
+		"units_per_month":int(tender.get("units_per_month", 0)),
+		"unit_price":int(rival_bid.get("unit_price", 1)),
+		"remaining_months":int(tender.get("duration_months", 12)),
+		"status":"ACTIVE",
+		"confidentiality":float(tender.get("confidentiality", 50.0)),
+		"exclusivity":bool(tender.get("exclusivity", false)),
+		"last_delivered_units":0
+	}
+	var rival_contracts: Array = competitor.get("b2b_contracts", [])
+	rival_contracts.append(contract)
+	competitor["b2b_contracts"] = rival_contracts
+	return true
+
 func _resolve_tender(tender: Dictionary):
-	var bid: Dictionary = tender.get("bid", {})
-	var product := ProductManager.get_product(str(bid.get("product_id", "")))
-	if product.is_empty():
-		tender["status"] = "REJECTED"
-		tender["result_text"] = "Produit indisponible au moment de la décision."
-		return
-	var fit := tender_fit(tender, product, int(bid.get("unit_price", 1)))
-	var score := float(fit.get("score", 0.0))
-	tender["result_score"] = score
-	var awarded := score >= 68.0
-	if awarded:
+	var player_bid: Dictionary = tender.get("bid", {})
+	var player_product := ProductManager.get_product(str(player_bid.get("product_id", "")))
+	var player_score := -1.0
+	var player_fit := {}
+	if not player_bid.is_empty() and not player_product.is_empty():
+		player_fit = tender_fit(tender, player_product, int(player_bid.get("unit_price", 1)))
+		player_score = float(player_fit.get("score", -1.0))
+
+	var rival_bids := _build_rival_tender_bids(tender)
+	tender["rival_bids"] = rival_bids.duplicate(true)
+	var best_rival := {}
+	var rival_score := -1.0
+	if not rival_bids.is_empty():
+		best_rival = rival_bids[0]
+		rival_score = float(best_rival.get("score", -1.0))
+
+	var player_credible := player_score >= 68.0
+	var rival_credible := rival_score >= 68.0
+	if player_credible and (not rival_credible or player_score >= rival_score):
 		tender["status"] = "AWARDED"
-		var contract_status := "ACTIVE" if str(product.get("status", "")) == "LAUNCHED" else "RESERVED"
+		tender["result_score"] = player_score
+		tender["winning_company"] = CompanyManager.company_name
+		tender["winning_product"] = str(player_product.get("name", "CPU"))
+		tender["winning_score"] = player_score
+		var contract_status := "ACTIVE" if str(player_product.get("status", "")) == "LAUNCHED" else "RESERVED"
 		var contract := {
 			"id":"B2B-%03d" % _next_contract_id,
 			"kind":"TENDER",
 			"tender_id":str(tender.get("id", "")),
-			"product_id":str(product.get("id", "")),
-			"product_name":str(product.get("name", "CPU")),
+			"product_id":str(player_product.get("id", "")),
+			"product_name":str(player_product.get("name", "CPU")),
 			"customer":str(tender.get("customer", "")),
 			"segment":str(tender.get("segment", default_segment())),
 			"application_profile":str(tender.get("application_profile", "GENERAL")),
 			"units_per_month":int(tender.get("units_per_month", 0)),
-			"unit_price":int(bid.get("unit_price", 1)),
+			"unit_price":int(player_bid.get("unit_price", 1)),
 			"remaining_months":int(tender.get("duration_months", 12)),
 			"status":contract_status,
 			"penalty_rate":float(tender.get("penalty_rate", 0.10)),
@@ -1482,22 +1523,57 @@ func _resolve_tender(tender: Dictionary):
 		}
 		_next_contract_id += 1
 		contracts.append(contract)
-		tender["result_text"] = "Offre retenue. Le contrat %s %s." % [
+		tender["result_text"] = "Offre retenue face à %d concurrent(s). Le contrat %s %s." % [
+			rival_bids.size(),
 			str(contract.get("id", "")),
 			"est réservé jusqu'au lancement du CPU" if contract_status == "RESERVED" else "entre en vigueur immédiatement"
 		]
 		CompanyManager.change_reputation({"professional":1.5,"prestige":0.5})
 		CompanyManager.add_alert("%s retient votre offre pour %s." % [str(tender.get("customer", "")), str(tender.get("title", ""))])
 		MediaManager.publish_business_event("Contrat remporté", "%s choisit %s pour son programme CPU." % [str(tender.get("customer", "")), CompanyManager.company_name])
+	elif rival_credible and _award_tender_to_rival(tender, best_rival):
+		var had_player_bid := not player_bid.is_empty()
+		tender["status"] = "LOST" if had_player_bid else "AWARDED_RIVAL"
+		tender["result_score"] = player_score if had_player_bid else rival_score
+		tender["winning_company"] = str(best_rival.get("company", ""))
+		tender["winning_product"] = str(best_rival.get("product_name", "CPU"))
+		tender["winning_score"] = rival_score
+		var confidentiality := float(tender.get("confidentiality", 50.0))
+		var public_winner := str(best_rival.get("company", "un concurrent")) if confidentiality <= 75.0 else "une entreprise concurrente"
+		if had_player_bid:
+			tender["result_text"] = "Offre non retenue • votre dossier %.1f/100 • offre gagnante %.1f/100 • %s." % [player_score, rival_score, public_winner]
+			CompanyManager.add_alert("%s retient une offre concurrente pour %s." % [str(tender.get("customer", "")), str(tender.get("title", ""))])
+		else:
+			tender["result_text"] = "Consultation remportée par %s avec un dossier évalué à %.1f/100." % [public_winner, rival_score]
+		if confidentiality <= 75.0:
+			var public_text := "%s choisit %s pour %s." % [str(tender.get("customer", "")), str(best_rival.get("company", "un fournisseur")), str(tender.get("title", "son programme CPU"))]
+			market_events.push_front({
+				"type":"RIVAL_B2B_AWARD",
+				"company":str(best_rival.get("company", "")),
+				"year":TimeManager.year,
+				"month":TimeManager.month,
+				"text":public_text
+			})
+			if market_events.size() > 24:
+				market_events.pop_back()
+			MediaManager.publish_business_event("Contrat B2B attribué", public_text)
 	else:
-		tender["status"] = "REJECTED"
-		var gaps: Array = fit.get("gaps", [])
-		tender["result_text"] = "Offre non retenue • score %.1f/100%s" % [
-			score,
-			(" • écarts : " + ", ".join(gaps)) if not gaps.is_empty() else ""
-		]
-		CompanyManager.add_alert("%s n'a pas retenu votre offre." % str(tender.get("customer", "")))
+		tender["status"] = "REJECTED" if not player_bid.is_empty() else "NO_AWARD"
+		tender["result_score"] = player_score if not player_bid.is_empty() else 0.0
+		tender["winning_company"] = ""
+		tender["winning_product"] = ""
+		tender["winning_score"] = 0.0
+		if not player_bid.is_empty():
+			var gaps: Array = player_fit.get("gaps", [])
+			tender["result_text"] = "Aucune offre crédible n'a été retenue • votre score %.1f/100%s" % [
+				player_score,
+				(" • écarts : " + ", ".join(gaps)) if not gaps.is_empty() else ""
+			]
+			CompanyManager.add_alert("%s n'a pas retenu votre offre." % str(tender.get("customer", "")))
+		else:
+			tender["result_text"] = "Consultation clôturée sans offre répondant suffisamment au cahier des charges."
 	market_changed.emit()
+
 
 func _update_tenders():
 	for tender in tenders:
@@ -1505,8 +1581,7 @@ func _update_tenders():
 		if status == "OPEN":
 			tender["deadline_months"] = maxi(int(tender.get("deadline_months", 1)) - 1, 0)
 			if int(tender.get("deadline_months", 0)) <= 0:
-				tender["status"] = "EXPIRED"
-				tender["result_text"] = "Consultation clôturée sans offre."
+				_resolve_tender(tender)
 		elif status == "SUBMITTED" and market_age_months >= int(tender.get("resolution_market_month", market_age_months + 1)):
 			_resolve_tender(tender)
 	var active_open := 0
