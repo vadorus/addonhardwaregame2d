@@ -497,28 +497,67 @@ func _ready() -> void:
 		_fail("Buying technology should accelerate development relative to fully internal R&D")
 		return
 
+	var license_suppliers := SupplierManager.supplier_keys_for_mode("LICENSE")
+	if license_suppliers.size() < 2:
+		_fail("Licensed sourcing does not expose multiple real technology suppliers")
+		return
+	var license_supplier_a := str(license_suppliers[0])
+	var license_supplier_b := str(license_suppliers[1])
+	var quote_a := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	var quote_b := SupplierManager.quote("LICENSE", license_supplier_b, "BALANCED")
+	if quote_a.is_empty() or quote_b.is_empty() or str(quote_a.get("supplier_name", "")) == str(quote_b.get("supplier_name", "")):
+		_fail("Technology suppliers do not produce distinct supplier quotes")
+		return
+	if float(quote_a.get("supplier_reliability", 0.0)) == float(quote_b.get("supplier_reliability", 0.0)) and int(quote_a.get("setup_cost", 0)) == int(quote_b.get("setup_cost", 0)):
+		_fail("Supplier choice has no meaningful economic or reliability difference")
+		return
+	var balanced_quote := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	var price_quote := SupplierManager.quote("LICENSE", license_supplier_a, "PRICE")
+	if int(price_quote.get("setup_cost", 0)) >= int(balanced_quote.get("setup_cost", 0)):
+		_fail("Price-priority negotiation did not reduce the supplier setup cost")
+		return
+	if float(price_quote.get("speed_factor", 1.0)) >= float(balanced_quote.get("speed_factor", 1.0)):
+		_fail("Price-priority negotiation did not trade speed for better pricing")
+		return
+
 	var sourcing_research_state := ResearchManager.get_state().duplicate(true)
 	var sourcing_economy_state := Economy.get_state().duplicate(true)
+	var sourcing_supplier_state := SupplierManager.get_state().duplicate(true)
 	var sourcing_cash_before := Economy.money
 	var licensed_probe_started := ResearchManager.start_project(
-		"Licence probe", "CPU", MarketManager.default_segment(), "LICENSE", "BALANCED", 20_000, CPU_DESIGN.default_design()
+		"Licence probe", "CPU", MarketManager.default_segment(), "LICENSE", "BALANCED", 20_000,
+		CPU_DESIGN.default_design(), {}, {}, "GENERAL", license_supplier_a, "PRICE"
 	)
 	if not licensed_probe_started:
-		_fail("Could not start a licensed CPU sourcing probe")
+		_fail("Could not start a licensed CPU project with a selected technology supplier")
 		return
-	var expected_license_setup := int(license_sourcing.get("setup_cost", 0))
+	var expected_license_setup := int(price_quote.get("setup_cost", 0))
 	if Economy.money != sourcing_cash_before - expected_license_setup:
-		_fail("Licensed sourcing setup cost was not charged at project start")
+		_fail("Selected supplier setup cost was not charged at project start")
 		return
 	var licensed_probe: Dictionary = ResearchManager.projects[-1]
 	if str(licensed_probe.get("sourcing", {}).get("mode", "")) != "LICENSE" or float(licensed_probe.get("sourcing", {}).get("royalty_rate", 0.0)) <= 0.0:
 		_fail("R&D project did not preserve its licensed sourcing terms")
 		return
-	if ProductManager._base_unit_cost({"sector":"CPU","approach":"PURCHASE","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}) <= ProductManager._base_unit_cost({"sector":"CPU","approach":"INTERNAL","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}):
-		_fail("Purchased technology did not create the expected per-unit sourcing cost premium")
+	if str(licensed_probe.get("supplier_id", "")) != license_supplier_a or str(licensed_probe.get("negotiation", "")) != "PRICE":
+		_fail("R&D project did not preserve the chosen supplier and negotiated terms")
+		return
+	var committed_supplier := SupplierManager.get_supplier(license_supplier_a)
+	if not committed_supplier.get("active_project_ids", []).has(str(licensed_probe.get("id", ""))):
+		_fail("Selected technology supplier did not reserve capacity for the R&D project")
+		return
+	var trust_before_completion := float(committed_supplier.get("trust", 0.0))
+	SupplierManager.complete_project(licensed_probe)
+	if float(SupplierManager.get_supplier(license_supplier_a).get("trust", 0.0)) <= trust_before_completion:
+		_fail("Successful supplier relationship did not build trust")
+		return
+	var purchased_quote := SupplierManager.quote("PURCHASE", SupplierManager.recommended_supplier("PURCHASE"), "BALANCED")
+	if ProductManager._base_unit_cost({"sector":"CPU","approach":"PURCHASE","sourcing":purchased_quote,"cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}) <= ProductManager._base_unit_cost({"sector":"CPU","approach":"INTERNAL","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}):
+		_fail("Purchased supplier technology did not create the expected per-unit sourcing cost premium")
 		return
 	ResearchManager.load_state(sourcing_research_state)
 	Economy.load_state(sourcing_economy_state)
+	SupplierManager.load_state(sourcing_supplier_state)
 
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("CPU research must start with three clear domains")
