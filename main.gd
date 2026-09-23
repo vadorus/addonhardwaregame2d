@@ -241,6 +241,9 @@ var tutorial_bubble_pointer: Label
 var tutorial_bubble_action: Button
 var _tutorial_target: Control
 var _tutorial_step_id := ""
+var _tutorial_dismissed_step_id := ""
+var _tutorial_bubble_dragging := false
+var _tutorial_bubble_user_position := Vector2(-1.0, -1.0)
 var _tutorial_pulse_tween: Tween
 var _tutorial_bubble_tween: Tween
 var _bar_tweens: Dictionary = {}
@@ -476,7 +479,7 @@ func _build_tutorial_overlay() -> void:
 	var dims: Array[ColorRect] = []
 	for _index in range(4):
 		var dim := ColorRect.new()
-		dim.color = Color(0.0, 0.0, 0.0, 0.64)
+		dim.color = Color(0.0, 0.0, 0.0, 0.34)
 		dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tutorial_overlay.add_child(dim)
 		dims.append(dim)
@@ -493,26 +496,32 @@ func _build_tutorial_overlay() -> void:
 	tutorial_highlight.add_theme_stylebox_override("panel", glow)
 	tutorial_overlay.add_child(tutorial_highlight)
 
-	tutorial_bubble = _card(Color(0.035, 0.055, 0.075, 0.995), 15, 16)
-	tutorial_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_bubble = _card(Color(0.035, 0.055, 0.075, 1.0), 15, 16)
+	tutorial_bubble.mouse_filter = Control.MOUSE_FILTER_STOP
+	tutorial_bubble.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	tutorial_bubble.gui_input.connect(_on_tutorial_bubble_gui_input)
 	tutorial_overlay.add_child(tutorial_bubble)
 	var bubble_box := VBoxContainer.new()
+	bubble_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bubble_box.add_theme_constant_override("separation", 7)
 	tutorial_bubble.add_child(bubble_box)
 	tutorial_bubble_title = _label("Nora • Tutoriel", 17)
+	tutorial_bubble_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tutorial_bubble_title.add_theme_color_override("font_color", APP_AMBER)
 	bubble_box.add_child(tutorial_bubble_title)
 	tutorial_bubble_text = _muted_label("", 13)
+	tutorial_bubble_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tutorial_bubble_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bubble_box.add_child(tutorial_bubble_text)
 	tutorial_bubble_pointer = _label("Observez la zone éclairée", 12)
+	tutorial_bubble_pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tutorial_bubble_pointer.add_theme_color_override("font_color", APP_CYAN)
 	bubble_box.add_child(tutorial_bubble_pointer)
 	tutorial_bubble_action = Button.new()
 	tutorial_bubble_action.text = "Commencer le premier contrat"
 	tutorial_bubble_action.custom_minimum_size.y = 48
 	tutorial_bubble_action.visible = false
-	tutorial_bubble_action.pressed.connect(_startup_contract_action)
+	tutorial_bubble_action.pressed.connect(_on_tutorial_bubble_action)
 	bubble_box.add_child(tutorial_bubble_action)
 
 func _tutorial_state() -> Dictionary:
@@ -614,11 +623,32 @@ func _tutorial_state() -> Dictionary:
 		}
 	return {}
 
+func _on_tutorial_bubble_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_tutorial_bubble_dragging = event.pressed
+		if event.pressed and _tutorial_bubble_tween != null and _tutorial_bubble_tween.is_valid():
+			_tutorial_bubble_tween.kill()
+		tutorial_bubble.accept_event()
+	elif event is InputEventMouseMotion and _tutorial_bubble_dragging:
+		var motion := event as InputEventMouseMotion
+		var next_position: Vector2 = tutorial_bubble.position + motion.relative
+		var limit: Vector2 = (size - tutorial_bubble.size).max(Vector2.ZERO)
+		tutorial_bubble.position = next_position.clamp(Vector2.ZERO, limit)
+		_tutorial_bubble_user_position = tutorial_bubble.position
+		tutorial_bubble.accept_event()
+
+func _on_tutorial_bubble_action() -> void:
+	if _tutorial_step_id == "FIRST_CONTRACT":
+		_startup_contract_action()
+	else:
+		_tutorial_dismissed_step_id = _tutorial_step_id
+		_refresh_tutorial_overlay()
+
 func _refresh_tutorial_overlay() -> void:
 	if tutorial_overlay == null:
 		return
 	var state := _tutorial_state()
-	if state.is_empty():
+	if state.is_empty() or str(state.get("id", "")) == _tutorial_dismissed_step_id:
 		tutorial_overlay.visible = false
 		_tutorial_target = null
 		_tutorial_step_id = ""
@@ -637,11 +667,18 @@ func _refresh_tutorial_overlay() -> void:
 	_tutorial_step_id = str(state.get("id", ""))
 	tutorial_bubble_title.text = str(state.get("title", "Nora • Tutoriel"))
 	tutorial_bubble_text.text = str(state.get("text", ""))
-	tutorial_bubble_action.visible = _tutorial_step_id == "FIRST_CONTRACT"
-	tutorial_bubble_action.disabled = target is Button and target.disabled
-	tutorial_bubble_pointer.text = "Appuyez sur le bouton éclairé ou ci-dessous ↓" if tutorial_bubble_action.visible else "Observez la zone éclairée"
-	if startup_nora_card != null:
+	tutorial_bubble_action.visible = true
+	tutorial_bubble_action.text = "Commencer le premier contrat" if _tutorial_step_id == "FIRST_CONTRACT" else "Compris • continuer"
+	tutorial_bubble_action.disabled = _tutorial_step_id == "FIRST_CONTRACT" and target is Button and target.disabled
+	tutorial_bubble_pointer.text = "Glissez Nora si besoin • appuyez sur le bouton ↓" if _tutorial_step_id == "FIRST_CONTRACT" else "Glissez Nora pour la déplacer • puis Compris ↓"
+	if startup_nora_card != null and startup_nora_card.visible:
 		startup_nora_card.visible = false
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+		if _tutorial_state().get("id", "") != _tutorial_step_id:
+			_refresh_tutorial_overlay()
+			return
 
 	var own_rect := get_global_rect()
 	var target_rect := target.get_global_rect()
@@ -665,15 +702,20 @@ func _refresh_tutorial_overlay() -> void:
 	tutorial_dim_right.size = Vector2(maxf(screen_size.x - focus.end.x, 0.0), focus.size.y)
 
 	var bubble_width := minf(420.0, maxf(screen_size.x - 24.0, 260.0))
-	var bubble_height := 230.0 if tutorial_bubble_action.visible else 170.0
+	var bubble_height := 230.0
 	tutorial_bubble.size = Vector2(bubble_width, bubble_height)
-	var bubble_x := clampf(focus.get_center().x - bubble_width * 0.5, 12.0, maxf(screen_size.x - bubble_width - 12.0, 12.0))
+	var bubble_x := maxf(screen_size.x - bubble_width - 12.0, 12.0)
 	var bubble_y := focus.end.y + 16.0
 	if bubble_y + bubble_height > screen_size.y - 12.0:
 		bubble_y = focus.position.y - bubble_height - 16.0
 	if bubble_y < 12.0:
 		bubble_y = 12.0
-	tutorial_bubble.position = Vector2(bubble_x, bubble_y)
+	if _tutorial_step_id != previous_step:
+		_tutorial_bubble_user_position = Vector2(-1.0, -1.0)
+		_tutorial_bubble_dragging = false
+	var default_position := Vector2(bubble_x, bubble_y)
+	var limit := (screen_size - tutorial_bubble.size).max(Vector2.ZERO)
+	tutorial_bubble.position = (_tutorial_bubble_user_position if _tutorial_bubble_user_position.x >= 0.0 else default_position).clamp(Vector2.ZERO, limit)
 	if _tutorial_step_id != previous_step:
 		_animate_tutorial_step()
 
