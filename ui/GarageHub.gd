@@ -2,12 +2,15 @@ extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
 
+const GARAGE_ART_PATH := "res://assets/ui/garage_shell.webp"
+const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
+
 const ZONES := [
-	{"name":"Établi CPU","subtitle":"Concevoir et améliorer","tab":3,"feature":"LAB","rect":Rect2(0.12,0.37,0.28,0.38)},
-	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.36,0.34,0.25,0.36)},
-	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"feature":"COMPANY","rect":Rect2(0.57,0.11,0.23,0.34)},
-	{"name":"Poste du fondateur","subtitle":"Vue dirigeant","tab":0,"feature":"QG","rect":Rect2(0.62,0.39,0.25,0.34)},
-	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.81,0.20,0.12,0.40)}
+	{"name":"Établi CPU","subtitle":"Concevoir et améliorer","tab":3,"feature":"LAB","rect":Rect2(0.17,0.56,0.25,0.14)},
+	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.43,0.49,0.24,0.14)},
+	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"feature":"COMPANY","rect":Rect2(0.69,0.31,0.21,0.14)},
+	{"name":"Poste du fondateur","subtitle":"Vue dirigeant","tab":0,"feature":"QG","rect":Rect2(0.61,0.67,0.25,0.14)},
+	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.48,0.18,0.20,0.15)}
 ]
 
 var _background: TextureRect
@@ -18,7 +21,7 @@ var _workplace_tier := 0
 var _workplace_condition := 62.0
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(0, 330)
+	custom_minimum_size = Vector2(0, 410)
 	clip_contents = true
 	_build_background()
 	_build_overlay()
@@ -26,17 +29,29 @@ func _ready() -> void:
 	call_deferred("_layout_zones")
 
 func _build_background() -> void:
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.075, 0.074, 0.075, 1.0)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
+
 	_background = TextureRect.new()
 	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_background.texture = load("res://assets/ui/garage_hq.svg")
+	var preferred_texture: Texture2D = null
+	if ResourceLoader.exists(GARAGE_ART_PATH):
+		preferred_texture = load(GARAGE_ART_PATH) as Texture2D
+	elif ResourceLoader.exists(GARAGE_FALLBACK_PATH):
+		preferred_texture = load(GARAGE_FALLBACK_PATH) as Texture2D
+	_background.texture = preferred_texture
 	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
 
 	var shade := ColorRect.new()
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.02, 0.04, 0.07, 0.08)
+	shade.color = Color(0.02, 0.04, 0.07, 0.04)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 
@@ -113,11 +128,22 @@ func _apply_zone_style(button: Button) -> void:
 func _layout_zones() -> void:
 	if size.x <= 0.0 or size.y <= 0.0:
 		return
+	var art_rect := _displayed_art_rect()
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
-		button.position = Vector2(r.position.x * size.x, r.position.y * size.y)
-		button.size = Vector2(maxf(r.size.x * size.x, 110.0), maxf(r.size.y * size.y, 58.0))
-		button.size.y = minf(button.size.y, 72.0)
+		button.position = art_rect.position + Vector2(r.position.x * art_rect.size.x, r.position.y * art_rect.size.y)
+		button.size = Vector2(maxf(r.size.x * art_rect.size.x, 104.0), maxf(r.size.y * art_rect.size.y, 50.0))
+		button.size.y = minf(button.size.y, 64.0)
+
+func _displayed_art_rect() -> Rect2:
+	if _background == null or _background.texture == null:
+		return Rect2(Vector2.ZERO, size)
+	var texture_size := _background.texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return Rect2(Vector2.ZERO, size)
+	var scale_factor := minf(size.x / texture_size.x, size.y / texture_size.y)
+	var displayed_size := texture_size * scale_factor
+	return Rect2((size - displayed_size) * 0.5, displayed_size)
 
 func _on_zone_pressed(button: Button) -> void:
 	zone_requested.emit(int(button.get_meta("tab", 0)), str(button.get_meta("zone_name", "")))
@@ -146,3 +172,7 @@ func visible_zone_count() -> int:
 		if button.visible:
 			count += 1
 	return count
+
+
+func background_resource_path() -> String:
+	return GARAGE_ART_PATH if ResourceLoader.exists(GARAGE_ART_PATH) else GARAGE_FALLBACK_PATH
