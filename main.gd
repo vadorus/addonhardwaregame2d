@@ -2202,6 +2202,7 @@ func _refresh_dashboard():
 		return
 	if dashboard_garage != null:
 		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
+		dashboard_garage.call("set_progression", ExecutiveManager.get_interface_unlocks())
 	if not CompanyManager.created:
 		if dashboard_priority_category != null:
 			dashboard_priority_category.text = "CRÉATION"
