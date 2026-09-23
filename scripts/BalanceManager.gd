@@ -122,8 +122,8 @@ func market_demand_factor() -> float:
 func competitor_pressure_factor() -> float:
 	return float(profile_data().get("competitor_pressure", 1.0))
 
-func company_ai_profile() -> Dictionary:
-	var profile := profile_data()
+func company_ai_profile(profile_key: String = "") -> Dictionary:
+	var profile := profile_data(profile_key)
 	return {
 		"decision_quality":float(profile.get("ai_decision_quality", 0.74)),
 		"decision_noise":float(profile.get("ai_decision_noise", 9.0)),
