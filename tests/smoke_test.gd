@@ -472,6 +472,54 @@ func _ready() -> void:
 		_fail("CPU development accepted a process that miniaturization cannot yet support")
 		return
 
+	var sourcing_keys := GameData.get_approach_keys()
+	for sourcing_key in ["INTERNAL","PURCHASE","LICENSE","SUBCONTRACT","PARTNER"]:
+		if not sourcing_keys.has(sourcing_key):
+			_fail("Strategic sourcing is missing active choice: %s" % sourcing_key)
+			return
+	if sourcing_keys.has("HYBRID") or sourcing_keys.has("EXTERNAL"):
+		_fail("Legacy sourcing choices leaked back into the new-game UI")
+		return
+	var internal_sourcing := GameData.sourcing_profile("INTERNAL")
+	var purchase_sourcing := GameData.sourcing_profile("PURCHASE")
+	var license_sourcing := GameData.sourcing_profile("LICENSE")
+	var partner_sourcing := GameData.sourcing_profile("PARTNER")
+	if float(internal_sourcing.get("ip_ownership", 0.0)) <= float(purchase_sourcing.get("ip_ownership", 0.0)):
+		_fail("Internal sourcing does not preserve more IP ownership than buying external technology")
+		return
+	if float(purchase_sourcing.get("dependency", 0.0)) <= float(partner_sourcing.get("dependency", 0.0)):
+		_fail("Buying external technology should create more supplier dependency than co-development")
+		return
+	if float(license_sourcing.get("royalty_rate", 0.0)) <= 0.0:
+		_fail("Licensed technology does not carry a real royalty")
+		return
+	if float(GameData.approach_data("PURCHASE").get("speed", 0.0)) <= float(GameData.approach_data("INTERNAL").get("speed", 0.0)):
+		_fail("Buying technology should accelerate development relative to fully internal R&D")
+		return
+
+	var sourcing_research_state := ResearchManager.get_state().duplicate(true)
+	var sourcing_economy_state := Economy.get_state().duplicate(true)
+	var sourcing_cash_before := Economy.money
+	var licensed_probe_started := ResearchManager.start_project(
+		"Licence probe", "CPU", MarketManager.default_segment(), "LICENSE", "BALANCED", 20_000, CPU_DESIGN.default_design()
+	)
+	if not licensed_probe_started:
+		_fail("Could not start a licensed CPU sourcing probe")
+		return
+	var expected_license_setup := int(license_sourcing.get("setup_cost", 0))
+	if Economy.money != sourcing_cash_before - expected_license_setup:
+		_fail("Licensed sourcing setup cost was not charged at project start")
+		return
+	var licensed_probe: Dictionary = ResearchManager.projects[-1]
+	if str(licensed_probe.get("sourcing", {}).get("mode", "")) != "LICENSE" or float(licensed_probe.get("sourcing", {}).get("royalty_rate", 0.0)) <= 0.0:
+		_fail("R&D project did not preserve its licensed sourcing terms")
+		return
+	if ProductManager._base_unit_cost({"sector":"CPU","approach":"PURCHASE","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}) <= ProductManager._base_unit_cost({"sector":"CPU","approach":"INTERNAL","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}):
+		_fail("Purchased technology did not create the expected per-unit sourcing cost premium")
+		return
+	ResearchManager.load_state(sourcing_research_state)
+	Economy.load_state(sourcing_economy_state)
+
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("CPU research must start with three clear domains")
 		return
