@@ -56,8 +56,7 @@ var finance_monthly_input: SpinBox
 var finance_advice_label: Label
 var hr_case_select: OptionButton
 var hr_case_label: Label
-var staff_label: Label
-var candidate_label: Label
+var personnel_screen: Control
 var tech_label: Label
 var projects_label: Label
 var patents_label: Label
@@ -75,13 +74,12 @@ var market_label: Label
 var contract_label: Label
 var after_sales_label: Label
 var after_sales_case_select: OptionButton
-var media_label: Label
+var media_screen: Control
 
 var setup_name: LineEdit
 var setup_sector: OptionButton
 var setup_difficulty: OptionButton
 var setup_difficulty_label: Label
-var recruit_department: OptionButton
 var rd_name: LineEdit
 var rd_sector: OptionButton
 var rd_segment: OptionButton
@@ -221,7 +219,10 @@ func _connect_signals():
 	CompanyManager.reputation_changed.connect(_refresh_all)
 	DivisionManager.divisions_changed.connect(_refresh_all)
 	PersonnelManager.staff_changed.connect(_refresh_all)
-	PersonnelManager.candidate_changed.connect(func(_c): _refresh_personnel())
+	PersonnelManager.candidate_changed.connect(func(_c):
+		if personnel_screen != null:
+			personnel_screen.call("refresh")
+	)
 	ExecutiveManager.executive_changed.connect(_refresh_all)
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
@@ -236,7 +237,10 @@ func _connect_signals():
 	AfterSalesManager.cases_changed.connect(_refresh_market)
 	AfterSalesManager.field_experience_changed.connect(_refresh_all)
 	MarketManager.market_changed.connect(_refresh_all)
-	MediaManager.news_changed.connect(_refresh_media)
+	MediaManager.news_changed.connect(func():
+		if media_screen != null:
+			media_screen.call("refresh")
+	)
 	PatentManager.patents_changed.connect(_refresh_all)
 	SaveManager.save_completed.connect(_on_save_message)
 	SimulationManager.game_over.connect(_on_game_over)
@@ -753,14 +757,12 @@ func _create_company_tab():
 	var sub_btn:=Button.new(); sub_btn.text="Créer une filiale"; sub_btn.pressed.connect(_create_subsidiary); box.add_child(sub_btn)
 
 func _create_personnel_tab():
-	var scroll := _tab_scroll("Personnel")
-	var box: VBoxContainer = scroll.get_child(0)
-	staff_label = _rich_label(); box.add_child(staff_label)
-	box.add_child(_section("Recrutement"))
-	recruit_department = OptionButton.new(); _fill_text(recruit_department,["R&D","Développement","Production","Marketing","Support","Finance"]); box.add_child(recruit_department)
-	var gen := Button.new(); gen.text="Chercher un candidat"; gen.pressed.connect(_generate_candidate); box.add_child(gen)
-	candidate_label = _rich_label(); box.add_child(candidate_label)
-	var hire := Button.new(); hire.text="Recruter ce candidat"; hire.pressed.connect(_hire_candidate); box.add_child(hire)
+	var personnel_script: Script = load("res://ui/screens/PersonnelScreen.gd")
+	personnel_screen = personnel_script.new() as Control
+	personnel_screen.connect("status_changed", func(message: String):
+		status_label.text = message
+	)
+	tabs.add_child(personnel_screen)
 
 func _create_research_tab():
 	var scroll := _tab_scroll("Laboratoire CPU")
@@ -1875,9 +1877,9 @@ func _create_market_tab():
 	sav_actions.add_child(recall)
 
 func _create_media_tab():
-	var scroll := _tab_scroll("Presse & médias")
-	var box: VBoxContainer = scroll.get_child(0)
-	media_label=_rich_label(); box.add_child(media_label)
+	var media_script: Script = load("res://ui/screens/MediaScreen.gd")
+	media_screen = media_script.new() as Control
+	tabs.add_child(media_screen)
 
 func _build_setup_layer():
 	setup_layer = ColorRect.new()
@@ -2594,7 +2596,11 @@ func _refresh_top():
 
 func _refresh_all():
 	_refresh_navigation_progression()
-	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_personnel(); _refresh_research(); _refresh_products(); _refresh_market(); _refresh_media()
+	_refresh_top(); _refresh_dashboard(); _refresh_company(); _refresh_research(); _refresh_products(); _refresh_market()
+	if personnel_screen != null:
+		personnel_screen.call("refresh")
+	if media_screen != null:
+		media_screen.call("refresh")
 
 func _refresh_navigation_progression():
 	if tabs == null:
@@ -3075,58 +3081,6 @@ func _create_subsidiary():
 	else: status_label.text="Capital insuffisant ou montant trop faible."
 	_refresh_all()
 
-func _refresh_personnel():
-	if staff_label==null: return
-	var lines:=["Effectif : %d" % PersonnelManager.staff.size()]
-	for emp in PersonnelManager.staff:
-		var leader_mark:=""
-		for dept in CompanyManager.departments:
-			if str(CompanyManager.departments[dept].leader_id)==str(emp.id): leader_mark=" ★ responsable %s" % dept
-		for sector_value in DivisionManager.get_active_division_keys():
-			var sector := str(sector_value)
-			if str(DivisionManager.get_division(sector).get("leader_id", "")) == str(emp.id):
-				leader_mark += " ★ directeur %s" % str(DivisionManager.get_division(sector).get("label", sector))
-		lines.append("• %s — %s | %s | compétence %d | expérience %.1f ans | leadership %d | spé. %s | %s €/mois%s" % [str(emp.name),str(emp.role),str(emp.department),int(emp.skill),float(emp.experience_years),int(emp.leadership),str(emp.specialization),_money(int(emp.salary)),leader_mark])
-	staff_label.text="\n".join(lines)
-	if PersonnelManager.candidate.is_empty(): candidate_label.text="Aucun candidat sélectionné."
-	else:
-		var c:=PersonnelManager.candidate
-		var profile: Dictionary = c.get("profile", {})
-		candidate_label.text="%s — %s\nCompétence %d | aptitude %d | expérience %.1f ans | leadership %d\nSpécialisation : %s | rigueur %.0f | résolution %.0f | équipe %.0f | stress %.0f | process %.0f\nSalaire : %s €/mois | prime d'embauche : %s €" % [
-			str(c.name),str(c.department),int(c.skill),int(c.aptitude),float(c.experience_years),int(c.leadership),str(c.specialization),
-			float(profile.get("rigor", 50.0)), float(profile.get("problem_solving", 50.0)), float(profile.get("teamwork", 50.0)),
-			float(profile.get("stress_tolerance", 50.0)), float(profile.get("process_quality", 50.0)),
-			_money(int(c.salary)),_money(int(c.salary)*2)
-		]
-
-func _generate_candidate(): PersonnelManager.generate_candidate(_meta(recruit_department)); _refresh_personnel()
-func _hire_candidate():
-	if PersonnelManager.hire_candidate(): status_label.text="Candidat recruté."; PersonnelManager.generate_candidate(_meta(recruit_department))
-	else: status_label.text="Recrutement impossible."; _refresh_all()
-
-func _apply_research_plan():
-	var allocations := {}
-	for research_key in ResearchManager.get_cpu_research_domain_keys():
-		var key := str(research_key)
-		allocations[key] = int((research_alloc_controls[key] as SpinBox).value)
-	if not ResearchManager.set_cpu_research_allocations(allocations):
-		status_label.text = "Répartition impossible : vous avez affecté plus de chercheurs que l'effectif R&D disponible."
-		_refresh_research()
-		return
-	ResearchManager.set_continuous_research_budget(int(research_budget.value))
-	status_label.text = "Recherche mise à jour : %d chercheur(s) réparti(s) sur les pistes CPU. L’équipe Développement reste indépendante." % ResearchManager.get_total_cpu_research_allocation()
-	_refresh_all()
-
-func _start_cpu_concept_program():
-	if concept_axis == null or concept_axis.item_count == 0:
-		return
-	var axis := str(concept_axis.get_item_metadata(concept_axis.selected))
-	var ambition := int(concept_ambition.get_item_metadata(concept_ambition.selected)) if concept_ambition != null else 2
-	if ResearchManager.start_cpu_concept_program(axis, int(concept_budget.value), ambition):
-		status_label.text = "Programme Concept lancé : %s." % ResearchManager.get_cpu_concept_axis_label(axis)
-	else:
-		status_label.text = "Impossible de lancer ce programme Concept : vérifiez trésorerie, équipe R&D ou programmes déjà actifs."
-	_refresh_all()
 
 func _refresh_research():
 	if tech_label == null:
@@ -4091,12 +4045,6 @@ func _recall_sav_case():
 	var case_id := _selected_sav_case_id()
 	status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."
 	_refresh_all()
-
-func _refresh_media():
-	if media_label==null: return
-	var lines:=[]
-	for n in MediaManager.news.slice(0,20): lines.append("[%02d/%d] %s — %s\n%s" % [int(n.month),int(n.year),str(n.category),str(n.headline),str(n.body)])
-	media_label.text="\n\n".join(lines) if not lines.is_empty() else "Aucune actualité."
 
 func _select_meta(option: OptionButton, wanted: String):
 	for i in range(option.item_count):
