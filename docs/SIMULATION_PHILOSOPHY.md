@@ -1,0 +1,153 @@
+# Philosophie de simulation — liberté du dirigeant
+
+> Ce document fixe les règles canoniques de Tech Empire. Elles doivent guider tout nouveau système avant d'ajouter des menus, des verrous ou des branches.
+
+## 1. Fantasme principal : être le chef de son entreprise
+
+Le joueur n'incarne pas uniquement un ingénieur. Il dirige une entreprise technologique complète.
+
+Il fixe la stratégie, choisit les marchés, décide des investissements, arbitre les budgets, valide les produits, nomme les responsables, accepte ou refuse les contrats et choisit comment l'entreprise réagit aux problèmes.
+
+La microgestion technique reste disponible lorsqu'elle est intéressante, mais elle peut être déléguée. Les équipes travaillent ; le joueur décide jusqu'où il veut intervenir.
+
+## 2. Liberté maximale, conséquences crédibles
+
+Tech Empire évite les interdictions artificielles.
+
+Un joueur peut tenter un CPU destiné à un marché même si son entreprise ne maîtrise pas encore toutes les technologies idéales. Le moteur évalue alors réellement le résultat : performances, consommation, coût, fiabilité, délai, adéquation au marché et compétitivité.
+
+Une technologie manquante n'est donc pas forcément un cadenas. Elle peut devenir :
+- un handicap de performance ;
+- un coût supérieur ;
+- une consommation excessive ;
+- un risque de panne ;
+- une estimation moins fiable ;
+- un délai supplémentaire ;
+- une faiblesse face aux concurrents.
+
+Les impossibilités dures sont réservées aux cas réellement incompatibles avec le produit ou le monde simulé.
+
+## 3. Cibler un domaine change les critères de réussite
+
+Un même composant n'est pas jugé de la même manière partout.
+
+Exemples :
+- **console** : coût, efficacité, intégration et stabilité ;
+- **mobile** : consommation, chauffe, compacité et autonomie ;
+- **gaming PC** : performances, fréquence, cache et potentiel de gamme ;
+- **serveur** : multicœur, mémoire, stabilité, efficacité et coût total ;
+- **spatial** : fiabilité, consommation, stabilité thermique et tolérance aux erreurs.
+
+Le joueur peut viser un domaine prématurément. Le produit reste lançable, mais le marché sanctionne une mauvaise adéquation.
+
+## 4. La concurrence sert de référence, pas de script
+
+Le joueur doit pouvoir comparer ses produits à ceux des concurrents sur des critères cohérents :
+- performances ;
+- performance par watt ;
+- performance par euro ;
+- prix ;
+- fiabilité ;
+- consommation ;
+- fonctionnalités ;
+- compatibilité ;
+- durée de support ;
+- réputation de marque.
+
+Être technologiquement en avance autorise un positionnement premium, mais ne garantit pas le succès. Le public juge si l'écart de valeur justifie le prix.
+
+Une entreprise peut construire des identités différentes : premium, rapport qualité/prix, fiabilité, innovation, spécialisation professionnelle, etc.
+
+## 5. La fiabilité compte autant que la performance
+
+Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.
+
+Le joueur choisit sa réponse :
+- surveillance ;
+- enquête technique ;
+- correctif firmware/microcode ;
+- révision matérielle ;
+- remplacement ;
+- remboursement ;
+- extension de garantie ;
+- rappel ;
+- arrêt d'un lot ;
+- communication et compensation.
+
+Le coût immédiat, la confiance, la réputation et les ventes futures évoluent selon la gravité du problème et la qualité de la réponse.
+
+La compétence des équipes techniques et du SAV influence la vitesse de diagnostic et l'efficacité des solutions.
+
+## 6. Produits ciblés et écosystèmes
+
+Le joueur peut concevoir un produit générique, une variante optimisée pour une gamme ou une solution dédiée à un produit précis.
+
+Exemple : développer un watercooling compatible avec beaucoup de plateformes, optimisé pour une génération de CPU concurrente ou conçu spécifiquement pour un modèle très chaud.
+
+Plus la cible est précise, plus l'optimisation potentielle est forte, mais plus le marché adressable est réduit et dépend du succès du produit partenaire.
+
+Ce principe doit s'appliquer à de nombreux domaines : refroidissement, cartes mères, alimentation, mémoire, serveurs, embarqué, automobile, console, mobile, spatial, etc.
+
+## 7. Appels d'offres et partenariats B2B
+
+Des entreprises peuvent rechercher un partenaire pour un produit futur ou un besoin spécifique.
+
+Un contrat peut contenir :
+- cahier des charges ;
+- performances minimales ;
+- prix ou budget cible ;
+- délai ;
+- volume ;
+- confidentialité ;
+- pénalités ;
+- exclusivité éventuelle ;
+- potentiel de partenariat à long terme.
+
+Le joueur peut devenir fournisseur spécialisé d'une autre entreprise sans devoir produire lui-même le produit final.
+
+## 8. Acheter, licencier, sous-traiter, co-développer ou internaliser
+
+Créer un produit complet ne signifie pas obligatoirement maîtriser chaque composant en interne.
+
+Une entreprise peut :
+- acheter un composant ;
+- licencier une technologie ;
+- sous-traiter ;
+- co-développer ;
+- acquérir une entreprise ;
+- développer ensuite sa propre solution.
+
+L'intégration verticale est une stratégie, pas une obligation.
+
+## 9. Diversification organique
+
+Le joueur ne suit pas une séquence imposée CPU → GPU → RAM → téléphone.
+
+Les nouvelles opportunités émergent de ce que l'entreprise a construit : équipes, technologies, brevets, architectures, logiciels, partenaires, réputation et capital.
+
+Une expertise GPU peut mener vers l'IA, le datacenter, le calcul scientifique ou les SoC. Une expertise CPU peut mener vers le serveur, la console, le mobile, l'embarqué ou le spatial.
+
+Les synergies réduisent le coût et le risque d'une diversification proche. Un pari éloigné reste possible, mais demande davantage d'investissement, de recrutement et de temps.
+
+## 10. Complexité de simulation ≠ complexité d'interface
+
+La simulation peut être profonde sans afficher vingt paramètres à chaque clic.
+
+L'interface suit trois niveaux :
+1. **essentiel** : ce que le CEO doit comprendre pour décider ;
+2. **gestion** : les réglages utiles au joueur impliqué ;
+3. **expert** : la microgestion technique détaillée.
+
+Les responsables proposent, résument et alertent. Le joueur peut déléguer les décisions courantes et reprendre la main à tout moment.
+
+## 11. Le jeu doit rester un jeu
+
+Le réalisme sert les décisions, pas la frustration.
+
+Avant une décision risquée, le joueur reçoit autant que possible des estimations de coût, délai, marge, risque et adéquation au marché. Ces estimations peuvent être imparfaites si l'équipe manque d'expérience.
+
+Une erreur doit généralement produire une nouvelle décision intéressante plutôt qu'une punition sèche : pivoter, corriger, baisser le prix, améliorer le SAV, réviser le produit, changer de cible ou négocier un partenariat.
+
+La règle de conception est :
+
+**réaliste dans ses conséquences, compréhensible dans son interface, amusant dans ses décisions.**
