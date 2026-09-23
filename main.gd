@@ -149,6 +149,7 @@ var subsidiary_sector: OptionButton
 var subsidiary_capital: SpinBox
 
 var nav_buttons: Array[Button] = []
+var dashboard_garage: Control
 var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
 var dashboard_stats_grid: GridContainer
@@ -342,6 +343,29 @@ func _create_dashboard_tab():
 	var title := _label("Votre entreprise, en un coup d'œil", 27)
 	heading_copy.add_child(title)
 	heading_copy.add_child(_muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+
+	var garage_card := _card(APP_PANEL, 14, 10)
+	garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(garage_card)
+	var garage_box := VBoxContainer.new()
+	garage_box.add_theme_constant_override("separation", 7)
+	garage_card.add_child(garage_box)
+	var garage_header := HBoxContainer.new()
+	garage_header.add_theme_constant_override("separation", 8)
+	garage_box.add_child(garage_header)
+	var garage_copy := VBoxContainer.new()
+	garage_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	garage_header.add_child(garage_copy)
+	garage_copy.add_child(_eyebrow("VOTRE QG"))
+	garage_copy.add_child(_label("Dirigez depuis votre garage", 20))
+	var garage_hint := _muted_label("Les zones du décor deviennent des raccourcis vers les décisions du patron. Les fonctions apparaissent avec la croissance de l'entreprise.", 11)
+	garage_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	garage_copy.add_child(garage_hint)
+	var garage_script: Script = load("res://ui/GarageHub.gd")
+	dashboard_garage = garage_script.new() as Control
+	dashboard_garage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_garage.zone_requested.connect(_on_garage_zone_requested)
+	garage_box.add_child(dashboard_garage)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -1912,6 +1936,12 @@ func _add_stat_card(parent: GridContainer, title: String) -> Label:
 	box.add_child(value_label)
 	return value_label
 
+func _on_garage_zone_requested(tab_index: int, zone_name: String):
+	var before := tabs.current_tab if tabs != null else -1
+	_show_tab(tab_index)
+	if tabs != null and tabs.current_tab == tab_index and before != tab_index:
+		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % zone_name
+
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)
 
@@ -1926,6 +1956,8 @@ func _update_responsive_layout():
 		dashboard_lower_grid.columns = 1 if compact else 2
 	if dashboard_project_grid != null:
 		dashboard_project_grid.columns = 1 if narrow else 2
+	if dashboard_garage != null:
+		dashboard_garage.custom_minimum_size.y = 250.0 if compact else 330.0
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
@@ -2098,6 +2130,8 @@ func _refresh_navigation_progression():
 func _refresh_dashboard():
 	if dashboard_label == null:
 		return
+	if dashboard_garage != null:
+		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
 	if not CompanyManager.created:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
