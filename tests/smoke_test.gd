@@ -4,6 +4,16 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
+	var garage_hub_script: Script = load("res://ui/GarageHub.gd")
+	if garage_hub_script == null:
+		_fail("Interactive garage HQ script could not be loaded")
+		return
+	var garage_hub := garage_hub_script.new()
+	add_child(garage_hub)
+	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
+		_fail("Interactive garage HQ did not expose the expected five management zones")
+		return
+	garage_hub.queue_free()
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":
 		_fail("Inactive starting sector was not normalized to CPU")
