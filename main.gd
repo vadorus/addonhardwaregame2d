@@ -84,6 +84,7 @@ var recruit_department: OptionButton
 var rd_name: LineEdit
 var rd_sector: OptionButton
 var rd_segment: OptionButton
+var rd_application: OptionButton
 var rd_approach: OptionButton
 var rd_focus: OptionButton
 var rd_budget: SpinBox
@@ -757,7 +758,19 @@ func _create_research_tab():
 	_fill_segment_options(rd_segment)
 	_select_meta(rd_segment, MarketManager.default_segment())
 	rd_segment.item_selected.connect(func(_index): _refresh_cpu_preview())
-	_add_labeled_control(configuration_box, "Client cible", rd_segment)
+	_add_labeled_control(configuration_box, "Marché commercial actuel", rd_segment)
+
+	rd_application = OptionButton.new()
+	for application_key_value in CPU_DESIGN.application_keys():
+		var application_key := str(application_key_value)
+		rd_application.add_item(CPU_DESIGN.application_label(application_key))
+		rd_application.set_item_metadata(rd_application.item_count - 1, application_key)
+	_select_meta(rd_application, "GENERAL")
+	rd_application.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Usage visé par l'architecture", rd_application)
+	var application_hint := _muted_label("L'usage technique est indépendant du marché actuel : vous pouvez préparer une architecture console, mobile ou spatiale avant que ce débouché soit mature.", 11)
+	application_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(application_hint)
 
 	rd_approach = OptionButton.new()
 	_fill_approach_options(rd_approach)
@@ -1245,6 +1258,8 @@ func _refresh_cpu_preview():
 		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
 	var segment := _meta(rd_segment) if rd_segment != null else MarketManager.default_segment()
 	var fit := CPU_DESIGN.segment_fit(evaluation, segment)
+	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
+	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach_key, GameData.APPROACHES.INTERNAL)
 	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
@@ -1279,9 +1294,15 @@ func _refresh_cpu_preview():
 	var remediation_tag := ""
 	if not active_cpu_remediation.is_empty():
 		remediation_tag = " • solution équipe +%d mois" % extra_months
-	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s" % [
+	var application_gaps: Array = application_assessment.get("gaps", [])
+	var application_gap_text := ""
+	if not application_gaps.is_empty():
+		application_gap_text = " • à améliorer : %s" % ", ".join(application_gaps)
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s\nUsage %s : %.0f/100 — %s%s" % [
 		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
-		_money(estimated_program_cost), risk_label, risk, remediation_tag
+		_money(estimated_program_cost), risk_label, risk, remediation_tag,
+		str(application_assessment.get("label", "Polyvalent")), float(application_assessment.get("fit", 0.0)),
+		str(application_assessment.get("summary", "")), application_gap_text
 	]
 	lab_unit_cost_value.text = "%s €" % _money(int(evaluation.unit_cost))
 	lab_dev_time_value.text = "~%d mois" % months
@@ -2852,11 +2873,12 @@ func _start_project():
 		evaluation = ResearchManager.cpu_remediation_preview(design, active_cpu_remediation)
 	var generation_plan := active_cpu_generation_plan.duplicate(true)
 	var remediation := active_cpu_remediation.duplicate(true)
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation):
+	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
-		status_label.text = "%s entre en développement — profil %s%s%s." % [name, str(evaluation.profile), plan_text, remediation_text]
+		status_label.text = "%s entre en développement — %s • usage %s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
 	else:
@@ -3011,13 +3033,14 @@ func _refresh_product_details():
 	if str(product.get("sector", "")) == "CPU":
 		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 		var target_label := MarketManager.segment_label(MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment()))))
+		var application_label := CPU_DESIGN.application_label(str(product.get("application_profile", "GENERAL")))
 		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
-		product_details_label.text = "G%d • %s — %s\n%s • cible %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nGravure/équipement %.0f/100 • marge conception %.0f/100\nDie sélectionné : qualité électrique %.0f/100 • constance %.0f/100 • dispersion ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
+		product_details_label.text = "G%d • %s — %s\n%s • cible %s • usage %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nGravure/équipement %.0f/100 • marge conception %.0f/100\nDie sélectionné : qualité électrique %.0f/100 • constance %.0f/100 • dispersion ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\n%s" % [
 			int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
-			str(product.get("range_role", "")), target_label,
+			str(product.get("range_role", "")), target_label, application_label,
 			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 			float(product.get("yield_rate", 0.0)) * 100.0, float(product.get("manufacturing_quality", 60.0)),
 			float(product.get("defect_rate", 0.025)) * 100.0, float(product.get("process_mastery", 35.0)),
