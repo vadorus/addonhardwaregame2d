@@ -2,7 +2,12 @@ extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
 
-const GARAGE_ART_PATH := "res://assets/ui/garage_stage0.webp"
+const WORKPLACE_ART := {
+	0:"res://assets/ui/garage_stage0.webp",
+	1:"res://assets/ui/garage_stage1.webp",
+	2:"res://assets/ui/garage_stage2.webp",
+	3:"res://assets/ui/garage_stage3.webp"
+}
 const GARAGE_EMPTY_ART_PATH := "res://assets/ui/garage_shell.webp"
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
 
@@ -38,14 +43,7 @@ func _build_background() -> void:
 
 	_background = TextureRect.new()
 	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var preferred_texture: Texture2D = null
-	if ResourceLoader.exists(GARAGE_ART_PATH):
-		preferred_texture = load(GARAGE_ART_PATH) as Texture2D
-	elif ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
-		preferred_texture = load(GARAGE_EMPTY_ART_PATH) as Texture2D
-	elif ResourceLoader.exists(GARAGE_FALLBACK_PATH):
-		preferred_texture = load(GARAGE_FALLBACK_PATH) as Texture2D
-	_background.texture = preferred_texture
+	_background.texture = _load_workplace_texture(_workplace_tier)
 	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -57,6 +55,32 @@ func _build_background() -> void:
 	shade.color = Color(0.02, 0.04, 0.07, 0.04)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
+
+func _art_path_for_tier(tier: int) -> String:
+	var normalized_tier := clampi(tier, 0, 3)
+	var path := str(WORKPLACE_ART.get(normalized_tier, WORKPLACE_ART[0]))
+	if ResourceLoader.exists(path):
+		return path
+	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
+		return GARAGE_EMPTY_ART_PATH
+	return GARAGE_FALLBACK_PATH
+
+func _load_workplace_texture(tier: int) -> Texture2D:
+	var path := _art_path_for_tier(tier)
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
+func _apply_workplace_art() -> void:
+	if _background == null:
+		return
+	var wanted_path := _art_path_for_tier(_workplace_tier)
+	var current_path := ""
+	if _background.texture != null:
+		current_path = str(_background.texture.resource_path)
+	if current_path != wanted_path:
+		_background.texture = _load_workplace_texture(_workplace_tier)
+		call_deferred("_layout_zones")
 
 func _build_overlay() -> void:
 	var title_panel := PanelContainer.new()
@@ -157,8 +181,9 @@ func set_progression(unlocks: Dictionary) -> void:
 		button.visible = bool(unlocks.get(feature, feature in ["QG", "LAB"]))
 
 func set_workplace(data: Dictionary) -> void:
-	_workplace_tier = int(data.get("tier", 0))
+	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)
 	_workplace_condition = float(data.get("condition", 62.0))
+	_apply_workplace_art()
 	var name := str(data.get("name", "Garage aménagé"))
 	if _title_label != null:
 		_title_label.text = name
@@ -178,8 +203,7 @@ func visible_zone_count() -> int:
 
 
 func background_resource_path() -> String:
-	if ResourceLoader.exists(GARAGE_ART_PATH):
-		return GARAGE_ART_PATH
-	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
-		return GARAGE_EMPTY_ART_PATH
-	return GARAGE_FALLBACK_PATH
+	return _art_path_for_tier(_workplace_tier)
+
+func workplace_visual_tier() -> int:
+	return _workplace_tier
