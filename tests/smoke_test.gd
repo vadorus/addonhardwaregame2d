@@ -542,14 +542,71 @@ func _ready() -> void:
 	if str(licensed_probe.get("supplier_id", "")) != license_supplier_a or str(licensed_probe.get("negotiation", "")) != "PRICE":
 		_fail("R&D project did not preserve the chosen supplier and negotiated terms")
 		return
+	var supplier_contract_id := str(licensed_probe.get("supplier_contract_id", ""))
+	if supplier_contract_id.is_empty():
+		_fail("External R&D project did not create a signed supplier contract")
+		return
+	var signed_contract := SupplierManager.get_contract(supplier_contract_id)
+	if str(signed_contract.get("status", "")) != "RND" or str(signed_contract.get("contract_term", "")) != "STANDARD":
+		_fail("Signed supplier contract did not preserve its R&D status or duration")
+		return
+	if str(signed_contract.get("ip_term", "")) != "SHARED" or str(signed_contract.get("exclusivity", "")) != "NONE":
+		_fail("Signed supplier contract did not preserve default IP/exclusivity terms")
+		return
+	var company_ip_quote := SupplierManager.contract_quote("LICENSE", license_supplier_a, "BALANCED", "STANDARD", "NONE", "COMPANY", "NONE")
+	var shared_ip_quote := SupplierManager.contract_quote("LICENSE", license_supplier_a, "BALANCED", "STANDARD", "NONE", "SHARED", "NONE")
+	if float(company_ip_quote.get("ip_ownership", 0.0)) <= float(shared_ip_quote.get("ip_ownership", 0.0)) or int(company_ip_quote.get("setup_cost", 0)) <= int(shared_ip_quote.get("setup_cost", 0)):
+		_fail("Demanding more supplier-contract IP did not increase both ownership and negotiation cost")
+		return
+	var volume_quote := SupplierManager.contract_quote("LICENSE", license_supplier_a, "BALANCED", "STANDARD", "NONE", "SHARED", "MEDIUM")
+	if int(volume_quote.get("guaranteed_units", 0)) <= 0 or float(volume_quote.get("unit_cost_factor", 1.0)) >= float(shared_ip_quote.get("unit_cost_factor", 1.0)):
+		_fail("Guaranteed supplier volume did not create a real unit-cost concession")
+		return
 	var committed_supplier := SupplierManager.get_supplier(license_supplier_a)
 	if not committed_supplier.get("active_project_ids", []).has(str(licensed_probe.get("id", ""))):
 		_fail("Selected technology supplier did not reserve capacity for the R&D project")
 		return
 	var trust_before_completion := float(committed_supplier.get("trust", 0.0))
 	SupplierManager.complete_project(licensed_probe)
+	signed_contract = SupplierManager.get_contract(supplier_contract_id)
+	if str(signed_contract.get("status", "")) != "COMMERCIAL" or int(signed_contract.get("remaining_months", 0)) != int(signed_contract.get("duration_months", -1)):
+		_fail("Supplier contract did not begin its commercial term after R&D completion")
+		return
 	if float(SupplierManager.get_supplier(license_supplier_a).get("trust", 0.0)) <= trust_before_completion:
 		_fail("Successful supplier relationship did not build trust")
+		return
+	var renegotiated := SupplierManager.renegotiate_contract(supplier_contract_id, "BALANCED", "LONG", "TECHNOLOGY", "COMPANY", "MEDIUM")
+	if renegotiated.is_empty() or not bool(renegotiated.get("accepted", false)):
+		_fail("Established supplier relationship could not renegotiate a reasonable long-term contract")
+		return
+	if str(renegotiated.get("exclusivity", "")) != "TECHNOLOGY" or int(renegotiated.get("guaranteed_units", 0)) != 2000:
+		_fail("Supplier contract renegotiation did not persist exclusivity and volume terms")
+		return
+	var blocked_other_supplier := SupplierManager.contract_quote("LICENSE", license_supplier_b, "BALANCED", "STANDARD", "NONE", "SHARED", "NONE")
+	if bool(blocked_other_supplier.get("accepted", true)):
+		_fail("Technology exclusivity did not block signing the same licensed technology with another supplier")
+		return
+	SupplierManager.record_product_sales(supplier_contract_id, 500)
+	if int(SupplierManager.get_contract(supplier_contract_id).get("units_delivered", 0)) != 500:
+		_fail("Supplier contract did not record commercial units against its volume commitment")
+		return
+	var contract_roundtrip := SupplierManager.get_state().duplicate(true)
+	SupplierManager.load_state(contract_roundtrip)
+	if str(SupplierManager.get_contract(supplier_contract_id).get("id", "")) != supplier_contract_id:
+		_fail("Supplier contracts did not survive a save-state round-trip")
+		return
+	var break_contract_before := SupplierManager.get_contract(supplier_contract_id)
+	var break_penalty := int(break_contract_before.get("termination_penalty", 0))
+	var cash_before_break := Economy.money
+	var trust_before_break := float(SupplierManager.get_supplier(license_supplier_a).get("trust", 0.0))
+	if not SupplierManager.break_contract(supplier_contract_id):
+		_fail("Commercial supplier contract could not be broken when the company could afford its penalty")
+		return
+	if str(SupplierManager.get_contract(supplier_contract_id).get("status", "")) != "TERMINATED" or Economy.money > cash_before_break - break_penalty:
+		_fail("Supplier contract break did not apply its termination state and financial penalty")
+		return
+	if float(SupplierManager.get_supplier(license_supplier_a).get("trust", 0.0)) >= trust_before_break:
+		_fail("Breaking a supplier contract did not damage trust")
 		return
 	var purchased_quote := SupplierManager.quote("PURCHASE", SupplierManager.recommended_supplier("PURCHASE"), "BALANCED")
 	if ProductManager._base_unit_cost({"sector":"CPU","approach":"PURCHASE","sourcing":purchased_quote,"cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}) <= ProductManager._base_unit_cost({"sector":"CPU","approach":"INTERNAL","cpu_design":CPU_DESIGN.default_design(),"final_metrics":{"reliability":60.0}}):
@@ -558,6 +615,22 @@ func _ready() -> void:
 	ResearchManager.load_state(sourcing_research_state)
 	Economy.load_state(sourcing_economy_state)
 	SupplierManager.load_state(sourcing_supplier_state)
+
+	var expiry_contract := SupplierManager.sign_contract("EXPIRY-PROBE", "LICENSE", license_supplier_a, "BALANCED", "SHORT", "NONE", "SHARED", "MEDIUM")
+	if expiry_contract.is_empty():
+		_fail("Could not create a supplier contract for expiry/volume testing")
+		return
+	var expiry_project := {"id":"EXPIRY-PROBE","name":"Expiry probe","supplier_id":license_supplier_a,"supplier_contract_id":str(expiry_contract.get("id", ""))}
+	SupplierManager.complete_project(expiry_project)
+	var expiry_id := str(expiry_contract.get("id", ""))
+	SupplierManager.contracts[expiry_id]["remaining_months"] = 1
+	var cash_before_expiry := Economy.money
+	SupplierManager.process_month()
+	if str(SupplierManager.get_contract(expiry_id).get("status", "")) != "EXPIRED" or Economy.money >= cash_before_expiry:
+		_fail("Supplier contract expiry did not penalize an unmet guaranteed volume")
+		return
+	SupplierManager.load_state(sourcing_supplier_state)
+	Economy.load_state(sourcing_economy_state)
 
 	if ResearchManager.get_cpu_research_domain_keys().size() != 3:
 		_fail("CPU research must start with three clear domains")
