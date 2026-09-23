@@ -87,6 +87,9 @@ var rd_sector: OptionButton
 var rd_segment: OptionButton
 var rd_application: OptionButton
 var rd_approach: OptionButton
+var rd_supplier: OptionButton
+var rd_negotiation: OptionButton
+var rd_supplier_label: Label
 var rd_focus: OptionButton
 var rd_budget: SpinBox
 var research_overview_label: Label
@@ -217,6 +220,7 @@ func _connect_signals():
 	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
+	SupplierManager.suppliers_changed.connect(_refresh_research)
 	ProductionManager.jobs_changed.connect(_refresh_all)
 	FoundryManager.foundries_changed.connect(_refresh_all)
 	ProductManager.products_changed.connect(_refresh_all)
@@ -800,8 +804,26 @@ func _create_research_tab():
 
 	rd_approach = OptionButton.new()
 	_fill_approach_options(rd_approach)
-	rd_approach.item_selected.connect(func(_index): _refresh_cpu_preview())
+	rd_approach.item_selected.connect(func(_index): _on_sourcing_approach_changed())
 	_add_labeled_control(configuration_box, "Méthode de développement", rd_approach)
+
+	rd_supplier = OptionButton.new()
+	rd_supplier.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Fournisseur / partenaire technologique", rd_supplier)
+
+	rd_negotiation = OptionButton.new()
+	for negotiation_value in SupplierManager.negotiation_keys():
+		var negotiation_key := str(negotiation_value)
+		rd_negotiation.add_item(SupplierManager.negotiation_label(negotiation_key))
+		rd_negotiation.set_item_metadata(rd_negotiation.item_count - 1, negotiation_key)
+	_select_meta(rd_negotiation, "BALANCED")
+	rd_negotiation.item_selected.connect(func(_index): _refresh_cpu_preview())
+	_add_labeled_control(configuration_box, "Priorité de négociation", rd_negotiation)
+
+	rd_supplier_label = _muted_label("", 11)
+	rd_supplier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	configuration_box.add_child(rd_supplier_label)
+	_refresh_supplier_options()
 
 	rd_focus = OptionButton.new()
 	_fill_focus_options(rd_focus)
@@ -2237,6 +2259,44 @@ func _fill_approach_options(option: OptionButton):
 
 func _fill_focus_options(option: OptionButton):
 	option.clear(); for key in GameData.get_focus_keys(): option.add_item(str(GameData.FOCUS_OPTIONS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
+
+func _on_sourcing_approach_changed():
+	_refresh_supplier_options()
+	_refresh_cpu_preview()
+
+func _refresh_supplier_options():
+	if rd_supplier == null or rd_approach == null:
+		return
+	var approach := _meta(rd_approach)
+	var previous := _meta(rd_supplier) if rd_supplier.item_count > 0 else ""
+	rd_supplier.clear()
+	if approach == "INTERNAL":
+		rd_supplier.add_item("Équipe interne — aucun fournisseur")
+		rd_supplier.set_item_metadata(0, "")
+		rd_supplier.disabled = true
+		if rd_negotiation != null:
+			rd_negotiation.disabled = true
+	else:
+		rd_supplier.disabled = false
+		if rd_negotiation != null:
+			rd_negotiation.disabled = false
+		for supplier_id_value in SupplierManager.supplier_keys_for_mode(approach):
+			var supplier_id := str(supplier_id_value)
+			var supplier := SupplierManager.get_supplier(supplier_id)
+			rd_supplier.add_item("%s — %s" % [str(supplier.get("name", supplier_id)), str(supplier.get("specialty", "Technologie"))])
+			rd_supplier.set_item_metadata(rd_supplier.item_count - 1, supplier_id)
+		if previous != "":
+			_select_meta(rd_supplier, previous)
+		if rd_supplier.selected < 0 and rd_supplier.item_count > 0:
+			_select_meta(rd_supplier, SupplierManager.recommended_supplier(approach))
+	if rd_supplier.item_count > 0 and rd_supplier.selected < 0:
+		rd_supplier.select(0)
+
+func _selected_supplier_quote() -> Dictionary:
+	var approach := _meta(rd_approach) if rd_approach != null else "INTERNAL"
+	var supplier_id := _meta(rd_supplier) if rd_supplier != null and rd_supplier.item_count > 0 else ""
+	var negotiation := _meta(rd_negotiation) if rd_negotiation != null and rd_negotiation.item_count > 0 else "BALANCED"
+	return SupplierManager.quote(approach, supplier_id, negotiation)
 
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
