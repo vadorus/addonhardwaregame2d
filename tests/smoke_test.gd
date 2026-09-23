@@ -179,8 +179,26 @@ func _ready() -> void:
 	if accessible_runway <= standard_runway or realistic_runway >= standard_runway:
 		_fail("Difficulty profiles do not create distinct starting runway pressure")
 		return
-	if BalanceManager.competitor_pressure_factor() <= 1.0:
-		_fail("Realistic difficulty did not increase competitor pressure")
+	var realistic_ai := BalanceManager.company_ai_profile()
+	BalanceManager.reset("STANDARD")
+	var standard_ai := BalanceManager.company_ai_profile()
+	BalanceManager.reset("ACCESSIBLE")
+	var accessible_ai := BalanceManager.company_ai_profile()
+	if not (
+		float(accessible_ai.get("decision_quality", 1.0)) < float(standard_ai.get("decision_quality", 0.0))
+		and float(standard_ai.get("decision_quality", 1.0)) < float(realistic_ai.get("decision_quality", 0.0))
+	):
+		_fail("Difficulty does not scale competitor decision quality progressively")
+		return
+	if not (
+		int(accessible_ai.get("decision_interval_months", 0)) > int(standard_ai.get("decision_interval_months", 0))
+		and int(standard_ai.get("decision_interval_months", 0)) > int(realistic_ai.get("decision_interval_months", 0))
+	):
+		_fail("Difficulty does not scale competitor reaction cadence progressively")
+		return
+	BalanceManager.reset("REALISTIC")
+	if absf(BalanceManager.competitor_pressure_factor() - 1.0) > 0.001:
+		_fail("Realistic difficulty still gives competitors a hidden market/stat multiplier")
 		return
 	if BalanceManager.expense_amount(10000, "Production — test CPU") != 10000:
 		_fail("Difficulty changed literal per-unit production economics")
@@ -220,12 +238,36 @@ func _ready() -> void:
 		_fail("Moderate technological lead unlocked gaming too early")
 		return
 	ResearchManager.load_state(market_research_probe)
+	var ai_competitors: Array = MarketManager.competitors.get("CPU", [])
+	if ai_competitors.size() != 3:
+		_fail("Autonomous CPU company simulation did not initialize three rivals")
+		return
+	if float(ai_competitors[0].get("ai_price_aggression", 0.0)) == float(ai_competitors[1].get("ai_price_aggression", 0.0)):
+		_fail("CPU competitors did not receive distinct company personalities")
+		return
+	for rival_value in ai_competitors:
+		var rival: Dictionary = rival_value
+		if not rival.has("ai_decision_history") or not rival.has("ai_decision_cooldown"):
+			_fail("CPU rival is missing persistent autonomous decision state")
+			return
+	var autonomous_market_state := MarketManager.get_state().duplicate(true)
+	MarketManager.process_month([])
+	for rival_value in MarketManager.competitors.get("CPU", []):
+		var rival: Dictionary = rival_value
+		if rival.get("ai_decision_history", []).is_empty():
+			_fail("Autonomous CPU rival did not make a monthly management decision")
+			return
+		if int(rival.get("ai_decision_cooldown", 0)) <= 0:
+			_fail("Autonomous CPU rival changed strategy without a decision cooldown")
+			return
+	MarketManager.load_state(autonomous_market_state)
+
 	var public_competitors := MarketManager.cpu_competitor_public_profiles()
 	if public_competitors.size() != 3:
 		_fail("Public CPU competitor profiles did not expose the expected market rivals")
 		return
 	var public_rival: Dictionary = public_competitors[0]
-	for forbidden_public_key in ["cash", "architecture", "manufacturing", "yield_rate", "capacity", "development_progress"]:
+	for forbidden_public_key in ["cash", "architecture", "manufacturing", "yield_rate", "capacity", "development_progress", "ai_last_reason", "ai_current_action", "ai_decision_history"]:
 		if public_rival.has(forbidden_public_key):
 			_fail("Public competitor profile leaked internal simulation data: %s" % forbidden_public_key)
 			return
@@ -1407,6 +1449,7 @@ func _ready() -> void:
 	var market_round_trip := MarketManager.get_state().duplicate(true)
 	var saved_market_age := MarketManager.market_age_months
 	var saved_competitor_generation := int(competitor_after.get("generation_index", 1))
+	var saved_ai_history_size: int = int(competitor_after.get("ai_decision_history", []).size())
 	var saved_known_markets := MarketManager.known_segments.size()
 	MarketManager.reset()
 	MarketManager.load_state(market_round_trip)
@@ -1415,6 +1458,9 @@ func _ready() -> void:
 		return
 	if int(MarketManager.competitors.get("CPU", [])[0].get("generation_index", 0)) != saved_competitor_generation:
 		_fail("Competitor generation state did not survive a save round-trip")
+		return
+	if MarketManager.competitors.get("CPU", [])[0].get("ai_decision_history", []).size() != saved_ai_history_size:
+		_fail("Competitor autonomous decision memory did not survive a save round-trip")
 		return
 	if MarketManager.known_segments.size() != saved_known_markets:
 		_fail("Evolving market unlock state did not survive a save round-trip")

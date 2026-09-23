@@ -60,6 +60,22 @@ Une entreprise peut construire des identités différentes : premium, rapport qu
 
 Le moteur de simulation peut conserver des données internes détaillées sur les concurrents, mais l'interface ne doit pas les révéler automatiquement au joueur. Par défaut, le dirigeant accède surtout aux éléments observables : produits, prix, caractéristiques annoncées, benchmarks, tests publics, disponibilité et signaux de marché. Les trésoreries, budgets R&D, rendements usine, capacités réelles ou projets secrets ne deviennent visibles que si une future mécanique crédible les révèle ou permet de les estimer.
 
+
+### Entreprises autonomes, pas scripts anti-joueur
+
+Les concurrents CPU ont une personnalité persistante : agressivité prix, appétit R&D, prudence financière, adaptabilité et volonté de croissance. À chaque cycle de décision, ils évaluent leur propre situation — trésorerie, utilisation de capacité, marge, âge du produit, progression de la génération suivante et attractivité des marchés disponibles — puis arbitrent entre plusieurs actions : attendre, ajuster le prix, accélérer ou ralentir la R&D, augmenter la capacité ou repositionner le produit.
+
+Ils ne choisissent jamais une action parce que « le joueur doit perdre ». Ils ne lisent pas les variables privées du joueur. Une action doit être finançable et possède un **cooldown** : un concurrent ne peut donc pas casser son prix, changer de marché et réinvestir industriellement tous les mois sans cohérence.
+
+La difficulté agit principalement sur le **niveau du dirigeant IA** :
+- **Accessible** : décisions moins fréquentes, davantage d'imperfection et seuil plus élevé avant de changer de stratégie ;
+- **Standard** : comportement de référence, cohérent mais imparfait ;
+- **Réaliste** : analyse plus fréquente, moins de bruit dans les choix et réaction commerciale plus affirmée.
+
+La difficulté ne donne pas aux concurrents de bonus caché de parts de marché, de progression R&D ou de technologie. Une accélération R&D coûte réellement plus cher à l'entreprise simulée ; une expansion de capacité consomme sa trésorerie ; une baisse de prix réduit sa marge. **Ne rien faire** reste une décision valide lorsqu'aucune action n'est suffisamment pertinente.
+
+Seules les actions publiquement observables remontent au joueur (prix, capacité annoncée, repositionnement commercial). Les arbitrages internes de R&D et les raisons précises restent privés tant qu'aucune mécanique de renseignement ne les révèle.
+
 ## 5. La fiabilité compte autant que la performance
 
 Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.
