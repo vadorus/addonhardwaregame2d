@@ -541,6 +541,109 @@ func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Di
 		"recommendation":recommendation
 	}
 
+func get_ceo_decisions() -> Array:
+	var decisions: Array = []
+
+	for escalation_value in DivisionManager.get_pending_escalations():
+		var escalation: Dictionary = escalation_value
+		decisions.append({
+			"id":"DIVISION:%s" % str(escalation.get("id", "")),
+			"category":"ARBITRAGE",
+			"severity":float(escalation.get("severity", 60.0)),
+			"title":str(escalation.get("title", "Arbitrage de division")),
+			"text":str(escalation.get("text", "")),
+			"recommendation":str(escalation.get("recommendation", "Le CEO doit arbitrer.")),
+			"target_tab":1,
+			"can_defer":false
+		})
+
+	var workplace_recommendation: Dictionary = workplace_upgrade_recommendation()
+	if bool(workplace_recommendation.get("due", false)):
+		var workplace_upgrade: Dictionary = workplace_recommendation.get("upgrade", {})
+		var workplace_finance: Dictionary = workplace_recommendation.get("financial_advice", {})
+		decisions.append({
+			"id":"WORKPLACE:%d" % int(workplace_upgrade.get("tier", int(workplace.get("tier", 0)) + 1)),
+			"category":"LOCAUX",
+			"severity":float(workplace_recommendation.get("severity", 50.0)),
+			"title":"Décider des locaux",
+			"text":str(workplace_recommendation.get("reason", "Les locaux méritent un point.")),
+			"recommendation":"Passer à « %s » pour %d €. %s" % [
+				str(workplace_upgrade.get("name", "de nouveaux locaux")),
+				int(workplace_upgrade.get("upgrade_cost", 0)),
+				str(workplace_finance.get("recommendation", ""))
+			],
+			"target_tab":1,
+			"can_defer":true
+		})
+
+	for issue_value in get_open_hr_issues():
+		var issue: Dictionary = issue_value
+		decisions.append({
+			"id":"HR:%s" % str(issue.get("id", "")),
+			"category":"RH",
+			"severity":float(issue.get("severity", 50.0)),
+			"title":str(issue.get("title", "Décision RH")),
+			"text":str(issue.get("text", "")),
+			"recommendation":"Choisissez une réponse dans le comité de direction.",
+			"target_tab":1,
+			"can_defer":false
+		})
+
+	for case_value in AfterSalesManager.get_open_cases():
+		var case_data: Dictionary = case_value
+		decisions.append({
+			"id":"SAV:%s" % str(case_data.get("id", "")),
+			"category":"SAV",
+			"severity":float(case_data.get("severity", 55.0)),
+			"title":"Crise SAV — %s" % str(case_data.get("product_name", "Produit")),
+			"text":"%s • gravité %.0f/100" % [
+				AfterSalesManager.issue_label(str(case_data.get("issue_type", ""))),
+				float(case_data.get("severity", 0.0))
+			],
+			"recommendation":"Diagnostiquez, surveillez ou engagez une action corrective selon les éléments disponibles.",
+			"target_tab":5,
+			"can_defer":false
+		})
+
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "READY":
+			continue
+		decisions.append({
+			"id":"LAUNCH:%s" % str(product.get("id", "")),
+			"category":"LANCEMENT",
+			"severity":64.0,
+			"title":"Lancer %s ?" % str(product.get("name", "le CPU")),
+			"text":"Le développement est terminé. Prix, capacité et calendrier restent à décider.",
+			"recommendation":"Ouvrez Production & Produits et validez vous-même les conditions de lancement.",
+			"target_tab":4,
+			"can_defer":false
+		})
+
+	for tender_value in MarketManager.open_tenders():
+		var tender: Dictionary = tender_value
+		if str(tender.get("status", "")) != "OPEN":
+			continue
+		var deadline := int(tender.get("deadline_months", 0))
+		var tender_severity := 46.0
+		if deadline <= 1:
+			tender_severity = 62.0
+		elif deadline <= 2:
+			tender_severity = 54.0
+		decisions.append({
+			"id":"TENDER:%s" % str(tender.get("id", "")),
+			"category":"CONTRAT",
+			"severity":tender_severity,
+			"title":"Répondre à %s ?" % str(tender.get("customer", "un client B2B")),
+			"text":"%s • clôture dans %d mois" % [str(tender.get("title", "Appel d'offres")), deadline],
+			"recommendation":"Vous pouvez déposer une offre, l'ignorer ou laisser l'opportunité expirer.",
+			"target_tab":5,
+			"can_defer":false
+		})
+
+	decisions.sort_custom(func(a, b): return float(a.get("severity", 0.0)) > float(b.get("severity", 0.0)))
+	return decisions
+
 func get_executive_brief() -> Dictionary:
 	var priorities: Array = []
 	var finance := financial_advice()
@@ -640,11 +743,13 @@ func get_executive_brief() -> Dictionary:
 		var first: Dictionary = priorities[0]
 		headline = str(first.get("text", headline))
 		text = str(first.get("action", text))
+	var ceo_decisions := get_ceo_decisions()
 	return {
 		"advisor":right_hand.duplicate(true),
 		"headline":headline,
 		"text":text,
 		"priorities":priorities,
+		"decision_count":ceo_decisions.size(),
 		"hr_role":"DRH disponible" if PersonnelManager.staff.size() >= 8 else "Suivi RH assuré avec le bras droit",
 		"finance_role":"DAF interne recommandé" if PersonnelManager.staff.size() >= 12 else "Conseil financier assuré avec le bras droit"
 	}

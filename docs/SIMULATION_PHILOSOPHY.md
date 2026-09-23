@@ -164,6 +164,9 @@ Une erreur doit généralement produire une nouvelle décision intéressante plu
 
 La même règle vaut pour la croissance interne. Atteindre les moyens financiers ou humains pour de meilleurs locaux ne déclenche jamais un déménagement automatique. Nora peut recommander un agrandissement lorsque l'équipe approche de la capacité, mais le CEO peut accepter, rester dans les locaux actuels ou reporter le rappel. Les conséquences réelles d'un espace trop petit continuent d'exister ; le jeu ne retire simplement pas la décision au joueur et n'insiste pas chaque mois après un report explicite.
 
+
+Le QG centralise maintenant les décisions structurelles dans une **file Décisions du dirigeant**. Cette file ne remplace pas les écrans spécialisés : elle sert de bureau du patron. Arbitrages de division, locaux, dossiers RH, crises SAV, lancements produits et appels d'offres peuvent y remonter ensemble, triés par urgence. Le joueur choisit laquelle traiter et est envoyé vers l'écran concerné. Une recommandation n'est jamais une exécution automatique.
+
 La règle de conception est :
 
 **réaliste dans ses conséquences, compréhensible dans son interface, amusant dans ses décisions.**

@@ -161,9 +161,13 @@ var subsidiary_capital: SpinBox
 var nav_buttons: Array[Button] = []
 var dashboard_garage: Control
 var dashboard_priority_category: Label
+var dashboard_priority_select: OptionButton
 var dashboard_priority_text: Label
 var dashboard_priority_action: Button
+var dashboard_priority_defer: Button
 var dashboard_priority_target_tab := 0
+var dashboard_priority_decisions: Array = []
+var dashboard_priority_selected_id := ""
 var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
 var dashboard_stats_grid: GridContainer
@@ -395,15 +399,27 @@ func _create_dashboard_tab():
 	dashboard_priority_category = _label("DÉMARRAGE", 11)
 	dashboard_priority_category.add_theme_color_override("font_color", APP_AMBER)
 	priority_head.add_child(dashboard_priority_category)
+	dashboard_priority_select = OptionButton.new()
+	dashboard_priority_select.item_selected.connect(func(_index): _refresh_selected_ceo_decision())
+	priority_box.add_child(dashboard_priority_select)
 	dashboard_priority_text = _rich_label()
-	dashboard_priority_text.custom_minimum_size.y = 68
+	dashboard_priority_text.custom_minimum_size.y = 78
 	dashboard_priority_text.add_theme_font_size_override("font_size", 14)
 	priority_box.add_child(dashboard_priority_text)
+	var priority_actions := HFlowContainer.new()
+	priority_actions.add_theme_constant_override("h_separation", 8)
+	priority_box.add_child(priority_actions)
 	dashboard_priority_action = Button.new()
 	dashboard_priority_action.text = "Traiter cette décision"
 	dashboard_priority_action.custom_minimum_size.y = 42
 	dashboard_priority_action.pressed.connect(_dashboard_priority_pressed)
-	priority_box.add_child(dashboard_priority_action)
+	priority_actions.add_child(dashboard_priority_action)
+	dashboard_priority_defer = Button.new()
+	dashboard_priority_defer.text = "Reporter 3 mois"
+	dashboard_priority_defer.custom_minimum_size.y = 42
+	dashboard_priority_defer.visible = false
+	dashboard_priority_defer.pressed.connect(_dashboard_priority_defer_pressed)
+	priority_actions.add_child(dashboard_priority_defer)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -2050,6 +2066,30 @@ func _on_garage_zone_requested(tab_index: int, zone_name: String):
 func _refresh_dashboard_priority(brief: Dictionary):
 	if dashboard_priority_text == null or dashboard_priority_category == null or dashboard_priority_action == null:
 		return
+	dashboard_priority_decisions = ExecutiveManager.get_ceo_decisions()
+	if not dashboard_priority_decisions.is_empty():
+		if dashboard_priority_select != null:
+			var previous_id := dashboard_priority_selected_id
+			dashboard_priority_select.clear()
+			for decision_value in dashboard_priority_decisions:
+				var decision: Dictionary = decision_value
+				var label := "[%s] %s" % [str(decision.get("category", "DIRECTION")), str(decision.get("title", "Décision"))]
+				dashboard_priority_select.add_item(label)
+				dashboard_priority_select.set_item_metadata(dashboard_priority_select.item_count - 1, str(decision.get("id", "")))
+			if previous_id != "":
+				_select_meta(dashboard_priority_select, previous_id)
+			if dashboard_priority_select.selected < 0 and dashboard_priority_select.item_count > 0:
+				dashboard_priority_select.select(0)
+			dashboard_priority_select.visible = dashboard_priority_decisions.size() > 1
+		_refresh_selected_ceo_decision()
+		return
+
+	dashboard_priority_selected_id = ""
+	if dashboard_priority_select != null:
+		dashboard_priority_select.clear()
+		dashboard_priority_select.visible = false
+	if dashboard_priority_defer != null:
+		dashboard_priority_defer.visible = false
 	var priorities: Array = brief.get("priorities", [])
 	if priorities.is_empty():
 		dashboard_priority_category.text = "AUCUNE URGENCE"
@@ -2062,17 +2102,47 @@ func _refresh_dashboard_priority(brief: Dictionary):
 	dashboard_priority_category.text = category
 	dashboard_priority_text.text = "%s\n%s" % [str(priority.get("text", "")), str(priority.get("action", ""))]
 	dashboard_priority_target_tab = _priority_category_target_tab(category)
+	dashboard_priority_action.text = _priority_action_text(category)
+
+func _refresh_selected_ceo_decision():
+	if dashboard_priority_decisions.is_empty():
+		return
+	var wanted_id := ""
+	if dashboard_priority_select != null and dashboard_priority_select.item_count > 0:
+		wanted_id = _meta(dashboard_priority_select)
+	var decision: Dictionary = {}
+	for decision_value in dashboard_priority_decisions:
+		var candidate: Dictionary = decision_value
+		if wanted_id == "" or str(candidate.get("id", "")) == wanted_id:
+			decision = candidate
+			break
+	if decision.is_empty():
+		decision = dashboard_priority_decisions[0]
+	dashboard_priority_selected_id = str(decision.get("id", ""))
+	var category := str(decision.get("category", "DIRECTION"))
+	dashboard_priority_category.text = "%s • %d À TRAITER" % [category, dashboard_priority_decisions.size()]
+	dashboard_priority_text.text = "%s\n%s\nConseil de Nora : %s" % [
+		str(decision.get("title", "Décision")),
+		str(decision.get("text", "")),
+		str(decision.get("recommendation", "À vous de trancher."))
+	]
+	dashboard_priority_target_tab = int(decision.get("target_tab", _priority_category_target_tab(category)))
+	dashboard_priority_action.text = _priority_action_text(category)
+	if dashboard_priority_defer != null:
+		dashboard_priority_defer.visible = bool(decision.get("can_defer", false))
+
+func _priority_action_text(category: String) -> String:
 	match category:
 		"DÉMARRAGE", "TECHNIQUE", "PROJET":
-			dashboard_priority_action.text = "Ouvrir le laboratoire CPU"
+			return "Ouvrir le laboratoire CPU"
 		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
-			dashboard_priority_action.text = "Ouvrir Production & Produits"
-		"SAV":
-			dashboard_priority_action.text = "Ouvrir Marché & SAV"
+			return "Ouvrir Production & Produits"
+		"SAV", "CONTRAT":
+			return "Ouvrir Marché & SAV"
 		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
-			dashboard_priority_action.text = "Ouvrir le comité de direction"
-		_:
-			dashboard_priority_action.text = "Traiter cette décision"
+			return "Ouvrir le comité de direction"
+	return "Traiter cette décision"
+
 
 func _priority_category_target_tab(category: String) -> int:
 	match category:
@@ -2080,7 +2150,7 @@ func _priority_category_target_tab(category: String) -> int:
 			return 3
 		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
 			return 4
-		"SAV":
+		"SAV", "CONTRAT":
 			return 5
 		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
 			return 1
@@ -2088,6 +2158,13 @@ func _priority_category_target_tab(category: String) -> int:
 
 func _dashboard_priority_pressed():
 	_show_tab(dashboard_priority_target_tab)
+
+func _dashboard_priority_defer_pressed():
+	if dashboard_priority_selected_id.begins_with("WORKPLACE:") and ExecutiveManager.defer_workplace_upgrade(3):
+		status_label.text = "Déménagement reporté. Nora refera un point dans 3 mois."
+		_refresh_all()
+	else:
+		status_label.text = "Cette décision ne peut pas être reportée depuis le QG."
 
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)

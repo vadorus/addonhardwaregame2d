@@ -307,6 +307,15 @@ func _ready() -> void:
 	if not bool(workplace_recommendation.get("recommended", false)) or not bool(workplace_recommendation.get("due", false)):
 		_fail("Nora did not recommend a workplace upgrade when the garage approached capacity")
 		return
+	var workplace_in_ceo_queue := false
+	for decision_value in ExecutiveManager.get_ceo_decisions():
+		var decision: Dictionary = decision_value
+		if str(decision.get("category", "")) == "LOCAUX":
+			workplace_in_ceo_queue = true
+			break
+	if not workplace_in_ceo_queue:
+		_fail("Workplace recommendation did not enter the central CEO decision queue")
+		return
 	if not ExecutiveManager.defer_workplace_upgrade(3):
 		_fail("CEO could not defer a workplace upgrade recommendation")
 		return
@@ -319,6 +328,11 @@ func _ready() -> void:
 		if str(priority_value.get("category", "")) == "LOCAUX":
 			_fail("Nora repeated a workplace upgrade priority immediately after the CEO deferred it")
 			return
+	for decision_value in ExecutiveManager.get_ceo_decisions():
+		var decision: Dictionary = decision_value
+		if str(decision.get("category", "")) == "LOCAUX":
+			_fail("Deferred workplace recommendation stayed in the central CEO decision queue")
+			return
 	var deferred_state := ExecutiveManager.get_state().duplicate(true)
 	ExecutiveManager.reset()
 	ExecutiveManager.load_state(deferred_state)
@@ -328,6 +342,15 @@ func _ready() -> void:
 	ExecutiveManager.months_operated += 3
 	if not bool(ExecutiveManager.workplace_upgrade_recommendation().get("due", false)):
 		_fail("Deferred workplace recommendation did not return after the requested delay")
+		return
+	var returned_to_ceo_queue := false
+	for decision_value in ExecutiveManager.get_ceo_decisions():
+		var decision: Dictionary = decision_value
+		if str(decision.get("category", "")) == "LOCAUX":
+			returned_to_ceo_queue = true
+			break
+	if not returned_to_ceo_queue:
+		_fail("Deferred workplace decision did not return to the CEO queue after the delay")
 		return
 	if not ExecutiveManager.renovate_workplace():
 		_fail("Could not renovate the starting workplace with sufficient cash")
@@ -953,6 +976,17 @@ func _ready() -> void:
 	var test_tender := MarketManager.create_tender_from_template("SPACE_GUIDANCE")
 	if test_tender.is_empty() or str(test_tender.get("application_profile", "")) != "SPACE":
 		_fail("Early specialized B2B tender could not appear independently from the consumer market")
+		return
+	var queue_has_launch := false
+	var queue_has_contract := false
+	for decision_value in ExecutiveManager.get_ceo_decisions():
+		var decision: Dictionary = decision_value
+		if str(decision.get("category", "")) == "LANCEMENT":
+			queue_has_launch = true
+		elif str(decision.get("category", "")) == "CONTRAT":
+			queue_has_contract = true
+	if not queue_has_launch or not queue_has_contract:
+		_fail("Central CEO decision queue did not combine product launch and B2B contract choices")
 		return
 	test_tender["requirements"] = {"performance":20.0,"efficiency":20.0,"reliability":20.0}
 	test_tender["max_unit_price"] = maxi(int(apex_model.get("unit_cost", 1)) * 4, 200)
