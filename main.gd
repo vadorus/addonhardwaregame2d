@@ -150,6 +150,10 @@ var subsidiary_capital: SpinBox
 
 var nav_buttons: Array[Button] = []
 var dashboard_garage: Control
+var dashboard_priority_category: Label
+var dashboard_priority_text: RichTextLabel
+var dashboard_priority_action: Button
+var dashboard_priority_target_tab := 0
 var dashboard_grid: GridContainer
 var dashboard_project_grid: GridContainer
 var dashboard_stats_grid: GridContainer
@@ -366,6 +370,30 @@ func _create_dashboard_tab():
 	dashboard_garage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard_garage.connect("zone_requested", Callable(self, "_on_garage_zone_requested"))
 	garage_box.add_child(dashboard_garage)
+
+	var priority_card := _card(APP_AMBER_DARK, 12, 12)
+	priority_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(priority_card)
+	var priority_box := VBoxContainer.new()
+	priority_box.add_theme_constant_override("separation", 7)
+	priority_card.add_child(priority_box)
+	var priority_head := HBoxContainer.new()
+	priority_box.add_child(priority_head)
+	var priority_eyebrow := _eyebrow("DÉCISION DU DIRIGEANT")
+	priority_eyebrow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	priority_head.add_child(priority_eyebrow)
+	dashboard_priority_category = _label("DÉMARRAGE", 11)
+	dashboard_priority_category.add_theme_color_override("font_color", APP_AMBER)
+	priority_head.add_child(dashboard_priority_category)
+	dashboard_priority_text = _rich_label()
+	dashboard_priority_text.custom_minimum_size.y = 68
+	dashboard_priority_text.add_theme_font_size_override("font_size", 14)
+	priority_box.add_child(dashboard_priority_text)
+	dashboard_priority_action = Button.new()
+	dashboard_priority_action.text = "Traiter cette décision"
+	dashboard_priority_action.custom_minimum_size.y = 42
+	dashboard_priority_action.pressed.connect(_dashboard_priority_pressed)
+	priority_box.add_child(dashboard_priority_action)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -1942,6 +1970,48 @@ func _on_garage_zone_requested(tab_index: int, zone_name: String):
 	if tabs != null and tabs.current_tab == tab_index and before != tab_index:
 		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % zone_name
 
+func _refresh_dashboard_priority(brief: Dictionary):
+	if dashboard_priority_text == null or dashboard_priority_category == null or dashboard_priority_action == null:
+		return
+	var priorities: Array = brief.get("priorities", [])
+	if priorities.is_empty():
+		dashboard_priority_category.text = "AUCUNE URGENCE"
+		dashboard_priority_text.text = "Aucun arbitrage critique. L'équipe peut continuer à exécuter la stratégie actuelle."
+		dashboard_priority_action.text = "Retour au QG"
+		dashboard_priority_target_tab = 0
+		return
+	var priority: Dictionary = priorities[0]
+	var category := str(priority.get("category", "DIRECTION"))
+	dashboard_priority_category.text = category
+	dashboard_priority_text.text = "[b]%s[/b]\n%s" % [str(priority.get("text", "")), str(priority.get("action", ""))]
+	dashboard_priority_target_tab = _priority_category_target_tab(category)
+	match category:
+		"DÉMARRAGE", "TECHNIQUE", "PROJET":
+			dashboard_priority_action.text = "Ouvrir le laboratoire CPU"
+		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
+			dashboard_priority_action.text = "Ouvrir Production & Produits"
+		"SAV":
+			dashboard_priority_action.text = "Ouvrir Marché & SAV"
+		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
+			dashboard_priority_action.text = "Ouvrir le comité de direction"
+		_:
+			dashboard_priority_action.text = "Traiter cette décision"
+
+func _priority_category_target_tab(category: String) -> int:
+	match category:
+		"DÉMARRAGE", "TECHNIQUE", "PROJET":
+			return 3
+		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
+			return 4
+		"SAV":
+			return 5
+		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
+			return 1
+	return 0
+
+func _dashboard_priority_pressed():
+	_show_tab(dashboard_priority_target_tab)
+
 func _dashboard_primary_action():
 	_show_tab(dashboard_target_tab)
 
@@ -2133,6 +2203,11 @@ func _refresh_dashboard():
 	if dashboard_garage != null:
 		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
 	if not CompanyManager.created:
+		if dashboard_priority_category != null:
+			dashboard_priority_category.text = "CRÉATION"
+			dashboard_priority_text.text = "Créez votre entreprise pour commencer à prendre les décisions du dirigeant."
+			dashboard_priority_action.text = "Créer l'entreprise"
+			dashboard_priority_target_tab = 0
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
 		dashboard_project_phase_label.text = "EN ATTENTE"
@@ -2240,6 +2315,7 @@ func _refresh_dashboard():
 			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
 
 	var executive_brief := ExecutiveManager.get_executive_brief()
+	_refresh_dashboard_priority(executive_brief)
 	if dashboard_cto_label != null:
 		var advisor_lines: Array[String] = [
 			"« %s »" % str(executive_brief.get("headline", "")),
