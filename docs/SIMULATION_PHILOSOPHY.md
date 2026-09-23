@@ -162,6 +162,8 @@ Avant un lancement produit, l'équipe Marketing fournit une fourchette de ventes
 
 Une erreur doit généralement produire une nouvelle décision intéressante plutôt qu'une punition sèche : pivoter, corriger, baisser le prix, améliorer le SAV, réviser le produit, changer de cible ou négocier un partenariat.
 
+La même règle vaut pour la croissance interne. Atteindre les moyens financiers ou humains pour de meilleurs locaux ne déclenche jamais un déménagement automatique. Nora peut recommander un agrandissement lorsque l'équipe approche de la capacité, mais le CEO peut accepter, rester dans les locaux actuels ou reporter le rappel. Les conséquences réelles d'un espace trop petit continuent d'exister ; le jeu ne retire simplement pas la décision au joueur et n'insiste pas chaque mois après un report explicite.
+
 La règle de conception est :
 
 **réaliste dans ses conséquences, compréhensible dans son interface, amusant dans ses décisions.**

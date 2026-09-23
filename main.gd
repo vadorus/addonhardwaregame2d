@@ -49,6 +49,7 @@ var division_escalation_select: OptionButton
 var division_escalation_label: Label
 var executive_label: Label
 var workplace_label: Label
+var workplace_defer_button: Button
 var benefit_controls: Dictionary = {}
 var finance_cost_input: SpinBox
 var finance_monthly_input: SpinBox
@@ -661,6 +662,10 @@ func _create_company_tab():
 	maintain.text = "Remettre les locaux en état"
 	maintain.pressed.connect(_maintain_workplace)
 	workplace_actions.add_child(maintain)
+	workplace_defer_button = Button.new()
+	workplace_defer_button.text = "Reporter le déménagement (3 mois)"
+	workplace_defer_button.pressed.connect(_defer_workplace_upgrade)
+	workplace_actions.add_child(workplace_defer_button)
 
 	executive_box.add_child(_eyebrow("AVIS FINANCIER"))
 	var finance_grid := GridContainer.new()
@@ -2465,14 +2470,25 @@ func _refresh_company():
 	if workplace_label != null:
 		var workspace := ExecutiveManager.workplace_data()
 		var upgrade := ExecutiveManager.next_workplace_upgrade()
+		var recommendation := ExecutiveManager.workplace_upgrade_recommendation()
 		var next_text := "niveau maximum actuel"
 		if not upgrade.is_empty():
 			next_text = "prochaine étape : %s (%s €)" % [str(upgrade.get("name", "")), _money(int(upgrade.get("upgrade_cost", 0)))]
-		workplace_label.text = "Locaux : %s • état %.0f/100 • environnement %.0f/100\nCapacité %d personnes • occupation %d • %s\nAvantages salariés : %s €/mois • coût locaux : %s €/mois • moral moyen %.0f/100" % [
+		var reminder_text := "Nora : aucun déménagement nécessaire pour l'instant."
+		if bool(recommendation.get("recommended", false)):
+			if bool(recommendation.get("snoozed", false)):
+				reminder_text = "Nora : décision reportée — nouveau point dans %d mois." % int(recommendation.get("months_until_reminder", 0))
+			else:
+				reminder_text = "Nora : %s Vous pouvez déménager maintenant ou reporter." % str(recommendation.get("reason", "un agrandissement devient pertinent."))
+		workplace_label.text = "Locaux : %s • état %.0f/100 • environnement %.0f/100\nCapacité %d personnes • occupation %d • %s\n%s\nAvantages salariés : %s €/mois • coût locaux : %s €/mois • moral moyen %.0f/100" % [
 			str(workspace.get("name", "Garage")), float(workspace.get("condition", 0.0)), float(workspace.get("score", 0.0)),
 			int(workspace.get("capacity", 0)), int(workspace.get("occupancy", 0)), next_text,
+			reminder_text,
 			_money(ExecutiveManager.monthly_benefit_cost()), _money(ExecutiveManager.monthly_workplace_cost()), ExecutiveManager.staff_average_morale()
 		]
+		if workplace_defer_button != null:
+			workplace_defer_button.visible = not upgrade.is_empty()
+			workplace_defer_button.disabled = bool(recommendation.get("snoozed", false))
 	for benefit_key_value in benefit_controls.keys():
 		var benefit_key := str(benefit_key_value)
 		var option: OptionButton = benefit_controls[benefit_key]
@@ -2648,6 +2664,13 @@ func _upgrade_workplace():
 
 func _maintain_workplace():
 	status_label.text = "Locaux remis en état." if ExecutiveManager.maintain_workplace() else "Entretien impossible : trésorerie insuffisante."
+	_refresh_all()
+
+func _defer_workplace_upgrade():
+	if ExecutiveManager.defer_workplace_upgrade(3):
+		status_label.text = "Déménagement reporté. Nora refera un point dans 3 mois."
+	else:
+		status_label.text = "Aucun déménagement à reporter."
 	_refresh_all()
 
 func _refresh_financial_advice():

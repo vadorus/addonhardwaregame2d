@@ -52,7 +52,8 @@ var workplace := {
 	"tier":0,
 	"condition":62.0,
 	"last_renovation_year":1971,
-	"last_renovation_month":1
+	"last_renovation_month":1,
+	"upgrade_reminder_at":-1
 }
 var hr_issues: Array = []
 var _next_hr_issue_id := 1
@@ -70,7 +71,7 @@ var unlock_history: Array = []
 
 func reset():
 	benefit_policy = {"HEALTH":"BASIC","MEALS":"NONE","TRAINING":"NONE","REST":"BASIC"}
-	workplace = {"tier":0,"condition":62.0,"last_renovation_year":TimeManager.year,"last_renovation_month":TimeManager.month}
+	workplace = {"tier":0,"condition":62.0,"last_renovation_year":TimeManager.year,"last_renovation_month":TimeManager.month,"upgrade_reminder_at":-1}
 	hr_issues = []
 	_next_hr_issue_id = 1
 	months_operated = 0
@@ -236,6 +237,62 @@ func next_workplace_upgrade() -> Dictionary:
 	result["tier"] = next_tier
 	return result
 
+func workplace_upgrade_recommendation() -> Dictionary:
+	var upgrade := next_workplace_upgrade()
+	if upgrade.is_empty():
+		return {"available":false,"recommended":false,"due":false,"months_until_reminder":0}
+
+	var data := workplace_data()
+	var capacity := maxi(int(data.get("capacity", 1)), 1)
+	var occupancy := int(data.get("occupancy", 0))
+	var ratio := float(occupancy) / float(capacity)
+	var over_capacity := int(data.get("over_capacity", 0))
+	var condition := float(data.get("condition", 60.0))
+	var reminder_at := int(workplace.get("upgrade_reminder_at", -1))
+	var months_until := maxi(reminder_at - months_operated, 0)
+	var snoozed := reminder_at > months_operated
+
+	var recommended := over_capacity > 0 or ratio >= 0.75 or condition < 42.0
+	var severity := 0.0
+	var reason := "Les locaux restent adaptés à l'effectif actuel."
+	if over_capacity > 0:
+		severity = clampf(72.0 + float(over_capacity) * 4.0, 72.0, 94.0)
+		reason = "Les locaux dépassent leur capacité de %d personne(s)." % over_capacity
+	elif ratio >= 0.90:
+		severity = 66.0
+		reason = "Les locaux sont presque saturés (%d/%d places)." % [occupancy, capacity]
+	elif ratio >= 0.75:
+		severity = 48.0
+		reason = "L'effectif approche de la capacité des locaux (%d/%d places)." % [occupancy, capacity]
+	elif condition < 42.0:
+		severity = 42.0
+		reason = "L'état des locaux se dégrade ; déménager devient une alternative à l'entretien."
+
+	var advice := financial_advice(
+		int(upgrade.get("upgrade_cost", 0)),
+		int(upgrade.get("monthly_cost", 0)) - monthly_workplace_cost()
+	)
+	return {
+		"available":true,
+		"recommended":recommended,
+		"due":recommended and not snoozed,
+		"snoozed":snoozed,
+		"months_until_reminder":months_until,
+		"severity":severity,
+		"reason":reason,
+		"upgrade":upgrade,
+		"financial_advice":advice
+	}
+
+func defer_workplace_upgrade(months: int = 3) -> bool:
+	if next_workplace_upgrade().is_empty():
+		return false
+	var delay := clampi(months, 1, 12)
+	workplace["upgrade_reminder_at"] = months_operated + delay
+	CompanyManager.add_alert("Nora : déménagement reporté. Je referai un point dans %d mois." % delay)
+	executive_changed.emit()
+	return true
+
 func renovate_workplace() -> bool:
 	var upgrade := next_workplace_upgrade()
 	if upgrade.is_empty():
@@ -248,6 +305,7 @@ func renovate_workplace() -> bool:
 	workplace["condition"] = 92.0
 	workplace["last_renovation_year"] = TimeManager.year
 	workplace["last_renovation_month"] = TimeManager.month
+	workplace["upgrade_reminder_at"] = -1
 	CompanyManager.change_reputation({"professional":1.2,"prestige":0.45,"sustainability":0.18})
 	CompanyManager.add_alert("Locaux : l'entreprise emménage dans « %s »." % str(upgrade.name))
 	_resolve_matching_hr_issues("OVERCROWDING")
@@ -505,8 +563,20 @@ func get_executive_brief() -> Dictionary:
 		priorities.append({"category":"RH","severity":float(issue.get("severity", 50.0)),"text":str(issue.get("text", "")),"action":"Ouvrir le dossier RH et choisir une réponse."})
 
 	var workspace := workplace_data()
-	if int(workspace.over_capacity) > 0:
-		priorities.append({"category":"LOCAUX","severity":70,"text":"Les locaux dépassent leur capacité de %d personne(s)." % int(workspace.over_capacity),"action":"Préparer un agrandissement ou ralentir les recrutements."})
+	var workplace_recommendation := workplace_upgrade_recommendation()
+	if bool(workplace_recommendation.get("due", false)):
+		var upgrade: Dictionary = workplace_recommendation.get("upgrade", {})
+		var workplace_finance: Dictionary = workplace_recommendation.get("financial_advice", {})
+		priorities.append({
+			"category":"LOCAUX",
+			"severity":float(workplace_recommendation.get("severity", 50.0)),
+			"text":"%s" % str(workplace_recommendation.get("reason", "Les locaux méritent un point.")),
+			"action":"Option : passer à « %s » pour %d €. %s Vous pouvez aussi reporter." % [
+				str(upgrade.get("name", "de nouveaux locaux")),
+				int(upgrade.get("upgrade_cost", 0)),
+				str(workplace_finance.get("recommendation", ""))
+			]
+		})
 
 	var open_sav := AfterSalesManager.get_open_cases()
 	if not open_sav.is_empty():
@@ -602,9 +672,10 @@ func load_state(state: Dictionary):
 			var option := str(saved_benefits.get(category, benefit_policy[category]))
 			if BENEFIT_OPTIONS[category].has(option):
 				benefit_policy[category] = option
-	workplace = state.get("workplace", {"tier":0,"condition":62.0,"last_renovation_year":1971,"last_renovation_month":1}).duplicate(true)
+	workplace = state.get("workplace", {"tier":0,"condition":62.0,"last_renovation_year":1971,"last_renovation_month":1,"upgrade_reminder_at":-1}).duplicate(true)
 	workplace["tier"] = clampi(int(workplace.get("tier", 0)), 0, WORKPLACE_TIERS.size() - 1)
 	workplace["condition"] = clampf(float(workplace.get("condition", 62.0)), 0.0, 100.0)
+	workplace["upgrade_reminder_at"] = int(workplace.get("upgrade_reminder_at", -1))
 	hr_issues = state.get("hr_issues", []).duplicate(true)
 	_next_hr_issue_id = int(state.get("next_hr_issue_id", hr_issues.size() + 1))
 	months_operated = int(state.get("months_operated", 0))

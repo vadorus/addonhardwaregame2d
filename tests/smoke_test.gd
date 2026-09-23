@@ -298,8 +298,42 @@ func _ready() -> void:
 	if upgrade.is_empty() or str(upgrade.get("name", "")).is_empty():
 		_fail("Garage did not expose a real next workplace upgrade")
 		return
+	while PersonnelManager.staff.size() < 7:
+		var temporary_employee: Dictionary = PersonnelManager.staff[0].duplicate(true)
+		temporary_employee["id"] = "WORKPLACE-TEST-%d" % PersonnelManager.staff.size()
+		temporary_employee["name"] = "Workplace test %d" % PersonnelManager.staff.size()
+		PersonnelManager.staff.append(temporary_employee)
+	var workplace_recommendation := ExecutiveManager.workplace_upgrade_recommendation()
+	if not bool(workplace_recommendation.get("recommended", false)) or not bool(workplace_recommendation.get("due", false)):
+		_fail("Nora did not recommend a workplace upgrade when the garage approached capacity")
+		return
+	if not ExecutiveManager.defer_workplace_upgrade(3):
+		_fail("CEO could not defer a workplace upgrade recommendation")
+		return
+	var deferred_recommendation := ExecutiveManager.workplace_upgrade_recommendation()
+	if not bool(deferred_recommendation.get("snoozed", false)) or bool(deferred_recommendation.get("due", true)) or int(deferred_recommendation.get("months_until_reminder", 0)) != 3:
+		_fail("Deferred workplace recommendation did not suppress the reminder for three months")
+		return
+	var deferred_brief := ExecutiveManager.get_executive_brief()
+	for priority_value in deferred_brief.get("priorities", []):
+		if str(priority_value.get("category", "")) == "LOCAUX":
+			_fail("Nora repeated a workplace upgrade priority immediately after the CEO deferred it")
+			return
+	var deferred_state := ExecutiveManager.get_state().duplicate(true)
+	ExecutiveManager.reset()
+	ExecutiveManager.load_state(deferred_state)
+	if not bool(ExecutiveManager.workplace_upgrade_recommendation().get("snoozed", false)):
+		_fail("Deferred workplace recommendation did not survive a save round-trip")
+		return
+	ExecutiveManager.months_operated += 3
+	if not bool(ExecutiveManager.workplace_upgrade_recommendation().get("due", false)):
+		_fail("Deferred workplace recommendation did not return after the requested delay")
+		return
 	if not ExecutiveManager.renovate_workplace():
 		_fail("Could not renovate the starting workplace with sufficient cash")
+		return
+	if int(ExecutiveManager.workplace.get("upgrade_reminder_at", -2)) != -1:
+		_fail("Workplace upgrade did not clear the deferred reminder")
 		return
 	if int(ExecutiveManager.workplace_data().get("tier", -1)) != 1 or int(ExecutiveManager.workplace_data().get("capacity", 0)) <= int(starting_workplace.get("capacity", 0)):
 		_fail("Workplace renovation did not improve company capacity")
