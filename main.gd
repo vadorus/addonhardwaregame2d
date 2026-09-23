@@ -137,6 +137,8 @@ var firmware_select: OptionButton
 var firmware_release_button: Button
 var control_software_button: Button
 var market_product_select: OptionButton
+var market_competitor_select: OptionButton
+var market_comparison_label: Label
 var policy_marketing: SpinBox
 var policy_support: SpinBox
 var policy_environment: SpinBox
@@ -1625,8 +1627,19 @@ func _create_products_tab():
 func _create_market_tab():
 	var scroll := _tab_scroll("Marché")
 	var box: VBoxContainer = scroll.get_child(0)
+	box.add_child(_section("Votre produit"))
 	market_product_select=OptionButton.new(); market_product_select.item_selected.connect(func(_i): _refresh_market()); box.add_child(market_product_select)
 	market_label=_rich_label(); box.add_child(market_label)
+	box.add_child(_section("Comparaison concurrentielle"))
+	var comparison_intro := _muted_label("Comparez les informations publiques disponibles. Les données internes des concurrents restent cachées : la simulation les utilise, mais votre entreprise ne les connaît pas automatiquement.", 12)
+	comparison_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(comparison_intro)
+	market_competitor_select = OptionButton.new()
+	market_competitor_select.item_selected.connect(func(_i): _refresh_market_comparison())
+	box.add_child(market_competitor_select)
+	market_comparison_label = _rich_label()
+	market_comparison_label.custom_minimum_size.y = 150
+	box.add_child(market_comparison_label)
 	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
 	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
 	box.add_child(_section("SAV & expérience terrain"))
@@ -3226,6 +3239,21 @@ func _refresh_market_product_options():
 	for p in ProductManager.products:
 		if str(p.status)=="LAUNCHED": market_product_select.add_item(str(p.name)); market_product_select.set_item_metadata(market_product_select.item_count-1,str(p.id))
 	if current!="": _select_meta(market_product_select,current)
+	_refresh_market_competitor_options()
+
+func _refresh_market_competitor_options():
+	if market_competitor_select == null:
+		return
+	var current := _meta(market_competitor_select) if market_competitor_select.item_count > 0 else ""
+	market_competitor_select.clear()
+	for profile_value in MarketManager.cpu_competitor_public_profiles():
+		var profile: Dictionary = profile_value
+		market_competitor_select.add_item("%s — %s" % [str(profile.get("company", "")), str(profile.get("product", ""))])
+		market_competitor_select.set_item_metadata(market_competitor_select.item_count - 1, str(profile.get("id", "")))
+	if current != "":
+		_select_meta(market_competitor_select, current)
+	if market_competitor_select.selected < 0 and market_competitor_select.item_count > 0:
+		market_competitor_select.select(0)
 
 func _refresh_market():
 	if market_label == null:
@@ -3254,19 +3282,18 @@ func _refresh_market():
 				str(next_need.get("label", "")), int(next_need.get("historical_year", 0)), float(next_need.get("tech_trigger", 0.0))
 			])
 
-	lines.append("\nConcurrents CPU :")
-	for competitor_value in MarketManager.competitor_summaries():
+	lines.append("\nConcurrents CPU — informations publiques :")
+	for competitor_value in MarketManager.cpu_competitor_public_profiles():
 		var competitor: Dictionary = competitor_value
-		lines.append("• %s — %s G%d • %s • %s • R&D %.0f%%" % [
+		lines.append("• %s — %s G%d • %s • cible %s • %s €" % [
 			str(competitor.get("company", "")), str(competitor.get("product", "")), int(competitor.get("generation", 1)),
 			CPU_DESIGN.node_label(int(competitor.get("node_nm", 10000))),
 			MarketManager.segment_label(str(competitor.get("target_segment", "EMBEDDED"))),
-			float(competitor.get("development_progress", 0.0))
+			_money(int(competitor.get("price", 0)))
 		])
-		lines.append("  trésorerie %s € • arch %.0f • fabrication %.0f • rendement %.0f%% • capacité %s/mois • ventes %s le mois dernier" % [
-			_money(int(competitor.get("cash", 0))), float(competitor.get("architecture", 0.0)),
-			float(competitor.get("manufacturing", 0.0)), float(competitor.get("yield_rate", 0.0)) * 100.0,
-			_money(int(competitor.get("capacity", 0))), _money(int(competitor.get("last_month_units", 0)))
+		lines.append("  benchmark %.1f • %s • %d mois sur le marché" % [
+			float(competitor.get("benchmark_score", 0.0)), str(competitor.get("market_signal", "Présence limitée")),
+			int(competitor.get("months_on_market", 0))
 		])
 
 	if market_product_select.item_count == 0:
@@ -3304,6 +3331,7 @@ func _refresh_market():
 				int(product.get("last_month_returns", 0)), float(product.get("customer_satisfaction", 50.0))
 			])
 	market_label.text = "\n".join(lines)
+	_refresh_market_comparison()
 
 	var contract_lines: Array[String] = []
 	for contract in MarketManager.contracts:
@@ -3312,6 +3340,41 @@ func _refresh_market():
 			_money(int(contract.get("unit_price", 0))), int(contract.get("remaining_months", 0)), str(contract.get("status", ""))
 		])
 	contract_label.text = "\n".join(contract_lines) if not contract_lines.is_empty() else "Aucune proposition. Les marchés industriels, scientifiques et professionnels peuvent générer des contrats quand un CPU devient crédible."
+
+func _refresh_market_comparison():
+	if market_comparison_label == null:
+		return
+	if market_product_select == null or market_product_select.item_count == 0:
+		market_comparison_label.text = "Commercialisez un CPU pour le comparer directement aux produits concurrents."
+		return
+	if market_competitor_select == null or market_competitor_select.item_count == 0:
+		market_comparison_label.text = "Aucun concurrent public disponible pour cette comparaison."
+		return
+	var product := ProductManager.get_product(_meta(market_product_select))
+	var comparison := MarketManager.compare_cpu_public(product, _meta(market_competitor_select))
+	if comparison.is_empty():
+		market_comparison_label.text = "Comparaison indisponible."
+		return
+	var lines: Array[String] = [
+		"%s face à %s — %s" % [str(product.get("name", "Votre CPU")), str(comparison.get("competitor_name", "Concurrent")), str(comparison.get("competitor_company", ""))],
+		"Cible comparée : %s" % MarketManager.segment_label(str(comparison.get("target_segment", MarketManager.default_segment()))),
+		"",
+		"Votre prix : %s € • concurrent : %s € • écart %+.1f%%" % [
+			_money(int(comparison.get("player_price", 0))), _money(int(comparison.get("competitor_price", 0))), float(comparison.get("price_premium_pct", 0.0))
+		],
+		"Adéquation cible : %.1f vs %.1f • benchmark : %.1f vs %.1f" % [
+			float(comparison.get("player_fit", 0.0)), float(comparison.get("competitor_fit", 0.0)),
+			float(comparison.get("player_benchmark", 0.0)), float(comparison.get("competitor_benchmark", 0.0))
+		]
+	]
+	for row_value in comparison.get("rows", []):
+		var row: Dictionary = row_value
+		lines.append("• %s : %.1f vs %.1f (%+.1f)" % [
+			str(row.get("label", "")), float(row.get("player", 0.0)), float(row.get("competitor", 0.0)), float(row.get("delta", 0.0))
+		])
+	lines.append("")
+	lines.append(str(comparison.get("summary", "")))
+	market_comparison_label.text = "\n".join(lines)
 
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
 
