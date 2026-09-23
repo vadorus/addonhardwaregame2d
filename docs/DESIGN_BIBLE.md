@@ -20,7 +20,7 @@ Le jeu n'impose pas de fin définitive. Les grandes réussites ouvrent de nouvea
 1. **Une simulation commune.** Les modes accessible et expert utilisent les mêmes règles. La délégation change la quantité de microgestion, pas la réalité du monde.
 2. **Une décision, une conséquence lisible.** Le joueur doit comprendre le lien entre choix, coût, délai, qualité, risque, réputation et résultat commercial.
 3. **Profondeur progressive.** Les détails sont révélés quand ils deviennent utiles. Les chiffres avancés restent accessibles, mais les écrans principaux montrent les décisions.
-4. **Deux voies durables dès le départ.** Le joueur peut développer et vendre ses logiciels pendant toute la partie, ou investir plus tard dans le matériel. Le CPU est la première branche matérielle approfondie ; les autres suivent une fois leur boucle jouable.
+4. **Des domaines librement choisis.** Le joueur peut développer et vendre ses logiciels pendant toute la partie. Lorsqu'il décide d'investir pour agrandir son entreprise, il choisit librement les domaines disponibles : CPU, GPU, mémoire, logiciels, appareils ou services, seuls ou en parallèle. Le CPU est la première branche matérielle approfondie dans le développement du jeu, sans constituer une étape obligatoire de la progression du joueur.
 5. **Une entreprise vivante.** Les personnes, rapports, découvertes, avis clients, médias, fournisseurs et incidents donnent un visage à la simulation.
 6. **Une progression visible.** Une entreprise modeste doit paraître modeste ; sa montée en gamme doit se voir dans les locaux, les outils, les sons et la qualité de l'interface.
 7. **PC et mobile, même jeu.** La densité et la disposition changent, pas les systèmes de fond.
@@ -78,13 +78,17 @@ Une entreprise peut posséder plusieurs divisions : CPU, serveurs, logiciel, clo
 - des technologies possédées, partagées ou licenciées ;
 - des dépendances envers d'autres divisions ou fournisseurs.
 
+### Liberté de diversification du joueur
+
+Après le garage, l'agrandissement ouvre des possibilités d'investissement, de recrutement et de création de divisions. Le joueur choisit quels domaines développer, dans quel ordre et jusqu'à quel niveau de spécialisation. Il peut rester éditeur de logiciels, investir d'abord dans le GPU ou la mémoire, vendre des composants sans assembler de PC, ou combiner plusieurs activités. Aucune branche matérielle ne sert de passage obligé pour ouvrir une autre branche indépendante ; les synergies améliorent les projets sans forcer un parcours unique. Chaque projet précis garde ses prérequis réels : financement, compétences, technologies accessibles, droits, fournisseurs, compatibilité et capacité de production. Le jeu indique ces besoins et les moyens de les satisfaire, notamment par l'achat, la licence, la sous-traitance et le codéveloppement.
+
 ### Règle de la vertical slice
 
 La première version permet le logiciel commercial dès le garage et approfondit en premier la division matérielle CPU. Le moteur peut connaître les futures branches, mais il refuse leurs projets tant que leur contenu n'est pas jouable. Cette frontière évite les écrans vides et les systèmes superficiels. Le CPU est une première preuve de la boucle matérielle commune, pas la destination finale du jeu.
 
 ### Produits assemblés et prérequis technologiques
 
-Une famille de produits assemblés n'est accessible que lorsque toutes ses briques indispensables sont disponibles et compatibles. Le joueur doit avoir ouvert les branches correspondantes et disposer d'une technologie ou d'un composant exploitable, puis le valider pour le produit visé. Débloquer une simple étiquette de branche ne suffit pas à assembler un appareil. Une pièce peut être conçue et produite par l'entreprise ou obtenue via un fournisseur ou une licence lorsque le scénario le permet ; les interfaces et l'approvisionnement restent alors à vérifier. Les modalités exactes de l'externalisation de chaque pièce seront équilibrées avec les futures branches.
+Une famille de produits assemblés n'est accessible que lorsque toutes ses briques indispensables sont disponibles et compatibles. Le joueur doit disposer des technologies ou composants requis pour le produit visé, en propre ou via des partenaires, puis valider leur compatibilité ; il n'a pas à développer personnellement toutes les branches correspondantes. Débloquer une simple étiquette de branche ne suffit pas à assembler un appareil. Une pièce peut être conçue et produite par l'entreprise ou obtenue via un fournisseur ou une licence lorsque le scénario le permet ; les interfaces et l'approvisionnement restent alors à vérifier. Les modalités exactes de l'externalisation de chaque pièce seront équilibrées avec les futures branches.
 
 | Famille | Socle requis pour lancer la conception | Surcouches possibles |
 |---|---|---|
@@ -94,7 +98,7 @@ Une famille de produits assemblés n'est accessible que lorsque toutes ses briqu
 | Console | calcul, graphismes, mémoire, stockage, alimentation, contrôleurs et logiciel de fonctionnement compatibles | jeux, plateforme, services |
 | Téléphone ou tablette | calcul intégré, mémoire, écran, batterie, radios et intégration compacte | modem avancé, capteurs, OS, services |
 
-Cette table énonce les catégories de dépendances, pas une liste définitive de technologies : les solutions et les interfaces évoluent avec l'époque. La branche graphismes doit être ouverte ; une solution graphique intégrée peut satisfaire le besoin sans imposer une carte dédiée. Pour un PC, l'OS peut être interne ou provenir d'un éditeur concurrent sous licence ; il faut dans les deux cas une compatibilité et un droit d'utilisation. Les postes de travail physiques et les capacités industrielles restent des contraintes distinctes du déblocage technologique.
+Cette table énonce les catégories de dépendances, pas une liste définitive de technologies : les solutions et les interfaces évoluent avec l'époque. Une solution graphique accessible et compatible est requise ; elle peut être intégrée au système ou achetée auprès d'un fournisseur, sans imposer une carte dédiée ni une division graphique interne. Pour un PC, l'OS peut être interne ou provenir d'un éditeur concurrent sous licence ; il faut dans les deux cas une compatibilité et un droit d'utilisation. Les postes de travail physiques et les capacités industrielles restent des contraintes distinctes du déblocage technologique.
 
 Une catégorie de produit déclare ses prérequis dans les données : briques obligatoires (« toutes »), alternatives compatibles (« au moins une »), niveau minimal, interfaces, qualification, capacité de production et éventuellement contrat fournisseur. Le moteur explique chaque blocage au joueur : « il manque une mémoire compatible » ou « la dissipation thermique du portable est insuffisante ». Le bureau ou le laboratoire concerné mène à l'action utile au lieu d'afficher un arbre de dizaines de cases grisées.
 
