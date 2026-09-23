@@ -144,6 +144,19 @@ Les correctifs modifient réellement le produit : défauts, fiabilité, efficaci
 
 Surtout, les incidents ne sont pas seulement punitifs. Diagnostiquer et résoudre un problème augmente l'expérience terrain et alimente les connaissances R&D / qualité Production. Les futures propositions CPU utilisent donc l'historique réel des générations précédentes pour améliorer la confiance et signaler quand l'entreprise manque encore de retour terrain.
 
+## 2.5 Usage d'architecture distinct du marché
+
+Le brief CPU sépare désormais deux décisions :
+
+- **marché commercial actuel** : le débouché que l'entreprise pense pouvoir adresser aujourd'hui ;
+- **usage visé par l'architecture** : le type de contraintes que l'équipe doit privilégier techniquement.
+
+L'usage n'est pas verrouillé par l'époque. Une entreprise peut préparer très tôt une architecture Console, Téléphone/mobile, Serveur, Spatial/critique, Industriel/embarqué critique ou Performance/overclocking. Le jeu calcule une adéquation et signale les faiblesses, mais n'interdit pas le projet.
+
+Exemple : un CPU spatial très rapide mais peu fiable reste développable. L'équipe signalera cependant la fiabilité et l'efficacité comme insuffisantes. Si un marché adapté apparaît plus tard, la qualité réelle du produit déterminera sa réception.
+
+Ce choix est conservé dans le projet R&D puis dans la génération et les références commerciales afin de pouvoir être réutilisé par les futurs systèmes de contrats, partenariats et marchés spécialisés.
+
 ## 3. Demander une nouvelle génération
 
 Le joueur fournit un brief :
