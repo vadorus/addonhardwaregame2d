@@ -566,7 +566,7 @@ func get_executive_brief() -> Dictionary:
 	var workplace_recommendation := workplace_upgrade_recommendation()
 	if bool(workplace_recommendation.get("due", false)):
 		var upgrade: Dictionary = workplace_recommendation.get("upgrade", {})
-		var finance: Dictionary = workplace_recommendation.get("financial_advice", {})
+		var workplace_finance: Dictionary = workplace_recommendation.get("financial_advice", {})
 		priorities.append({
 			"category":"LOCAUX",
 			"severity":float(workplace_recommendation.get("severity", 50.0)),
@@ -574,7 +574,7 @@ func get_executive_brief() -> Dictionary:
 			"action":"Option : passer à « %s » pour %d €. %s Vous pouvez aussi reporter." % [
 				str(upgrade.get("name", "de nouveaux locaux")),
 				int(upgrade.get("upgrade_cost", 0)),
-				str(finance.get("recommendation", ""))
+				str(workplace_finance.get("recommendation", ""))
 			]
 		})
 
