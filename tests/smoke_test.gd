@@ -267,7 +267,7 @@ func _ready() -> void:
 		_fail("Public CPU competitor profiles did not expose the expected market rivals")
 		return
 	var public_rival: Dictionary = public_competitors[0]
-	for forbidden_public_key in ["cash", "architecture", "manufacturing", "yield_rate", "capacity", "development_progress", "ai_last_reason", "ai_current_action", "ai_decision_history"]:
+	for forbidden_public_key in ["cash", "architecture", "manufacturing", "yield_rate", "capacity", "development_progress", "ai_last_reason", "ai_current_action", "ai_decision_history", "b2b_contracts", "last_month_b2b_profit"]:
 		if public_rival.has(forbidden_public_key):
 			_fail("Public competitor profile leaked internal simulation data: %s" % forbidden_public_key)
 			return
@@ -1275,6 +1275,61 @@ func _ready() -> void:
 	if MarketManager.evaluate_product(apex_model, "HOBBYIST") <= MarketManager.evaluate_product(enthusiast_baseline, "HOBBYIST"):
 		_fail("Hobbyist market does not value die headroom and consistency")
 		return
+
+	var rival_b2b_market_state := MarketManager.get_state().duplicate(true)
+	var rival_b2b_tender := MarketManager.create_tender_from_template("INDUSTRIAL_CONTROL")
+	if rival_b2b_tender.is_empty():
+		_fail("Could not create an isolated B2B tender for rival-company competition")
+		return
+	rival_b2b_tender["requirements"] = {"performance":20.0,"efficiency":20.0,"reliability":20.0}
+	rival_b2b_tender["max_unit_price"] = 500
+	rival_b2b_tender["units_per_month"] = 20
+	rival_b2b_tender["duration_months"] = 3
+	rival_b2b_tender["deadline_months"] = 1
+	rival_b2b_tender["confidentiality"] = 40.0
+	var rival_bid_probe: Dictionary = MarketManager.competitors.get("CPU", [])[0]
+	rival_bid_probe["metrics"] = {
+		"performance":96.0,"efficiency":96.0,"reliability":96.0,
+		"usability":90.0,"innovation":92.0,"ecosystem":88.0,"sustainability":90.0
+	}
+	rival_bid_probe["brand"] = 90.0
+	rival_bid_probe["capacity"] = 5000
+	rival_bid_probe["unit_cost"] = 30
+	rival_bid_probe["price"] = 100
+	rival_bid_probe["target_segment"] = "INDUSTRIAL"
+	if MarketManager.estimated_rival_tender_interest(rival_b2b_tender) <= 0:
+		_fail("Credible rival was not recognized as a possible B2B bidder")
+		return
+	MarketManager._update_tenders()
+	if str(rival_b2b_tender.get("status", "")) != "AWARDED_RIVAL":
+		_fail("Rival-only B2B tender was not awarded to a credible competing company")
+		return
+	var rival_b2b_winner_id := ""
+	for competitor_value in MarketManager.competitors.get("CPU", []):
+		var competitor: Dictionary = competitor_value
+		if str(competitor.get("company", "")) == str(rival_b2b_tender.get("winning_company", "")):
+			rival_b2b_winner_id = str(competitor.get("id", ""))
+			break
+	if rival_b2b_winner_id.is_empty():
+		_fail("Rival B2B award did not identify the winning simulated company")
+		return
+	var rival_b2b_winner := MarketManager._cpu_competitor_internal(rival_b2b_winner_id)
+	if rival_b2b_winner.get("b2b_contracts", []).is_empty():
+		_fail("Rival B2B award did not create a real supply contract on the winning company")
+		return
+	var rival_b2b_capacity := int(rival_b2b_winner.get("capacity", 0))
+	var rival_b2b_delivery := MarketManager._process_competitor_b2b(rival_b2b_winner)
+	if int(rival_b2b_delivery.get("units", 0)) <= 0 or int(rival_b2b_delivery.get("units", 0)) > rival_b2b_capacity:
+		_fail("Rival B2B contract did not consume a valid amount of real production capacity")
+		return
+	if int(rival_b2b_delivery.get("profit", 0)) <= 0:
+		_fail("Rival B2B delivery did not create real contract economics")
+		return
+	var rival_public_b2b := MarketManager.cpu_competitor_public_profile(rival_b2b_winner_id)
+	if str(rival_public_b2b.get("public_b2b_customer", "")) != str(rival_b2b_tender.get("customer", "")):
+		_fail("Low-confidentiality rival B2B award was not observable in public market intelligence")
+		return
+	MarketManager.load_state(rival_b2b_market_state)
 
 	var test_tender := MarketManager.create_tender_from_template("SPACE_GUIDANCE")
 	if test_tender.is_empty() or str(test_tender.get("application_profile", "")) != "SPACE":
