@@ -584,6 +584,68 @@ func _ready() -> void:
 	if float(quote_a.get("supplier_reliability", 0.0)) == float(quote_b.get("supplier_reliability", 0.0)) and int(quote_a.get("setup_cost", 0)) == int(quote_b.get("setup_cost", 0)):
 		_fail("Supplier choice has no meaningful economic or reliability difference")
 		return
+	var rival_capacity_state := SupplierManager.get_state().duplicate(true)
+	SupplierManager.reset()
+	var rival_capacity_quote_before := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	var rival_reservation := SupplierManager.request_rival_capacity("RIVAL-CAPACITY-PROBE", "Rival Capacity Probe", "LICENSE", 10, 100000)
+	if rival_reservation.is_empty():
+		_fail("Rival company could not reserve a real technology-supplier slot")
+		return
+	var rival_capacity_quote_after := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	if int(rival_capacity_quote_after.get("supplier_rival_load", 0)) <= int(rival_capacity_quote_before.get("supplier_rival_load", 0)):
+		_fail("Rival supplier reservation did not increase named competitive load")
+		return
+	if int(rival_capacity_quote_after.get("available_capacity_slots", 0)) < 1:
+		_fail("Rival supplier reservation removed the last fair player-access slot")
+		return
+	SupplierManager.release_rival_capacity("RIVAL-CAPACITY-PROBE")
+	SupplierManager.load_state(rival_capacity_state)
+
+	var rival_sourcing_market_state := MarketManager.get_state().duplicate(true)
+	var rival_sourcing_supplier_state := SupplierManager.get_state().duplicate(true)
+	SupplierManager.reset()
+	var rival_probe: Dictionary = MarketManager.competitors.get("CPU", [])[1]
+	rival_probe["ai_research_drive"] = 100.0
+	rival_probe["ai_growth_drive"] = 100.0
+	rival_probe["ai_adaptability"] = 100.0
+	rival_probe["ai_financial_prudence"] = 0.0
+	rival_probe["risk_tolerance"] = 100.0
+	rival_probe["cash"] = 450000
+	MarketManager._clear_competitor_sourcing(rival_probe)
+	var rival_cash_before_sourcing := int(rival_probe.get("cash", 0))
+	MarketManager._ensure_competitor_sourcing(rival_probe)
+	var rival_sourcing_mode := str(rival_probe.get("ai_sourcing_mode", ""))
+	if rival_sourcing_mode == "" or rival_sourcing_mode == "INTERNAL":
+		_fail("Aggressive rival CEO did not select an available external technology strategy")
+		return
+	if str(rival_probe.get("ai_supplier_id", "")).is_empty() or SupplierManager.rival_reservation_for(str(rival_probe.get("id", ""))).is_empty():
+		_fail("Rival external sourcing did not reserve supplier capacity")
+		return
+	if int(rival_probe.get("cash", 0)) >= rival_cash_before_sourcing:
+		_fail("Rival external sourcing did not charge a real setup cost")
+		return
+	if int(rival_probe.get("ai_supplier_monthly_fee", 0)) <= 0:
+		_fail("Rival supplier contract has no recurring economic cost")
+		return
+	if absf(float(rival_probe.get("ai_supplier_speed_factor", 1.0)) - 1.0) < 0.001 and absf(float(rival_probe.get("ai_supplier_knowledge_factor", 1.0)) - 1.0) < 0.001:
+		_fail("Rival supplier strategy has no development trade-off")
+		return
+	var rival_generation_before_sourcing := int(rival_probe.get("generation_index", 1))
+	var rival_supplier_name := str(rival_probe.get("ai_supplier_name", ""))
+	MarketManager._launch_competitor_generation(rival_probe)
+	if int(rival_probe.get("generation_index", 1)) <= rival_generation_before_sourcing:
+		_fail("Rival supplier-backed generation did not launch")
+		return
+	if not SupplierManager.rival_reservation_for(str(rival_probe.get("id", ""))).is_empty():
+		_fail("Rival supplier capacity was not released after generation launch")
+		return
+	var rival_history: Array = rival_probe.get("history", [])
+	if rival_history.is_empty() or str(rival_history[0].get("sourcing_mode", "")) != rival_sourcing_mode or str(rival_history[0].get("supplier_name", "")) != rival_supplier_name:
+		_fail("Rival generation history lost its real supplier strategy")
+		return
+	MarketManager.load_state(rival_sourcing_market_state)
+	SupplierManager.load_state(rival_sourcing_supplier_state)
+
 	var balanced_quote := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
 	var supplier_market_probe := SupplierManager.get_state().duplicate(true)
 	SupplierManager.suppliers[license_supplier_a]["market_cost_factor"] = 1.10

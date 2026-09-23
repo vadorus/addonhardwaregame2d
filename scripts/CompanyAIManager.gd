@@ -120,6 +120,38 @@ func choose_action(company: Dictionary, context: Dictionary, rng: RandomNumberGe
 	best["difficulty_profile"] = str(BalanceManager.active_profile)
 	return best
 
+func choose_sourcing_mode(company: Dictionary, rng: RandomNumberGenerator) -> String:
+	ensure_company_state(company)
+	var profile := BalanceManager.company_ai_profile()
+	var quality := clampf(float(profile.get("decision_quality", 0.74)), 0.0, 1.0)
+	var noise := maxf(float(profile.get("decision_noise", 9.0)), 0.0) * 0.55
+	var research_drive := clampf(float(company.get("ai_research_drive", 50.0)) / 100.0, 0.0, 1.0)
+	var prudence := clampf(float(company.get("ai_financial_prudence", 50.0)) / 100.0, 0.0, 1.0)
+	var adaptability := clampf(float(company.get("ai_adaptability", 50.0)) / 100.0, 0.0, 1.0)
+	var growth_drive := clampf(float(company.get("ai_growth_drive", 50.0)) / 100.0, 0.0, 1.0)
+	var risk := clampf(float(company.get("risk_tolerance", 50.0)) / 100.0, 0.0, 1.0)
+	var cash_health := clampf(float(company.get("cash", 0)) / 420000.0, 0.0, 1.0)
+
+	var scores := {
+		"INTERNAL":48.0 + prudence * 14.0 + (1.0 - risk) * 8.0 + cash_health * 2.0,
+		"PURCHASE":32.0 + growth_drive * 16.0 + adaptability * 9.0 + risk * 8.0 - prudence * 8.0,
+		"LICENSE":38.0 + research_drive * 17.0 + growth_drive * 9.0 + risk * 4.0 - prudence * 4.0,
+		"SUBCONTRACT":34.0 + growth_drive * 15.0 + adaptability * 7.0 + risk * 8.0 - prudence * 6.0,
+		"PARTNER":40.0 + adaptability * 16.0 + research_drive * 8.0 + prudence * 3.0
+	}
+	var best_mode := "INTERNAL"
+	var best_score := -999.0
+	for mode_value in scores.keys():
+		var mode := str(mode_value)
+		var score := float(scores[mode])
+		if mode != "INTERNAL" and int(company.get("cash", 0)) < 45000:
+			continue
+		score += rng.randf_range(-noise, noise) * (1.12 - quality * 0.40)
+		if score > best_score:
+			best_score = score
+			best_mode = mode
+	return best_mode
+
 func apply_decision_state(company: Dictionary, decision: Dictionary) -> void:
 	ensure_company_state(company)
 	var profile := BalanceManager.company_ai_profile()

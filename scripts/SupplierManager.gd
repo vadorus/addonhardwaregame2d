@@ -94,9 +94,10 @@ func reset():
 		data["relationship"] = 0.0
 		data["completed_projects"] = 0
 		data["active_project_ids"] = []
+		data["rival_reservations"] = []
 		data["delay_events"] = 0
 		data["supplier_cash"] = 180000 + int(round(float(data.get("quality", 70.0)) * 1800.0))
-		data["external_load"] = maxi(int(data.get("capacity_slots", 1)) - 1, 0)
+		data["external_load"] = maxi(int(data.get("capacity_slots", 1)) - 2, 0)
 		CompanyAIManager.ensure_supplier_state(data)
 		data["ai_supplier_cooldown"] = (suppliers.size() % 4) + 1
 		suppliers[supplier_id] = data
@@ -173,11 +174,110 @@ func _active_count(supplier: Dictionary) -> int:
 	var active = supplier.get("active_project_ids", [])
 	return active.size() if typeof(active) == TYPE_ARRAY else 0
 
+func _rival_count(supplier: Dictionary) -> int:
+	var reservations = supplier.get("rival_reservations", [])
+	return reservations.size() if typeof(reservations) == TYPE_ARRAY else 0
+
 func _used_capacity(supplier: Dictionary) -> int:
-	return _active_count(supplier) + maxi(int(supplier.get("external_load", 0)), 0)
+	return _active_count(supplier) + _rival_count(supplier) + maxi(int(supplier.get("external_load", 0)), 0)
 
 func _free_capacity(supplier: Dictionary) -> int:
 	return maxi(int(supplier.get("capacity_slots", 1)) - _used_capacity(supplier), 0)
+
+func _rival_capacity_available(supplier: Dictionary) -> bool:
+	var capacity := maxi(int(supplier.get("capacity_slots", 1)), 1)
+	var external_load := maxi(int(supplier.get("external_load", 0)), 0)
+	var non_player_load := _rival_count(supplier) + external_load
+	return non_player_load < maxi(capacity - 1, 0) or external_load > 0
+
+func rival_reservation_for(company_id: String) -> Dictionary:
+	for supplier_id_value in suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var reservations: Array = suppliers[supplier_id].get("rival_reservations", [])
+		for reservation_value in reservations:
+			var reservation: Dictionary = reservation_value
+			if str(reservation.get("company_id", "")) == company_id:
+				return reservation.duplicate(true)
+	return {}
+
+func request_rival_capacity(company_id: String, company_name: String, mode: String, duration_months: int, max_setup_cost: int) -> Dictionary:
+	if company_id.is_empty() or mode == "INTERNAL":
+		return {}
+	var existing := rival_reservation_for(company_id)
+	if not existing.is_empty():
+		return existing
+	var best_supplier_id := ""
+	var best_score := -99999.0
+	var best_terms := {}
+	var base := GameData.sourcing_profile(mode)
+	for supplier_id_value in supplier_keys_for_mode(mode):
+		var supplier_id := str(supplier_id_value)
+		var supplier: Dictionary = suppliers[supplier_id]
+		if not _rival_capacity_available(supplier):
+			continue
+		var market_factor := float(supplier.get("market_cost_factor", 1.0))
+		var setup_cost := maxi(1000, int(round(float(base.get("setup_cost", 0)) * float(supplier.get("setup_factor", 1.0)) * market_factor)))
+		if setup_cost > maxi(max_setup_cost, 0):
+			continue
+		var speed_factor := clampf(float(GameData.approach_data(mode).get("speed", 1.0)) * float(supplier.get("speed_factor", 1.0)), 0.75, 1.65)
+		var quality_factor := clampf(float(GameData.approach_data(mode).get("quality", 1.0)) * lerpf(0.94, 1.08, float(supplier.get("quality", 70.0)) / 100.0), 0.88, 1.16)
+		var unit_cost_factor := clampf(float(base.get("unit_cost_factor", 1.0)) * float(supplier.get("cost_factor", 1.0)) * market_factor, 0.75, 1.75)
+		var score := float(supplier.get("quality", 70.0)) * 0.27
+		score += float(supplier.get("reliability", 70.0)) * 0.23
+		score += speed_factor * 24.0
+		score += float(supplier.get("flexibility", 50.0)) * 0.08
+		score -= maxf(unit_cost_factor - 1.0, 0.0) * 38.0
+		score -= float(setup_cost) / 5000.0
+		if score > best_score:
+			best_score = score
+			best_supplier_id = supplier_id
+			best_terms = {
+				"supplier_id":supplier_id,
+				"supplier_name":str(supplier.get("name", supplier_id)),
+				"company_id":company_id,
+				"company_name":company_name,
+				"mode":mode,
+				"months_remaining":maxi(duration_months, 3),
+				"setup_cost":setup_cost,
+				"monthly_fee":maxi(1200, int(round(float(setup_cost) / maxf(float(duration_months), 3.0) * 0.55))),
+				"speed_factor":speed_factor,
+				"quality_factor":quality_factor,
+				"unit_cost_factor":unit_cost_factor,
+				"knowledge_factor":clampf(float(GameData.approach_data(mode).get("knowledge", 1.0)), 0.25, 1.40),
+				"public":mode == "PARTNER",
+				"year":TimeManager.year,
+				"month":TimeManager.month
+			}
+	if best_supplier_id.is_empty():
+		return {}
+	var supplier: Dictionary = suppliers[best_supplier_id]
+	var external_load := maxi(int(supplier.get("external_load", 0)), 0)
+	var capacity := maxi(int(supplier.get("capacity_slots", 1)), 1)
+	var non_player_load := _rival_count(supplier) + external_load
+	if non_player_load >= maxi(capacity - 1, 0) and external_load > 0:
+		supplier["external_load"] = external_load - 1
+	var reservations: Array = supplier.get("rival_reservations", [])
+	reservations.append(best_terms.duplicate(true))
+	supplier["rival_reservations"] = reservations
+	suppliers_changed.emit()
+	return best_terms.duplicate(true)
+
+func release_rival_capacity(company_id: String) -> void:
+	if company_id.is_empty():
+		return
+	var changed := false
+	for supplier_id_value in suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var supplier: Dictionary = suppliers[supplier_id]
+		var reservations: Array = supplier.get("rival_reservations", [])
+		for i in range(reservations.size() - 1, -1, -1):
+			var reservation: Dictionary = reservations[i]
+			if str(reservation.get("company_id", "")) == company_id:
+				reservations.remove_at(i)
+				changed = true
+		supplier["rival_reservations"] = reservations
+	if changed:
+		suppliers_changed.emit()
 
 func can_accept_project(mode: String, supplier_id: String) -> bool:
 	if mode == "INTERNAL":
@@ -295,6 +395,13 @@ func quote(mode: String, supplier_id: String, negotiation: String = "BALANCED") 
 	base["supplier_relationship"] = relationship
 	base["supplier_capacity_slots"] = int(supplier.get("capacity_slots", 1))
 	base["supplier_external_load"] = maxi(int(supplier.get("external_load", 0)), 0)
+	base["supplier_rival_load"] = _rival_count(supplier)
+	var public_rivals: Array[String] = []
+	for reservation_value in supplier.get("rival_reservations", []):
+		var reservation: Dictionary = reservation_value
+		if bool(reservation.get("public", false)):
+			public_rivals.append(str(reservation.get("company_name", "")))
+	base["supplier_public_rivals"] = public_rivals
 	base["available_capacity_slots"] = _free_capacity(supplier)
 	base["supplier_commercial_stance"] = str(supplier.get("ai_supplier_action", "HOLD"))
 	base["supplier_public_action"] = str(supplier.get("supplier_last_public_action", "Conditions commerciales stables."))
@@ -564,6 +671,7 @@ func _supplier_ai_context(supplier: Dictionary) -> Dictionary:
 		"utilization":clampf(float(used) / float(capacity), 0.0, 1.0),
 		"free_slots":maxi(capacity - used, 0),
 		"external_load":maxi(int(supplier.get("external_load", 0)), 0),
+		"rival_projects":_rival_count(supplier),
 		"player_projects":_active_count(supplier)
 	}
 
@@ -574,7 +682,7 @@ func _apply_supplier_ai_decision(supplier: Dictionary, decision: Dictionary) -> 
 		"SOFTEN_TERMS":
 			supplier["market_cost_factor"] = 0.94
 			supplier["market_royalty_factor"] = 0.96
-			var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+			var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1 - _rival_count(supplier), 0)
 			if int(supplier.get("external_load", 0)) < max_external:
 				supplier["external_load"] = int(supplier.get("external_load", 0)) + 1
 			public_text = "%s cherche de nouveaux projets et assouplit temporairement ses conditions commerciales." % str(supplier.get("name", "Un partenaire"))
@@ -613,18 +721,41 @@ func _process_supplier_businesses() -> bool:
 		CompanyAIManager.tick_supplier_state(supplier)
 		var external_load := maxi(int(supplier.get("external_load", 0)), 0)
 		var player_projects := _active_count(supplier)
-		var operating_result := external_load * 14000 + player_projects * 9000 - int(supplier.get("capacity_slots", 1)) * 7000
+		var rival_revenue := 0
+		var reservations: Array = supplier.get("rival_reservations", [])
+		for reservation_value in reservations:
+			var reservation: Dictionary = reservation_value
+			rival_revenue += int(reservation.get("monthly_fee", 0))
+		var operating_result := external_load * 14000 + player_projects * 9000 + rival_revenue - int(supplier.get("capacity_slots", 1)) * 7000
 		supplier["supplier_cash"] = maxi(int(supplier.get("supplier_cash", 0)) + operating_result, 0)
 		if CompanyAIManager.supplier_decision_due(supplier):
 			var decision := CompanyAIManager.choose_supplier_action(supplier, _supplier_ai_context(supplier), rng)
 			_apply_supplier_ai_decision(supplier, decision)
 			changed = true
-		var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+		var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1 - _rival_count(supplier), 0)
 		supplier["external_load"] = clampi(int(supplier.get("external_load", 0)), 0, max_external)
+	return changed
+
+func _process_rival_reservations() -> bool:
+	var changed := false
+	for supplier_id_value in suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var supplier: Dictionary = suppliers[supplier_id]
+		var reservations: Array = supplier.get("rival_reservations", [])
+		for i in range(reservations.size() - 1, -1, -1):
+			var reservation: Dictionary = reservations[i]
+			reservation["months_remaining"] = maxi(int(reservation.get("months_remaining", 0)) - 1, 0)
+			if int(reservation.get("months_remaining", 0)) <= 0:
+				reservations.remove_at(i)
+				changed = true
+			else:
+				reservations[i] = reservation
+		supplier["rival_reservations"] = reservations
 	return changed
 
 func process_month():
 	var changed := _process_supplier_businesses()
+	changed = _process_rival_reservations() or changed
 	for contract_id_value in contracts.keys():
 		var contract_id := str(contract_id_value)
 		var contract: Dictionary = contracts[contract_id]
@@ -668,6 +799,8 @@ func load_state(state: Dictionary):
 				suppliers[supplier_id][key] = saved[supplier_id][key]
 			var active = suppliers[supplier_id].get("active_project_ids", [])
 			suppliers[supplier_id]["active_project_ids"] = active if typeof(active) == TYPE_ARRAY else []
+			var rival_reservations = suppliers[supplier_id].get("rival_reservations", [])
+			suppliers[supplier_id]["rival_reservations"] = rival_reservations if typeof(rival_reservations) == TYPE_ARRAY else []
 	var saved_contracts = state.get("contracts", {})
 	contracts = saved_contracts.duplicate(true) if typeof(saved_contracts) == TYPE_DICTIONARY else {}
 	_next_contract_id = int(state.get("next_contract_id", contracts.size() + 1))
