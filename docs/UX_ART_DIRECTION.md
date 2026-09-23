@@ -189,6 +189,19 @@ Le contenu et les résultats restent identiques.
 
 
 
+## QG isométrique interactif — première implémentation V0.3
+
+Le QG n'est plus seulement un tableau de bord abstrait. Une scène isométrique représente le lieu de travail courant et sert de raccourci spatial vers les décisions du dirigeant.
+
+Au garage, cinq zones structurent la lecture :
+- **Établi CPU** : conception et amélioration du processeur ;
+- **Banc de test** : prototype et validation ;
+- **Tableau de direction** : stratégie, arbitrages et décisions de management ;
+- **Poste du fondateur** : retour à la vue dirigeant ;
+- **Stock & production** : accès progressif à l'industrialisation.
+
+Les zones associées à une fonction encore verrouillée restent soumises au déblocage progressif existant : Nora explique pourquoi elles ne sont pas encore nécessaires. Le décor évolue à partir du vrai palier de locaux de l'entreprise et doit progressivement recevoir des assets séparés cohérents avec la direction artistique garage-tech chaleureuse.
+
 ## Évolution visuelle des locaux
 
 La progression de l'interface doit être soutenue par l'évolution visible du lieu de travail. Le système de locaux possède maintenant quatre paliers de simulation : garage aménagé, atelier + bureaux, siège technique et campus R&D.
