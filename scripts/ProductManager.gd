@@ -90,7 +90,9 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 func _create_single_product(project: Dictionary) -> void:
 	var sector := str(project.get("sector", "CPU"))
 	var sector_data: Dictionary = GameData.SECTORS[sector]
-	var approach: Dictionary = GameData.APPROACHES[str(project.get("approach", "INTERNAL"))]
+	var approach_key := str(project.get("approach", "INTERNAL"))
+	var approach: Dictionary = GameData.approach_data(approach_key)
+	var sourcing := project.get("sourcing", GameData.sourcing_profile(approach_key)).duplicate(true)
 	var metrics: Dictionary = project.get("final_metrics", {}).duplicate(true)
 	var avg := _metric_average(metrics)
 	var unit_cost := _base_unit_cost(project)
@@ -98,7 +100,9 @@ func _create_single_product(project: Dictionary) -> void:
 	var product := {
 		"id":"PROD-%03d" % _next_id,"project_id":str(project.get("id", "")),"name":str(project.get("name", "Produit")),
 		"company":CompanyManager.company_name,"sector":sector,"target_segment":str(project.get("segment", "MAINSTREAM")),
-		"approach":str(project.get("approach", "INTERNAL")),"internal_ratio":float(approach.internal_ratio),
+		"approach":approach_key,"internal_ratio":float(approach.internal_ratio),"sourcing":sourcing,
+		"royalty_rate":float(sourcing.get("royalty_rate", 0.0)),"vendor_dependency":float(sourcing.get("dependency", 0.0)),
+		"customization_freedom":float(sourcing.get("customization", 100.0)),"ip_ownership":float(sourcing.get("ip_ownership", 100.0)),
 		"application_profile":str(project.get("application_profile", "GENERAL")),
 		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
@@ -121,11 +125,8 @@ func _base_unit_cost(project: Dictionary) -> int:
 		var estimate := CPU_DESIGN.evaluate(design)
 		var design_cost := int(estimate.get("unit_cost", unit_cost))
 		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
-	var approach := str(project.get("approach", "INTERNAL"))
-	if approach == "INTERNAL":
-		unit_cost = int(unit_cost * 0.92)
-	elif approach == "EXTERNAL":
-		unit_cost = int(unit_cost * 1.13)
+	var sourcing := GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))
+	unit_cost = int(round(float(unit_cost) * float(sourcing.get("unit_cost_factor", 1.0))))
 	return maxi(unit_cost, 1)
 
 func _metric_average(metrics: Dictionary) -> float:
@@ -467,6 +468,10 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var production_cost := total_units * int(product.unit_cost)
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	var royalty_rate := clampf(float(product.get("royalty_rate", product.get("sourcing", {}).get("royalty_rate", 0.0))), 0.0, 0.50)
+	var royalty_cost := int(round(float(revenue) * royalty_rate))
+	if royalty_cost > 0:
+		Economy.add_expense(royalty_cost, "Royalties technologie — %s" % str(product.name))
 	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
 	return_rate += float(product.get("defect_rate", 0.0)) * 0.42
 	return_rate = clampf(return_rate, 0.005, 0.28)
@@ -490,7 +495,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
+	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"royalty_cost":royalty_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id), sold_b2b)
@@ -543,6 +548,16 @@ func load_state(state: Dictionary):
 				legacy_generation_by_project[project_id] = "CPU-GEN-LEGACY-%03d" % (legacy_generation_by_project.size() + 1)
 			product["generation_id"] = str(legacy_generation_by_project[project_id])
 		product["generation_index"] = maxi(int(product.get("generation_index", 1)), 1)
+		var saved_approach := str(product.get("approach", "INTERNAL"))
+		var saved_sourcing_value = product.get("sourcing", {})
+		var saved_sourcing: Dictionary = saved_sourcing_value.duplicate(true) if typeof(saved_sourcing_value) == TYPE_DICTIONARY else {}
+		if saved_sourcing.is_empty():
+			saved_sourcing = GameData.sourcing_profile(saved_approach)
+		product["sourcing"] = saved_sourcing
+		product["royalty_rate"] = float(product.get("royalty_rate", saved_sourcing.get("royalty_rate", 0.0)))
+		product["vendor_dependency"] = float(product.get("vendor_dependency", saved_sourcing.get("dependency", 0.0)))
+		product["customization_freedom"] = float(product.get("customization_freedom", saved_sourcing.get("customization", 100.0)))
+		product["ip_ownership"] = float(product.get("ip_ownership", saved_sourcing.get("ip_ownership", 100.0)))
 		product["generation_name"] = str(product.get("generation_name", product.get("name", "CPU historique")))
 		product["sku_tier"] = str(product.get("sku_tier", "LEGACY"))
 		product["sku_label"] = str(product.get("sku_label", "Héritage"))
