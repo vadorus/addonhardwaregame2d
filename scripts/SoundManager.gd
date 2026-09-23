@@ -138,5 +138,6 @@ func _build_garage_ambience() -> AudioStreamWAV:
 	wav.data = data
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	wav.loop_begin = 0
-	wav.loop_end = sample_count
+	# Keep the inclusive mixer boundary inside the PCM buffer.
+	wav.loop_end = sample_count - 1
 	return wav

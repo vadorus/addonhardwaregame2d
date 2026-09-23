@@ -237,6 +237,8 @@ var tutorial_highlight: PanelContainer
 var tutorial_bubble: PanelContainer
 var tutorial_bubble_title: Label
 var tutorial_bubble_text: Label
+var tutorial_bubble_pointer: Label
+var tutorial_bubble_action: Button
 var _tutorial_target: Control
 var _tutorial_step_id := ""
 var _tutorial_pulse_tween: Tween
@@ -503,9 +505,15 @@ func _build_tutorial_overlay() -> void:
 	tutorial_bubble_text = _muted_label("", 13)
 	tutorial_bubble_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bubble_box.add_child(tutorial_bubble_text)
-	var pointer := _label("↓  Regardez la zone éclairée", 12)
-	pointer.add_theme_color_override("font_color", APP_CYAN)
-	bubble_box.add_child(pointer)
+	tutorial_bubble_pointer = _label("Observez la zone éclairée", 12)
+	tutorial_bubble_pointer.add_theme_color_override("font_color", APP_CYAN)
+	bubble_box.add_child(tutorial_bubble_pointer)
+	tutorial_bubble_action = Button.new()
+	tutorial_bubble_action.text = "Commencer le premier contrat"
+	tutorial_bubble_action.custom_minimum_size.y = 48
+	tutorial_bubble_action.visible = false
+	tutorial_bubble_action.pressed.connect(_startup_contract_action)
+	bubble_box.add_child(tutorial_bubble_action)
 
 func _tutorial_state() -> Dictionary:
 	if not bool(SettingsManager.get_setting("gameplay", "tutorial_enabled")):
@@ -531,7 +539,7 @@ func _tutorial_state() -> Dictionary:
 			"id":"FIRST_CONTRACT",
 			"target":startup_contract_action_button,
 			"title":"Nora • Première étape",
-			"text":"Pour commencer, une seule chose compte : acceptez ce petit contrat. Je vous expliquerai les jauges seulement quand elles deviendront utiles."
+			"text":"Pour commencer, appuyez sur COMMENCER LE PREMIER CONTRAT. Vous pouvez aussi utiliser le bouton ci-dessous. Je vous expliquerai les jauges ensuite."
 		}
 
 	if StartupManager.is_first_contract_tutorial():
@@ -629,6 +637,9 @@ func _refresh_tutorial_overlay() -> void:
 	_tutorial_step_id = str(state.get("id", ""))
 	tutorial_bubble_title.text = str(state.get("title", "Nora • Tutoriel"))
 	tutorial_bubble_text.text = str(state.get("text", ""))
+	tutorial_bubble_action.visible = _tutorial_step_id == "FIRST_CONTRACT"
+	tutorial_bubble_action.disabled = target is Button and target.disabled
+	tutorial_bubble_pointer.text = "Appuyez sur le bouton éclairé ou ci-dessous ↓" if tutorial_bubble_action.visible else "Observez la zone éclairée"
 	if startup_nora_card != null:
 		startup_nora_card.visible = false
 
@@ -654,7 +665,7 @@ func _refresh_tutorial_overlay() -> void:
 	tutorial_dim_right.size = Vector2(maxf(screen_size.x - focus.end.x, 0.0), focus.size.y)
 
 	var bubble_width := minf(420.0, maxf(screen_size.x - 24.0, 260.0))
-	var bubble_height := 170.0
+	var bubble_height := 230.0 if tutorial_bubble_action.visible else 170.0
 	tutorial_bubble.size = Vector2(bubble_width, bubble_height)
 	var bubble_x := clampf(focus.get_center().x - bubble_width * 0.5, 12.0, maxf(screen_size.x - bubble_width - 12.0, 12.0))
 	var bubble_y := focus.end.y + 16.0
