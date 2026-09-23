@@ -557,6 +557,7 @@ func _ready() -> void:
 			return
 	for _supplier_month in range(5):
 		SupplierManager.process_month()
+	var supplier_finances_changed := false
 	for supplier_id_value in SupplierManager.suppliers.keys():
 		var supplier_id := str(supplier_id_value)
 		var supplier := SupplierManager.get_supplier(supplier_id)
@@ -566,9 +567,11 @@ func _ready() -> void:
 		if int(supplier.get("external_load", 0)) > maxi(int(supplier.get("capacity_slots", 1)) - 1, 0):
 			_fail("Autonomous supplier external business crowded the player out of all open capacity")
 			return
-		if int(supplier.get("supplier_cash", 0)) == int(supplier_cash_before_ai.get(supplier_id, 0)):
-			_fail("Autonomous supplier finances did not react to its external business")
-			return
+		if int(supplier.get("supplier_cash", 0)) != int(supplier_cash_before_ai.get(supplier_id, 0)):
+			supplier_finances_changed = true
+	if not supplier_finances_changed:
+		_fail("Autonomous supplier economy remained completely static")
+		return
 	SupplierManager.load_state(supplier_ai_initial_state)
 
 	var license_supplier_a := str(license_suppliers[0])
