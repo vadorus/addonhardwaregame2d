@@ -58,6 +58,8 @@ Le joueur doit pouvoir comparer ses produits à ceux des concurrents sur des cri
 
 Une entreprise peut construire des identités différentes : premium, rapport qualité/prix, fiabilité, innovation, spécialisation professionnelle, etc.
 
+Le moteur de simulation peut conserver des données internes détaillées sur les concurrents, mais l'interface ne doit pas les révéler automatiquement au joueur. Par défaut, le dirigeant accède surtout aux éléments observables : produits, prix, caractéristiques annoncées, benchmarks, tests publics, disponibilité et signaux de marché. Les trésoreries, budgets R&D, rendements usine, capacités réelles ou projets secrets ne deviennent visibles que si une future mécanique crédible les révèle ou permet de les estimer.
+
 ## 5. La fiabilité compte autant que la performance
 
 Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.
