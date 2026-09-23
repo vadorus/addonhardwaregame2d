@@ -1,6 +1,6 @@
 # Bible de conception — Tech Empire
 
-> Document canonique des décisions de conception prises avec le créateur du jeu. Il décrit la cible complète sans élargir prématurément la version jouable : la branche CPU reste la seule branche active tant que sa boucle n'est pas aboutie.
+> Document canonique des décisions de conception prises avec le créateur du jeu. Le logiciel commercial est jouable dès le garage ; le CPU est la première branche matérielle approfondie. Les autres familles restent prévues sans afficher des systèmes inachevés.
 
 ## 1. Promesse du jeu
 
@@ -20,7 +20,7 @@ Le jeu n'impose pas de fin définitive. Les grandes réussites ouvrent de nouvea
 1. **Une simulation commune.** Les modes accessible et expert utilisent les mêmes règles. La délégation change la quantité de microgestion, pas la réalité du monde.
 2. **Une décision, une conséquence lisible.** Le joueur doit comprendre le lien entre choix, coût, délai, qualité, risque, réputation et résultat commercial.
 3. **Profondeur progressive.** Les détails sont révélés quand ils deviennent utiles. Les chiffres avancés restent accessibles, mais les écrans principaux montrent les décisions.
-4. **Le CPU d'abord pour la version jouable.** Les autres branches restent dans la vision et les règles de dépendance du jeu ; elles ne doivent pas détourner le développement de la première boucle CPU.
+4. **Deux voies durables dès le départ.** Le joueur peut développer et vendre ses logiciels pendant toute la partie, ou investir plus tard dans le matériel. Le CPU est la première branche matérielle approfondie ; les autres suivent une fois leur boucle jouable.
 5. **Une entreprise vivante.** Les personnes, rapports, découvertes, avis clients, médias, fournisseurs et incidents donnent un visage à la simulation.
 6. **Une progression visible.** Une entreprise modeste doit paraître modeste ; sa montée en gamme doit se voir dans les locaux, les outils, les sons et la qualité de l'interface.
 7. **PC et mobile, même jeu.** La densité et la disposition changent, pas les systèmes de fond.
@@ -80,7 +80,7 @@ Une entreprise peut posséder plusieurs divisions : CPU, serveurs, logiciel, clo
 
 ### Règle de la vertical slice
 
-La première version n'active que la division CPU. Le moteur peut connaître les futures branches, mais il refuse leurs projets tant que leur contenu n'est pas jouable. Cette frontière évite les écrans vides et les systèmes superficiels. Le CPU est une première preuve de la boucle commune, pas la destination finale du jeu.
+La première version permet le logiciel commercial dès le garage et approfondit en premier la division matérielle CPU. Le moteur peut connaître les futures branches, mais il refuse leurs projets tant que leur contenu n'est pas jouable. Cette frontière évite les écrans vides et les systèmes superficiels. Le CPU est une première preuve de la boucle matérielle commune, pas la destination finale du jeu.
 
 ### Produits assemblés et prérequis technologiques
 
@@ -160,7 +160,7 @@ La complexité de Tech Empire doit grandir au même rythme que l'entreprise et q
 
 ### Le garage comme phase d'apprentissage
 
-La partie commence dans un petit garage ou bureau improvisé avec très peu de fonctions visibles. Le joueur pilote directement son premier domaine — CPU dans la vertical slice — et n'a accès qu'aux informations nécessaires au problème courant.
+La partie commence dans un petit garage ou bureau improvisé avec très peu de fonctions visibles. Le joueur peut accepter un contrat client ou créer un logiciel à sa marque ; il choisit si et quand il ouvre le matériel. Seules les informations nécessaires au problème courant apparaissent.
 
 La scène du local sert d'interface principale : personnage, ordinateur, bureaux libres et machines indiquent ce qui est interactif. Toucher un poste ouvre quelques actions adaptées à son occupant et au projet en cours ; une fiche détail révèle les paramètres techniques à la demande. Le schéma d'interaction éprouvé des tycoons à personnages reste pertinent sur souris et écran tactile. Tech Empire l'étend par les composants, les dépendances, les choix de fabrication et l'évolution physique des ateliers, avec sa propre identité visuelle et ses propres textes.
 
@@ -408,6 +408,14 @@ Opportunité → architecture → conception → prototypes → validation → i
 Opportunité → conception → développement → tests → lancement → correctifs → mises à jour → contenu ou extensions → maintenance → migration vers une nouvelle version → fin éventuelle de support.
 
 Le logiciel peut être vendu une fois, par abonnement, avec maintenance, contenu, extensions ou service associé. Un produit logiciel peut durer des années et continuer d'évoluer ; il ne se termine pas le jour de sa sortie.
+
+### Première voie commerciale : rester dans le logiciel
+
+Dès le garage, le fondateur choisit librement entre deux activités complémentaires : contrats clients ponctuels (trésorerie immédiate, expérience, relation) ou produits à sa marque (investissement initial, publication, ventes et entretien sur la durée). Les premiers débouchés cohérents avec 1971 sont les outils de gestion, facturation, programmation et exploitation de mini-ordinateurs. Les systèmes d'exploitation et, plus tard, logiciels de réseau ou de gestion de serveurs exigent davantage de maîtrise technique et de compatibilité avec les machines de leur époque.
+
+Une petite boucle jouable utilise les verbes **concevoir → coder/tester/faire connaître → publier → vendre chaque mois → corriger et préparer une version**. La qualité, la visibilité, l'âge du produit et les frais de maintenance affectent le résultat. Publier une amélioration relance le produit ; l'argent et la compétence accumulés peuvent financer d'autres logiciels. Le joueur n'a aucune obligation de recruter pour le matériel ni de lancer un CPU.
+
+À terme, ce métier s'élargit : licences, contrats de maintenance, support, mises à jour, formation des clients, systèmes d'exploitation pour plateformes compatibles, outils de développement, logiciels professionnels, puis services récurrents. Si le joueur choisit aussi le matériel, les deux activités créent des synergies ; elles restent chacune viables séparément. La première implémentation n'expose que quelques familles et des ventes simplifiées : canaux de distribution, concurrence, prix, licences et support détaillé seront ajoutés progressivement.
 
 ### Service
 

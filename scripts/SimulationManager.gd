@@ -12,6 +12,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	BalanceManager.reset(difficulty)
 	FounderManager.reset()
 	StartupManager.reset()
+	SoftwareStudioManager.reset()
 	CompanyManager.reset(company_name, active_sector, BalanceManager.starting_capital())
 	DivisionManager.reset(active_sector)
 	PersonnelManager.reset(active_sector)
@@ -29,12 +30,14 @@ func process_day() -> void:
 	if is_game_over:
 		return
 	StartupManager.process_day()
+	SoftwareStudioManager.process_day()
 
 func process_month_end() -> Dictionary:
 	if is_game_over:
 		return {}
 	CompanyManager.process_month()
 	StartupManager.process_month()
+	SoftwareStudioManager.process_month()
 	DivisionManager.process_month()
 	var active := ResearchManager.active_departments()
 	for dept in FoundryManager.active_departments():

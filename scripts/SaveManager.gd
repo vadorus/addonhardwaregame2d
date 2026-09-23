@@ -7,11 +7,11 @@ signal loading_finished(ok)
 
 const SAVE_DIR := "user://saves"
 const LEGACY_SAVE_PATH := "user://tech_empire_save.json"
-const SAVE_VERSION := 27
+const SAVE_VERSION := 28
 const SLOT_IDS := ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5"]
 
 const STATE_SECTIONS := [
-	"time", "balance", "founder", "startup", "economy", "company", "divisions", "personnel",
+	"time", "balance", "founder", "startup", "software_studio", "economy", "company", "divisions", "personnel",
 	"executive", "research", "foundry", "production", "patents",
 	"products", "after_sales", "market", "media"
 ]
@@ -126,6 +126,11 @@ func _migrate_state(raw_state: Dictionary) -> Dictionary:
 		# V27 ajoute difficulté, points de travail, échéance et crise de retard.
 		# Les contrats V26 en cours sont complétés par StartupManager au chargement.
 		state["version"] = 27
+		version = 27
+	if version <= 27:
+		# V28 ajoute les logiciels commercialisés ; les anciennes parties débutent sans catalogue.
+		state["software_studio"] = state.get("software_studio", {})
+		state["version"] = 28
 	return state
 
 func _read_valid_state(path: String) -> Dictionary:
@@ -323,6 +328,7 @@ func _build_state(slot_id: String, slot_name: String) -> Dictionary:
 		"balance": BalanceManager.get_state(),
 		"founder": FounderManager.get_state(),
 		"startup": StartupManager.get_state(),
+		"software_studio": SoftwareStudioManager.get_state(),
 		"economy": Economy.get_state(),
 		"company": CompanyManager.get_state(),
 		"divisions": DivisionManager.get_state(),
@@ -382,6 +388,7 @@ func _apply_state(state: Dictionary) -> bool:
 	BalanceManager.load_state(state.get("balance", {"active_profile":"STANDARD"}))
 	FounderManager.load_state(state.get("founder", {}))
 	StartupManager.load_state(state.get("startup", {}))
+	SoftwareStudioManager.load_state(state.get("software_studio", {}))
 	DivisionManager.load_state(state.get("divisions", {}))
 	Economy.load_state(state.get("economy", {}))
 	PersonnelManager.load_state(state.get("personnel", {}))

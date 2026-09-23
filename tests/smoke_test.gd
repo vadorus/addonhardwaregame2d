@@ -66,6 +66,42 @@ func _ready() -> void:
 		_fail("Garage starting cash does not match the selected difficulty")
 		return
 
+	if not SoftwareStudioManager.start_product("STOCK_APP") or not SoftwareStudioManager.perform_session("CODE"):
+		_fail("A founder cannot create an owned software product at the start")
+		return
+	for _day in range(25):
+		SimulationManager.process_day()
+	if not SoftwareStudioManager.project_ready() or not SoftwareStudioManager.release_product():
+		_fail("An owned software product could not be published")
+		return
+	var software_month: Dictionary = SimulationManager.process_month_end()
+	if int(software_month.get("result", 0)) <= 0:
+		_fail("The first owned software cannot cover garage operating costs")
+		return
+	for _month in range(5):
+		SimulationManager.process_month_end()
+	if SoftwareStudioManager.lifetime_sales < 3500 or not StartupManager.can_hire_first_engineer():
+		_fail("Software sales did not fund the optional hardware path")
+		return
+	if StartupManager.first_engineer_hired or StartupManager.cpu_program_unlocked:
+		_fail("Software sales forced the player into hardware")
+		return
+	if not SoftwareStudioManager.start_product("STOCK_APP"):
+		_fail("The software-only player cannot begin a new version")
+		return
+	for _day in range(25):
+		SimulationManager.process_day()
+	if not SoftwareStudioManager.release_product() or int(SoftwareStudioManager.products[0].get("version", 0)) != 2:
+		_fail("The second release did not update the existing product")
+		return
+	var saved_software := SoftwareStudioManager.get_state()
+	SimulationManager.reset_all("CI Test", "GPU")
+	SoftwareStudioManager.load_state(saved_software)
+	if SoftwareStudioManager.products.size() != 1 or SoftwareStudioManager.lifetime_sales < 3500:
+		_fail("Published software did not survive save state round-trip")
+		return
+	SimulationManager.reset_all("CI Test", "GPU")
+
 	var easy_preview := StartupManager.contract_preview("STOCK", "SOLID")
 	var hard_preview := StartupManager.contract_preview("INDUSTRIAL_LOG", "SOLID")
 	if not bool(easy_preview.get("fits_deadline", false)):

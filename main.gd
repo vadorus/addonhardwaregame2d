@@ -3,6 +3,7 @@ extends Control
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const QG_BACKGROUND: Texture2D = preload("res://assets/ui/runtime/menu/menu_background_1971.png")
 const GARAGE_VIEW := preload("res://ui/GarageView.gd")
+const SOFTWARE_STUDIO_PANEL := preload("res://ui/SoftwareStudioPanel.gd")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
 const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
@@ -205,6 +206,7 @@ var dashboard_target_tab := 3
 var startup_intro_layer: Control
 var startup_intro_text: Label
 var startup_dashboard_panel: PanelContainer
+var software_studio_panel: PanelContainer
 var garage_view: Control
 var garage_action_panel: PanelContainer
 var garage_action_title: Label
@@ -316,6 +318,7 @@ func _connect_signals():
 	FounderManager.level_up.connect(func(new_level): status_label.text = "Niveau du fondateur atteint : %d." % int(new_level))
 	FounderManager.branch_level_up.connect(func(branch, new_level): status_label.text = "%s atteint le niveau %d : nouveau savoir-faire débloqué." % [FounderManager.branch_label(str(branch)), int(new_level)])
 	StartupManager.startup_changed.connect(_refresh_all)
+	SoftwareStudioManager.studio_changed.connect(_refresh_all)
 	StartupManager.milestone_unlocked.connect(_on_startup_milestone)
 	ResearchManager.projects_changed.connect(_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
@@ -864,9 +867,16 @@ func _create_dashboard_tab():
 	heading_copy.add_child(_eyebrow("ATELIER • PRINTEMPS 1971"))
 	var title := _label("Votre garage", 29)
 	heading_copy.add_child(title)
-	heading_copy.add_child(_muted_label("Touchez votre personnage ou un poste de travail pour découvrir les actions.", 13))
+	heading_copy.add_child(_muted_label("Touchez votre personnage ou un poste pour choisir votre prochaine activité.", 13))
+	var studio_button := Button.new()
+	studio_button.text = "Studio logiciel"
+	studio_button.custom_minimum_size = Vector2(160, 48)
+	studio_button.pressed.connect(_open_software_studio)
+	heading.add_child(studio_button)
 
 	_build_garage_ui(box)
+	software_studio_panel = SOFTWARE_STUDIO_PANEL.new()
+	box.add_child(software_studio_panel)
 	_build_startup_dashboard(box)
 
 	dashboard_grid = GridContainer.new()
@@ -1072,6 +1082,10 @@ func _build_garage_ui(parent: VBoxContainer) -> void:
 	)
 	content.add_child(garage_details_button)
 
+func _open_software_studio() -> void:
+	if software_studio_panel != null:
+		software_studio_panel.call("open")
+
 func _select_garage_station(index: int) -> void:
 	garage_selected_station = index
 	_refresh_garage_ui(true)
@@ -1085,18 +1099,30 @@ func _garage_action(index: int) -> void:
 		return
 	if garage_selected_station != 0:
 		return
+	if StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and index == 1:
+		_open_software_studio()
+		return
+	if StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and index == 2:
+		garage_details_expanded = true
+		_refresh_garage_ui(true)
+		var scroll := startup_dashboard_panel.get_parent().get_parent()
+		if scroll is ScrollContainer:
+			(scroll as ScrollContainer).ensure_control_visible.call_deferred(startup_dashboard_panel)
+		return
 	var action := str(StartupManager.current_objective().get("action", ""))
 	match action:
 		"START_SOFTWARE":
 			if index == 0:
 				_startup_contract_action()
 			elif index == 1:
-				garage_details_expanded = true
-				_refresh_garage_ui(true)
+				_open_software_studio()
 		"WAIT_CONTRACT", "CONTRACT_MILESTONE", "CONTRACT_DEADLINE", "WORK_ELECTRONICS":
 			if index >= 0 and index < 3:
 				_startup_work_action(["BUILD", "TEST", "CLIENT"][index])
-		"DISMISS_RESULT", "HIRE_ENGINEER", "START_ELECTRONICS", "OPEN_CPU":
+		"DISMISS_RESULT", "HIRE_ENGINEER", "START_ELECTRONICS", "OPEN_CPU", "SOFTWARE_STUDIO":
+			if action == "SOFTWARE_STUDIO":
+				_open_software_studio()
+				return
 			if index == 0:
 				_startup_primary_action()
 
@@ -1364,18 +1390,18 @@ func _startup_nora_guidance() -> Dictionary:
 	if not StartupManager.last_contract_result.is_empty() and StartupManager.software_contracts_completed == 1:
 		return {
 			"title":"Nora • Votre premier vrai paiement",
-			"text":"Vous avez prouvé que le garage peut rapporter de l'argent. À partir de maintenant, les contrats sont optionnels : ils servent à financer et améliorer l'entreprise, mais ils ne bloquent plus votre route vers le hardware."
+			"text":"Ce paiement peut financer votre prochain logiciel, de nouvelles versions ou, si vous le souhaitez, un atelier matériel. Vous choisissez votre spécialité."
 		}
 	match StartupManager.stage:
 		StartupManager.STAGE_GARAGE:
 			return {
 				"title":"Nora • Commencez simple",
-				"text":"La Quincaillerie Morel a besoin d'un petit logiciel de stock. C'est votre contrat tutoriel : acceptez-le, puis observez comment votre niveau de Programmation transforme le temps en points de développement."
+				"text":"La Quincaillerie Morel propose un contrat. Vous pouvez aussi créer un logiciel sous votre marque. Touchez votre personnage et choisissez ce qui vous intéresse."
 			}
 		StartupManager.STAGE_FIRST_HIRE:
 			return {
 				"title":"Nora • Le garage peut grandir",
-				"text":"Le premier contrat a payé. Votre prochaine étape n'est pas de collectionner les petits logiciels : utilisez ce capital pour recruter une compétence que vous n'avez pas encore et préparer l'électronique."
+				"text":"Votre premier revenu vous donne le choix : développer des logiciels à vendre, poursuivre les contrats ou recruter pour explorer le matériel. Vous pouvez rester spécialiste du logiciel."
 			}
 		StartupManager.STAGE_ELECTRONICS:
 			return {
@@ -1425,7 +1451,7 @@ func _refresh_garage_ui(visible: bool) -> void:
 	var action := str(StartupManager.current_objective().get("action", ""))
 	match action:
 		"START_SOFTWARE":
-			_configure_garage_actions("%s • devant le terminal" % FounderManager.founder_name, "La Quincaillerie Morel cherche un logiciel de stock. Acceptez sa commande pour commencer à travailler.", ["Accepter le contrat Morel", "Voir la proposition"])
+			_configure_garage_actions("%s • devant le terminal" % FounderManager.founder_name, "La Quincaillerie Morel propose un contrat. Vous pouvez aussi créer un logiciel à vendre sous votre propre marque.", ["Accepter le contrat Morel", "Créer votre logiciel"])
 		"WAIT_CONTRACT":
 			var project := StartupManager.active_contract
 			var days := StartupManager.days_until_next_work_session()
@@ -1439,14 +1465,18 @@ func _refresh_garage_ui(visible: bool) -> void:
 		"DISMISS_RESULT":
 			_configure_garage_actions("Le contrat est livré", "Découvrez le paiement et la prochaine possibilité de votre garage.", ["Voir le bilan"])
 		"HIRE_ENGINEER":
-			_configure_garage_actions("Votre prochain recrutement", "Le bureau libre peut accueillir Élise, ingénieure électronique.", ["Recruter Élise • 3 500 €"], StartupManager.can_hire_first_engineer())
+			_configure_garage_actions("Choisissez votre activité", "Vos logiciels peuvent continuer à financer l'entreprise. Élise ouvrira la voie matérielle quand vous le voudrez.", ["Recruter Élise • 3 500 €", "Studio logiciel", "Choisir un contrat"])
+			garage_action_buttons[0].disabled = not StartupManager.can_hire_first_engineer()
 		"START_ELECTRONICS":
-			_configure_garage_actions("Passer au matériel", "Construisez un premier contrôleur logique avec Élise.", ["Lancer le prototype"], StartupManager.can_start_electronics_project())
+			_configure_garage_actions("Logiciel ou matériel", "Vous pouvez lancer un contrôleur logique ou continuer à vendre vos logiciels.", ["Lancer le prototype", "Studio logiciel", "Choisir un contrat"])
+			garage_action_buttons[0].disabled = not StartupManager.can_start_electronics_project()
 		"WORK_ELECTRONICS":
 			var days := StartupManager.days_until_next_work_session()
 			_configure_garage_actions("Prototype électronique", "Votre prochaine séance : assembler, mesurer ou documenter." if days == 0 else "Prochaine séance dans %d jour(s)." % days, ["Assembler", "Tester", "Documenter"], days == 0)
 		"OPEN_CPU":
-			_configure_garage_actions("Le laboratoire CPU est prêt", "Le prototype ouvre la voie au premier processeur.", ["Ouvrir le labo CPU"])
+			_configure_garage_actions("Le laboratoire CPU est prêt", "Entrer sur le marché matériel est votre choix. Vos logiciels restent actifs.", ["Ouvrir le labo CPU", "Studio logiciel", "Choisir un contrat"])
+		"SOFTWARE_STUDIO":
+			_configure_garage_actions("Votre produit logiciel", "Le développement avance. Choisissez une priorité au studio, puis publiez pour lancer les ventes.", ["Ouvrir le studio"])
 		_:
 			_configure_garage_actions("Votre bureau", "Touchez un poste pour voir les actions disponibles.", [])
 
@@ -1461,10 +1491,10 @@ func _refresh_startup_dashboard() -> void:
 
 	_refresh_founder_panel()
 	var objective := StartupManager.current_objective()
-	var first_contract_not_started := StartupManager.software_contracts_completed == 0 and StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty()
+	var first_contract_not_started := StartupManager.software_contracts_completed == 0 and SoftwareStudioManager.products.is_empty() and SoftwareStudioManager.active_project.is_empty() and StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty()
 	var first_contract_running := StartupManager.is_first_contract_tutorial()
-	startup_summary_label.text = "PREMIER OBJECTIF" if first_contract_not_started else str(objective.get("title", "Votre garage"))
-	startup_progress_label.text = "Gagnez votre premier vrai paiement. Nora vous explique le reste au fur et à mesure." if first_contract_not_started else "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
+	startup_summary_label.text = "PREMIER CHOIX" if first_contract_not_started else str(objective.get("title", "Votre garage"))
+	startup_progress_label.text = "Contrat client ou logiciel à votre marque : choisissez votre premier projet." if first_contract_not_started else "%s\n%s" % [str(objective.get("text", "")), str(objective.get("progress", ""))]
 	var guidance := _startup_nora_guidance()
 	startup_nora_card.visible = not guidance.is_empty()
 	if not guidance.is_empty():
@@ -1507,7 +1537,7 @@ func _refresh_startup_dashboard() -> void:
 
 	_update_result_feedback()
 
-	var contract_choices_visible := StartupManager.active_contract.is_empty() and StartupManager.last_contract_result.is_empty() and not StartupManager.available_contract_ids().is_empty()
+	var contract_choices_visible := StartupManager.active_contract.is_empty() and SoftwareStudioManager.active_project.is_empty() and StartupManager.last_contract_result.is_empty() and not StartupManager.available_contract_ids().is_empty()
 	startup_contract_select.visible = contract_choices_visible and not first_contract_not_started
 	startup_approach_select.visible = contract_choices_visible and not first_contract_not_started
 	startup_contract_hint.visible = contract_choices_visible
@@ -2987,7 +3017,7 @@ func _build_setup_layer():
 	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
 	var title:=_label("Votre aventure commence en 1971",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("Créez votre fondateur et votre entreprise, puis touchez votre personnage dans le garage pour décrocher votre premier contrat.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	var desc:=_label("Créez votre fondateur et votre entreprise, puis touchez votre personnage pour accepter un contrat ou créer votre propre logiciel.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
 	setup_founder_name=LineEdit.new(); setup_founder_name.placeholder_text="Nom de votre personnage"; setup_founder_name.text="Alex"; box.add_child(setup_founder_name)
 	setup_portrait=OptionButton.new()
 	setup_portrait.add_item("Apparence • combinaison turquoise")
@@ -3604,7 +3634,7 @@ func _start_new_game():
 	FounderManager.portrait_style = setup_portrait.selected
 	setup_layer.visible=false
 	game_over_layer.visible=false
-	status_label.text="Touchez votre personnage dans le garage pour trouver votre premier client."
+	status_label.text="Touchez votre personnage : premier contrat ou logiciel à votre marque, à vous de choisir."
 	StartupManager.mark_intro_seen()
 	_refresh_all()
 
