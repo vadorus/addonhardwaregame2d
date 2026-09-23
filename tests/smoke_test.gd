@@ -250,6 +250,7 @@ func _ready() -> void:
 		if not rival.has("ai_decision_history") or not rival.has("ai_decision_cooldown"):
 			_fail("CPU rival is missing persistent autonomous decision state")
 			return
+	var autonomous_market_state := MarketManager.get_state().duplicate(true)
 	MarketManager.process_month([])
 	for rival_value in MarketManager.competitors.get("CPU", []):
 		var rival: Dictionary = rival_value
@@ -259,6 +260,7 @@ func _ready() -> void:
 		if int(rival.get("ai_decision_cooldown", 0)) <= 0:
 			_fail("Autonomous CPU rival changed strategy without a decision cooldown")
 			return
+	MarketManager.load_state(autonomous_market_state)
 
 	var public_competitors := MarketManager.cpu_competitor_public_profiles()
 	if public_competitors.size() != 3:
