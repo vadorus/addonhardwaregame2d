@@ -681,9 +681,13 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		if not MarketManager.is_segment_available(market_segment):
 			return false
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
+	var sourcing_profile := GameData.sourcing_profile(approach)
+	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
 	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
 	if remediation_upfront > 0:
 		first_month_commitment += Economy.quoted_expense(remediation_upfront, "Programme technique")
+	if sourcing_setup_cost > 0:
+		first_month_commitment += Economy.quoted_expense(sourcing_setup_cost, "Accès technologique — %s" % str(sourcing_profile.get("label", "")))
 	if Economy.money < first_month_commitment:
 		return false
 	if sector == "CPU" and get_development_team_size() <= 0:
@@ -755,7 +759,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 
 	var project := {
 		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":market_segment,
-		"approach":approach,"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
+		"approach":approach,"sourcing":sourcing_profile.duplicate(true),"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
@@ -780,6 +784,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	}
 	if sector == "CPU" and not stored_remediation.is_empty():
 		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
+	if sourcing_setup_cost > 0:
+		Economy.add_expense(sourcing_setup_cost, "Accès technologique — %s" % str(sourcing_profile.get("label", "")))
 	_next_id += 1
 	projects.append(project)
 	if sector == "CPU":
@@ -801,7 +807,7 @@ func process_month():
 
 func _process_project_month(project: Dictionary):
 	var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
-	var approach_data: Dictionary = GameData.APPROACHES[str(project.approach)]
+	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
 	var specialization := str(sector_data.specialization)
 	var team := PersonnelManager.team_score("R&D", specialization)
 	var management := CompanyManager.department_management_modifier("R&D")
@@ -894,7 +900,7 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 		_finalize_project(project, team, tech, budget_ratio)
 
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
-	var approach_data: Dictionary = GameData.APPROACHES[str(project.approach)]
+	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
 	var metrics := {}
 	var desired: Dictionary = project.desired_metrics
 	var average_quality: float = float(project.quality_accumulator) / maxf(float(project.months_spent), 1.0)
