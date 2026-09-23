@@ -202,6 +202,33 @@ func _ready() -> void:
 		_fail("Moderate technological lead unlocked gaming too early")
 		return
 	ResearchManager.load_state(market_research_probe)
+	var public_competitors := MarketManager.cpu_competitor_public_profiles()
+	if public_competitors.size() != 3:
+		_fail("Public CPU competitor profiles did not expose the expected market rivals")
+		return
+	var public_rival: Dictionary = public_competitors[0]
+	for forbidden_public_key in ["cash", "architecture", "manufacturing", "yield_rate", "capacity", "development_progress"]:
+		if public_rival.has(forbidden_public_key):
+			_fail("Public competitor profile leaked internal simulation data: %s" % forbidden_public_key)
+			return
+	var comparison_probe := {
+		"name":"Public comparison probe",
+		"company":CompanyManager.company_name,
+		"sector":"CPU",
+		"target_segment":"EMBEDDED",
+		"price":105,
+		"metrics":{
+			"performance":62.0,
+			"efficiency":64.0,
+			"reliability":66.0,
+			"innovation":58.0,
+			"sustainability":55.0
+		}
+	}
+	var public_comparison := MarketManager.compare_cpu_public(comparison_probe, str(public_rival.get("id", "")))
+	if public_comparison.is_empty() or public_comparison.get("rows", []).size() != 5 or str(public_comparison.get("summary", "")).is_empty():
+		_fail("Public CPU comparison did not produce a usable player-vs-rival analysis")
+		return
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
 		_fail("Garage onboarding did not expose QG and CPU Lab")
