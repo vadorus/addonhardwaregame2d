@@ -364,7 +364,7 @@ func _create_dashboard_tab():
 	var garage_script: Script = load("res://ui/GarageHub.gd")
 	dashboard_garage = garage_script.new() as Control
 	dashboard_garage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dashboard_garage.zone_requested.connect(_on_garage_zone_requested)
+	dashboard_garage.connect("zone_requested", Callable(self, "_on_garage_zone_requested"))
 	garage_box.add_child(dashboard_garage)
 
 	dashboard_grid = GridContainer.new()
