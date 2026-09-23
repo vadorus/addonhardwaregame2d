@@ -1288,7 +1288,7 @@ func _refresh_cpu_preview():
 	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
 	var approach_data: Dictionary = GameData.approach_data(approach_key)
-	var sourcing := GameData.sourcing_profile(approach_key)
+	var sourcing: Dictionary = GameData.sourcing_profile(approach_key)
 	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
 	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
 	var months := base_months + extra_months
