@@ -672,7 +672,7 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL") -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED") -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	var market_segment := segment
@@ -681,7 +681,14 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		if not MarketManager.is_segment_available(market_segment):
 			return false
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
-	var sourcing_profile := GameData.sourcing_profile(approach)
+	var resolved_supplier_id := supplier_id
+	if approach != "INTERNAL" and resolved_supplier_id.is_empty():
+		resolved_supplier_id = SupplierManager.recommended_supplier(approach)
+	var sourcing_profile: Dictionary = SupplierManager.quote(approach, resolved_supplier_id, negotiation)
+	if sourcing_profile.is_empty():
+		return false
+	if approach != "INTERNAL" and not SupplierManager.can_accept_project(approach, resolved_supplier_id):
+		return false
 	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
 	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
 	if remediation_upfront > 0:
@@ -757,9 +764,13 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			or int(stored_generation_plan.get("monthly_budget", monthly_budget)) != monthly_budget
 		)
 
+	var project_id := "PRJ-%03d" % _next_id
 	var project := {
-		"id":"PRJ-%03d" % _next_id,"name":project_name,"sector":sector,"segment":market_segment,
-		"approach":approach,"sourcing":sourcing_profile.duplicate(true),"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
+		"id":project_id,"name":project_name,"sector":sector,"segment":market_segment,
+		"approach":approach,"sourcing":sourcing_profile.duplicate(true),
+		"supplier_id":resolved_supplier_id,"supplier_name":str(sourcing_profile.get("supplier_name", "Équipe interne")),
+		"negotiation":str(sourcing_profile.get("negotiation", negotiation)),
+		"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
@@ -782,6 +793,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		} if sector == "CPU" else {},
 		"complexity":float(design_estimate.get("complexity", 50.0))
 	}
+	if approach != "INTERNAL" and not SupplierManager.commit_project(project_id, approach, resolved_supplier_id):
+		return false
 	if sector == "CPU" and not stored_remediation.is_empty():
 		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
 	if sourcing_setup_cost > 0:
@@ -808,6 +821,8 @@ func process_month():
 func _process_project_month(project: Dictionary):
 	var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
+	var sourcing_value = project.get("sourcing", {})
+	var sourcing: Dictionary = sourcing_value if typeof(sourcing_value) == TYPE_DICTIONARY else {}
 	var specialization := str(sector_data.specialization)
 	var team := PersonnelManager.team_score("R&D", specialization)
 	var management := CompanyManager.department_management_modifier("R&D")
@@ -816,7 +831,7 @@ func _process_project_month(project: Dictionary):
 		management = CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
-	var expense := int(float(project.monthly_budget) * float(approach_data.cost))
+	var expense := int(float(project.monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0)))
 	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
 	if str(project.sector) == "CPU" and int(project.get("remediation_months_remaining", 0)) > 0:
@@ -832,13 +847,14 @@ func _process_project_month(project: Dictionary):
 			])
 		return
 	var tech := float(technologies.get(specialization, 5.0))
-	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * management
+	var supplier_execution := SupplierManager.monthly_execution_factor(project)
+	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0)) * supplier_execution * management
 	if str(project.sector) == "CPU":
 		var complexity_factor := lerpf(0.86, 1.28, clampf(float(project.get("complexity", 50.0)) / 100.0, 0.0, 1.0))
 		progress /= complexity_factor
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
-	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge)
+	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
 	technologies[specialization] = clampf(tech + knowledge_gain, 0.0, 100.0)
 	technologies["integration"] = clampf(float(technologies.get("integration", 10.0)) + knowledge_gain * 0.18, 0.0, 100.0)
 	_apply_development_learning(project)
@@ -901,12 +917,14 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
+	var sourcing_value = project.get("sourcing", {})
+	var sourcing: Dictionary = sourcing_value if typeof(sourcing_value) == TYPE_DICTIONARY else {}
 	var metrics := {}
 	var desired: Dictionary = project.desired_metrics
 	var average_quality: float = float(project.quality_accumulator) / maxf(float(project.months_spent), 1.0)
 	for metric in GameData.METRICS:
 		var base := float(desired.get(metric, 55.0)) * 0.40 + team * 0.20 + tech * 0.16 + average_quality * 0.12 + budget_ratio * 6.0
-		base *= float(approach_data.quality)
+		base *= float(approach_data.quality) * float(sourcing.get("quality_factor", 1.0))
 		base += rng.randf_range(-4.0, 4.0)
 		metrics[metric] = clampf(base, 25.0, 96.0)
 	var design_estimate: Dictionary = project.get("design_estimate", {})
@@ -915,7 +933,7 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 			var simulated_value := float(metrics.get(design_metric, 50.0))
 			var designed_value := float(design_estimate.get(design_metric, simulated_value))
 			metrics[design_metric] = clampf(simulated_value * 0.62 + designed_value * 0.38, 20.0, 98.0)
-	var internal_ratio := float(approach_data.internal_ratio)
+	var internal_ratio := float(sourcing.get("internal_ratio", approach_data.internal_ratio))
 	var integration_skill := float(technologies.get("integration", 10.0))
 	if internal_ratio >= 0.6:
 		metrics.ecosystem = clampf(float(metrics.ecosystem) + integration_skill * 0.08, 0.0, 100.0)
@@ -926,6 +944,7 @@ func _finalize_project(project: Dictionary, team: float, tech: float, budget_rat
 	project.final_metrics = metrics
 	project.status = "COMPLETED"
 	project.phase_progress = 100.0
+	SupplierManager.complete_project(project)
 	project_completed.emit(project)
 	PatentManager.create_candidate(project)
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
@@ -962,6 +981,21 @@ func get_state() -> Dictionary:
 func load_state(state: Dictionary):
 	projects = state.get("projects", []).duplicate(true)
 	for project in projects:
+		var saved_approach := str(project.get("approach", "INTERNAL"))
+		var saved_sourcing_value = project.get("sourcing", {})
+		var saved_sourcing: Dictionary = saved_sourcing_value.duplicate(true) if typeof(saved_sourcing_value) == TYPE_DICTIONARY else {}
+		if saved_sourcing.is_empty():
+			saved_sourcing = GameData.sourcing_profile(saved_approach)
+			saved_sourcing["supplier_id"] = str(project.get("supplier_id", ""))
+			saved_sourcing["supplier_name"] = str(project.get("supplier_name", "Technologie externe" if saved_approach != "INTERNAL" else "Équipe interne"))
+			saved_sourcing["speed_factor"] = float(saved_sourcing.get("speed_factor", 1.0))
+			saved_sourcing["quality_factor"] = float(saved_sourcing.get("quality_factor", 1.0))
+			saved_sourcing["knowledge_transfer_factor"] = float(saved_sourcing.get("knowledge_transfer_factor", 1.0))
+			saved_sourcing["monthly_cost_factor"] = float(saved_sourcing.get("monthly_cost_factor", 1.0))
+		project["sourcing"] = saved_sourcing
+		project["supplier_id"] = str(project.get("supplier_id", saved_sourcing.get("supplier_id", "")))
+		project["supplier_name"] = str(project.get("supplier_name", saved_sourcing.get("supplier_name", "Équipe interne")))
+		project["negotiation"] = str(project.get("negotiation", saved_sourcing.get("negotiation", "BALANCED")))
 		if str(project.get("sector", "")) == "CPU":
 			var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 			var saved_capability_snapshot = project.get("technical_capabilities_snapshot", {})
