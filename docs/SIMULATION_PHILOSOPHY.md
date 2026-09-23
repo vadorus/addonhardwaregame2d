@@ -107,6 +107,16 @@ Un contrat peut contenir :
 
 Le joueur peut devenir fournisseur spécialisé d'une autre entreprise sans devoir produire lui-même le produit final.
 
+### Appels d'offres jouables
+
+Le B2B ne doit pas être uniquement une prime aléatoire après le lancement d'un bon produit. Des clients peuvent publier un besoin avant la commercialisation : usage technique, performances minimales, efficacité, fiabilité, volume mensuel, durée, prix plafond, confidentialité, exclusivité éventuelle et pénalités de livraison.
+
+Le joueur choisit quel CPU prêt ou déjà lancé proposer et fixe son prix. L'équipe donne une lecture de la compétitivité, mais la décision du client intervient au cycle mensuel suivant.
+
+Un contrat remporté avec un CPU encore prêt est **réservé** jusqu'au lancement. Une fois le produit commercialisé, le contrat devient actif. Une livraison inférieure au volume promis peut déclencher une pénalité financière et dégrader la réputation professionnelle.
+
+Un appel d'offres spécialisé peut exister indépendamment d'un marché grand public mature. Un programme spatial ou industriel peut donc rechercher un CPU adapté bien avant qu'un marché de masse comparable existe.
+
 ## 8. Acheter, licencier, sous-traiter, co-développer ou internaliser
 
 Créer un produit complet ne signifie pas obligatoirement maîtriser chaque composant en interne.

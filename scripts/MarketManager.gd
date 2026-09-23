@@ -50,11 +50,96 @@ const COMPETITOR_ARCHETYPES := {
 	}
 }
 
+const TENDER_TEMPLATES := {
+	"INDUSTRIAL_CONTROL":{
+		"customer":"Atlas Automation",
+		"title":"Plateforme de contrôle industriel",
+		"application_profile":"INDUSTRIAL",
+		"segment":"INDUSTRIAL",
+		"historical_year":1971,
+		"tech_trigger":0.0,
+		"requirements":{"performance":44.0,"efficiency":54.0,"reliability":74.0},
+		"base_volume":900,
+		"duration_months":12,
+		"deadline_months":4,
+		"max_price_factor":1.12,
+		"confidentiality":48.0,
+		"exclusivity":false,
+		"penalty_rate":0.10
+	},
+	"SPACE_GUIDANCE":{
+		"customer":"Orbital Systems Agency",
+		"title":"Calculateur embarqué mission critique",
+		"application_profile":"SPACE",
+		"segment":"SCIENTIFIC",
+		"historical_year":1971,
+		"tech_trigger":0.0,
+		"requirements":{"performance":38.0,"efficiency":68.0,"reliability":86.0},
+		"base_volume":180,
+		"duration_months":18,
+		"deadline_months":6,
+		"max_price_factor":2.10,
+		"confidentiality":92.0,
+		"exclusivity":true,
+		"penalty_rate":0.18
+	},
+	"CONSOLE_PLATFORM":{
+		"customer":"Aurora Interactive",
+		"title":"CPU pour future console domestique",
+		"application_profile":"CONSOLE",
+		"segment":"HOME_PC",
+		"historical_year":1976,
+		"tech_trigger":44.0,
+		"requirements":{"performance":60.0,"efficiency":58.0,"reliability":66.0},
+		"base_volume":4200,
+		"duration_months":18,
+		"deadline_months":5,
+		"max_price_factor":0.90,
+		"confidentiality":76.0,
+		"exclusivity":true,
+		"penalty_rate":0.14
+	},
+	"SERVER_FLEET":{
+		"customer":"Northstar Systems",
+		"title":"Processeur pour gamme de serveurs",
+		"application_profile":"SERVER",
+		"segment":"SERVER",
+		"historical_year":1983,
+		"tech_trigger":62.0,
+		"requirements":{"performance":66.0,"efficiency":64.0,"reliability":80.0},
+		"base_volume":2100,
+		"duration_months":24,
+		"deadline_months":6,
+		"max_price_factor":1.35,
+		"confidentiality":70.0,
+		"exclusivity":false,
+		"penalty_rate":0.15
+	},
+	"MOBILE_PLATFORM":{
+		"customer":"Mercury Mobile",
+		"title":"CPU basse consommation pour appareil mobile",
+		"application_profile":"MOBILE",
+		"segment":"MOBILE_COMPUTING",
+		"historical_year":1990,
+		"tech_trigger":78.0,
+		"requirements":{"performance":54.0,"efficiency":80.0,"reliability":70.0},
+		"base_volume":8500,
+		"duration_months":18,
+		"deadline_months":5,
+		"max_price_factor":0.82,
+		"confidentiality":82.0,
+		"exclusivity":true,
+		"penalty_rate":0.16
+	}
+}
+
 var competitors: Dictionary = {}
 var contracts: Array = []
+var tenders: Array = []
 var market_events: Array = []
 var known_segments: Array = []
 var _next_contract_id := 1
+var _next_tender_id := 1
 var market_age_months := 0
 var rng := RandomNumberGenerator.new()
 
@@ -63,8 +148,10 @@ func _ready():
 
 func reset():
 	contracts = []
+	tenders = []
 	market_events = []
 	_next_contract_id = 1
+	_next_tender_id = 1
 	market_age_months = 0
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
@@ -835,6 +922,236 @@ func forecast_cpu_launch(product: Dictionary, proposed_price: int) -> Dictionary
 		"trust_signal":trust_signal
 	}
 
+func get_tender(tender_id: String) -> Dictionary:
+	for tender in tenders:
+		if str(tender.get("id", "")) == tender_id:
+			return tender
+	return {}
+
+func open_tenders() -> Array:
+	var result: Array = []
+	for tender in tenders:
+		if str(tender.get("status", "")) in ["OPEN", "SUBMITTED"]:
+			result.append(tender)
+	return result
+
+func _tender_template_available(template: Dictionary) -> bool:
+	return TimeManager.year >= int(template.get("historical_year", 1971)) or market_technology_signal() >= float(template.get("tech_trigger", 0.0))
+
+func create_tender_from_template(template_id: String) -> Dictionary:
+	if not TENDER_TEMPLATES.has(template_id):
+		return {}
+	var template: Dictionary = TENDER_TEMPLATES[template_id]
+	if not _tender_template_available(template):
+		return {}
+	for existing in tenders:
+		if str(existing.get("template_id", "")) != template_id:
+			continue
+		if str(existing.get("status", "")) in ["OPEN", "SUBMITTED"]:
+			return existing
+		if market_age_months - int(existing.get("created_market_month", -999)) < 18:
+			return {}
+	var segment := normalize_segment(str(template.get("segment", default_segment())))
+	var reference_price := segment_reference_price(segment)
+	var volume_scale := clampf(BalanceManager.market_demand_factor(), 0.65, 1.55)
+	var tender := {
+		"id":"RFP-%03d" % _next_tender_id,
+		"template_id":template_id,
+		"customer":str(template.get("customer", "Client industriel")),
+		"title":str(template.get("title", "Appel d'offres CPU")),
+		"application_profile":str(template.get("application_profile", "GENERAL")),
+		"segment":segment,
+		"requirements":template.get("requirements", {}).duplicate(true),
+		"units_per_month":maxi(20, int(round(float(template.get("base_volume", 500)) * volume_scale))),
+		"duration_months":maxi(int(template.get("duration_months", 12)), 1),
+		"deadline_months":maxi(int(template.get("deadline_months", 4)), 1),
+		"max_unit_price":maxi(1, int(round(reference_price * float(template.get("max_price_factor", 1.0))))),
+		"confidentiality":clampf(float(template.get("confidentiality", 50.0)), 0.0, 100.0),
+		"exclusivity":bool(template.get("exclusivity", false)),
+		"penalty_rate":clampf(float(template.get("penalty_rate", 0.10)), 0.0, 0.50),
+		"status":"OPEN",
+		"created_market_month":market_age_months,
+		"bid":{},
+		"resolution_market_month":-1,
+		"result_score":0.0,
+		"result_text":""
+	}
+	_next_tender_id += 1
+	tenders.push_front(tender)
+	CompanyManager.add_alert("Appel d'offres : %s recherche un partenaire pour %s." % [str(tender.customer), str(tender.title)])
+	MediaManager.publish_business_event("Nouvel appel d'offres CPU", "%s ouvre une consultation pour %s." % [str(tender.customer), str(tender.title)])
+	market_changed.emit()
+	return tender
+
+func _product_application_evaluation(product: Dictionary) -> Dictionary:
+	var metrics: Dictionary = product.get("metrics", {})
+	return {
+		"performance":float(metrics.get("performance", 50.0)),
+		"efficiency":float(metrics.get("efficiency", 50.0)),
+		"reliability":float(metrics.get("reliability", 50.0)),
+		"innovation":float(metrics.get("innovation", 50.0)),
+		"unit_cost":float(product.get("unit_cost", 100.0))
+	}
+
+func tender_fit(tender: Dictionary, product: Dictionary, bid_price: int) -> Dictionary:
+	if tender.is_empty() or product.is_empty() or str(product.get("sector", "")) != "CPU":
+		return {}
+	var evaluation := _product_application_evaluation(product)
+	var application_key := str(tender.get("application_profile", "GENERAL"))
+	var application_fit := CPU_DESIGN.application_fit(evaluation, application_key)
+	var requirements: Dictionary = tender.get("requirements", {})
+	var requirement_score := 0.0
+	var requirement_count := 0
+	var gaps: Array[String] = []
+	for metric in ["performance", "efficiency", "reliability"]:
+		if not requirements.has(metric):
+			continue
+		requirement_count += 1
+		var current := float(evaluation.get(metric, 50.0))
+		var required := maxf(float(requirements.get(metric, 1.0)), 1.0)
+		requirement_score += clampf(current / required * 100.0, 0.0, 115.0)
+		if current + 0.1 < required:
+			gaps.append("%s %.0f/%.0f" % [metric, current, required])
+	requirement_score /= maxf(float(requirement_count), 1.0)
+	var max_price := maxi(int(tender.get("max_unit_price", 1)), 1)
+	var price_ratio := float(maxi(bid_price, 1)) / float(max_price)
+	var price_score := clampf(112.0 - maxf(price_ratio - 0.72, 0.0) * 115.0, 10.0, 100.0)
+	if bid_price > max_price:
+		price_score = maxf(price_score - (price_ratio - 1.0) * 70.0, 5.0)
+	var professional := float(CompanyManager.reputation.get("professional", 45.0))
+	var reliability_reputation := float(CompanyManager.reputation.get("reliability", 50.0))
+	var reputation_score := professional * 0.64 + reliability_reputation * 0.36
+	var intent_bonus := 6.0 if str(product.get("application_profile", "GENERAL")) == application_key else 0.0
+	var total_score := clampf(application_fit * 0.34 + requirement_score * 0.31 + price_score * 0.20 + reputation_score * 0.15 + intent_bonus, 0.0, 100.0)
+	return {
+		"score":total_score,
+		"application_fit":application_fit,
+		"requirement_score":requirement_score,
+		"price_score":price_score,
+		"reputation_score":reputation_score,
+		"intent_bonus":intent_bonus,
+		"gaps":gaps,
+		"max_unit_price":max_price
+	}
+
+func submit_tender_bid(tender_id: String, product_id: String, bid_price: int) -> bool:
+	var tender := get_tender(tender_id)
+	var product := ProductManager.get_product(product_id)
+	if tender.is_empty() or product.is_empty() or str(tender.get("status", "")) != "OPEN":
+		return false
+	if str(product.get("status", "")) not in ["READY", "LAUNCHED"] or str(product.get("sector", "")) != "CPU":
+		return false
+	for contract in contracts:
+		if str(contract.get("product_id", "")) == product_id and str(contract.get("status", "")) in ["ACTIVE", "RESERVED"]:
+			return false
+	var fit := tender_fit(tender, product, bid_price)
+	if fit.is_empty():
+		return false
+	tender["bid"] = {
+		"product_id":product_id,
+		"product_name":str(product.get("name", "CPU")),
+		"unit_price":maxi(bid_price, 1),
+		"submitted_market_month":market_age_months,
+		"preview_score":float(fit.get("score", 0.0))
+	}
+	tender["status"] = "SUBMITTED"
+	tender["resolution_market_month"] = market_age_months + 1
+	CompanyManager.add_alert("Offre envoyée à %s pour %s." % [str(tender.get("customer", "")), str(product.get("name", "CPU"))])
+	market_changed.emit()
+	return true
+
+func _resolve_tender(tender: Dictionary):
+	var bid: Dictionary = tender.get("bid", {})
+	var product := ProductManager.get_product(str(bid.get("product_id", "")))
+	if product.is_empty():
+		tender["status"] = "REJECTED"
+		tender["result_text"] = "Produit indisponible au moment de la décision."
+		return
+	var fit := tender_fit(tender, product, int(bid.get("unit_price", 1)))
+	var score := float(fit.get("score", 0.0))
+	tender["result_score"] = score
+	var awarded := score >= 68.0
+	if awarded:
+		tender["status"] = "AWARDED"
+		var contract_status := "ACTIVE" if str(product.get("status", "")) == "LAUNCHED" else "RESERVED"
+		var contract := {
+			"id":"B2B-%03d" % _next_contract_id,
+			"kind":"TENDER",
+			"tender_id":str(tender.get("id", "")),
+			"product_id":str(product.get("id", "")),
+			"product_name":str(product.get("name", "CPU")),
+			"customer":str(tender.get("customer", "")),
+			"segment":str(tender.get("segment", default_segment())),
+			"application_profile":str(tender.get("application_profile", "GENERAL")),
+			"units_per_month":int(tender.get("units_per_month", 0)),
+			"unit_price":int(bid.get("unit_price", 1)),
+			"remaining_months":int(tender.get("duration_months", 12)),
+			"status":contract_status,
+			"penalty_rate":float(tender.get("penalty_rate", 0.10)),
+			"confidentiality":float(tender.get("confidentiality", 50.0)),
+			"exclusivity":bool(tender.get("exclusivity", false))
+		}
+		_next_contract_id += 1
+		contracts.append(contract)
+		tender["result_text"] = "Offre retenue. Le contrat %s %s." % [
+			str(contract.get("id", "")),
+			"est réservé jusqu'au lancement du CPU" if contract_status == "RESERVED" else "entre en vigueur immédiatement"
+		]
+		CompanyManager.change_reputation({"professional":1.5,"prestige":0.5})
+		CompanyManager.add_alert("%s retient votre offre pour %s." % [str(tender.get("customer", "")), str(tender.get("title", ""))])
+		MediaManager.publish_business_event("Contrat remporté", "%s choisit %s pour son programme CPU." % [str(tender.get("customer", "")), CompanyManager.company_name])
+	else:
+		tender["status"] = "REJECTED"
+		var gaps: Array = fit.get("gaps", [])
+		tender["result_text"] = "Offre non retenue • score %.1f/100%s" % [
+			score,
+			(" • écarts : " + ", ".join(gaps)) if not gaps.is_empty() else ""
+		]
+		CompanyManager.add_alert("%s n'a pas retenu votre offre." % str(tender.get("customer", "")))
+	market_changed.emit()
+
+func _update_tenders():
+	for tender in tenders:
+		var status := str(tender.get("status", ""))
+		if status == "OPEN":
+			tender["deadline_months"] = maxi(int(tender.get("deadline_months", 1)) - 1, 0)
+			if int(tender.get("deadline_months", 0)) <= 0:
+				tender["status"] = "EXPIRED"
+				tender["result_text"] = "Consultation clôturée sans offre."
+		elif status == "SUBMITTED" and market_age_months >= int(tender.get("resolution_market_month", market_age_months + 1)):
+			_resolve_tender(tender)
+	var active_open := 0
+	for tender in tenders:
+		if str(tender.get("status", "")) in ["OPEN", "SUBMITTED"]:
+			active_open += 1
+	if active_open >= 2:
+		return
+	var eligible_templates: Array[String] = []
+	for template_id_value in TENDER_TEMPLATES.keys():
+		var template_id := str(template_id_value)
+		var template: Dictionary = TENDER_TEMPLATES[template_id]
+		if not _tender_template_available(template):
+			continue
+		var recently_used := false
+		for tender in tenders:
+			if str(tender.get("template_id", "")) == template_id and market_age_months - int(tender.get("created_market_month", -999)) < 18:
+				recently_used = true
+				break
+		if not recently_used:
+			eligible_templates.append(template_id)
+	if eligible_templates.is_empty():
+		return
+	var professional_bonus := clampf((float(CompanyManager.reputation.get("professional", 45.0)) - 40.0) / 220.0, 0.0, 0.18)
+	if rng.randf() <= 0.18 + professional_bonus:
+		create_tender_from_template(str(eligible_templates[rng.randi_range(0, eligible_templates.size() - 1)]))
+
+func activate_reserved_contracts(product_id: String):
+	for contract in contracts:
+		if str(contract.get("product_id", "")) == product_id and str(contract.get("status", "")) == "RESERVED":
+			contract["status"] = "ACTIVE"
+			CompanyManager.add_alert("Le contrat avec %s démarre avec le lancement de %s." % [str(contract.get("customer", "")), str(contract.get("product_name", ""))])
+	market_changed.emit()
+
 func maybe_generate_b2b(product: Dictionary):
 	if str(product.get("status", "")) != "LAUNCHED":
 		return
@@ -895,9 +1212,18 @@ func active_contract_for(product_id: String) -> Dictionary:
 			return contract
 	return {}
 
-func advance_contract(product_id: String):
+func advance_contract(product_id: String, delivered_units: int = -1):
 	for contract in contracts:
 		if str(contract.get("product_id", "")) == product_id and str(contract.get("status", "")) == "ACTIVE":
+			var promised := int(contract.get("units_per_month", 0))
+			if delivered_units >= 0 and delivered_units < promised:
+				var shortfall := promised - delivered_units
+				var penalty := int(round(float(shortfall * int(contract.get("unit_price", 0))) * float(contract.get("penalty_rate", 0.08))))
+				if penalty > 0:
+					Economy.add_expense(penalty, "Pénalité contrat — %s" % str(contract.get("customer", "")))
+				var severity := clampf(float(shortfall) / maxf(float(promised), 1.0), 0.0, 1.0)
+				CompanyManager.change_reputation({"professional":-1.5 * severity,"reliability":-0.8 * severity})
+				CompanyManager.add_alert("Contrat %s : livraison incomplète (%d/%d), pénalité %d €." % [str(contract.get("id", "")), delivered_units, promised, penalty])
 			contract["remaining_months"] = int(contract.get("remaining_months", 0)) - 1
 			if int(contract.get("remaining_months", 0)) <= 0:
 				contract["status"] = "COMPLETED"
@@ -929,6 +1255,7 @@ func process_month(products: Array):
 	market_age_months += 1
 	_advance_competitors()
 	_update_market_opportunities()
+	_update_tenders()
 	for product in products:
 		if str(product.get("status", "")) == "LAUNCHED":
 			maybe_generate_b2b(product)
@@ -937,9 +1264,11 @@ func get_state() -> Dictionary:
 	return {
 		"competitors":competitors,
 		"contracts":contracts,
+		"tenders":tenders,
 		"market_events":market_events,
 		"known_segments":known_segments,
 		"next_contract_id":_next_contract_id,
+		"next_tender_id":_next_tender_id,
 		"market_age_months":market_age_months,
 		"rng_seed":rng.seed,
 		"rng_state":rng.state
@@ -997,11 +1326,13 @@ func load_state(state: Dictionary):
 			rows[i] = _migrate_competitor(competitor, sector)
 		competitors[sector_value] = rows
 	contracts = state.get("contracts", []).duplicate(true)
+	tenders = state.get("tenders", []).duplicate(true)
 	market_events = state.get("market_events", []).duplicate(true)
 	known_segments = state.get("known_segments", []).duplicate(true)
 	if known_segments.is_empty():
 		known_segments = available_segment_keys()
 	_next_contract_id = int(state.get("next_contract_id", 1))
+	_next_tender_id = int(state.get("next_tender_id", tenders.size() + 1))
 	market_age_months = int(state.get("market_age_months", 0))
 	rng.seed = int(state.get("rng_seed", 43021))
 	rng.state = int(state.get("rng_state", rng.state))

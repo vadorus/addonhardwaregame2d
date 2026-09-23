@@ -898,6 +898,40 @@ func _ready() -> void:
 		_fail("Hobbyist market does not value die headroom and consistency")
 		return
 
+	var test_tender := MarketManager.create_tender_from_template("SPACE_GUIDANCE")
+	if test_tender.is_empty() or str(test_tender.get("application_profile", "")) != "SPACE":
+		_fail("Early specialized B2B tender could not appear independently from the consumer market")
+		return
+	test_tender["requirements"] = {"performance":20.0,"efficiency":20.0,"reliability":20.0}
+	test_tender["max_unit_price"] = maxi(int(apex_model.get("unit_cost", 1)) * 4, 200)
+	test_tender["units_per_month"] = mini(25, maxi(int(apex_model.get("max_monthly_capacity", 25)), 1))
+	test_tender["duration_months"] = 2
+	var tender_bid_price := maxi(int(apex_model.get("unit_cost", 1)) + 5, 1)
+	var tender_preview := MarketManager.tender_fit(test_tender, apex_model, tender_bid_price)
+	if tender_preview.is_empty() or float(tender_preview.get("application_fit", 0.0)) <= 0.0:
+		_fail("B2B tender did not evaluate the CPU application profile")
+		return
+	if not MarketManager.submit_tender_bid(str(test_tender.get("id", "")), str(apex_model.get("id", "")), tender_bid_price):
+		_fail("Could not submit a READY CPU to a B2B tender before public launch")
+		return
+	if str(test_tender.get("status", "")) != "SUBMITTED":
+		_fail("B2B tender did not enter submitted state")
+		return
+	MarketManager.market_age_months += 1
+	MarketManager._update_tenders()
+	if str(test_tender.get("status", "")) != "AWARDED":
+		_fail("Competitive B2B tender was not awarded after the decision cycle")
+		return
+	var reserved_contract := {}
+	for contract_value in MarketManager.contracts:
+		var contract: Dictionary = contract_value
+		if str(contract.get("tender_id", "")) == str(test_tender.get("id", "")):
+			reserved_contract = contract
+			break
+	if reserved_contract.is_empty() or str(reserved_contract.get("status", "")) != "RESERVED":
+		_fail("Tender won with a READY CPU did not reserve the supply contract until launch")
+		return
+
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(ProductManager.products)
 	var portfolio_units := 0
 	for demand_product in ProductManager.products:
@@ -914,6 +948,10 @@ func _ready() -> void:
 		return
 	if int(apex_model.production_capacity) != apex_max_capacity:
 		_fail("CPU launch ignored the binning capacity limit")
+		return
+	var activated_tender_contract := MarketManager.active_contract_for(str(apex_model.id))
+	if activated_tender_contract.is_empty() or str(activated_tender_contract.get("status", "")) != "ACTIVE":
+		_fail("Reserved B2B tender contract did not activate when the CPU launched")
 		return
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("MARKET"):
