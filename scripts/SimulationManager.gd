@@ -14,6 +14,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	DivisionManager.reset(active_sector)
 	PersonnelManager.reset(active_sector)
 	ExecutiveManager.reset()
+	SupplierManager.reset()
 	ResearchManager.reset(active_sector)
 	FoundryManager.reset()
 	ProductionManager.reset()
