@@ -141,6 +141,11 @@ var control_software_button: Button
 var market_product_select: OptionButton
 var market_competitor_select: OptionButton
 var market_comparison_label: Label
+var tender_select: OptionButton
+var tender_product_select: OptionButton
+var tender_bid_price: SpinBox
+var tender_label: Label
+var tender_submit_button: Button
 var policy_marketing: SpinBox
 var policy_support: SpinBox
 var policy_environment: SpinBox
@@ -1671,6 +1676,29 @@ func _create_market_tab():
 	market_comparison_label = _rich_label()
 	market_comparison_label.custom_minimum_size.y = 150
 	box.add_child(market_comparison_label)
+
+	box.add_child(_section("Appels d'offres & partenariats"))
+	var tender_intro := _muted_label("Les clients B2B publient un cahier des charges. Vous pouvez proposer un CPU prêt ou déjà lancé. Une offre acceptée avant lancement réserve le contrat jusqu'à la commercialisation.", 12)
+	tender_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(tender_intro)
+	tender_select = OptionButton.new()
+	tender_select.item_selected.connect(func(_i): _refresh_tender_detail())
+	box.add_child(tender_select)
+	tender_product_select = OptionButton.new()
+	tender_product_select.item_selected.connect(func(_i): _refresh_tender_detail())
+	box.add_child(tender_product_select)
+	tender_bid_price = _spin(1, 1000000, 1, 100)
+	tender_bid_price.value_changed.connect(func(_value): _refresh_tender_detail())
+	box.add_child(tender_bid_price)
+	tender_label = _rich_label()
+	tender_label.custom_minimum_size.y = 170
+	box.add_child(tender_label)
+	tender_submit_button = Button.new()
+	tender_submit_button.text = "Soumettre l'offre"
+	tender_submit_button.custom_minimum_size.y = 42
+	tender_submit_button.pressed.connect(_submit_tender_bid)
+	box.add_child(tender_submit_button)
+
 	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
 	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
 	box.add_child(_section("SAV & expérience terrain"))
@@ -3433,6 +3461,7 @@ func _refresh_market():
 			])
 	market_label.text = "\n".join(lines)
 	_refresh_market_comparison()
+	_refresh_tenders()
 
 	var contract_lines: Array[String] = []
 	for contract in MarketManager.contracts:
@@ -3476,6 +3505,118 @@ func _refresh_market_comparison():
 	lines.append("")
 	lines.append(str(comparison.get("summary", "")))
 	market_comparison_label.text = "\n".join(lines)
+
+func _refresh_tenders():
+	if tender_select == null or tender_product_select == null or tender_label == null:
+		return
+	var current_tender := _meta(tender_select) if tender_select.item_count > 0 else ""
+	var current_product := _meta(tender_product_select) if tender_product_select.item_count > 0 else ""
+	tender_select.clear()
+	for tender_value in MarketManager.open_tenders():
+		var tender: Dictionary = tender_value
+		tender_select.add_item("%s — %s [%s]" % [
+			str(tender.get("customer", "")), str(tender.get("title", "")), str(tender.get("status", "OPEN"))
+		])
+		tender_select.set_item_metadata(tender_select.item_count - 1, str(tender.get("id", "")))
+	if current_tender != "":
+		_select_meta(tender_select, current_tender)
+	if tender_select.selected < 0 and tender_select.item_count > 0:
+		tender_select.select(0)
+
+	tender_product_select.clear()
+	for product in ProductManager.products:
+		if str(product.get("sector", "")) != "CPU" or str(product.get("status", "")) not in ["READY", "LAUNCHED"]:
+			continue
+		tender_product_select.add_item("%s — %s" % [str(product.get("name", "CPU")), str(product.get("status", ""))])
+		tender_product_select.set_item_metadata(tender_product_select.item_count - 1, str(product.get("id", "")))
+	if current_product != "":
+		_select_meta(tender_product_select, current_product)
+	if tender_product_select.selected < 0 and tender_product_select.item_count > 0:
+		tender_product_select.select(0)
+
+	if tender_select.item_count == 0:
+		tender_label.text = "Aucun appel d'offres ouvert pour le moment. Les opportunités apparaissent selon l'époque, le progrès technologique et la réputation professionnelle."
+		if tender_submit_button != null:
+			tender_submit_button.disabled = true
+		return
+	var tender := MarketManager.get_tender(_meta(tender_select))
+	if tender.is_empty():
+		return
+	if tender_product_select.item_count > 0 and int(tender_bid_price.value) <= 1:
+		var selected_product := ProductManager.get_product(_meta(tender_product_select))
+		tender_bid_price.value = float(mini(int(selected_product.get("price", 100)), int(tender.get("max_unit_price", 100))))
+	_refresh_tender_detail()
+
+func _refresh_tender_detail():
+	if tender_label == null or tender_select == null:
+		return
+	if tender_select.item_count == 0:
+		tender_label.text = "Aucun appel d'offres ouvert."
+		if tender_submit_button != null:
+			tender_submit_button.disabled = true
+		return
+	var tender := MarketManager.get_tender(_meta(tender_select))
+	if tender.is_empty():
+		return
+	var application := CPU_DESIGN.application_label(str(tender.get("application_profile", "GENERAL")))
+	var requirements: Dictionary = tender.get("requirements", {})
+	var exclusivity := "oui" if bool(tender.get("exclusivity", false)) else "non"
+	var lines: Array[String] = [
+		"%s — %s" % [str(tender.get("customer", "")), str(tender.get("title", ""))],
+		"Usage demandé : %s • délai offre %d mois • confidentialité %.0f/100 • exclusivité %s" % [
+			application, int(tender.get("deadline_months", 0)), float(tender.get("confidentiality", 0.0)), exclusivity
+		],
+		"Cahier des charges : perf ≥ %.0f • efficacité ≥ %.0f • fiabilité ≥ %.0f" % [
+			float(requirements.get("performance", 0.0)), float(requirements.get("efficiency", 0.0)), float(requirements.get("reliability", 0.0))
+		],
+		"Volume : %s unités/mois pendant %d mois • prix plafond %s € • pénalité livraison %.0f%%" % [
+			_money(int(tender.get("units_per_month", 0))), int(tender.get("duration_months", 0)),
+			_money(int(tender.get("max_unit_price", 0))), float(tender.get("penalty_rate", 0.0)) * 100.0
+		]
+	]
+	var status := str(tender.get("status", "OPEN"))
+	if status == "SUBMITTED":
+		var bid: Dictionary = tender.get("bid", {})
+		lines.append("Offre soumise : %s à %s €/unité. Décision attendue au prochain cycle mensuel." % [
+			str(bid.get("product_name", "CPU")), _money(int(bid.get("unit_price", 0)))
+		])
+		if tender_submit_button != null:
+			tender_submit_button.disabled = true
+	elif tender_product_select == null or tender_product_select.item_count == 0:
+		lines.append("Aucun CPU prêt ou lancé n'est disponible pour répondre.")
+		if tender_submit_button != null:
+			tender_submit_button.disabled = true
+	else:
+		var product := ProductManager.get_product(_meta(tender_product_select))
+		var bid_price := int(tender_bid_price.value)
+		var preview := MarketManager.tender_fit(tender, product, bid_price)
+		var score := float(preview.get("score", 0.0))
+		var confidence_text := "offre risquée"
+		if score >= 78.0:
+			confidence_text = "offre très compétitive"
+		elif score >= 68.0:
+			confidence_text = "offre crédible"
+		elif score >= 58.0:
+			confidence_text = "offre fragile"
+		var gaps: Array = preview.get("gaps", [])
+		lines.append("Lecture de l'équipe : %s • adéquation usage %.0f/100 • prix %s €" % [
+			confidence_text, float(preview.get("application_fit", 0.0)), _money(bid_price)
+		])
+		if not gaps.is_empty():
+			lines.append("Points faibles face au cahier des charges : %s" % ", ".join(gaps))
+		if bid_price > int(tender.get("max_unit_price", 0)):
+			lines.append("⚠ Le prix dépasse le plafond annoncé ; l'offre peut être rejetée malgré un bon CPU.")
+		if tender_submit_button != null:
+			tender_submit_button.disabled = false
+	tender_label.text = "\n".join(lines)
+
+func _submit_tender_bid():
+	if tender_select == null or tender_select.item_count == 0 or tender_product_select == null or tender_product_select.item_count == 0:
+		status_label.text = "Aucun appel d'offres ou CPU disponible."
+		return
+	var ok := MarketManager.submit_tender_bid(_meta(tender_select), _meta(tender_product_select), int(tender_bid_price.value))
+	status_label.text = "Offre B2B envoyée. Le client rendra sa décision au prochain cycle mensuel." if ok else "Impossible d'envoyer cette offre : vérifiez le statut du CPU, du contrat et de l'appel d'offres."
+	_refresh_all()
 
 func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
 
