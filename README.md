@@ -92,6 +92,7 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 
 - [`docs/VISION.md`](docs/VISION.md) — vision globale ;
 - [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes ;
+- [`docs/SIMULATION_PHILOSOPHY.md`](docs/SIMULATION_PHILOSOPHY.md) — liberté du CEO, conséquences et profondeur configurable ;
 - [`docs/DESIGN_BIBLE.md`](docs/DESIGN_BIBLE.md) — décisions canoniques issues de la conception ;
 - [`docs/CPU_VERTICAL_SLICE.md`](docs/CPU_VERTICAL_SLICE.md) — boucle CPU complète à implémenter ;
 - [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — interface chaleureuse et progression des bureaux ;
