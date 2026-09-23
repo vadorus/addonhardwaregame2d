@@ -2507,8 +2507,12 @@ func _refresh_setup_difficulty():
 	projected += int(round(float(base_research) * float(data.get("research_cost", 1.0))))
 	var capital := int(data.get("starting_capital", 500000))
 	var runway := float(capital) / maxf(float(projected), 1.0)
-	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois." % [
-		BalanceManager.profile_description(key), _money(capital), _money(projected), runway
+	var ai_profile := BalanceManager.company_ai_profile(key)
+	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
+		BalanceManager.profile_description(key), _money(capital), _money(projected), runway,
+		int(ai_profile.get("decision_interval_months", 2)),
+		float(ai_profile.get("decision_quality", 0.74)) * 100.0,
+		float(ai_profile.get("commercial_aggression", 1.0)) * 100.0
 	]
 
 func _start_new_game():
@@ -3808,6 +3812,9 @@ func _refresh_market():
 			float(competitor.get("benchmark_score", 0.0)), str(competitor.get("market_signal", "Présence limitée")),
 			int(competitor.get("months_on_market", 0))
 		])
+		var public_action := str(competitor.get("recent_public_action", ""))
+		if public_action != "":
+			lines.append("  Mouvement observé : %s" % public_action)
 
 	if market_product_select.item_count == 0:
 		lines.append("\nAucun de vos CPU n'est encore commercialisé. Le marché et les concurrents continuent néanmoins d'évoluer.")
