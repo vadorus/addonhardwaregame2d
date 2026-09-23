@@ -8,7 +8,7 @@ func _ready() -> void:
 	if garage_hub_script == null:
 		_fail("Interactive garage HQ script could not be loaded")
 		return
-	var garage_hub := garage_hub_script.new()
+	var garage_hub: Control = garage_hub_script.new() as Control
 	add_child(garage_hub)
 	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
 		_fail("Interactive garage HQ did not expose the expected five management zones")
