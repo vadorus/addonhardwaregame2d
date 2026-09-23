@@ -766,6 +766,75 @@ func compare_cpu_public(product: Dictionary, competitor_id: String) -> Dictionar
 		"summary":summary
 	}
 
+func forecast_cpu_launch(product: Dictionary, proposed_price: int) -> Dictionary:
+	if str(product.get("sector", "CPU")) != "CPU":
+		return {}
+	var candidate: Dictionary = product.duplicate(true)
+	candidate["price"] = maxi(proposed_price, 1)
+	var target := normalize_segment(str(candidate.get("target_segment", default_segment())))
+	if not is_segment_available(target):
+		return {}
+	var demand := estimate_consumer_demand(candidate)
+	var marketing_score := PersonnelManager.team_score("Marketing", "marketing")
+	var confidence := clampf(34.0 + marketing_score * 0.58, 42.0, 92.0)
+	var uncertainty := clampf(0.34 - confidence * 0.0025, 0.09, 0.24)
+	var expected_units := maxi(int(demand.get("units", 0)), 0)
+	var min_units := maxi(int(round(float(expected_units) * (1.0 - uncertainty))), 0)
+	var max_units := maxi(int(round(float(expected_units) * (1.0 + uncertainty))), min_units)
+	var expected_share := clampf(float(demand.get("share", 0.0)), 0.0, 1.0)
+	var min_share := clampf(expected_share * (1.0 - uncertainty), 0.0, 1.0)
+	var max_share := clampf(expected_share * (1.0 + uncertainty), 0.0, 1.0)
+	var expectation_gap := float(demand.get("expectation_gap", 0.0))
+	var perception := "Acceptable"
+	if expectation_gap >= 12.0:
+		perception = "Très convaincant"
+	elif expectation_gap >= 5.0:
+		perception = "Solide"
+	elif expectation_gap < -12.0:
+		perception = "Difficile"
+	elif expectation_gap < -4.0:
+		perception = "Contesté"
+	var reference_price := segment_reference_price(target)
+	var price_ratio := float(proposed_price) / maxf(reference_price, 1.0)
+	var positioning := "Aligné au marché"
+	if price_ratio < 0.84:
+		positioning = "Prix agressif"
+	elif price_ratio > 1.32:
+		positioning = "Très premium"
+	elif price_ratio > 1.10:
+		positioning = "Premium"
+	var value_signal := "Le prix et la proposition technique semblent cohérents."
+	if price_ratio > 1.10 and expectation_gap < 5.0:
+		value_signal = "Le premium risque d'être discuté si la marque ne prouve pas rapidement sa valeur."
+	elif price_ratio > 1.10 and expectation_gap >= 5.0:
+		value_signal = "L'avantage produit peut soutenir un premium, mais les tests publics resteront déterminants."
+	elif price_ratio < 0.84:
+		value_signal = "Le prix facilite l'adoption, mais la marge doit absorber SAV, promotions et variations de production."
+	var reliability := float(candidate.get("metrics", {}).get("reliability", 50.0))
+	var trust_signal := "Fiabilité perçue dans la norme."
+	if reliability >= 72.0:
+		trust_signal = "La fiabilité est un argument commercial fort."
+	elif reliability < 52.0:
+		trust_signal = "La fiabilité peut freiner l'adoption et amplifier l'impact de futurs retours SAV."
+	return {
+		"segment":target,
+		"confidence":confidence,
+		"uncertainty":uncertainty,
+		"expected_units":expected_units,
+		"min_units":min_units,
+		"max_units":max_units,
+		"expected_share":expected_share,
+		"min_share":min_share,
+		"max_share":max_share,
+		"score":float(demand.get("score", 0.0)),
+		"expectation_gap":expectation_gap,
+		"perception":perception,
+		"positioning":positioning,
+		"reference_price":reference_price,
+		"value_signal":value_signal,
+		"trust_signal":trust_signal
+	}
+
 func maybe_generate_b2b(product: Dictionary):
 	if str(product.get("status", "")) != "LAUNCHED":
 		return
