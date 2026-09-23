@@ -122,6 +122,25 @@ func create_subsidiary(name: String, sector: String, capital: int) -> bool:
 	company_changed.emit()
 	return true
 
+func register_acquired_subsidiary(source_id: String, name: String, sector: String, acquisition_cost: int, specialty: String = "") -> bool:
+	for subsidiary_value in subsidiaries:
+		var subsidiary: Dictionary = subsidiary_value
+		if str(subsidiary.get("source_id", "")) == source_id and source_id != "":
+			return false
+	subsidiaries.append({
+		"name":name,
+		"sector":sector if GameData.SECTORS.has(sector) else starting_sector,
+		"capital":maxi(acquisition_cost, 0),
+		"reputation":55.0,
+		"source_id":source_id,
+		"origin":"ACQUISITION",
+		"specialty":specialty,
+		"ownership":100.0
+	})
+	add_alert("Acquisition finalisée : %s devient une filiale technologique du groupe." % name)
+	company_changed.emit()
+	return true
+
 func add_alert(text: String):
 	alerts.push_front(text)
 	if alerts.size() > 20:
