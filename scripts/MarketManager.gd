@@ -34,19 +34,22 @@ const COMPETITOR_ARCHETYPES := {
 		"company":"Aster Systems","product_prefix":"Aster",
 		"strategy":"EFFICIENCY","cash":310000,
 		"architecture":20.0,"layout":22.0,"miniaturization":18.0,"manufacturing":24.0,"integration":18.0,
-		"brand":47.0,"risk_tolerance":42.0,"capacity":10500
+		"brand":47.0,"risk_tolerance":42.0,"capacity":10500,
+		"ai_price_aggression":42.0,"ai_research_drive":58.0,"ai_financial_prudence":76.0,"ai_adaptability":48.0,"ai_growth_drive":50.0
 	},
 	"HELIX":{
 		"company":"Helix Global","product_prefix":"Helix",
 		"strategy":"PERFORMANCE","cash":390000,
 		"architecture":27.0,"layout":18.0,"miniaturization":21.0,"manufacturing":20.0,"integration":20.0,
-		"brand":58.0,"risk_tolerance":72.0,"capacity":9000
+		"brand":58.0,"risk_tolerance":72.0,"capacity":9000,
+		"ai_price_aggression":72.0,"ai_research_drive":84.0,"ai_financial_prudence":38.0,"ai_adaptability":68.0,"ai_growth_drive":80.0
 	},
 	"QUANTUM":{
 		"company":"Quantum Works","product_prefix":"Quantum",
 		"strategy":"BALANCED","cash":345000,
 		"architecture":23.0,"layout":23.0,"miniaturization":20.0,"manufacturing":23.0,"integration":22.0,
-		"brand":52.0,"risk_tolerance":56.0,"capacity":11500
+		"brand":52.0,"risk_tolerance":56.0,"capacity":11500,
+		"ai_price_aggression":54.0,"ai_research_drive":66.0,"ai_financial_prudence":58.0,"ai_adaptability":74.0,"ai_growth_drive":64.0
 	}
 }
 
@@ -196,6 +199,11 @@ func _make_competitors(sector: String) -> Array:
 			"integration_skill":float(data.integration),
 			"brand":float(data.brand),
 			"risk_tolerance":float(data.risk_tolerance),
+			"ai_price_aggression":float(data.get("ai_price_aggression", 50.0)),
+			"ai_research_drive":float(data.get("ai_research_drive", 50.0)),
+			"ai_financial_prudence":float(data.get("ai_financial_prudence", 50.0)),
+			"ai_adaptability":float(data.get("ai_adaptability", 50.0)),
+			"ai_growth_drive":float(data.get("ai_growth_drive", 50.0)),
 			"generation_index":1,
 			"development_progress":rng.randf_range(6.0, 28.0),
 			"months_on_market":0,
@@ -212,6 +220,7 @@ func _make_competitors(sector: String) -> Array:
 			"last_month_profit":0,
 			"restructurings":0
 		}
+		CompanyAIManager.ensure_company_state(competitor)
 		_configure_competitor_product(competitor, true)
 		rows.append(competitor)
 	return rows
@@ -562,26 +571,127 @@ func _advance_competitors() -> void:
 			_advance_cpu_competitor(competitor)
 		competitors[sector_value] = rows
 
+func _competitor_ai_context(competitor: Dictionary) -> Dictionary:
+	var target := normalize_segment(str(competitor.get("target_segment", default_segment())))
+	if not is_segment_available(target):
+		target = _choose_competitor_segment(competitor)
+	var capacity := maxi(int(competitor.get("capacity", 1)), 1)
+	var last_units := maxi(int(competitor.get("last_month_units", 0)), 0)
+	var utilization := clampf(float(last_units) / float(capacity), 0.0, 1.0)
+	var price := maxi(int(competitor.get("price", 1)), 1)
+	var unit_cost := maxi(int(competitor.get("unit_cost", 1)), 1)
+	var margin_ratio := clampf(float(price - unit_cost) / float(price), 0.0, 0.95)
+	var cash := int(competitor.get("cash", 0))
+	var cash_health := clampf(float(cash + 50000) / 400000.0, 0.0, 1.0)
+	var last_profit := int(competitor.get("last_month_profit", 0))
+	var profit_scale := maxf(float(abs(last_profit)) + 25000.0, 25000.0)
+	var profit_signal := clampf(float(last_profit) / profit_scale, -1.0, 1.0)
+	var current_fit := _evaluate_competitor(competitor, target)
+	var best_segment := target
+	var best_fit := current_fit
+	for segment_value in available_segment_keys():
+		var segment := str(segment_value)
+		var fit := _evaluate_competitor(competitor, segment)
+		if fit > best_fit:
+			best_fit = fit
+			best_segment = segment
+	return {
+		"target_segment":target,
+		"utilization":utilization,
+		"margin_ratio":margin_ratio,
+		"cash_health":cash_health,
+		"profit_signal":profit_signal,
+		"product_age":int(competitor.get("months_on_market", 0)),
+		"best_alternative_segment":best_segment,
+		"alternative_segment_gain":maxf(best_fit - current_fit, 0.0)
+	}
+
+func _apply_competitor_ai_decision(competitor: Dictionary, decision: Dictionary, context: Dictionary) -> void:
+	var action := str(decision.get("action", "HOLD"))
+	var before_price := int(competitor.get("price", 0))
+	var before_capacity := int(competitor.get("capacity", 0))
+	var public_text := ""
+	match action:
+		"CUT_PRICE":
+			var floor_price := maxi(int(round(float(competitor.get("unit_cost", 1)) * 1.12)), int(competitor.get("unit_cost", 1)) + 3)
+			competitor["price"] = maxi(floor_price, int(round(float(before_price) * 0.93)))
+			if int(competitor.get("price", 0)) < before_price:
+				public_text = "%s baisse le prix de %s de %d à %d €." % [str(competitor.get("company", "")), str(competitor.get("name", "son CPU")), before_price, int(competitor.get("price", 0))]
+		"RAISE_PRICE":
+			competitor["price"] = maxi(int(round(float(before_price) * 1.06)), before_price + 1)
+			public_text = "%s relève le prix de %s à %d € face à une forte utilisation de sa capacité." % [str(competitor.get("company", "")), str(competitor.get("name", "son CPU")), int(competitor.get("price", 0))]
+		"BOOST_RD":
+			competitor["ai_rd_multiplier"] = 1.35
+			competitor["ai_action_months"] = 3
+		"CONSERVE_CASH":
+			competitor["ai_rd_multiplier"] = 0.65
+			competitor["ai_action_months"] = 3
+		"EXPAND_CAPACITY":
+			var expansion_cost := maxi(45000, int(round(float(before_capacity) * 5.0)))
+			if int(competitor.get("cash", 0)) >= expansion_cost:
+				competitor["cash"] = int(competitor.get("cash", 0)) - expansion_cost
+				competitor["capacity"] = maxi(before_capacity + 1000, int(round(float(before_capacity) * 1.18)))
+				public_text = "%s investit dans sa capacité industrielle (%d → %d unités/mois)." % [str(competitor.get("company", "")), before_capacity, int(competitor.get("capacity", 0))]
+		"REPOSITION":
+			var new_segment := str(context.get("best_alternative_segment", context.get("target_segment", default_segment())))
+			if new_segment != str(context.get("target_segment", "")) and is_segment_available(new_segment):
+				var reposition_cost := 12000
+				if int(competitor.get("cash", 0)) >= reposition_cost:
+					competitor["cash"] = int(competitor.get("cash", 0)) - reposition_cost
+					competitor["target_segment"] = new_segment
+					var strategy := str(competitor.get("strategy", "BALANCED"))
+					var price_factor := 1.0
+					if strategy == "PERFORMANCE":
+						price_factor = 1.12
+					elif strategy == "EFFICIENCY":
+						price_factor = 0.86
+					competitor["price"] = maxi(int(competitor.get("unit_cost", 1)) + 6, int(round(segment_reference_price(new_segment) * price_factor)))
+					public_text = "%s repositionne %s vers le marché %s." % [str(competitor.get("company", "")), str(competitor.get("name", "son CPU")), segment_label(new_segment)]
+		_:
+			pass
+	CompanyAIManager.apply_decision_state(competitor, decision)
+	if public_text != "":
+		var event := {
+			"type":"COMPETITOR_ACTION",
+			"company":str(competitor.get("company", "")),
+			"year":TimeManager.year,
+			"month":TimeManager.month,
+			"text":public_text
+		}
+		market_events.push_front(event)
+		if market_events.size() > 24:
+			market_events.pop_back()
+
 func _advance_cpu_competitor(competitor: Dictionary):
+	CompanyAIManager.tick_company_state(competitor)
 	competitor["months_on_market"] = int(competitor.get("months_on_market", 0)) + 1
-	var target := _choose_competitor_segment(competitor)
-	competitor["target_segment"] = target
+	var current_target := normalize_segment(str(competitor.get("target_segment", default_segment())))
+	if not is_segment_available(current_target):
+		current_target = _choose_competitor_segment(competitor)
+		competitor["target_segment"] = current_target
+
+	var ai_context := _competitor_ai_context(competitor)
+	if CompanyAIManager.decision_due(competitor):
+		var decision := CompanyAIManager.choose_action(competitor, ai_context, rng)
+		_apply_competitor_ai_decision(competitor, decision, ai_context)
+
+	var target := normalize_segment(str(competitor.get("target_segment", current_target)))
 	var market_units := segment_market_units(target)
 	var score := _evaluate_competitor(competitor, target)
-	var pressure := BalanceManager.competitor_pressure_factor()
-	var share := clampf((0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015) * pressure, 0.012, 0.31)
+	var share := clampf(0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015, 0.012, 0.31)
 	var units := mini(int(competitor.get("capacity", 5000)), int(float(market_units) * share))
 	var margin := maxi(int(competitor.get("price", 1)) - int(competitor.get("unit_cost", 1)), 1)
 	var operating_profit := units * margin
 	var cash := int(competitor.get("cash", 200000))
-	var rd_budget := clampi(int(float(maxi(cash, 0)) * 0.035), 3500, 24000)
+	var base_rd_budget := clampi(int(float(maxi(cash, 0)) * 0.035), 3500, 24000)
+	var rd_budget := clampi(int(round(float(base_rd_budget) * float(competitor.get("ai_rd_multiplier", 1.0)))), 1800, 34000)
 	var fixed_cost := 7000 + int(competitor.get("generation_index", 1)) * 600
 	cash += operating_profit - rd_budget - fixed_cost
 	competitor["last_month_units"] = units
 	competitor["last_month_profit"] = operating_profit - rd_budget - fixed_cost
 	competitor["cash"] = cash
 
-	var budget_factor := clampf(float(rd_budget) / 15000.0, 0.22, 1.8)
+	var budget_factor := clampf(float(rd_budget) / 15000.0, 0.12, 2.2)
 	var strategy := str(competitor.get("strategy", "BALANCED"))
 	var arch_gain := 0.16 * budget_factor
 	var layout_gain := 0.13 * budget_factor
@@ -605,8 +715,7 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	competitor["integration_skill"] = clampf(float(competitor.get("integration_skill", 20.0)) + integration_gain, 0.0, 100.0)
 
 	var progress_gain := 4.8 + float(competitor.get("architecture_skill", 20.0)) * 0.035 + float(competitor.get("integration_skill", 20.0)) * 0.015
-	progress_gain *= clampf(0.82 + budget_factor * 0.18, 0.70, 1.18)
-	progress_gain *= BalanceManager.competitor_pressure_factor()
+	progress_gain *= clampf(0.82 + budget_factor * 0.18, 0.62, 1.28)
 	progress_gain += rng.randf_range(-0.45, 0.65)
 	competitor["development_progress"] = clampf(float(competitor.get("development_progress", 0.0)) + progress_gain, 0.0, 100.0)
 	var generation_cost := 24000 + int(competitor.get("generation_index", 1)) * 4500
@@ -620,6 +729,7 @@ func _advance_cpu_competitor(competitor: Dictionary):
 		competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) - 3.0, 20.0, 90.0)
 		competitor["capacity"] = maxi(2500, int(float(competitor.get("capacity", 8000)) * 0.84))
 		competitor["development_progress"] = minf(float(competitor.get("development_progress", 0.0)), 62.0)
+
 
 func _launch_competitor_generation(competitor: Dictionary):
 	var manufacturing := float(competitor.get("manufacturing_skill", 20.0))
@@ -735,7 +845,10 @@ func competitor_summaries() -> Array:
 			"yield_rate":float(competitor.get("yield_rate", 0.0)),
 			"last_month_units":int(competitor.get("last_month_units", 0)),
 			"last_month_profit":int(competitor.get("last_month_profit", 0)),
-			"restructurings":int(competitor.get("restructurings", 0))
+			"restructurings":int(competitor.get("restructurings", 0)),
+			"current_action":str(competitor.get("ai_current_action", "HOLD")),
+			"decision_cooldown":int(competitor.get("ai_decision_cooldown", 0)),
+			"last_reason":str(competitor.get("ai_last_reason", ""))
 		})
 	return result
 
@@ -1295,6 +1408,12 @@ func _migrate_competitor(competitor: Dictionary, sector: String) -> Dictionary:
 	competitor["integration_skill"] = float(competitor.get("integration_skill", avg * 0.32))
 	competitor["brand"] = float(competitor.get("brand", 50.0))
 	competitor["risk_tolerance"] = float(competitor.get("risk_tolerance", 55.0))
+	competitor["ai_price_aggression"] = float(competitor.get("ai_price_aggression", 50.0))
+	competitor["ai_research_drive"] = float(competitor.get("ai_research_drive", 50.0))
+	competitor["ai_financial_prudence"] = float(competitor.get("ai_financial_prudence", 50.0))
+	competitor["ai_adaptability"] = float(competitor.get("ai_adaptability", 50.0))
+	competitor["ai_growth_drive"] = float(competitor.get("ai_growth_drive", 50.0))
+	CompanyAIManager.ensure_company_state(competitor)
 	competitor["generation_index"] = maxi(int(competitor.get("generation_index", 1)), 1)
 	competitor["development_progress"] = clampf(float(competitor.get("development_progress", 20.0)), 0.0, 100.0)
 	competitor["months_on_market"] = maxi(int(competitor.get("months_on_market", 0)), 0)
