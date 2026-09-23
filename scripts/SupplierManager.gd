@@ -456,7 +456,7 @@ func break_contract(contract_id: String) -> bool:
 	if not contracts.has(contract_id):
 		return false
 	var contract: Dictionary = contracts[contract_id]
-	if str(contract.get("status", "")) not in ["RND","COMMERCIAL"]:
+	if str(contract.get("status", "")) != "COMMERCIAL":
 		return false
 	var penalty := int(contract.get("termination_penalty", 0))
 	if Economy.money < penalty:
