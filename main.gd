@@ -1439,12 +1439,17 @@ func _refresh_cpu_preview():
 			var volume_commitment := int(sourcing.get("guaranteed_units", 0))
 			var volume_text := "aucun volume garanti" if volume_commitment <= 0 else "%s unités garanties" % _money(volume_commitment)
 			var supplier_public_action := str(sourcing.get("supplier_public_action", "Conditions commerciales stables."))
-			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100\nCapacité : %d/%d créneau(x) libre(s) • %d occupé(s) par d'autres clients\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\nMouvement partenaire : %s\n%s — score d'acceptation %.0f/100" % [
+			var rival_load := int(sourcing.get("supplier_rival_load", 0))
+			var public_rivals: Array = sourcing.get("supplier_public_rivals", [])
+			var rivalry_text := "%d projet(s) concurrent(s) identifié(s)" % rival_load
+			if not public_rivals.is_empty():
+				rivalry_text += " — %s" % ", ".join(public_rivals)
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100\nCapacité : %d/%d créneau(x) libre(s) • %d charge client anonyme • %s\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\nMouvement partenaire : %s\n%s — score d'acceptation %.0f/100" % [
 				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
 				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
 				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
 				int(sourcing.get("available_capacity_slots", 0)), int(sourcing.get("supplier_capacity_slots", 0)),
-				int(sourcing.get("supplier_external_load", 0)),
+				int(sourcing.get("supplier_external_load", 0)), rivalry_text,
 				str(sourcing.get("contract_term_label", "")), str(sourcing.get("exclusivity_label", "")),
 				str(sourcing.get("ip_term_label", "")), volume_text,
 				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("royalty_rate", 0.0)) * 100.0,
@@ -3815,6 +3820,9 @@ func _refresh_market():
 			float(competitor.get("benchmark_score", 0.0)), str(competitor.get("market_signal", "Présence limitée")),
 			int(competitor.get("months_on_market", 0))
 		])
+		var technology_partner := str(competitor.get("technology_partner", ""))
+		if technology_partner != "":
+			lines.append("  Partenariat technologique public : %s" % technology_partner)
 		var public_action := str(competitor.get("recent_public_action", ""))
 		if public_action != "":
 			lines.append("  Mouvement observé : %s" % public_action)
