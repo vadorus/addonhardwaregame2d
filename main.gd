@@ -129,6 +129,7 @@ var cpu_metric_labels: Dictionary = {}
 var product_select: OptionButton
 var product_price: SpinBox
 var product_capacity: SpinBox
+var launch_intel_label: Label
 var post_launch_group: VBoxContainer
 var post_launch_label: Label
 var promotion_select: OptionButton
@@ -1560,8 +1561,17 @@ func _create_products_tab():
 	product_select=OptionButton.new(); product_select.item_selected.connect(func(_i): _refresh_product_details()); box.add_child(product_select)
 	product_details_label=_rich_label(); box.add_child(product_details_label)
 	var grid:=GridContainer.new(); grid.columns=2; box.add_child(grid)
-	grid.add_child(_label("Prix de vente",14)); product_price=_spin(1,1000000,5,300); grid.add_child(product_price)
+	grid.add_child(_label("Prix de vente",14)); product_price=_spin(1,1000000,5,300); product_price.value_changed.connect(func(_value): _refresh_launch_intel()); grid.add_child(product_price)
 	grid.add_child(_label("Capacité mensuelle",14)); product_capacity=_spin(1,1000000,100,5000); grid.add_child(product_capacity)
+	var intel_card := _card(APP_CYAN_DARK, 10, 10)
+	box.add_child(intel_card)
+	var intel_box := VBoxContainer.new()
+	intel_box.add_theme_constant_override("separation", 6)
+	intel_card.add_child(intel_box)
+	intel_box.add_child(_eyebrow("VEILLE AVANT LANCEMENT"))
+	launch_intel_label = _rich_label()
+	launch_intel_label.custom_minimum_size.y = 118
+	intel_box.add_child(launch_intel_label)
 	var launch:=Button.new(); launch.text="Lancer sur le marché"; launch.pressed.connect(_launch_product); box.add_child(launch)
 
 	post_launch_group = VBoxContainer.new()
@@ -3069,6 +3079,62 @@ func _refresh_product_details():
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
+	_refresh_launch_intel()
+
+func _refresh_launch_intel():
+	if launch_intel_label == null:
+		return
+	if product_select == null or product_select.item_count == 0:
+		launch_intel_label.text = "Terminez l'industrialisation d'un CPU pour préparer son positionnement."
+		return
+	var product := ProductManager.get_product(_meta(product_select))
+	if product.is_empty():
+		launch_intel_label.text = "Aucun produit sélectionné."
+		return
+	if str(product.get("status", "")) == "LAUNCHED":
+		launch_intel_label.text = "Ce CPU est déjà commercialisé. Utilisez l'écran Marché pour suivre sa position face aux concurrents."
+		return
+	var candidate: Dictionary = product.duplicate(true)
+	candidate["price"] = int(product_price.value)
+	var target := MarketManager.normalize_segment(str(candidate.get("target_segment", MarketManager.default_segment())))
+	var unit_cost := int(candidate.get("unit_cost", 0))
+	var planned_price := int(candidate.get("price", 0))
+	var gross_margin := planned_price - unit_cost
+	var gross_margin_pct := 0.0
+	if planned_price > 0:
+		gross_margin_pct = float(gross_margin) / float(planned_price) * 100.0
+	var lines: Array[String] = [
+		"Cible : %s • repère marché ~%s €" % [MarketManager.segment_label(target), _money(int(round(MarketManager.segment_reference_price(target))))],
+		"Coût unitaire %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
+			_money(unit_cost), _money(planned_price), _money(gross_margin), gross_margin_pct
+		]
+	]
+	var best_comparison: Dictionary = {}
+	var best_fit := -1.0
+	for profile_value in MarketManager.cpu_competitor_public_profiles():
+		var profile: Dictionary = profile_value
+		var comparison := MarketManager.compare_cpu_public(candidate, str(profile.get("id", "")))
+		if comparison.is_empty():
+			continue
+		var rival_fit := float(comparison.get("competitor_fit", 0.0))
+		if rival_fit > best_fit:
+			best_fit = rival_fit
+			best_comparison = comparison
+	if not best_comparison.is_empty():
+		lines.append("Rival de référence : %s — %s • %s €" % [
+			str(best_comparison.get("competitor_company", "")), str(best_comparison.get("competitor_name", "")),
+			_money(int(best_comparison.get("competitor_price", 0)))
+		])
+		lines.append("Adéquation cible : vous %.1f • rival %.1f | benchmark %.1f • %.1f" % [
+			float(best_comparison.get("player_fit", 0.0)), float(best_comparison.get("competitor_fit", 0.0)),
+			float(best_comparison.get("player_benchmark", 0.0)), float(best_comparison.get("competitor_benchmark", 0.0))
+		])
+		lines.append(str(best_comparison.get("summary", "")))
+	if gross_margin <= 0:
+		lines.append("⚠ Ce prix ne couvre pas le coût unitaire.")
+	elif gross_margin_pct < 10.0:
+		lines.append("⚠ La marge est très faible : retours SAV, promotions ou défauts peuvent rapidement la faire disparaître.")
+	launch_intel_label.text = "\n".join(lines)
 
 func _refresh_selected_industrialization_controls():
 	if industrialization_select == null or industrialization_select.item_count == 0:
