@@ -3823,6 +3823,9 @@ func _refresh_market():
 		var technology_partner := str(competitor.get("technology_partner", ""))
 		if technology_partner != "":
 			lines.append("  Partenariat technologique public : %s" % technology_partner)
+		var public_b2b_customer := str(competitor.get("public_b2b_customer", ""))
+		if public_b2b_customer != "":
+			lines.append("  Contrat B2B public : %s" % public_b2b_customer)
 		var public_action := str(competitor.get("recent_public_action", ""))
 		if public_action != "":
 			lines.append("  Mouvement observé : %s" % public_action)
@@ -3976,10 +3979,12 @@ func _refresh_tender_detail():
 			_money(int(tender.get("max_unit_price", 0))), float(tender.get("penalty_rate", 0.0)) * 100.0
 		]
 	]
+	var rival_interest := MarketManager.estimated_rival_tender_interest(tender)
+	lines.append("Concurrence estimée : %d entreprise(s) susceptible(s) de répondre. Leurs offres restent confidentielles jusqu'à la décision." % rival_interest)
 	var status := str(tender.get("status", "OPEN"))
 	if status == "SUBMITTED":
 		var bid: Dictionary = tender.get("bid", {})
-		lines.append("Offre soumise : %s à %s €/unité. Décision attendue au prochain cycle mensuel." % [
+		lines.append("Offre soumise : %s à %s €/unité. Décision attendue au prochain cycle mensuel face aux offres concurrentes éventuelles." % [
 			str(bid.get("product_name", "CPU")), _money(int(bid.get("unit_price", 0)))
 		])
 		if tender_submit_button != null:
