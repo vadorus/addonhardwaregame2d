@@ -76,6 +76,11 @@ La difficulté ne donne pas aux concurrents de bonus caché de parts de marché,
 
 Seules les actions publiquement observables remontent au joueur (prix, capacité annoncée, repositionnement commercial). Les arbitrages internes de R&D et les raisons précises restent privés tant qu'aucune mécanique de renseignement ne les révèle.
 
+
+Les partenaires technologiques suivent la même philosophie. Ils ne restent pas figés en attendant le joueur : ils disposent de leur propre charge externe, d'une trésorerie simulée, d'une capacité et d'un rythme de décision. Selon leur carnet de commandes, leur qualité, leur fiabilité et leurs ressources, ils peuvent maintenir leur position, assouplir leurs conditions pour chercher des clients, durcir leurs tarifs lorsqu'ils sont saturés, investir dans une équipe supplémentaire ou améliorer leur qualité d'exécution.
+
+Ces décisions ont un effet réel sur les devis futurs et sur la capacité disponible. Elles restent toutefois bornées pour préserver le jeu : l'activité simulée avec d'autres clients ne peut pas réserver définitivement la dernière capacité ouverte d'un fournisseur, et les changements commerciaux ont des cooldowns. Le joueur voit les mouvements commerciaux pertinents, sans accéder à la comptabilité interne du partenaire.
+
 ## 5. La fiabilité compte autant que la performance
 
 Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.

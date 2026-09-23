@@ -95,6 +95,10 @@ func reset():
 		data["completed_projects"] = 0
 		data["active_project_ids"] = []
 		data["delay_events"] = 0
+		data["supplier_cash"] = 180000 + int(round(float(data.get("quality", 70.0)) * 1800.0))
+		data["external_load"] = maxi(int(data.get("capacity_slots", 1)) - 1, 0)
+		CompanyAIManager.ensure_supplier_state(data)
+		data["ai_supplier_cooldown"] = (suppliers.size() % 4) + 1
 		suppliers[supplier_id] = data
 	rng.seed = 19471
 	suppliers_changed.emit()
@@ -169,13 +173,19 @@ func _active_count(supplier: Dictionary) -> int:
 	var active = supplier.get("active_project_ids", [])
 	return active.size() if typeof(active) == TYPE_ARRAY else 0
 
+func _used_capacity(supplier: Dictionary) -> int:
+	return _active_count(supplier) + maxi(int(supplier.get("external_load", 0)), 0)
+
+func _free_capacity(supplier: Dictionary) -> int:
+	return maxi(int(supplier.get("capacity_slots", 1)) - _used_capacity(supplier), 0)
+
 func can_accept_project(mode: String, supplier_id: String) -> bool:
 	if mode == "INTERNAL":
 		return true
 	var supplier := get_supplier(supplier_id)
 	if supplier.is_empty() or not supplier.get("modes", []).has(mode):
 		return false
-	return _active_count(supplier) < maxi(int(supplier.get("capacity_slots", 1)), 1)
+	return _free_capacity(supplier) > 0
 
 func _active_contract_values() -> Array:
 	var result: Array = []
@@ -233,9 +243,9 @@ func quote(mode: String, supplier_id: String, negotiation: String = "BALANCED") 
 	var trust_cost_factor := clampf(1.06 - trust * 0.0014 - relationship * 0.0007, 0.88, 1.08)
 	var speed_factor := float(supplier.get("speed_factor", 1.0))
 	var quality_factor := lerpf(0.94, 1.08, clampf(float(supplier.get("quality", 50.0)) / 100.0, 0.0, 1.0))
-	var setup_factor := float(supplier.get("setup_factor", 1.0)) * trust_cost_factor
-	var unit_factor := float(supplier.get("cost_factor", 1.0)) * trust_cost_factor
-	var royalty_factor := float(supplier.get("royalty_factor", 1.0)) * clampf(1.04 - relationship * 0.0010, 0.92, 1.04)
+	var setup_factor := float(supplier.get("setup_factor", 1.0)) * trust_cost_factor * float(supplier.get("market_cost_factor", 1.0))
+	var unit_factor := float(supplier.get("cost_factor", 1.0)) * trust_cost_factor * float(supplier.get("market_cost_factor", 1.0))
+	var royalty_factor := float(supplier.get("royalty_factor", 1.0)) * clampf(1.04 - relationship * 0.0010, 0.92, 1.04) * float(supplier.get("market_royalty_factor", 1.0))
 	var dependency := float(base.get("dependency", 0.0)) + float(supplier.get("dependency_delta", 0.0)) - relationship * 0.08
 	var customization := float(base.get("customization", 100.0)) + float(supplier.get("customization_bonus", 0.0)) + relationship * 0.06
 	var ip_ownership := float(base.get("ip_ownership", 100.0)) + float(supplier.get("ip_bonus", 0.0)) + relationship * 0.04
@@ -284,7 +294,10 @@ func quote(mode: String, supplier_id: String, negotiation: String = "BALANCED") 
 	base["supplier_trust"] = trust
 	base["supplier_relationship"] = relationship
 	base["supplier_capacity_slots"] = int(supplier.get("capacity_slots", 1))
-	base["available_capacity_slots"] = maxi(int(supplier.get("capacity_slots", 1)) - _active_count(supplier), 0)
+	base["supplier_external_load"] = maxi(int(supplier.get("external_load", 0)), 0)
+	base["available_capacity_slots"] = _free_capacity(supplier)
+	base["supplier_commercial_stance"] = str(supplier.get("ai_supplier_action", "HOLD"))
+	base["supplier_public_action"] = str(supplier.get("supplier_last_public_action", "Conditions commerciales stables."))
 	base["specialty"] = str(supplier.get("specialty", "Technologie"))
 	return base
 
@@ -544,8 +557,74 @@ func effective_royalty_rate(contract_id: String, fallback_rate: float) -> float:
 		return 0.0
 	return float(contract.get("royalty_rate", fallback_rate))
 
-func process_month():
+func _supplier_ai_context(supplier: Dictionary) -> Dictionary:
+	var capacity := maxi(int(supplier.get("capacity_slots", 1)), 1)
+	var used := _used_capacity(supplier)
+	return {
+		"utilization":clampf(float(used) / float(capacity), 0.0, 1.0),
+		"free_slots":maxi(capacity - used, 0),
+		"external_load":maxi(int(supplier.get("external_load", 0)), 0),
+		"player_projects":_active_count(supplier)
+	}
+
+func _apply_supplier_ai_decision(supplier: Dictionary, decision: Dictionary) -> void:
+	var action := str(decision.get("action", "HOLD"))
+	var public_text := ""
+	match action:
+		"SOFTEN_TERMS":
+			supplier["market_cost_factor"] = 0.94
+			supplier["market_royalty_factor"] = 0.96
+			var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+			if int(supplier.get("external_load", 0)) < max_external:
+				supplier["external_load"] = int(supplier.get("external_load", 0)) + 1
+			public_text = "%s cherche de nouveaux projets et assouplit temporairement ses conditions commerciales." % str(supplier.get("name", "Un partenaire"))
+		"TIGHTEN_TERMS":
+			supplier["market_cost_factor"] = 1.06
+			supplier["market_royalty_factor"] = 1.04
+			public_text = "%s, très sollicité, durcit ses conditions pour les nouveaux contrats." % str(supplier.get("name", "Un partenaire"))
+		"EXPAND_SUPPLY":
+			var expansion_cost := 90000 + int(supplier.get("capacity_slots", 1)) * 20000
+			if int(supplier.get("supplier_cash", 0)) >= expansion_cost:
+				supplier["supplier_cash"] = int(supplier.get("supplier_cash", 0)) - expansion_cost
+				supplier["capacity_slots"] = int(supplier.get("capacity_slots", 1)) + 1
+				supplier["market_cost_factor"] = lerpf(float(supplier.get("market_cost_factor", 1.0)), 1.0, 0.5)
+				public_text = "%s investit dans une équipe supplémentaire et augmente sa capacité technologique." % str(supplier.get("name", "Un partenaire"))
+		"INVEST_QUALITY":
+			var quality_cost := 70000
+			if int(supplier.get("supplier_cash", 0)) >= quality_cost:
+				supplier["supplier_cash"] = int(supplier.get("supplier_cash", 0)) - quality_cost
+				supplier["quality"] = clampf(float(supplier.get("quality", 70.0)) + 1.5, 0.0, 98.0)
+				supplier["reliability"] = clampf(float(supplier.get("reliability", 70.0)) + 0.8, 0.0, 99.0)
+				public_text = "%s investit dans ses méthodes : qualité et fiabilité progressent." % str(supplier.get("name", "Un partenaire"))
+		_:
+			supplier["market_cost_factor"] = lerpf(float(supplier.get("market_cost_factor", 1.0)), 1.0, 0.35)
+			supplier["market_royalty_factor"] = lerpf(float(supplier.get("market_royalty_factor", 1.0)), 1.0, 0.35)
+	CompanyAIManager.apply_supplier_decision_state(supplier, decision)
+	if public_text != "":
+		supplier["supplier_last_public_action"] = public_text
+		CompanyManager.add_alert(public_text)
+		supplier_event.emit(public_text)
+
+func _process_supplier_businesses() -> bool:
 	var changed := false
+	for supplier_id_value in suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var supplier: Dictionary = suppliers[supplier_id]
+		CompanyAIManager.tick_supplier_state(supplier)
+		var external_load := maxi(int(supplier.get("external_load", 0)), 0)
+		var player_projects := _active_count(supplier)
+		var operating_result := external_load * 14000 + player_projects * 9000 - int(supplier.get("capacity_slots", 1)) * 7000
+		supplier["supplier_cash"] = maxi(int(supplier.get("supplier_cash", 0)) + operating_result, 0)
+		if CompanyAIManager.supplier_decision_due(supplier):
+			var decision := CompanyAIManager.choose_supplier_action(supplier, _supplier_ai_context(supplier), rng)
+			_apply_supplier_ai_decision(supplier, decision)
+			changed = true
+		var max_external := maxi(int(supplier.get("capacity_slots", 1)) - 1, 0)
+		supplier["external_load"] = clampi(int(supplier.get("external_load", 0)), 0, max_external)
+	return changed
+
+func process_month():
+	var changed := _process_supplier_businesses()
 	for contract_id_value in contracts.keys():
 		var contract_id := str(contract_id_value)
 		var contract: Dictionary = contracts[contract_id]

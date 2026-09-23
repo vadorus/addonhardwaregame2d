@@ -152,6 +152,108 @@ func apply_decision_state(company: Dictionary, decision: Dictionary) -> void:
 		history.pop_back()
 	company["ai_decision_history"] = history
 
+func ensure_supplier_state(supplier: Dictionary) -> void:
+	if not supplier.has("ai_supplier_cooldown"):
+		supplier["ai_supplier_cooldown"] = 0
+	if not supplier.has("ai_supplier_action"):
+		supplier["ai_supplier_action"] = "HOLD"
+	if not supplier.has("ai_supplier_history"):
+		supplier["ai_supplier_history"] = []
+	if not supplier.has("market_cost_factor"):
+		supplier["market_cost_factor"] = 1.0
+	if not supplier.has("market_royalty_factor"):
+		supplier["market_royalty_factor"] = 1.0
+	if not supplier.has("external_load"):
+		supplier["external_load"] = 0
+	if not supplier.has("supplier_cash"):
+		supplier["supplier_cash"] = 250000
+	if not supplier.has("supplier_last_public_action"):
+		supplier["supplier_last_public_action"] = "Conditions commerciales stables."
+
+func tick_supplier_state(supplier: Dictionary) -> void:
+	ensure_supplier_state(supplier)
+	supplier["ai_supplier_cooldown"] = maxi(int(supplier.get("ai_supplier_cooldown", 0)) - 1, 0)
+
+func supplier_decision_due(supplier: Dictionary) -> bool:
+	ensure_supplier_state(supplier)
+	return int(supplier.get("ai_supplier_cooldown", 0)) <= 0
+
+func choose_supplier_action(supplier: Dictionary, context: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	ensure_supplier_state(supplier)
+	var profile := BalanceManager.company_ai_profile()
+	var quality := clampf(float(profile.get("decision_quality", 0.74)), 0.0, 1.0)
+	var noise := maxf(float(profile.get("decision_noise", 9.0)), 0.0) * 0.65
+	var utilization := clampf(float(context.get("utilization", 0.0)), 0.0, 1.0)
+	var free_slots := maxi(int(context.get("free_slots", 0)), 0)
+	var cash := int(supplier.get("supplier_cash", 0))
+	var flexibility := clampf(float(supplier.get("flexibility", 50.0)) / 100.0, 0.0, 1.0)
+	var reliability := clampf(float(supplier.get("reliability", 70.0)) / 100.0, 0.0, 1.0)
+	var supplier_quality := clampf(float(supplier.get("quality", 70.0)) / 100.0, 0.0, 1.0)
+
+	var actions: Array = []
+	actions.append(_candidate("HOLD", 49.0 + reliability * 8.0, true, "Le carnet de commandes et les conditions actuelles restent équilibrés."))
+	actions.append(_candidate(
+		"SOFTEN_TERMS",
+		22.0 + (1.0 - utilization) * 48.0 + flexibility * 17.0,
+		free_slots > 0 and utilization <= 0.55,
+		"Le partenaire dispose de capacité libre et cherche à attirer de nouveaux projets."
+	))
+	actions.append(_candidate(
+		"TIGHTEN_TERMS",
+		18.0 + utilization * 52.0 + supplier_quality * 13.0,
+		utilization >= 0.78,
+		"Le carnet de commandes est chargé ; le partenaire peut défendre davantage ses prix."
+	))
+	actions.append(_candidate(
+		"EXPAND_SUPPLY",
+		12.0 + utilization * 54.0 + reliability * 14.0,
+		utilization >= 0.78 and cash >= 90000,
+		"La demande justifie un investissement dans une équipe technologique supplémentaire."
+	))
+	actions.append(_candidate(
+		"INVEST_QUALITY",
+		18.0 + (1.0 - supplier_quality) * 35.0 + reliability * 10.0,
+		cash >= 70000 and float(supplier.get("quality", 70.0)) < 94.0,
+		"Le partenaire peut investir dans ses méthodes et sa qualité d'exécution."
+	))
+
+	var best := _candidate("HOLD", -999.0, true, "")
+	for candidate_value in actions:
+		var candidate: Dictionary = candidate_value
+		if not bool(candidate.get("feasible", false)):
+			continue
+		var evaluated := float(candidate.get("score", 0.0)) + rng.randf_range(-noise, noise) * (1.12 - quality * 0.35)
+		candidate["evaluated_score"] = evaluated
+		if evaluated > float(best.get("evaluated_score", -999.0)):
+			best = candidate
+	if float(best.get("evaluated_score", 0.0)) < 50.0:
+		best = _candidate("HOLD", 50.0, true, "Aucun changement commercial n'est assez pertinent.")
+		best["evaluated_score"] = 50.0
+	return best
+
+func apply_supplier_decision_state(supplier: Dictionary, decision: Dictionary) -> void:
+	ensure_supplier_state(supplier)
+	var profile := BalanceManager.company_ai_profile()
+	var action := str(decision.get("action", "HOLD"))
+	var cooldown := maxi(int(profile.get("decision_interval_months", 2)) + 1, 2)
+	match action:
+		"EXPAND_SUPPLY", "INVEST_QUALITY":
+			cooldown = maxi(cooldown, 6)
+		"SOFTEN_TERMS", "TIGHTEN_TERMS":
+			cooldown = maxi(cooldown, 4)
+	supplier["ai_supplier_cooldown"] = cooldown
+	supplier["ai_supplier_action"] = action
+	var history: Array = supplier.get("ai_supplier_history", [])
+	history.push_front({
+		"action":action,
+		"reason":str(decision.get("reason", "")),
+		"year":TimeManager.year,
+		"month":TimeManager.month
+	})
+	if history.size() > 10:
+		history.pop_back()
+	supplier["ai_supplier_history"] = history
+
 func _candidate(action: String, score: float, feasible: bool, reason: String) -> Dictionary:
 	return {
 		"action":action,
