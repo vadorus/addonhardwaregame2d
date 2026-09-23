@@ -81,6 +81,17 @@ Les partenaires technologiques suivent la même philosophie. Ils ne restent pas 
 
 Ces décisions ont un effet réel sur les devis futurs et sur la capacité disponible. Elles restent toutefois bornées pour préserver le jeu : l'activité simulée avec d'autres clients ne peut pas réserver définitivement la dernière capacité ouverte d'un fournisseur, et les changements commerciaux ont des cooldowns. Le joueur voit les mouvements commerciaux pertinents, sans accéder à la comptabilité interne du partenaire.
 
+
+### Les entreprises IA utilisent aussi le même monde industriel
+
+Les concurrents ne reçoivent pas une chaîne d'approvisionnement abstraite gratuite. Pour préparer une nouvelle génération, leur direction choisit elle aussi entre développement interne, achat, licence, sous-traitance ou co-développement. Le choix dépend de leur trésorerie, de leur prudence, de leur appétit R&D, de leur adaptabilité et de leur volonté de croissance.
+
+Lorsqu'une entreprise IA choisit une solution externe, elle réserve un véritable créneau chez un fournisseur simulé. Elle paie un coût initial et des frais récurrents, bénéficie éventuellement d'un gain de vitesse ou de qualité, mais accumule moins de savoir-faire interne selon la formule choisie. Le fournisseur encaisse cette activité, sa charge augmente et ses conditions commerciales futures peuvent évoluer.
+
+Une réservation rivale peut donc réduire la capacité libre visible par le joueur. Le système conserve néanmoins un garde-fou de jouabilité : les entreprises IA et la charge anonyme ne peuvent pas monopoliser durablement le dernier créneau ouvert d'un fournisseur. Une entreprise rivale en difficulté ou qui termine sa génération libère sa réservation.
+
+Les partenariats explicitement publics peuvent être observés sur le marché. Les contrats privés, leurs prix exacts et leurs arbitrages internes restent cachés.
+
 ## 5. La fiabilité compte autant que la performance
 
 Un produit très performant peut devenir une crise si des unités surchauffent, deviennent instables ou tombent en panne.
