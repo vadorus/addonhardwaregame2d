@@ -2,7 +2,8 @@ extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
 
-const GARAGE_ART_PATH := "res://assets/ui/garage_shell.webp"
+const GARAGE_ART_PATH := "res://assets/ui/garage_stage0.webp"
+const GARAGE_EMPTY_ART_PATH := "res://assets/ui/garage_shell.webp"
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
 
 const ZONES := [
@@ -40,6 +41,8 @@ func _build_background() -> void:
 	var preferred_texture: Texture2D = null
 	if ResourceLoader.exists(GARAGE_ART_PATH):
 		preferred_texture = load(GARAGE_ART_PATH) as Texture2D
+	elif ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
+		preferred_texture = load(GARAGE_EMPTY_ART_PATH) as Texture2D
 	elif ResourceLoader.exists(GARAGE_FALLBACK_PATH):
 		preferred_texture = load(GARAGE_FALLBACK_PATH) as Texture2D
 	_background.texture = preferred_texture
@@ -104,8 +107,8 @@ func _build_overlay() -> void:
 
 func _apply_zone_style(button: Button) -> void:
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.035, 0.060, 0.095, 0.72)
-	normal.border_color = Color(0.25, 0.75, 0.82, 0.45)
+	normal.bg_color = Color(0.035, 0.060, 0.095, 0.36)
+	normal.border_color = Color(0.25, 0.75, 0.82, 0.58)
 	normal.set_border_width_all(1)
 	normal.corner_radius_top_left = 10
 	normal.corner_radius_top_right = 10
@@ -175,4 +178,8 @@ func visible_zone_count() -> int:
 
 
 func background_resource_path() -> String:
-	return GARAGE_ART_PATH if ResourceLoader.exists(GARAGE_ART_PATH) else GARAGE_FALLBACK_PATH
+	if ResourceLoader.exists(GARAGE_ART_PATH):
+		return GARAGE_ART_PATH
+	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
+		return GARAGE_EMPTY_ART_PATH
+	return GARAGE_FALLBACK_PATH
