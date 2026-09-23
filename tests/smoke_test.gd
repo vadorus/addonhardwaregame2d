@@ -370,6 +370,27 @@ func _ready() -> void:
 	if CPU_DESIGN.available_nodes_for_capabilities(30.0, 30.0).size() <= starting_nodes.size():
 		_fail("Manufacturing plus miniaturization mastery does not unlock finer historical processes")
 		return
+	var space_reliable_eval := {
+		"performance":52.0,
+		"efficiency":88.0,
+		"reliability":96.0,
+		"innovation":58.0,
+		"unit_cost":130
+	}
+	var space_fast_fragile_eval := {
+		"performance":96.0,
+		"efficiency":42.0,
+		"reliability":44.0,
+		"innovation":82.0,
+		"unit_cost":130
+	}
+	if CPU_DESIGN.application_fit(space_reliable_eval, "SPACE") <= CPU_DESIGN.application_fit(space_fast_fragile_eval, "SPACE"):
+		_fail("Spatial CPU application profile did not prioritize reliability and efficiency over raw speed")
+		return
+	var early_space_assessment := CPU_DESIGN.application_assessment(space_fast_fragile_eval, "SPACE")
+	if str(early_space_assessment.get("status", "")) == "ADAPTED":
+		_fail("Spatial application assessment accepted a fragile high-performance CPU without warning")
+		return
 	var forbidden_8um := CPU_DESIGN.default_design()
 	forbidden_8um["node_nm"] = 8000
 	if ResearchManager.start_project("Too Early 8um", "CPU", "MAINSTREAM", "INTERNAL", "INNOVATION", 20_000, forbidden_8um):
@@ -626,7 +647,7 @@ func _ready() -> void:
 		return
 	var capability_before_remediation := ResearchManager.get_cpu_capability(str(project_remediation.get("capability", "ARCHITECTURE")))
 	var cash_before_remediation := Economy.money
-	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design, project_plan, project_remediation)
+	var started: bool = ResearchManager.start_project("CI CPU", "CPU", "MAINSTREAM", "INTERNAL", "PERFORMANCE", 42_000, cpu_design, project_plan, project_remediation, "SPACE")
 	if not started:
 		_fail("Could not start R&D project with the team's technical solution")
 		return
@@ -636,6 +657,9 @@ func _ready() -> void:
 	var project: Dictionary = ResearchManager.projects[0]
 	if str(project.get("segment", "")) != "EMBEDDED":
 		_fail("Legacy MAINSTREAM project target was not normalized to the real 1971 embedded market")
+		return
+	if str(project.get("application_profile", "")) != "SPACE":
+		_fail("CPU application intent was not preserved independently from the commercial market")
 		return
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("TEAM"):

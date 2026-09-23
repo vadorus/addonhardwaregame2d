@@ -672,7 +672,7 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}) -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL") -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	var market_segment := segment
@@ -705,9 +705,15 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	var normalized_design: Dictionary = {}
 	var design_estimate: Dictionary = {}
 	var stored_remediation: Dictionary = {}
+	var stored_application_profile := "GENERAL"
 	var effective_capabilities := cpu_capabilities.duplicate(true)
 	var effective_manufacturing := float(technologies.get("manufacturing", 0.0))
 	if sector == "CPU":
+		stored_application_profile = str(CPU_DESIGN.application_profile(application_profile).get("key", "GENERAL"))
+		var application_targets: Dictionary = CPU_DESIGN.application_profile(stored_application_profile).get("targets", {})
+		for application_metric in ["performance", "efficiency", "reliability"]:
+			if application_targets.has(application_metric):
+				desired[application_metric] = maxf(float(desired.get(application_metric, 55.0)), float(application_targets[application_metric]))
 		normalized_design = CPU_DESIGN.normalize(cpu_design)
 		if not technical_remediation.is_empty():
 			var remediation_design := CPU_DESIGN.normalize(technical_remediation.get("design", {}))
@@ -754,6 +760,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
+		"application_profile":stored_application_profile,
 		"generation_plan":stored_generation_plan,
 		"research_snapshot":cpu_research_domains.duplicate(true) if sector == "CPU" else {},
 		"technical_capabilities_snapshot":effective_capabilities.duplicate(true) if sector == "CPU" else {},

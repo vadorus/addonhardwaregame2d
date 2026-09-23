@@ -39,11 +39,119 @@ const PRESETS := {
 	"PERFORMANCE": {"cores":1, "frequency_ghz":0.0014, "cache_mb":0.0, "node_nm":10000, "tdp_w":4}
 }
 
+
+const APPLICATION_PROFILES := {
+	"GENERAL":{
+		"label":"Polyvalent",
+		"description":"Compromis généraliste sans usage dominant.",
+		"weights":{"performance":0.22,"efficiency":0.19,"reliability":0.22,"innovation":0.12,"value":0.25},
+		"targets":{"performance":55.0,"efficiency":55.0,"reliability":60.0}
+	},
+	"CONSOLE":{
+		"label":"Console",
+		"description":"Performance soutenue, efficacité, stabilité et coût maîtrisé pour une plateforme fermée.",
+		"weights":{"performance":0.28,"efficiency":0.20,"reliability":0.22,"innovation":0.10,"value":0.20},
+		"targets":{"performance":65.0,"efficiency":60.0,"reliability":68.0}
+	},
+	"MOBILE":{
+		"label":"Téléphone / mobile",
+		"description":"Consommation et chauffe faibles, autonomie et stabilité avant la puissance brute.",
+		"weights":{"performance":0.14,"efficiency":0.38,"reliability":0.22,"innovation":0.12,"value":0.14},
+		"targets":{"performance":52.0,"efficiency":78.0,"reliability":70.0}
+	},
+	"SERVER":{
+		"label":"Serveur",
+		"description":"Fiabilité, efficacité continue et performances soutenues pour des charges longues.",
+		"weights":{"performance":0.23,"efficiency":0.22,"reliability":0.38,"innovation":0.07,"value":0.10},
+		"targets":{"performance":66.0,"efficiency":66.0,"reliability":82.0}
+	},
+	"SPACE":{
+		"label":"Spatial / critique",
+		"description":"Fiabilité maximale, sobriété énergétique et stabilité thermique avant la performance.",
+		"weights":{"performance":0.08,"efficiency":0.29,"reliability":0.50,"innovation":0.08,"value":0.05},
+		"targets":{"performance":42.0,"efficiency":78.0,"reliability":90.0}
+	},
+	"INDUSTRIAL":{
+		"label":"Industriel / embarqué critique",
+		"description":"Robustesse, continuité de service et consommation contenue pour les systèmes spécialisés.",
+		"weights":{"performance":0.12,"efficiency":0.20,"reliability":0.46,"innovation":0.07,"value":0.15},
+		"targets":{"performance":48.0,"efficiency":62.0,"reliability":86.0}
+	},
+	"OVERCLOCK":{
+		"label":"Performance / overclocking",
+		"description":"Fréquence, marge de performance et innovation, avec davantage de contraintes thermiques.",
+		"weights":{"performance":0.52,"efficiency":0.05,"reliability":0.14,"innovation":0.22,"value":0.07},
+		"targets":{"performance":84.0,"efficiency":40.0,"reliability":60.0}
+	}
+}
+
 static func default_design() -> Dictionary:
 	return PRESETS.BALANCED.duplicate(true)
 
 static func preset(key: String) -> Dictionary:
 	return normalize(PRESETS.get(key, PRESETS.BALANCED))
+
+static func application_keys() -> Array:
+	return APPLICATION_PROFILES.keys()
+
+static func application_profile(key: String) -> Dictionary:
+	var normalized_key := key if APPLICATION_PROFILES.has(key) else "GENERAL"
+	var result: Dictionary = APPLICATION_PROFILES[normalized_key].duplicate(true)
+	result["key"] = normalized_key
+	return result
+
+static func application_label(key: String) -> String:
+	return str(application_profile(key).get("label", "Polyvalent"))
+
+static func application_description(key: String) -> String:
+	return str(application_profile(key).get("description", ""))
+
+static func application_fit(evaluation: Dictionary, key: String) -> float:
+	var profile := application_profile(key)
+	var weights: Dictionary = profile.get("weights", {})
+	var unit_cost := float(evaluation.get("unit_cost", 120.0))
+	var value_score := clampf((220.0 - unit_cost) / 1.60, 0.0, 100.0)
+	var score := (
+		float(evaluation.get("performance", 50.0)) * float(weights.get("performance", 0.0))
+		+ float(evaluation.get("efficiency", 50.0)) * float(weights.get("efficiency", 0.0))
+		+ float(evaluation.get("reliability", 50.0)) * float(weights.get("reliability", 0.0))
+		+ float(evaluation.get("innovation", 50.0)) * float(weights.get("innovation", 0.0))
+		+ value_score * float(weights.get("value", 0.0))
+	)
+	return clampf(score, 0.0, 100.0)
+
+static func application_assessment(evaluation: Dictionary, key: String) -> Dictionary:
+	var profile := application_profile(key)
+	var targets: Dictionary = profile.get("targets", {})
+	var fit := application_fit(evaluation, key)
+	var gaps: Array[String] = []
+	var labels := {
+		"performance":"performance",
+		"efficiency":"efficacité / thermique",
+		"reliability":"fiabilité"
+	}
+	for metric in ["performance","efficiency","reliability"]:
+		var target := float(targets.get(metric, 0.0))
+		var current := float(evaluation.get(metric, 50.0))
+		if target > 0.0 and current + 3.0 < target:
+			gaps.append("%s %.0f/%.0f" % [str(labels[metric]), current, target])
+	var status := "ADAPTED"
+	var summary := "Le design est cohérent avec l'usage %s." % str(profile.get("label", "choisi"))
+	if fit < 55.0 or gaps.size() >= 2:
+		status = "WEAK"
+		summary = "Le CPU peut viser cet usage, mais plusieurs compromis sont encore défavorables."
+	elif fit < 70.0 or not gaps.is_empty():
+		status = "PROMISING"
+		summary = "Le CPU est crédible pour cet usage, avec encore des points à améliorer."
+	return {
+		"key":str(profile.get("key", "GENERAL")),
+		"label":str(profile.get("label", "Polyvalent")),
+		"fit":fit,
+		"status":status,
+		"gaps":gaps,
+		"summary":summary,
+		"description":str(profile.get("description", ""))
+	}
 
 static func available_nodes() -> Array:
 	return NODE_ORDER.duplicate()

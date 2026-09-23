@@ -99,6 +99,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"id":"PROD-%03d" % _next_id,"project_id":str(project.get("id", "")),"name":str(project.get("name", "Produit")),
 		"company":CompanyManager.company_name,"sector":sector,"target_segment":str(project.get("segment", "MAINSTREAM")),
 		"approach":str(project.get("approach", "INTERNAL")),"internal_ratio":float(approach.internal_ratio),
+		"application_profile":str(project.get("application_profile", "GENERAL")),
 		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
