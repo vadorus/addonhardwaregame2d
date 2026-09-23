@@ -92,7 +92,8 @@ func _create_single_product(project: Dictionary) -> void:
 	var sector_data: Dictionary = GameData.SECTORS[sector]
 	var approach_key := str(project.get("approach", "INTERNAL"))
 	var approach: Dictionary = GameData.approach_data(approach_key)
-	var sourcing := project.get("sourcing", GameData.sourcing_profile(approach_key)).duplicate(true)
+	var sourcing_value = project.get("sourcing", GameData.sourcing_profile(approach_key))
+	var sourcing: Dictionary = sourcing_value.duplicate(true) if typeof(sourcing_value) == TYPE_DICTIONARY else GameData.sourcing_profile(approach_key)
 	var metrics: Dictionary = project.get("final_metrics", {}).duplicate(true)
 	var avg := _metric_average(metrics)
 	var unit_cost := _base_unit_cost(project)
@@ -125,7 +126,7 @@ func _base_unit_cost(project: Dictionary) -> int:
 		var estimate := CPU_DESIGN.evaluate(design)
 		var design_cost := int(estimate.get("unit_cost", unit_cost))
 		unit_cost = int(float(design_cost) * (0.94 + (100.0 - float(metrics.get("reliability", 50.0))) / 500.0))
-	var sourcing := GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))
+	var sourcing: Dictionary = GameData.sourcing_profile(str(project.get("approach", "INTERNAL")))
 	unit_cost = int(round(float(unit_cost) * float(sourcing.get("unit_cost_factor", 1.0))))
 	return maxi(unit_cost, 1)
 
