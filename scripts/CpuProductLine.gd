@@ -158,6 +158,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"approach":approach,
 		"internal_ratio":float(approach_data.internal_ratio),
 		"sourcing":sourcing,
+		"supplier_contract_id":str(project.get("supplier_contract_id", sourcing.get("id", ""))),
 		"royalty_rate":float(sourcing.get("royalty_rate", 0.0)),
 		"vendor_dependency":float(sourcing.get("dependency", 0.0)),
 		"customization_freedom":float(sourcing.get("customization", 100.0)),
