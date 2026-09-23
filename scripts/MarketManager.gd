@@ -1247,7 +1247,7 @@ func _product_application_evaluation(product: Dictionary) -> Dictionary:
 		"unit_cost":float(product.get("unit_cost", 100.0))
 	}
 
-func tender_fit(tender: Dictionary, product: Dictionary, bid_price: int) -> Dictionary:
+func _tender_fit_for(tender: Dictionary, product: Dictionary, bid_price: int, reputation_score: float, intent_bonus: float = 0.0) -> Dictionary:
 	if tender.is_empty() or product.is_empty() or str(product.get("sector", "")) != "CPU":
 		return {}
 	var evaluation := _product_application_evaluation(product)
@@ -1272,21 +1272,107 @@ func tender_fit(tender: Dictionary, product: Dictionary, bid_price: int) -> Dict
 	var price_score := clampf(112.0 - maxf(price_ratio - 0.72, 0.0) * 115.0, 10.0, 100.0)
 	if bid_price > max_price:
 		price_score = maxf(price_score - (price_ratio - 1.0) * 70.0, 5.0)
-	var professional := float(CompanyManager.reputation.get("professional", 45.0))
-	var reliability_reputation := float(CompanyManager.reputation.get("reliability", 50.0))
-	var reputation_score := professional * 0.64 + reliability_reputation * 0.36
-	var intent_bonus := 6.0 if str(product.get("application_profile", "GENERAL")) == application_key else 0.0
-	var total_score := clampf(application_fit * 0.34 + requirement_score * 0.31 + price_score * 0.20 + reputation_score * 0.15 + intent_bonus, 0.0, 100.0)
+	var total_score := clampf(application_fit * 0.34 + requirement_score * 0.31 + price_score * 0.20 + clampf(reputation_score, 0.0, 100.0) * 0.15 + intent_bonus, 0.0, 100.0)
 	return {
 		"score":total_score,
 		"application_fit":application_fit,
 		"requirement_score":requirement_score,
 		"price_score":price_score,
-		"reputation_score":reputation_score,
+		"reputation_score":clampf(reputation_score, 0.0, 100.0),
 		"intent_bonus":intent_bonus,
 		"gaps":gaps,
 		"max_unit_price":max_price
 	}
+
+func tender_fit(tender: Dictionary, product: Dictionary, bid_price: int) -> Dictionary:
+	var professional := float(CompanyManager.reputation.get("professional", 45.0))
+	var reliability_reputation := float(CompanyManager.reputation.get("reliability", 50.0))
+	var reputation_score := professional * 0.64 + reliability_reputation * 0.36
+	var application_key := str(tender.get("application_profile", "GENERAL"))
+	var intent_bonus := 6.0 if str(product.get("application_profile", "GENERAL")) == application_key else 0.0
+	return _tender_fit_for(tender, product, bid_price, reputation_score, intent_bonus)
+
+func _rival_tender_fit(tender: Dictionary, competitor: Dictionary, bid_price: int) -> Dictionary:
+	var metrics: Dictionary = competitor.get("metrics", {})
+	var brand := float(competitor.get("brand", 50.0))
+	var reliability := float(metrics.get("reliability", 50.0))
+	var reputation_score := brand * 0.62 + reliability * 0.38
+	var intent_bonus := 4.0 if normalize_segment(str(competitor.get("target_segment", default_segment()))) == normalize_segment(str(tender.get("segment", default_segment()))) else 0.0
+	return _tender_fit_for(tender, competitor, bid_price, reputation_score, intent_bonus)
+
+func _rival_bid_price(tender: Dictionary, competitor: Dictionary) -> int:
+	var max_price := maxi(int(tender.get("max_unit_price", 1)), 1)
+	var unit_cost := maxi(int(competitor.get("unit_cost", 1)), 1)
+	var aggression := clampf(float(competitor.get("ai_price_aggression", 50.0)) / 100.0, 0.0, 1.0)
+	var prudence := clampf(float(competitor.get("ai_financial_prudence", 50.0)) / 100.0, 0.0, 1.0)
+	var strategy := str(competitor.get("strategy", "BALANCED"))
+	var target_ratio := 0.88 - aggression * 0.10 + prudence * 0.05
+	if strategy == "PERFORMANCE":
+		target_ratio += 0.04
+	elif strategy == "EFFICIENCY":
+		target_ratio -= 0.03
+	var profile := BalanceManager.company_ai_profile()
+	var noise := maxf(float(profile.get("decision_noise", 9.0)), 0.0) / 100.0
+	var quality := clampf(float(profile.get("decision_quality", 0.74)), 0.0, 1.0)
+	target_ratio += rng.randf_range(-noise, noise) * (0.9 - quality * 0.45)
+	var floor_price := maxi(unit_cost + 4, int(round(float(unit_cost) * 1.10)))
+	return maxi(floor_price, int(round(float(max_price) * clampf(target_ratio, 0.68, 1.08))))
+
+func _competitor_has_exclusive_b2b(competitor: Dictionary) -> bool:
+	for contract_value in competitor.get("b2b_contracts", []):
+		var contract: Dictionary = contract_value
+		if int(contract.get("remaining_months", 0)) > 0 and bool(contract.get("exclusivity", false)):
+			return true
+	return false
+
+func _build_rival_tender_bids(tender: Dictionary) -> Array:
+	var bids: Array = []
+	for competitor_value in competitors.get("CPU", []):
+		var competitor: Dictionary = competitor_value
+		if _competitor_has_exclusive_b2b(competitor):
+			continue
+		var capacity := maxi(int(competitor.get("capacity", 0)), 1)
+		var committed_units := 0
+		for contract_value in competitor.get("b2b_contracts", []):
+			var contract: Dictionary = contract_value
+			if int(contract.get("remaining_months", 0)) > 0:
+				committed_units += int(contract.get("units_per_month", 0))
+		var free_capacity := maxi(capacity - committed_units, 0)
+		var tender_units := maxi(int(tender.get("units_per_month", 0)), 0)
+		if free_capacity < int(round(float(tender_units) * 0.75)):
+			continue
+		var bid_price := _rival_bid_price(tender, competitor)
+		var fit := _rival_tender_fit(tender, competitor, bid_price)
+		if fit.is_empty() or float(fit.get("score", 0.0)) < 52.0:
+			continue
+		bids.append({
+			"company_id":str(competitor.get("id", "")),
+			"company":str(competitor.get("company", "")),
+			"product_name":str(competitor.get("name", "CPU")),
+			"unit_price":bid_price,
+			"score":float(fit.get("score", 0.0)),
+			"gaps":fit.get("gaps", []).duplicate(),
+			"capacity_available":free_capacity
+		})
+	bids.sort_custom(func(a, b): return float(a.get("score", 0.0)) > float(b.get("score", 0.0)))
+	return bids
+
+func estimated_rival_tender_interest(tender: Dictionary) -> int:
+	if tender.is_empty():
+		return 0
+	var count := 0
+	for competitor_value in competitors.get("CPU", []):
+		var competitor: Dictionary = competitor_value
+		if _competitor_has_exclusive_b2b(competitor):
+			continue
+		var capacity := maxi(int(competitor.get("capacity", 0)), 1)
+		if capacity < int(tender.get("units_per_month", 0)):
+			continue
+		var reference_bid := maxi(int(competitor.get("unit_cost", 1)) + 4, mini(int(competitor.get("price", 1)), int(tender.get("max_unit_price", 1))))
+		var fit := _rival_tender_fit(tender, competitor, reference_bid)
+		if not fit.is_empty() and float(fit.get("score", 0.0)) >= 52.0:
+			count += 1
+	return count
 
 func submit_tender_bid(tender_id: String, product_id: String, bid_price: int) -> bool:
 	var tender := get_tender(tender_id)
