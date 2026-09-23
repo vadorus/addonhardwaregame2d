@@ -543,6 +543,34 @@ func _ready() -> void:
 	if license_suppliers.size() < 2:
 		_fail("Licensed sourcing does not expose multiple real technology suppliers")
 		return
+	var supplier_ai_initial_state := SupplierManager.get_state().duplicate(true)
+	var supplier_cash_before_ai := {}
+	for supplier_id_value in SupplierManager.suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var supplier := SupplierManager.get_supplier(supplier_id)
+		supplier_cash_before_ai[supplier_id] = int(supplier.get("supplier_cash", 0))
+		if not supplier.has("ai_supplier_history") or not supplier.has("external_load"):
+			_fail("Technology supplier is missing autonomous business state")
+			return
+		if int(supplier.get("external_load", 0)) > maxi(int(supplier.get("capacity_slots", 1)) - 1, 0):
+			_fail("External supplier workload consumed the last open-market capacity slot")
+			return
+	for _supplier_month in range(5):
+		SupplierManager.process_month()
+	for supplier_id_value in SupplierManager.suppliers.keys():
+		var supplier_id := str(supplier_id_value)
+		var supplier := SupplierManager.get_supplier(supplier_id)
+		if supplier.get("ai_supplier_history", []).is_empty():
+			_fail("Autonomous technology supplier never made a business decision")
+			return
+		if int(supplier.get("external_load", 0)) > maxi(int(supplier.get("capacity_slots", 1)) - 1, 0):
+			_fail("Autonomous supplier external business crowded the player out of all open capacity")
+			return
+		if int(supplier.get("supplier_cash", 0)) == int(supplier_cash_before_ai.get(supplier_id, 0)):
+			_fail("Autonomous supplier finances did not react to its external business")
+			return
+	SupplierManager.load_state(supplier_ai_initial_state)
+
 	var license_supplier_a := str(license_suppliers[0])
 	var license_supplier_b := str(license_suppliers[1])
 	var quote_a := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
@@ -554,6 +582,14 @@ func _ready() -> void:
 		_fail("Supplier choice has no meaningful economic or reliability difference")
 		return
 	var balanced_quote := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	var supplier_market_probe := SupplierManager.get_state().duplicate(true)
+	SupplierManager.suppliers[license_supplier_a]["market_cost_factor"] = 1.10
+	var tighter_market_quote := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
+	if int(tighter_market_quote.get("setup_cost", 0)) <= int(balanced_quote.get("setup_cost", 0)):
+		_fail("Autonomous supplier commercial stance did not change a real future quote")
+		return
+	SupplierManager.load_state(supplier_market_probe)
+	balanced_quote = SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
 	var price_quote := SupplierManager.quote("LICENSE", license_supplier_a, "PRICE")
 	if int(price_quote.get("setup_cost", 0)) >= int(balanced_quote.get("setup_cost", 0)):
 		_fail("Price-priority negotiation did not reduce the supplier setup cost")
