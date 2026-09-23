@@ -204,6 +204,8 @@ Les zones associées à une fonction encore verrouillée restent soumises au dé
 
 Le premier asset de production est désormais `assets/ui/garage_shell.webp` : un garage isométrique chaleureux, optimisé en WebP pour rester léger sur PC et Android. L'image est affichée sans déformation ni recadrage ; les hotspots sont calculés relativement au rectangle réellement occupé par l'illustration afin de rester alignés sur différents formats d'écran. Le SVG précédent reste uniquement comme fallback technique.
 
+Le **niveau 0 jouable** utilise ensuite `assets/ui/garage_stage0.webp`, qui ajoute directement les trois postes disponibles au démarrage : établi CPU, banc de test et poste du fondateur. Les fonctions encore verrouillées ne reçoivent pas encore de mobilier dédié. Cela permet au décor de suivre le même apprentissage progressif que l'interface : le joueur voit d'abord uniquement ce qu'il peut réellement utiliser.
+
 ## Évolution visuelle des locaux
 
 La progression de l'interface doit être soutenue par l'évolution visible du lieu de travail. Le système de locaux possède maintenant quatre paliers de simulation : garage aménagé, atelier + bureaux, siège technique et campus R&D.
