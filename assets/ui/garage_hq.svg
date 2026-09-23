@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520">
+<defs>
+  <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#e9dfcf"/><stop offset="1" stop-color="#cbbda9"/>
+  </linearGradient>
+  <linearGradient id="floor" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#7e756b"/><stop offset="1" stop-color="#59534f"/>
+  </linearGradient>
+  <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#8a5d36"/><stop offset=".5" stop-color="#b17a48"/><stop offset="1" stop-color="#6f472c"/>
+  </linearGradient>
+  <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#173450"/><stop offset="1" stop-color="#0b1726"/>
+  </linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#111927" flood-opacity=".35"/></filter>
+  <filter id="warm"><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#ffcf7d" flood-opacity=".45"/></filter>
+</defs>
+<rect width="1280" height="520" fill="#0f1826"/>
+<!-- room shell -->
+<polygon points="110,110 650,34 1160,118 620,205" fill="url(#wall)"/>
+<polygon points="110,110 620,205 620,452 110,350" fill="#d6c8b5"/>
+<polygon points="620,205 1160,118 1160,348 620,452" fill="#c7baa8"/>
+<polygon points="110,350 620,452 1160,348 650,260" fill="url(#floor)"/>
+<!-- structural beams -->
+<polygon points="110,100 650,24 1160,108 1160,126 650,43 110,120" fill="#3c2d26"/>
+<polygon points="607,198 628,202 628,454 607,449" fill="#332925"/>
+<polygon points="111,342 619,443 619,459 111,358" fill="#3b302b"/>
+<!-- open garage door / sunlight -->
+<polygon points="130,145 330,174 330,336 130,295" fill="#222c35"/>
+<polygon points="145,165 315,190 315,307 145,275" fill="#86b6c0"/>
+<polygon points="145,255 315,280 315,307 145,275" fill="#9ac06e"/>
+<polygon points="315,307 480,336 372,372 207,342" fill="#e9bd72" opacity=".55"/>
+<!-- workbench -->
+<g filter="url(#shadow)">
+  <polygon points="255,255 480,295 400,335 175,294" fill="url(#wood)"/>
+  <polygon points="185,295 210,300 210,365 185,359" fill="#2c3138"/>
+  <polygon points="387,336 413,330 413,396 387,402" fill="#2c3138"/>
+  <polygon points="237,268 400,297 350,321 187,292" fill="#315c55"/>
+  <rect x="207" y="204" width="175" height="72" rx="8" fill="#805f3e"/>
+  <circle cx="228" cy="224" r="5" fill="#161b22"/><circle cx="251" cy="232" r="5" fill="#161b22"/><circle cx="276" cy="238" r="5" fill="#161b22"/>
+  <path d="M300 216v34M322 214v41M343 220v34" stroke="#343b42" stroke-width="8" stroke-linecap="round"/>
+  <rect x="264" y="278" width="58" height="31" rx="4" fill="#263940"/><rect x="274" y="284" width="15" height="15" fill="#b8c7ae"/>
+  <circle cx="438" cy="279" r="22" fill="#1b222a"/><path d="M438 259v-42" stroke="#20262e" stroke-width="6"/><path d="M438 217l-26 14" stroke="#20262e" stroke-width="6"/>
+</g>
+<!-- prototype test station -->
+<g filter="url(#shadow)">
+  <polygon points="525,246 746,281 683,315 461,279" fill="#9a6a42"/>
+  <rect x="500" y="178" width="215" height="83" rx="8" fill="#343a43"/>
+  <rect x="516" y="191" width="78" height="50" rx="5" fill="url(#screen)"/>
+  <path d="M523 224c20-30 31 25 57-9 11-14 18 6 26 0" fill="none" stroke="#5be0e8" stroke-width="3"/>
+  <rect x="608" y="192" width="89" height="50" rx="5" fill="url(#screen)"/>
+  <rect x="619" y="203" width="18" height="9" fill="#68d7ab"/><rect x="642" y="203" width="40" height="6" fill="#486a80"/>
+  <rect x="619" y="219" width="57" height="5" fill="#4f7f9d"/>
+  <polygon points="548,259 641,275 605,293 512,277" fill="#1b2027"/>
+  <circle cx="576" cy="274" r="18" fill="#39434a"/><circle cx="576" cy="274" r="9" fill="#111820"/>
+  <path d="M590 267c22-15 45-12 66 5" fill="none" stroke="#c95c50" stroke-width="4"/>
+</g>
+<!-- founder desk -->
+<g filter="url(#shadow)">
+  <polygon points="770,246 1012,207 1100,243 858,286" fill="url(#wood)"/>
+  <polygon points="867,287 894,281 894,357 867,362" fill="#2e333a"/>
+  <polygon points="1080,247 1101,243 1101,316 1080,320" fill="#2e333a"/>
+  <rect x="822" y="173" width="95" height="57" rx="6" fill="#171e27"/><rect x="830" y="181" width="79" height="41" fill="url(#screen)"/>
+  <rect x="920" y="164" width="95" height="57" rx="6" fill="#171e27"/><rect x="928" y="172" width="79" height="41" fill="url(#screen)"/>
+  <path d="M850 191h38M850 201h29M949 184h40M949 194h31" stroke="#4fd2dd" stroke-width="3" opacity=".8"/>
+  <ellipse cx="934" cy="322" rx="45" ry="24" fill="#1f252c"/><rect x="925" y="285" width="18" height="52" rx="8" fill="#2b3139"/>
+</g>
+<!-- planning wall -->
+<g filter="url(#shadow)">
+  <polygon points="734,101 1020,61 1020,177 734,221" fill="#f2efe7" stroke="#494642" stroke-width="6"/>
+  <circle cx="780" cy="139" r="21" fill="none" stroke="#d79a49" stroke-width="4"/>
+  <path d="M780 114v-13M758 119l-10-10M803 119l10-10" stroke="#d79a49" stroke-width="4"/>
+  <path d="M823 126h130M823 143h94M823 160h119M823 177h67" stroke="#6f8392" stroke-width="5" stroke-linecap="round"/>
+  <path d="M765 181l26-21 21 13 28-27" fill="none" stroke="#4a8e79" stroke-width="5"/>
+</g>
+<!-- shelving -->
+<g filter="url(#shadow)">
+  <path d="M1050 132v175M1134 118v175M1050 173l84-14M1050 221l84-14M1050 268l84-14" stroke="#2d3237" stroke-width="9"/>
+  <polygon points="1057,151 1127,140 1127,161 1057,172" fill="#9a754f"/>
+  <polygon points="1057,199 1127,188 1127,209 1057,220" fill="#9a754f"/>
+  <polygon points="1057,246 1127,235 1127,256 1057,267" fill="#9a754f"/>
+  <rect x="1066" y="154" width="27" height="18" fill="#a87a4b"/><rect x="1097" y="149" width="24" height="18" fill="#5f6871"/>
+  <rect x="1065" y="202" width="55" height="17" fill="#555e67"/>
+  <rect x="1068" y="250" width="24" height="17" fill="#b48858"/><rect x="1097" y="245" width="23" height="17" fill="#67727b"/>
+</g>
+<!-- plants & warmth -->
+<g fill="#4f7c52"><circle cx="1030" cy="113" r="14"/><circle cx="1046" cy="107" r="13"/><circle cx="1038" cy="126" r="13"/></g>
+<circle cx="437" cy="220" r="12" fill="#ffd289" filter="url(#warm)"/>
+<!-- floor rugs / path -->
+<polygon points="675,333 857,302 973,327 790,360" fill="#24303c" opacity=".78"/>
+<path d="M130 352L620 450L1160 347" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="2"/>
+<!-- ambient labels as abstract plaques -->
+<rect x="169" y="387" width="210" height="52" rx="12" fill="#111b28" opacity=".82"/>
+<rect x="870" y="371" width="205" height="52" rx="12" fill="#111b28" opacity=".82"/>
+</svg>
