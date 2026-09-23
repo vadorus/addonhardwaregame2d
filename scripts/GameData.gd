@@ -180,10 +180,57 @@ const FOCUS_OPTIONS := {
 	"SUSTAINABILITY": {"label":"Durabilité / environnement", "metric":"sustainability"}
 }
 
+const ACTIVE_APPROACH_KEYS := ["INTERNAL","PURCHASE","LICENSE","SUBCONTRACT","PARTNER"]
+
 const APPROACHES := {
-	"INTERNAL": {"label":"Développement interne", "speed":0.90, "knowledge":1.35, "quality":1.06, "cost":1.18, "internal_ratio":1.0},
-	"HYBRID": {"label":"Hybride / partenariat", "speed":1.06, "knowledge":0.90, "quality":1.02, "cost":1.00, "internal_ratio":0.60},
-	"EXTERNAL": {"label":"Composants / technologie externe", "speed":1.26, "knowledge":0.48, "quality":0.98, "cost":0.82, "internal_ratio":0.22}
+	"INTERNAL": {
+		"label":"Développer en interne",
+		"description":"Contrôle maximal, propriété intellectuelle forte et apprentissage élevé, au prix d'un développement plus lent et plus coûteux.",
+		"speed":0.90, "knowledge":1.35, "quality":1.06, "cost":1.18, "internal_ratio":1.0,
+		"setup_cost":0, "royalty_rate":0.0, "unit_cost_factor":0.95,
+		"dependency":8.0, "customization":100.0, "ip_ownership":100.0, "confidentiality":92.0
+	},
+	"PURCHASE": {
+		"label":"Acheter une technologie / composant",
+		"description":"Accès rapide à une solution existante. Peu d'apprentissage interne, dépendance forte et personnalisation limitée.",
+		"speed":1.34, "knowledge":0.34, "quality":0.98, "cost":0.80, "internal_ratio":0.16,
+		"setup_cost":22000, "royalty_rate":0.0, "unit_cost_factor":1.16,
+		"dependency":78.0, "customization":34.0, "ip_ownership":15.0, "confidentiality":52.0
+	},
+	"LICENSE": {
+		"label":"Prendre une licence",
+		"description":"Technologie éprouvée et adaptable, avec frais initiaux et royalties. Contrôle intermédiaire sur l'intégration.",
+		"speed":1.18, "knowledge":0.62, "quality":1.03, "cost":0.94, "internal_ratio":0.40,
+		"setup_cost":35000, "royalty_rate":0.06, "unit_cost_factor":1.06,
+		"dependency":56.0, "customization":64.0, "ip_ownership":35.0, "confidentiality":68.0
+	},
+	"SUBCONTRACT": {
+		"label":"Sous-traiter le développement",
+		"description":"Un prestataire réalise une part importante du travail. Rapide et flexible, mais le savoir-faire reste largement chez lui.",
+		"speed":1.25, "knowledge":0.44, "quality":1.00, "cost":1.04, "internal_ratio":0.26,
+		"setup_cost":14000, "royalty_rate":0.0, "unit_cost_factor":1.10,
+		"dependency":70.0, "customization":56.0, "ip_ownership":28.0, "confidentiality":58.0
+	},
+	"PARTNER": {
+		"label":"Co-développer avec un partenaire",
+		"description":"Coûts, risques et connaissances sont partagés. Bonne personnalisation, mais certaines décisions et la propriété intellectuelle sont communes.",
+		"speed":1.08, "knowledge":0.90, "quality":1.04, "cost":0.96, "internal_ratio":0.62,
+		"setup_cost":9000, "royalty_rate":0.025, "unit_cost_factor":1.02,
+		"dependency":40.0, "customization":80.0, "ip_ownership":62.0, "confidentiality":74.0
+	},
+	# Clés conservées uniquement pour les anciennes sauvegardes.
+	"HYBRID": {
+		"label":"Hybride / partenariat (hérité)", "legacy":true,
+		"speed":1.06, "knowledge":0.90, "quality":1.02, "cost":1.00, "internal_ratio":0.60,
+		"setup_cost":0, "royalty_rate":0.02, "unit_cost_factor":1.02,
+		"dependency":42.0, "customization":76.0, "ip_ownership":58.0, "confidentiality":72.0
+	},
+	"EXTERNAL": {
+		"label":"Technologie externe (hérité)", "legacy":true,
+		"speed":1.26, "knowledge":0.48, "quality":0.98, "cost":0.82, "internal_ratio":0.22,
+		"setup_cost":0, "royalty_rate":0.0, "unit_cost_factor":1.13,
+		"dependency":74.0, "customization":42.0, "ip_ownership":22.0, "confidentiality":56.0
+	}
 }
 
 func get_active_sector_keys() -> Array:
@@ -202,7 +249,26 @@ func get_focus_keys() -> Array:
 	return FOCUS_OPTIONS.keys()
 
 func get_approach_keys() -> Array:
-	return APPROACHES.keys()
+	return ACTIVE_APPROACH_KEYS.duplicate()
+
+func approach_data(key: String) -> Dictionary:
+	return APPROACHES.get(key, APPROACHES.INTERNAL)
+
+func sourcing_profile(key: String) -> Dictionary:
+	var data := approach_data(key)
+	return {
+		"mode":key if APPROACHES.has(key) else "INTERNAL",
+		"label":str(data.get("label", "Développer en interne")),
+		"description":str(data.get("description", "")),
+		"internal_ratio":float(data.get("internal_ratio", 1.0)),
+		"setup_cost":int(data.get("setup_cost", 0)),
+		"royalty_rate":float(data.get("royalty_rate", 0.0)),
+		"unit_cost_factor":float(data.get("unit_cost_factor", 1.0)),
+		"dependency":float(data.get("dependency", 0.0)),
+		"customization":float(data.get("customization", 100.0)),
+		"ip_ownership":float(data.get("ip_ownership", 100.0)),
+		"confidentiality":float(data.get("confidentiality", 80.0))
+	}
 
 func metric_label(metric: String) -> String:
 	var labels := {

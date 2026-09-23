@@ -1287,12 +1287,13 @@ func _refresh_cpu_preview():
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
 	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
-	var approach_data: Dictionary = GameData.APPROACHES.get(approach_key, GameData.APPROACHES.INTERNAL)
+	var approach_data: Dictionary = GameData.approach_data(approach_key)
+	var sourcing: Dictionary = GameData.sourcing_profile(approach_key)
 	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / float(approach_data.speed))))
 	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
 	var months := base_months + extra_months
 	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
-	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost)) + int(active_cpu_remediation.get("upfront_cost", 0))
+	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost)) + int(active_cpu_remediation.get("upfront_cost", 0)) + int(sourcing.get("setup_cost", 0))
 	var risk := float(evaluation.risk)
 	var risk_label := "faible"
 	if risk >= 60.0:
@@ -1324,9 +1325,14 @@ func _refresh_cpu_preview():
 	var application_gap_text := ""
 	if not application_gaps.is_empty():
 		application_gap_text = " • à améliorer : %s" % ", ".join(application_gaps)
-	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s\nUsage %s : %.0f/100 — %s%s" % [
+	var royalty_text := "aucune royalty"
+	if float(sourcing.get("royalty_rate", 0.0)) > 0.0:
+		royalty_text = "%.1f%% du CA" % (float(sourcing.get("royalty_rate", 0.0)) * 100.0)
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s\nSourcing : %s • dépendance %.0f/100 • IP %.0f/100 • personnalisation %.0f/100 • %s\nUsage %s : %.0f/100 — %s%s" % [
 		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 		_money(estimated_program_cost), risk_label, risk, remediation_tag,
+		str(sourcing.get("label", "Interne")), float(sourcing.get("dependency", 0.0)), float(sourcing.get("ip_ownership", 100.0)),
+		float(sourcing.get("customization", 100.0)), royalty_text,
 		str(application_assessment.get("label", "Polyvalent")), float(application_assessment.get("fit", 0.0)),
 		str(application_assessment.get("summary", "")), application_gap_text
 	]
@@ -3162,7 +3168,9 @@ func _refresh_product_details():
 		var design := CPU_DESIGN.normalize(product.get("cpu_design", {}))
 		var target_label := MarketManager.segment_label(MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment()))))
 		var application_label := CPU_DESIGN.application_label(str(product.get("application_profile", "GENERAL")))
-		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0))
+		var royalty_per_unit := int(round(float(product.get("price", 0)) * float(product.get("royalty_rate", 0.0))))
+		var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0)) - royalty_per_unit
+		var product_sourcing: Dictionary = product.get("sourcing", GameData.sourcing_profile(str(product.get("approach", "INTERNAL"))))
 		var lifecycle_info := ""
 		if str(product.get("status", "")) == "LAUNCHED":
 			lifecycle_info = "\nCycle commercial : %s • %d mois sur le marché • pression d'âge %.1f pts" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))]
@@ -3180,15 +3188,21 @@ func _refresh_product_details():
 			float(product.get("oc_headroom_pct", 0.0)), CPU_DESIGN.format_frequency({"frequency_ghz":float(product.get("typical_oc_frequency_ghz", design.frequency_ghz))}),
 			float(product.get("undervolt_headroom_pct", 0.0)),
 			_money(int(product.get("recommended_capacity", 0))), _money(int(product.get("max_monthly_capacity", 0))), _money(margin), lifecycle_info,
-			"Fabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100\n%s" % [
+			"Sourcing : %s • dépendance fournisseur %.0f/100 • IP %.0f/100 • personnalisation %.0f/100 • royalty %.1f%%\nFabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100\n%s" % [
+				str(product_sourcing.get("label", "Interne")), float(product.get("vendor_dependency", product_sourcing.get("dependency", 0.0))),
+				float(product.get("ip_ownership", product_sourcing.get("ip_ownership", 100.0))),
+				float(product.get("customization_freedom", product_sourcing.get("customization", 100.0))),
+				float(product.get("royalty_rate", product_sourcing.get("royalty_rate", 0.0))) * 100.0,
 				str(product.get("foundry_name", "non renseignée")), float(product.get("foundry_dependency", 0.0)),
 				float(product.get("foundry_confidentiality", 0.0)), " • ".join(metric_lines)
 			]
 		]
 	else:
-		product_details_label.text = "%s\nApproche : %s | interne %.0f%%\n%s" % [
-			str(product.name), GameData.APPROACHES[str(product.approach)].label,
-			float(product.internal_ratio) * 100.0, " • ".join(metric_lines)
+		var generic_sourcing: Dictionary = product.get("sourcing", GameData.sourcing_profile(str(product.get("approach", "INTERNAL"))))
+		product_details_label.text = "%s\nApproche : %s | interne %.0f%% | dépendance %.0f/100 | IP %.0f/100\n%s" % [
+			str(product.name), str(generic_sourcing.get("label", "Interne")),
+			float(product.internal_ratio) * 100.0, float(generic_sourcing.get("dependency", 0.0)), float(generic_sourcing.get("ip_ownership", 100.0)),
+			" • ".join(metric_lines)
 		]
 	product_price.value = float(product.price)
 	if post_launch_label != null:
@@ -3250,14 +3264,15 @@ func _refresh_launch_intel():
 	var target := MarketManager.normalize_segment(str(candidate.get("target_segment", MarketManager.default_segment())))
 	var unit_cost := int(candidate.get("unit_cost", 0))
 	var planned_price := int(candidate.get("price", 0))
-	var gross_margin := planned_price - unit_cost
+	var royalty_per_unit := int(round(float(planned_price) * float(candidate.get("royalty_rate", 0.0))))
+	var gross_margin := planned_price - unit_cost - royalty_per_unit
 	var gross_margin_pct := 0.0
 	if planned_price > 0:
 		gross_margin_pct = float(gross_margin) / float(planned_price) * 100.0
 	var lines: Array[String] = [
 		"Cible : %s • repère marché ~%s €" % [MarketManager.segment_label(target), _money(int(round(MarketManager.segment_reference_price(target))))],
-		"Coût unitaire %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
-			_money(unit_cost), _money(planned_price), _money(gross_margin), gross_margin_pct
+		"Coût unitaire %s € • royalty %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
+			_money(unit_cost), _money(royalty_per_unit), _money(planned_price), _money(gross_margin), gross_margin_pct
 		]
 	]
 	var forecast := MarketManager.forecast_cpu_launch(candidate, planned_price)

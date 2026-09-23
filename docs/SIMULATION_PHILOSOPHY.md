@@ -131,6 +131,16 @@ Une entreprise peut :
 
 L'intégration verticale est une stratégie, pas une obligation.
 
+Pour le CPU, ce choix est désormais jouable dès le brief R&D avec cinq modes distincts :
+
+- **Interne** : contrôle, IP et apprentissage maximums, mais développement plus lent et coûteux ;
+- **Achat** : accès très rapide à une technologie ou un composant existant, avec forte dépendance et faible personnalisation ;
+- **Licence** : accès à une technologie éprouvée avec frais initiaux et royalties sur les ventes ;
+- **Sous-traitance** : un prestataire réalise une grande partie du développement, ce qui accélère l'exécution mais limite le transfert de savoir-faire ;
+- **Partenariat** : développement et risques partagés, avec une meilleure personnalisation que l'achat mais une IP moins exclusive qu'en interne.
+
+Le choix suit le produit après la R&D : coût unitaire, royalties, dépendance fournisseur, liberté de personnalisation et part d'IP restent attachés à la génération et aux références commerciales. Il n'existe donc pas de solution universellement optimale : le CEO arbitre entre vitesse, contrôle, risque, marge et accumulation de capacités internes.
+
 ## 9. Diversification organique
 
 Le joueur ne suit pas une séquence imposée CPU → GPU → RAM → téléphone.
