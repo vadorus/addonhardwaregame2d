@@ -12,11 +12,13 @@ const CATALOG := {
 var products: Array[Dictionary] = []
 var active_project: Dictionary = {}
 var lifetime_sales := 0
+var last_service_day := -3
 
 func reset() -> void:
 	products.clear()
 	active_project.clear()
 	lifetime_sales = 0
+	last_service_day = -3
 	studio_changed.emit()
 
 func _absolute_day() -> int:
@@ -96,10 +98,11 @@ func release_product() -> bool:
 	var product := {"type":type_id,"title":str(data.title),"version":version,
 		"quality":float(active_project.get("quality", 54.0)),
 		"awareness":float(active_project.get("awareness", 30.0)),
-		"age_months":0,"last_sales":0,"lifetime_sales":0}
+		"age_months":0,"last_sales":0,"lifetime_sales":0,"last_client_month":-1}
 	if index >= 0:
 		product["awareness"] = maxf(float(product.awareness), float(products[index].get("awareness", 30.0)))
 		product["lifetime_sales"] = int(products[index].get("lifetime_sales", 0))
+		product["last_client_month"] = int(products[index].get("last_client_month", -1))
 		products[index] = product
 	else:
 		products.append(product)
@@ -109,6 +112,46 @@ func release_product() -> bool:
 	CompanyManager.add_alert("Logiciel publié : %s, version %d. Les ventes apparaîtront au prochain bilan mensuel." % [str(data.title), version])
 	studio_changed.emit()
 	return true
+func can_service_product(type_id: String, action: String) -> bool:
+	var index := _product_index(type_id)
+	if index < 0 or _absolute_day() - last_service_day < 3:
+		return false
+	var product: Dictionary = products[index]
+	match action:
+		"SUPPORT":
+			return float(product.get("quality", 50.0)) < 95.0 and Economy.can_afford(140, "Assistance logicielle")
+		"PROSPECT":
+			return float(product.get("awareness", 30.0)) < 90.0 and Economy.can_afford(180, "Prospection logicielle")
+		"ADAPT":
+			return int(product.get("last_client_month", -1)) != TimeManager.year * 12 + TimeManager.month
+	return false
+
+func service_product(type_id: String, action: String) -> bool:
+	if not can_service_product(type_id, action):
+		return false
+	var index := _product_index(type_id)
+	var product: Dictionary = products[index]
+	match action:
+		"SUPPORT":
+			Economy.add_expense(140, "Assistance clients — " + str(product.title))
+			product["quality"] = minf(float(product.get("quality", 50.0)) + 5.0, 95.0)
+			FounderManager.add_multi_experience(5, {FounderManager.SKILL_PROGRAMMING:0.8, FounderManager.SKILL_COMMERCIAL:0.2})
+		"PROSPECT":
+			Economy.add_expense(180, "Prospection — " + str(product.title))
+			product["awareness"] = minf(float(product.get("awareness", 30.0)) + 7.0, 90.0)
+			FounderManager.add_multi_experience(5, {FounderManager.SKILL_PROGRAMMING:0.2, FounderManager.SKILL_COMMERCIAL:0.8})
+		"ADAPT":
+			var fee := 360 + int(FounderManager.skill_value(FounderManager.SKILL_PROGRAMMING) * 3.0)
+			Economy.add_income(fee, "Adaptation client — " + str(product.title))
+			product["last_client_month"] = TimeManager.year * 12 + TimeManager.month
+			product["awareness"] = minf(float(product.get("awareness", 30.0)) + 2.0, 90.0)
+			FounderManager.add_multi_experience(8, {FounderManager.SKILL_PROGRAMMING:0.7, FounderManager.SKILL_COMMERCIAL:0.3})
+	last_service_day = _absolute_day()
+	products[index] = product
+	CompanyManager.add_alert("Studio logiciel : %s — %s." % [str(product.title), action])
+	studio_changed.emit()
+	return true
+
 func process_month() -> void:
 	if not active_project.is_empty():
 		var development: Dictionary = CATALOG.get(str(active_project.get("type", "")), {})
@@ -129,6 +172,7 @@ func process_month() -> void:
 		product["lifetime_sales"] = int(product.get("lifetime_sales", 0)) + sales
 		product["age_months"] = int(product.get("age_months", 0)) + 1
 		product["awareness"] = minf(float(product.get("awareness", 30.0)) + 1.0, 90.0)
+		product["quality"] = maxf(float(product.get("quality", 50.0)) - 1.0, 45.0)
 		products[index] = product
 		lifetime_sales += sales
 	if lifetime_sales >= 3500:
@@ -136,7 +180,7 @@ func process_month() -> void:
 	studio_changed.emit()
 func get_state() -> Dictionary:
 	return {"products":products.duplicate(true),"active_project":active_project.duplicate(true),
-		"lifetime_sales":lifetime_sales}
+		"lifetime_sales":lifetime_sales,"last_service_day":last_service_day}
 
 func load_state(state: Dictionary) -> void:
 	products.clear()
@@ -147,4 +191,5 @@ func load_state(state: Dictionary) -> void:
 	if not CATALOG.has(str(active_project.get("type", ""))):
 		active_project = {}
 	lifetime_sales = maxi(int(state.get("lifetime_sales", 0)), 0)
+	last_service_day = int(state.get("last_service_day", -3))
 	studio_changed.emit()

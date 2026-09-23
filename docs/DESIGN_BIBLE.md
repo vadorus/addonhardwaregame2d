@@ -415,7 +415,32 @@ Dès le garage, le fondateur choisit librement entre deux activités complément
 
 Une petite boucle jouable utilise les verbes **concevoir → coder/tester/faire connaître → publier → vendre chaque mois → corriger et préparer une version**. La qualité, la visibilité, l'âge du produit et les frais de maintenance affectent le résultat. Publier une amélioration relance le produit ; l'argent et la compétence accumulés peuvent financer d'autres logiciels. Le joueur n'a aucune obligation de recruter pour le matériel ni de lancer un CPU.
 
-À terme, ce métier s'élargit : licences, contrats de maintenance, support, mises à jour, formation des clients, systèmes d'exploitation pour plateformes compatibles, outils de développement, logiciels professionnels, puis services récurrents. Si le joueur choisit aussi le matériel, les deux activités créent des synergies ; elles restent chacune viables séparément. La première implémentation n'expose que quelques familles et des ventes simplifiées : canaux de distribution, concurrence, prix, licences et support détaillé seront ajoutés progressivement.
+### Que fait le fondateur devant son ordinateur ?
+
+Chaque décision occupe du temps et change une grandeur visible. Au départ, le joueur voit seulement **contrat client**, **créer un logiciel** et **studio logiciel**. Cliquer sur le personnage ou son poste ouvre ces activités. Une fois un produit publié, le catalogue donne accès aux interventions ci-dessous ; le panneau annonce le coût, le prochain revenu et la progression.
+
+| Activité | Argent et contrepartie | Progression et intérêt |
+| --- | --- | --- |
+| Contrat client sur mesure | Paiement ponctuel à la livraison ; échéance et qualité à respecter. | Programmation et réputation locale ; filet de trésorerie au garage. |
+| Créer et vendre son logiciel | Coût de développement, ventes mensuelles après publication, entretien mensuel. | Catalogue et marque propres, indépendants des contrats et du CPU. |
+| Assister et corriger | Dépense et temps du fondateur ; restaure la qualité du produit et protège ses ventes. | Connaissance du terrain et fidélité des clients. |
+| Démarcher des entreprises | Dépense et temps ; augmente la visibilité, donc la demande future. | Compétence commerciale et nouveaux marchés. |
+| Adapter un produit à un client | Prestation payée immédiatement, une fois par produit et par mois ; prend une intervention du fondateur. | Revenus de service, pratique et bouche-à-oreille sans ouvrir une usine. |
+| Préparer une nouvelle version | Nouveau développement et frais, amélioration de qualité et relance des ventes. | Technologie et valeur du catalogue sur plusieurs années. |
+
+Dans la version actuelle, le joueur peut intervenir une fois tous les trois jours au maximum sur un produit publié : support à 140 €, prospection à 180 € ou adaptation facturée à partir de 360 €. Les produits perdent un peu de qualité avec le temps ; maintenir leur utilité demande donc un choix. La prestation d'adaptation est limitée à une fois par produit et par mois ; le détail de la clientèle et des contrats doit encore être simulé.
+
+### Développement de la carrière logicielle
+
+La suite de la branche doit ajouter des décisions, pas seulement de nouvelles lignes de catalogue :
+
+- **Prestations et expertise** : dépannage, audit, formation, intégration et outils sur commande. Le joueur échange son temps et ses compétences contre un revenu prévisible, au détriment du temps consacré à sa marque.
+- **Édition** : choix du public, fonctionnalités, prix, licence, distribution, compatibilité et cadence des versions. Une solution moins chère peut toucher plus de clients ; un produit plus cher doit démontrer sa valeur.
+- **Relations clients** : maintenance contractuelle, support à plusieurs niveaux, renouvellements, incidents et demandes de fonctionnalités. Un contrat récurrent entraîne de vraies obligations et coûts.
+- **Spécialisation technique** : outils de programmation, logiciels de gestion, solutions pour mini-ordinateurs, puis systèmes d'exploitation pour plateformes compatibles. Les services de gestion de serveurs et de réseau exigent d'abord l'infrastructure et les clients correspondants.
+- **Croissance** : recruter des programmeurs, des testeurs et des commerciaux ; répartir le travail entre plusieurs produits ; conserver un fondateur qui pilote au moins une décision importante.
+
+Le logiciel peut financer d'autres logiciels pendant toute la partie. Le seuil financier ouvrant le matériel représente une possibilité, jamais une étape imposée. Le joueur peut aussi combiner les deux branches plus tard. Les futurs canaux de distribution, prix, licences et marchés doivent être reliés aux ventes réelles et à l'expérience du joueur ; ils ne sont pas encore simulés en détail.
 
 ### Service
 

@@ -8,6 +8,10 @@ var action_row: HFlowContainer
 var action_buttons: Array[Button] = []
 var release_button: Button
 var catalog_label: Label
+var product_select: OptionButton
+var service_row: HFlowContainer
+var service_buttons: Array[Button] = []
+var service_hint: Label
 
 func _ready() -> void:
 	visible = false
@@ -62,22 +66,44 @@ func _ready() -> void:
 	catalog_label = Label.new()
 	catalog_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(catalog_label)
+	product_select = OptionButton.new()
+	product_select.custom_minimum_size.y = 48
+	product_select.item_selected.connect(func(_index): _refresh_service())
+	box.add_child(product_select)
+	service_hint = Label.new()
+	service_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	service_hint.text = "Après publication : consacrez une journée au support, à la prospection ou à une adaptation pour un client. Une intervention tous les 3 jours."
+	box.add_child(service_hint)
+	service_row = HFlowContainer.new()
+	service_row.add_theme_constant_override("h_separation", 8)
+	box.add_child(service_row)
+	for action in ["Assister les clients • 140 €", "Prospecter • 180 €", "Adapter pour un client • +360 €"]:
+		var button := Button.new()
+		button.text = action
+		button.custom_minimum_size = Vector2(245, 48)
+		button.pressed.connect(_service.bind(service_buttons.size()))
+		service_row.add_child(button)
+		service_buttons.append(button)
 	var close := Button.new()
 	close.text = "Fermer le studio"
 	close.custom_minimum_size.y = 42
 	close.pressed.connect(func(): visible = false)
 	box.add_child(close)
 	SoftwareStudioManager.studio_changed.connect(_refresh)
-	Economy.money_changed.connect(func(_money): _refresh_buttons())
+	Economy.money_changed.connect(func(_money): _refresh())
 	FounderManager.founder_changed.connect(_refresh)
 	_refresh()
 
 func open() -> void:
 	visible = true
 	_refresh()
+	_focus_studio.call_deferred()
+
+func _focus_studio() -> void:
+	await get_tree().process_frame
 	var scroll := get_parent().get_parent()
 	if scroll is ScrollContainer:
-		(scroll as ScrollContainer).ensure_control_visible.call_deferred(self)
+		(scroll as ScrollContainer).scroll_vertical = maxi(int(position.y) - 16, 0)
 func _refresh() -> void:
 	if type_select == null:
 		return
@@ -103,7 +129,19 @@ func _refresh() -> void:
 	for product in SoftwareStudioManager.products:
 		lines.append("%s v%d • dernière vente : %d € / mois • total : %d €" % [str(product.get("title", "Logiciel")), int(product.get("version", 1)), int(product.get("last_sales", 0)), int(product.get("lifetime_sales", 0))])
 	catalog_label.text = "CATALOGUE\n" + ("\n".join(lines) if not lines.is_empty() else "Aucun produit publié.")
+	var previous_product := str(product_select.get_item_metadata(product_select.selected)) if product_select.selected >= 0 else ""
+	product_select.clear()
+	for product in SoftwareStudioManager.products:
+		product_select.add_item("%s • qualité %.0f • visibilité %.0f" % [str(product.get("title", "Logiciel")), float(product.get("quality", 0)), float(product.get("awareness", 0))])
+		product_select.set_item_metadata(product_select.item_count - 1, str(product.get("type", "")))
+	for index in range(product_select.item_count):
+		if str(product_select.get_item_metadata(index)) == previous_product:
+			product_select.select(index)
+	product_select.visible = product_select.item_count > 0
+	service_row.visible = product_select.item_count > 0
+	service_hint.visible = product_select.item_count > 0
 	_refresh_buttons()
+	_refresh_service()
 
 func _refresh_buttons() -> void:
 	if start_button == null or type_select == null:
@@ -117,6 +155,18 @@ func _refresh_buttons() -> void:
 		button.disabled = not SoftwareStudioManager.session_available()
 	release_button.visible = not SoftwareStudioManager.active_project.is_empty()
 	release_button.disabled = not SoftwareStudioManager.project_ready()
+func _refresh_service() -> void:
+	if product_select == null:
+		return
+	var type_id := str(product_select.get_item_metadata(product_select.selected)) if product_select.selected >= 0 else ""
+	for index in range(service_buttons.size()):
+		service_buttons[index].disabled = not SoftwareStudioManager.can_service_product(type_id, ["SUPPORT", "PROSPECT", "ADAPT"][index])
+
+func _service(index: int) -> void:
+	if product_select.selected < 0:
+		return
+	SoftwareStudioManager.service_product(str(product_select.get_item_metadata(product_select.selected)), ["SUPPORT", "PROSPECT", "ADAPT"][index])
+
 func _start_product() -> void:
 	if type_select.selected < 0:
 		return
