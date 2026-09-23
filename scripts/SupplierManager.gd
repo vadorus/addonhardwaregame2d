@@ -172,13 +172,19 @@ func _active_count(supplier: Dictionary) -> int:
 	var active = supplier.get("active_project_ids", [])
 	return active.size() if typeof(active) == TYPE_ARRAY else 0
 
+func _used_capacity(supplier: Dictionary) -> int:
+	return _active_count(supplier) + maxi(int(supplier.get("external_load", 0)), 0)
+
+func _free_capacity(supplier: Dictionary) -> int:
+	return maxi(int(supplier.get("capacity_slots", 1)) - _used_capacity(supplier), 0)
+
 func can_accept_project(mode: String, supplier_id: String) -> bool:
 	if mode == "INTERNAL":
 		return true
 	var supplier := get_supplier(supplier_id)
 	if supplier.is_empty() or not supplier.get("modes", []).has(mode):
 		return false
-	return _active_count(supplier) < maxi(int(supplier.get("capacity_slots", 1)), 1)
+	return _free_capacity(supplier) > 0
 
 func _active_contract_values() -> Array:
 	var result: Array = []
@@ -236,9 +242,9 @@ func quote(mode: String, supplier_id: String, negotiation: String = "BALANCED") 
 	var trust_cost_factor := clampf(1.06 - trust * 0.0014 - relationship * 0.0007, 0.88, 1.08)
 	var speed_factor := float(supplier.get("speed_factor", 1.0))
 	var quality_factor := lerpf(0.94, 1.08, clampf(float(supplier.get("quality", 50.0)) / 100.0, 0.0, 1.0))
-	var setup_factor := float(supplier.get("setup_factor", 1.0)) * trust_cost_factor
-	var unit_factor := float(supplier.get("cost_factor", 1.0)) * trust_cost_factor
-	var royalty_factor := float(supplier.get("royalty_factor", 1.0)) * clampf(1.04 - relationship * 0.0010, 0.92, 1.04)
+	var setup_factor := float(supplier.get("setup_factor", 1.0)) * trust_cost_factor * float(supplier.get("market_cost_factor", 1.0))
+	var unit_factor := float(supplier.get("cost_factor", 1.0)) * trust_cost_factor * float(supplier.get("market_cost_factor", 1.0))
+	var royalty_factor := float(supplier.get("royalty_factor", 1.0)) * clampf(1.04 - relationship * 0.0010, 0.92, 1.04) * float(supplier.get("market_royalty_factor", 1.0))
 	var dependency := float(base.get("dependency", 0.0)) + float(supplier.get("dependency_delta", 0.0)) - relationship * 0.08
 	var customization := float(base.get("customization", 100.0)) + float(supplier.get("customization_bonus", 0.0)) + relationship * 0.06
 	var ip_ownership := float(base.get("ip_ownership", 100.0)) + float(supplier.get("ip_bonus", 0.0)) + relationship * 0.04
@@ -287,7 +293,10 @@ func quote(mode: String, supplier_id: String, negotiation: String = "BALANCED") 
 	base["supplier_trust"] = trust
 	base["supplier_relationship"] = relationship
 	base["supplier_capacity_slots"] = int(supplier.get("capacity_slots", 1))
-	base["available_capacity_slots"] = maxi(int(supplier.get("capacity_slots", 1)) - _active_count(supplier), 0)
+	base["supplier_external_load"] = maxi(int(supplier.get("external_load", 0)), 0)
+	base["available_capacity_slots"] = _free_capacity(supplier)
+	base["supplier_commercial_stance"] = str(supplier.get("ai_supplier_action", "HOLD"))
+	base["supplier_public_action"] = str(supplier.get("supplier_last_public_action", "Conditions commerciales stables."))
 	base["specialty"] = str(supplier.get("specialty", "Technologie"))
 	return base
 
