@@ -229,6 +229,20 @@ func _ready() -> void:
 	if public_comparison.is_empty() or public_comparison.get("rows", []).size() != 5 or str(public_comparison.get("summary", "")).is_empty():
 		_fail("Public CPU comparison did not produce a usable player-vs-rival analysis")
 		return
+	var launch_forecast := MarketManager.forecast_cpu_launch(comparison_probe, 105)
+	if launch_forecast.is_empty():
+		_fail("CPU launch forecast returned no market guidance")
+		return
+	var forecast_expected := int(launch_forecast.get("expected_units", -1))
+	var forecast_min := int(launch_forecast.get("min_units", -1))
+	var forecast_max := int(launch_forecast.get("max_units", -1))
+	var forecast_confidence := float(launch_forecast.get("confidence", 0.0))
+	if forecast_expected < 0 or forecast_min < 0 or forecast_max < forecast_min or forecast_expected < forecast_min or forecast_expected > forecast_max:
+		_fail("CPU launch forecast produced an invalid sales range")
+		return
+	if forecast_confidence < 40.0 or forecast_confidence > 95.0 or str(launch_forecast.get("perception", "")).is_empty():
+		_fail("CPU launch forecast did not expose bounded analyst confidence and perception")
+		return
 	ExecutiveManager.sync_interface_unlocks()
 	if not ExecutiveManager.is_interface_feature_unlocked("QG") or not ExecutiveManager.is_interface_feature_unlocked("LAB"):
 		_fail("Garage onboarding did not expose QG and CPU Lab")

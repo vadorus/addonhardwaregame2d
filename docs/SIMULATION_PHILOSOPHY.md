@@ -148,6 +148,8 @@ Le réalisme sert les décisions, pas la frustration.
 
 Avant une décision risquée, le joueur reçoit autant que possible des estimations de coût, délai, marge, risque et adéquation au marché. Ces estimations peuvent être imparfaites si l'équipe manque d'expérience.
 
+Avant un lancement produit, l'équipe Marketing fournit une fourchette de ventes, une perception probable du positionnement et un niveau de confiance. Une meilleure équipe resserre la fourchette sans jamais garantir les ventes réelles.
+
 Une erreur doit généralement produire une nouvelle décision intéressante plutôt qu'une punition sèche : pivoter, corriger, baisser le prix, améliorer le SAV, réviser le produit, changer de cible ou négocier un partenariat.
 
 La règle de conception est :
