@@ -1438,15 +1438,18 @@ func _refresh_cpu_preview():
 				acceptance_text = "CONTRE-PROPOSITION : %s" % str(sourcing.get("counter_text", "conditions à revoir"))
 			var volume_commitment := int(sourcing.get("guaranteed_units", 0))
 			var volume_text := "aucun volume garanti" if volume_commitment <= 0 else "%s unités garanties" % _money(volume_commitment)
-			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100 • capacité %d/%d créneau(x) libre(s)\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\n%s — score d'acceptation %.0f/100" % [
+			var supplier_public_action := str(sourcing.get("supplier_public_action", "Conditions commerciales stables."))
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100\nCapacité : %d/%d créneau(x) libre(s) • %d occupé(s) par d'autres clients\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\nMouvement partenaire : %s\n%s — score d'acceptation %.0f/100" % [
 				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
 				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
 				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
 				int(sourcing.get("available_capacity_slots", 0)), int(sourcing.get("supplier_capacity_slots", 0)),
+				int(sourcing.get("supplier_external_load", 0)),
 				str(sourcing.get("contract_term_label", "")), str(sourcing.get("exclusivity_label", "")),
 				str(sourcing.get("ip_term_label", "")), volume_text,
 				_money(int(sourcing.get("setup_cost", 0))), float(sourcing.get("royalty_rate", 0.0)) * 100.0,
 				float(sourcing.get("unit_cost_factor", 1.0)), _money(int(sourcing.get("termination_penalty", 0))),
+				supplier_public_action,
 				acceptance_text, float(sourcing.get("acceptance_score", 0.0))
 			]
 	lab_dev_time_value.text = "~%d mois" % months
