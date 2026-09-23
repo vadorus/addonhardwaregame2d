@@ -151,7 +151,7 @@ var subsidiary_capital: SpinBox
 var nav_buttons: Array[Button] = []
 var dashboard_garage: Control
 var dashboard_priority_category: Label
-var dashboard_priority_text: RichTextLabel
+var dashboard_priority_text: Label
 var dashboard_priority_action: Button
 var dashboard_priority_target_tab := 0
 var dashboard_grid: GridContainer
@@ -1983,7 +1983,7 @@ func _refresh_dashboard_priority(brief: Dictionary):
 	var priority: Dictionary = priorities[0]
 	var category := str(priority.get("category", "DIRECTION"))
 	dashboard_priority_category.text = category
-	dashboard_priority_text.text = "[b]%s[/b]\n%s" % [str(priority.get("text", "")), str(priority.get("action", ""))]
+	dashboard_priority_text.text = "%s\n%s" % [str(priority.get("text", "")), str(priority.get("action", ""))]
 	dashboard_priority_target_tab = _priority_category_target_tab(category)
 	match category:
 		"DÉMARRAGE", "TECHNIQUE", "PROJET":
