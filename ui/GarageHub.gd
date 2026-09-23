@@ -3,11 +3,11 @@ extends Control
 signal zone_requested(tab_index: int, zone_name: String)
 
 const ZONES := [
-	{"name":"Établi CPU","subtitle":"Concevoir et améliorer","tab":3,"rect":Rect2(0.12,0.37,0.28,0.38),"active":true},
-	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"rect":Rect2(0.36,0.34,0.25,0.36),"active":true},
-	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"rect":Rect2(0.57,0.11,0.23,0.34),"active":true},
-	{"name":"Poste du fondateur","subtitle":"Vue dirigeant","tab":0,"rect":Rect2(0.62,0.39,0.25,0.34),"active":true},
-	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"rect":Rect2(0.81,0.20,0.12,0.40),"active":true}
+	{"name":"Établi CPU","subtitle":"Concevoir et améliorer","tab":3,"feature":"LAB","rect":Rect2(0.12,0.37,0.28,0.38)},
+	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.36,0.34,0.25,0.36)},
+	{"name":"Tableau de direction","subtitle":"Stratégie & arbitrages","tab":1,"feature":"COMPANY","rect":Rect2(0.57,0.11,0.23,0.34)},
+	{"name":"Poste du fondateur","subtitle":"Vue dirigeant","tab":0,"feature":"QG","rect":Rect2(0.62,0.39,0.25,0.34)},
+	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.81,0.20,0.12,0.40)}
 ]
 
 var _background: TextureRect
@@ -81,6 +81,7 @@ func _build_overlay() -> void:
 		button.set_meta("zone_rect", data.rect)
 		button.set_meta("tab", int(data.tab))
 		button.set_meta("zone_name", str(data.name))
+		button.set_meta("feature", str(data.get("feature", "QG")))
 		button.pressed.connect(_on_zone_pressed.bind(button))
 		_apply_zone_style(button)
 		add_child(button)
@@ -121,6 +122,11 @@ func _layout_zones() -> void:
 func _on_zone_pressed(button: Button) -> void:
 	zone_requested.emit(int(button.get_meta("tab", 0)), str(button.get_meta("zone_name", "")))
 
+func set_progression(unlocks: Dictionary) -> void:
+	for button in _zone_buttons:
+		var feature := str(button.get_meta("feature", "QG"))
+		button.visible = bool(unlocks.get(feature, feature in ["QG", "LAB"]))
+
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = int(data.get("tier", 0))
 	_workplace_condition = float(data.get("condition", 62.0))
@@ -133,3 +139,10 @@ func set_workplace(data: Dictionary) -> void:
 
 func zone_count() -> int:
 	return _zone_buttons.size()
+
+func visible_zone_count() -> int:
+	var count := 0
+	for button in _zone_buttons:
+		if button.visible:
+			count += 1
+	return count
