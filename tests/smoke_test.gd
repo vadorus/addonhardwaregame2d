@@ -585,6 +585,7 @@ func _ready() -> void:
 		_fail("Supplier choice has no meaningful economic or reliability difference")
 		return
 	var rival_capacity_state := SupplierManager.get_state().duplicate(true)
+	SupplierManager.reset()
 	var rival_capacity_quote_before := SupplierManager.quote("LICENSE", license_supplier_a, "BALANCED")
 	var rival_reservation := SupplierManager.request_rival_capacity("RIVAL-CAPACITY-PROBE", "Rival Capacity Probe", "LICENSE", 10, 100000)
 	if rival_reservation.is_empty():
@@ -602,6 +603,7 @@ func _ready() -> void:
 
 	var rival_sourcing_market_state := MarketManager.get_state().duplicate(true)
 	var rival_sourcing_supplier_state := SupplierManager.get_state().duplicate(true)
+	SupplierManager.reset()
 	var rival_probe: Dictionary = MarketManager.competitors.get("CPU", [])[1]
 	rival_probe["ai_research_drive"] = 100.0
 	rival_probe["ai_growth_drive"] = 100.0
