@@ -38,3 +38,9 @@ On retient le principe de lisibilité et de progression, pas les personnages, gr
 - Ajouter un éditeur de symbole/logo plus complet ; le monogramme actuel constitue seulement un premier repère.
 - Tester l'ouverture et l'utilisation sur écrans Android étroits, en paysage et sur PC avec souris et clavier.
 - Évaluer en test joueur les trois premières minutes : clic spontanément repéré, première action, décision, progrès visible.
+
+## Extension après le CPU
+
+La grammaire du garage doit survivre aux nouvelles branches : un poste/personne/machine donne accès à un projet et à ses décisions immédiates, sans afficher simultanément toutes les familles de produits. En grandissant, les bureaux deviennent des ateliers et des divisions ; le joueur passe d'une action directe à un mandat ou un arbitrage. La même scène contextuelle fonctionne au toucher sur mobile et à la souris sur PC.
+
+Le CPU est le premier composant jouable. Mémoire, graphismes, cartes mères, stockage, alimentation et boîtiers doivent ensuite former des briques compatibles avant un PC assemblé. L'OS peut être développé ou licencié. Les portables ajoutent miniaturisation, batterie et contraintes thermiques ; serveurs, consoles, mobile, automobile, aéronautique, spatial et défense réutilisent les briques avec leurs propres qualifications. Voir « Produits assemblés et prérequis technologiques » dans `docs/DESIGN_BIBLE.md`.

@@ -20,7 +20,7 @@ Le jeu n'impose pas de fin définitive. Les grandes réussites ouvrent de nouvea
 1. **Une simulation commune.** Les modes accessible et expert utilisent les mêmes règles. La délégation change la quantité de microgestion, pas la réalité du monde.
 2. **Une décision, une conséquence lisible.** Le joueur doit comprendre le lien entre choix, coût, délai, qualité, risque, réputation et résultat commercial.
 3. **Profondeur progressive.** Les détails sont révélés quand ils deviennent utiles. Les chiffres avancés restent accessibles, mais les écrans principaux montrent les décisions.
-4. **Le CPU d'abord.** Les futurs secteurs sont documentés et prévus dans les données, mais ne doivent pas détourner le développement de la vertical slice CPU.
+4. **Le CPU d'abord pour la version jouable.** Les autres branches restent dans la vision et les règles de dépendance du jeu ; elles ne doivent pas détourner le développement de la première boucle CPU.
 5. **Une entreprise vivante.** Les personnes, rapports, découvertes, avis clients, médias, fournisseurs et incidents donnent un visage à la simulation.
 6. **Une progression visible.** Une entreprise modeste doit paraître modeste ; sa montée en gamme doit se voir dans les locaux, les outils, les sons et la qualité de l'interface.
 7. **PC et mobile, même jeu.** La densité et la disposition changent, pas les systèmes de fond.
@@ -80,7 +80,25 @@ Une entreprise peut posséder plusieurs divisions : CPU, serveurs, logiciel, clo
 
 ### Règle de la vertical slice
 
-La première version n'active que la division CPU. Le moteur peut connaître les futures branches, mais il refuse leurs projets tant que leur contenu n'est pas jouable. Cette frontière évite les écrans vides et les systèmes superficiels.
+La première version n'active que la division CPU. Le moteur peut connaître les futures branches, mais il refuse leurs projets tant que leur contenu n'est pas jouable. Cette frontière évite les écrans vides et les systèmes superficiels. Le CPU est une première preuve de la boucle commune, pas la destination finale du jeu.
+
+### Produits assemblés et prérequis technologiques
+
+Une famille de produits assemblés n'est accessible que lorsque toutes ses briques indispensables sont disponibles et compatibles. Le joueur doit avoir ouvert les branches correspondantes et disposer d'une technologie ou d'un composant exploitable, puis le valider pour le produit visé. Débloquer une simple étiquette de branche ne suffit pas à assembler un appareil. Une pièce peut être conçue et produite par l'entreprise ou obtenue via un fournisseur ou une licence lorsque le scénario le permet ; les interfaces et l'approvisionnement restent alors à vérifier. Les modalités exactes de l'externalisation de chaque pièce seront équilibrées avec les futures branches.
+
+| Famille | Socle requis pour lancer la conception | Surcouches possibles |
+|---|---|---|
+| PC fixe | calcul CPU, mémoire, solution graphique intégrée ou dédiée, carte mère et interfaces compatibles, stockage, alimentation, boîtier, refroidissement | périphériques, réseau, marque et logiciels propres |
+| PC portable | socle informatique compatible, écran, batterie et gestion énergétique, intégration thermique | miniaturisation, autonomie, robustesse, mobilité |
+| Serveur | calcul, mémoire, stockage, carte et alimentation compatibles | redondance, fiabilité, réseau, administration |
+| Console | calcul, graphismes, mémoire, stockage, alimentation, contrôleurs et logiciel de fonctionnement compatibles | jeux, plateforme, services |
+| Téléphone ou tablette | calcul intégré, mémoire, écran, batterie, radios et intégration compacte | modem avancé, capteurs, OS, services |
+
+Cette table énonce les catégories de dépendances, pas une liste définitive de technologies : les solutions et les interfaces évoluent avec l'époque. La branche graphismes doit être ouverte ; une solution graphique intégrée peut satisfaire le besoin sans imposer une carte dédiée. Pour un PC, l'OS peut être interne ou provenir d'un éditeur concurrent sous licence ; il faut dans les deux cas une compatibilité et un droit d'utilisation. Les postes de travail physiques et les capacités industrielles restent des contraintes distinctes du déblocage technologique.
+
+Une catégorie de produit déclare ses prérequis dans les données : briques obligatoires (« toutes »), alternatives compatibles (« au moins une »), niveau minimal, interfaces, qualification, capacité de production et éventuellement contrat fournisseur. Le moteur explique chaque blocage au joueur : « il manque une mémoire compatible » ou « la dissipation thermique du portable est insuffisante ». Le bureau ou le laboratoire concerné mène à l'action utile au lieu d'afficher un arbre de dizaines de cases grisées.
+
+Au-delà des machines informatiques, les mêmes composants et technologies peuvent être réutilisés dans des serveurs, appareils mobiles, voitures, aéronefs, applications spatiales ou de défense. Ces marchés exigent en plus leurs propres tests, compétences, normes de fiabilité et infrastructures. Ils ne s'ouvrent pas automatiquement parce que le joueur sait fabriquer un CPU. La boucle de conception, production, vente et support reste commune ; les contraintes et débouchés varient selon le secteur.
 
 ### Coût réel de la diversification
 
@@ -143,6 +161,8 @@ La complexité de Tech Empire doit grandir au même rythme que l'entreprise et q
 ### Le garage comme phase d'apprentissage
 
 La partie commence dans un petit garage ou bureau improvisé avec très peu de fonctions visibles. Le joueur pilote directement son premier domaine — CPU dans la vertical slice — et n'a accès qu'aux informations nécessaires au problème courant.
+
+La scène du local sert d'interface principale : personnage, ordinateur, bureaux libres et machines indiquent ce qui est interactif. Toucher un poste ouvre quelques actions adaptées à son occupant et au projet en cours ; une fiche détail révèle les paramètres techniques à la demande. Le schéma d'interaction éprouvé des tycoons à personnages reste pertinent sur souris et écran tactile. Tech Empire l'étend par les composants, les dépendances, les choix de fabrication et l'évolution physique des ateliers, avec sa propre identité visuelle et ses propres textes.
 
 Les nouvelles fonctions apparaissent lorsqu'un événement concret les rend utiles : embauche d'une équipe → RH ; première industrialisation → Production ; premières ventes → Marché et SAV ; croissance de l'effectif → management ; seconde branche → Divisions et délégation. Les menus ne doivent pas être remplis dès le départ de boutons grisés annonçant des dizaines de systèmes futurs.
 
