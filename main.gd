@@ -3082,6 +3082,30 @@ func _create_subsidiary():
 	_refresh_all()
 
 
+func _apply_research_plan():
+	var allocations := {}
+	for research_key in ResearchManager.get_cpu_research_domain_keys():
+		var key := str(research_key)
+		allocations[key] = int((research_alloc_controls[key] as SpinBox).value)
+	if not ResearchManager.set_cpu_research_allocations(allocations):
+		status_label.text = "Répartition impossible : vous avez affecté plus de chercheurs que l'effectif R&D disponible."
+		_refresh_research()
+		return
+	ResearchManager.set_continuous_research_budget(int(research_budget.value))
+	status_label.text = "Recherche mise à jour : %d chercheur(s) réparti(s) sur les pistes CPU. L’équipe Développement reste indépendante." % ResearchManager.get_total_cpu_research_allocation()
+	_refresh_all()
+
+func _start_cpu_concept_program():
+	if concept_axis == null or concept_axis.item_count == 0:
+		return
+	var axis := str(concept_axis.get_item_metadata(concept_axis.selected))
+	var ambition := int(concept_ambition.get_item_metadata(concept_ambition.selected)) if concept_ambition != null else 2
+	if ResearchManager.start_cpu_concept_program(axis, int(concept_budget.value), ambition):
+		status_label.text = "Programme Concept lancé : %s." % ResearchManager.get_cpu_concept_axis_label(axis)
+	else:
+		status_label.text = "Impossible de lancer ce programme Concept : vérifiez trésorerie, équipe R&D ou programmes déjà actifs."
+	_refresh_all()
+
 func _refresh_research():
 	if tech_label == null:
 		return
