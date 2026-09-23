@@ -420,6 +420,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.last_month_age_penalty = 0.0
 			product.market_lifecycle = "Nouveau"
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
+			MarketManager.activate_reserved_contracts(str(product.id))
 			product_launched.emit(product)
 			products_changed.emit()
 			return true
@@ -492,7 +493,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
 	sales_report_created.emit(report)
 	if not contract.is_empty():
-		MarketManager.advance_contract(str(product.id))
+		MarketManager.advance_contract(str(product.id), sold_b2b)
 	if not _reviewed_products.has(str(product.id)):
 		var scores := MarketManager.segment_scores(product)
 		var rows := MarketManager.benchmark_for(product)
