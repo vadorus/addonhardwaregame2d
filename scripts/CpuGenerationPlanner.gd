@@ -49,6 +49,8 @@ static func normalize_saved_proposal(input: Dictionary) -> Dictionary:
 	proposal["risks"] = proposal.get("risks", []).duplicate(true)
 	proposal["strengths"] = proposal.get("strengths", []).duplicate(true)
 	proposal["potential_models"] = clampi(maxi(int(proposal.get("potential_models", 3)), 3), 3, 6)
+	var market_learning_value = proposal.get("market_learning", {})
+	proposal["market_learning"] = market_learning_value.duplicate(true) if typeof(market_learning_value) == TYPE_DICTIONARY else {}
 	proposal["recommended"] = bool(proposal.get("recommended", false))
 	return proposal
 
@@ -215,6 +217,10 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	confidence += float(context.get("equipment_score", 25.0)) * 0.08
 	confidence += (float(context.get("research_confidence", 50.0)) - 50.0) * 0.18
 	confidence += float(context.get("field_experience", 0.0)) * 0.045
+	var market_learning_value = context.get("market_learning", {})
+	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	if bool(market_learning.get("has_data", false)):
+		confidence += (float(market_learning.get("confidence", 50.0)) - 50.0) * 0.08
 	confidence += (management_modifier - 0.8) * 25.0
 	confidence -= float(evaluation.complexity) * 0.10
 	confidence += float(profile.confidence_delta)
@@ -236,6 +242,17 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		strengths.append("Retours terrain solides sur les générations précédentes")
 		strengths = strengths.slice(0, 3)
 	var risks := _risks_for(str(profile.key), design, evaluation, context, capability_gap, budget_ratio)
+	if bool(market_learning.get("has_data", false)):
+		var market_archetype := str(market_learning.get("recommended_archetype", "BALANCED"))
+		if market_archetype == str(profile.key):
+			strengths.push_front("Plan cohérent avec les retours réels de la génération précédente")
+			strengths = strengths.slice(0, 3)
+		elif market_archetype == "SAFE" and str(profile.key) == "BOLD":
+			risks.push_front("Le terrain demande d'abord davantage de maîtrise et de fiabilité")
+			risks = risks.slice(0, 3)
+		elif market_archetype == "BOLD" and str(profile.key) == "SAFE":
+			risks.push_front("Le marché montre une demande non servie que ce plan prudent pourrait laisser aux concurrents")
+			risks = risks.slice(0, 3)
 
 	return {
 		"id":"CPU-G%02d-%s" % [generation_index, str(profile.key)],
@@ -267,6 +284,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"research_score":float(context.get("research_score", 0.0)),
 		"research_confidence":float(context.get("research_confidence", 50.0)),
 		"field_experience":float(context.get("field_experience", 0.0)),
+		"market_learning":market_learning.duplicate(true),
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
 		"development_team_size":int(context.get("development_team_size", 0)),
 		"development_confidence":float(context.get("development_confidence", 50.0)),
@@ -349,11 +367,29 @@ static func _mark_recommendation(proposals: Array, context: Dictionary, capabili
 			recommended_key = "BOLD"
 		elif treasury > 0 and treasury < int(safe.program_cost * 0.85):
 			recommended_key = "SAFE"
+
+	var market_learning_value = context.get("market_learning", {})
+	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var market_confidence := float(market_learning.get("confidence", 0.0))
+	if bool(market_learning.get("has_data", false)) and market_confidence >= 45.0:
+		var market_key := str(market_learning.get("recommended_archetype", "BALANCED"))
+		if market_key == "SAFE":
+			recommended_key = "SAFE"
+		elif market_key == "BOLD" and capability >= 58.0 and (treasury <= 0 or treasury >= int(bold.program_cost * 0.65)):
+			recommended_key = "BOLD"
+
 	for proposal_value in proposals:
 		var proposal: Dictionary = proposal_value
 		proposal.recommended = str(proposal.archetype) == recommended_key
 		if bool(proposal.recommended):
-			proposal.recommendation = "Camille recommande ce plan au vu de votre équipe, de votre trésorerie et du risque accepté."
+			if bool(market_learning.get("has_data", false)):
+				proposal.recommendation = "Camille recommande ce plan en croisant l'équipe, la trésorerie et %d mois de terrain (confiance %.0f%%). %s" % [
+					int(market_learning.get("sample_months", 0)),
+					market_confidence,
+					str(market_learning.get("summary", ""))
+				]
+			else:
+				proposal.recommendation = "Camille recommande ce plan au vu de votre équipe, de votre trésorerie et du risque accepté."
 		elif str(proposal.archetype) == "SAFE":
 			proposal.recommendation = "À choisir si vous privilégiez la trésorerie, la fiabilité et une sortie rapide."
 		elif str(proposal.archetype) == "BOLD":

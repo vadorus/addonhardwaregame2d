@@ -4,6 +4,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 const DEVELOPMENT_GATES := preload("res://scripts/DevelopmentGates.gd")
 const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
+const CPU_MARKET_LEARNING := preload("res://scripts/CpuMarketLearning.gd")
 
 signal projects_changed
 signal generation_proposals_changed(proposals)
@@ -637,6 +638,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	var integration_score := float(technologies.get("integration", 0.0))
 	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
 	var equipment_score := clampf(25.0 + manufacturing_score * 1.55 + integration_score * 0.85, 20.0, 100.0)
+	var market_learning := CPU_MARKET_LEARNING.summarize(ProductManager.products, market_segment)
 	cpu_generation_context = {
 		"segment":market_segment,
 		"approach":approach,
@@ -658,6 +660,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"research_score":research_score,
 		"research_confidence":research_confidence_score,
 		"field_experience":field_experience_score,
+		"market_learning":market_learning.duplicate(true),
 		"development_capacity_factor":projected_capacity_factor,
 		"development_team_size":get_development_team_size(),
 		"development_confidence":development_confidence(),
