@@ -70,10 +70,22 @@ static func run(host: Node) -> String:
 	garage_hub.call("set_onboarding_stage", "FIRST_IDEA")
 	if int(garage_hub.call("visible_zone_count")) != 1:
 		garage_hub.queue_free()
-		return "Garage onboarding did not focus the player on the CPU workbench"
+		return "Room-first onboarding did not focus the player on the CPU workbench"
+	if bool(garage_hub.call("zone_buttons_have_visible_text")):
+		garage_hub.queue_free()
+		return "Room-first garage still paints button labels over the room"
+	if not bool(garage_hub.call("open_zone_menu", "Établi CPU")) or not bool(garage_hub.call("context_menu_visible")):
+		garage_hub.queue_free()
+		return "Touching the CPU workbench did not open its contextual menu"
+	var opening_actions: Array = garage_hub.call("context_action_labels")
+	if not opening_actions.has("Nouveau processeur") or not opening_actions.has("Conception avancée"):
+		garage_hub.queue_free()
+		return "CPU workbench contextual menu does not expose the expected first actions"
+	garage_hub.call("close_context_menu")
 	garage_hub.call("set_onboarding_stage", "NORMAL")
+	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":true,"PRODUCTS":false,"MARKET":false,"PRESS":false})
 	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
 		garage_hub.queue_free()
-		return "Garage onboarding exposed advanced management zones too early"
+		return "Room-first garage did not reveal the meeting area after Team unlock"
 	garage_hub.queue_free()
 	return ""
