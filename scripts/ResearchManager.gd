@@ -779,6 +779,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
+		"pending_decision":{},"decision_history":[],"decision_delay_months_remaining":0,
 		"cpu_design":normalized_design,"design_estimate":design_estimate,
 		"application_profile":stored_application_profile,
 		"generation_plan":stored_generation_plan,
@@ -828,6 +829,9 @@ func process_month():
 	projects_changed.emit()
 
 func _process_project_month(project: Dictionary):
+	var pending_decision_value = project.get("pending_decision", {})
+	if typeof(pending_decision_value) == TYPE_DICTIONARY and not pending_decision_value.is_empty():
+		return
 	var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
 	var sourcing_value = project.get("sourcing", {})
@@ -843,6 +847,11 @@ func _process_project_month(project: Dictionary):
 	var expense := int(float(project.monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0)))
 	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
+	if str(project.sector) == "CPU" and int(project.get("decision_delay_months_remaining", 0)) > 0:
+		project["decision_delay_months_remaining"] = int(project.get("decision_delay_months_remaining", 0)) - 1
+		if int(project.get("decision_delay_months_remaining", 0)) <= 0:
+			CompanyManager.add_alert("%s : les corrections décidées en revue prototype sont terminées. Le développement reprend." % str(project.name))
+		return
 	if str(project.sector) == "CPU" and int(project.get("remediation_months_remaining", 0)) > 0:
 		project["remediation_months_remaining"] = int(project.get("remediation_months_remaining", 0)) - 1
 		var remediation: Dictionary = project.get("technical_remediation", {})
@@ -921,8 +930,149 @@ func _complete_phase(project: Dictionary, team: float, tech: float, budget_ratio
 	phase_report_created.emit(project, report)
 	CompanyManager.add_alert("%s : rapport %s disponible." % [str(project.name), phase_name])
 	project.phase_index = phase_index + 1
+	if str(project.get("sector", "")) == "CPU" and phase_name == "Prototype":
+		project["pending_decision"] = _build_prototype_review(project, report)
+		CompanyManager.add_alert("%s : revue prototype requise. Le développement attend votre arbitrage." % str(project.name))
+		projects_changed.emit()
+		return
 	if int(project.phase_index) >= GameData.PHASES.size():
 		_finalize_project(project, team, tech, budget_ratio)
+
+func _build_prototype_review(project: Dictionary, report: Dictionary) -> Dictionary:
+	var weakness := str(report.get("weakness", "reliability"))
+	var confidence := float(report.get("confidence", 50.0))
+	var monthly_budget := maxi(int(project.get("monthly_budget", 42000)), 1)
+	var correction_cost := maxi(6000, int(round(float(monthly_budget) * 0.30)))
+	var balance_cost := maxi(3000, int(round(float(monthly_budget) * 0.15)))
+	return {
+		"id":"PROTOTYPE_REVIEW",
+		"type":"PROTOTYPE_REVIEW",
+		"title":"Revue du prototype — %s" % str(project.get("name", "CPU")),
+		"text":"Le premier prototype fonctionne, mais l'équipe signale %s comme point faible. Confiance actuelle : %.0f%%. Le développement est en pause jusqu'à votre décision." % [GameData.metric_label(weakness), confidence],
+		"weakness":weakness,
+		"confidence":confidence,
+		"created_month":TimeManager.month,
+		"created_year":TimeManager.year,
+		"options":[
+			{
+				"id":"FIX",
+				"label":"Corriger la faiblesse",
+				"description":"+6 sur la cible %s, +2 fiabilité, une passe de validation supplémentaire et 1 mois de délai." % GameData.metric_label(weakness),
+				"cost":correction_cost,
+				"delay_months":1
+			},
+			{
+				"id":"BALANCE",
+				"label":"Rééquilibrer le design",
+				"description":"+3 sur la faiblesse, +2 efficacité et +2 fiabilité, sans mois de délai dédié.",
+				"cost":balance_cost,
+				"delay_months":0
+			},
+			{
+				"id":"PUSH",
+				"label":"Pousser les performances",
+				"description":"+6 performance et +3 innovation, mais -4 fiabilité et -2 efficacité. Aucun coût supplémentaire immédiat.",
+				"cost":0,
+				"delay_months":0
+			}
+		]
+	}
+
+func get_pending_project_decisions() -> Array:
+	var result: Array = []
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("status", "")) != "DEVELOPMENT":
+			continue
+		var decision_value = project.get("pending_decision", {})
+		if typeof(decision_value) != TYPE_DICTIONARY or decision_value.is_empty():
+			continue
+		var decision: Dictionary = decision_value.duplicate(true)
+		decision["project_id"] = str(project.get("id", ""))
+		decision["project_name"] = str(project.get("name", "CPU"))
+		result.append(decision)
+	return result
+
+func get_project_decision(project_id: String) -> Dictionary:
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("id", "")) != project_id:
+			continue
+		var decision_value = project.get("pending_decision", {})
+		if typeof(decision_value) != TYPE_DICTIONARY:
+			return {}
+		var decision: Dictionary = decision_value.duplicate(true)
+		if decision.is_empty():
+			return {}
+		decision["project_id"] = project_id
+		decision["project_name"] = str(project.get("name", "CPU"))
+		return decision
+	return {}
+
+func resolve_project_decision(project_id: String, choice_id: String) -> bool:
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("id", "")) != project_id or str(project.get("status", "")) != "DEVELOPMENT":
+			continue
+		var decision_value = project.get("pending_decision", {})
+		if typeof(decision_value) != TYPE_DICTIONARY or decision_value.is_empty():
+			return false
+		var decision: Dictionary = decision_value
+		var selected_option: Dictionary = {}
+		for option_value in decision.get("options", []):
+			var option: Dictionary = option_value
+			if str(option.get("id", "")) == choice_id:
+				selected_option = option
+				break
+		if selected_option.is_empty():
+			return false
+		var cost := maxi(int(selected_option.get("cost", 0)), 0)
+		if cost > 0 and not Economy.can_afford(cost, "Revue prototype — %s" % str(project.get("name", "CPU"))):
+			return false
+		if cost > 0:
+			Economy.add_expense(cost, "Revue prototype — %s" % str(project.get("name", "CPU")))
+
+		var desired_value = project.get("desired_metrics", {})
+		var desired: Dictionary = desired_value if typeof(desired_value) == TYPE_DICTIONARY else {}
+		var weakness := str(decision.get("weakness", "reliability"))
+		match choice_id:
+			"FIX":
+				desired[weakness] = clampf(float(desired.get(weakness, 55.0)) + 6.0, 20.0, 96.0)
+				desired["reliability"] = clampf(float(desired.get("reliability", 55.0)) + 2.0, 20.0, 96.0)
+				project["quality_accumulator"] = float(project.get("quality_accumulator", 0.0)) + 10.0
+			"BALANCE":
+				desired[weakness] = clampf(float(desired.get(weakness, 55.0)) + 3.0, 20.0, 96.0)
+				desired["efficiency"] = clampf(float(desired.get("efficiency", 55.0)) + 2.0, 20.0, 96.0)
+				desired["reliability"] = clampf(float(desired.get("reliability", 55.0)) + 2.0, 20.0, 96.0)
+				project["quality_accumulator"] = float(project.get("quality_accumulator", 0.0)) + 4.0
+			"PUSH":
+				desired["performance"] = clampf(float(desired.get("performance", 55.0)) + 6.0, 20.0, 96.0)
+				desired["innovation"] = clampf(float(desired.get("innovation", 55.0)) + 3.0, 20.0, 96.0)
+				desired["reliability"] = clampf(float(desired.get("reliability", 55.0)) - 4.0, 20.0, 96.0)
+				desired["efficiency"] = clampf(float(desired.get("efficiency", 55.0)) - 2.0, 20.0, 96.0)
+			_:
+				return false
+		project["desired_metrics"] = desired
+		project["decision_delay_months_remaining"] = maxi(int(selected_option.get("delay_months", 0)), 0)
+		var history_value = project.get("decision_history", [])
+		var history: Array = history_value if typeof(history_value) == TYPE_ARRAY else []
+		history.push_front({
+			"type":str(decision.get("type", "PROTOTYPE_REVIEW")),
+			"choice":choice_id,
+			"label":str(selected_option.get("label", choice_id)),
+			"cost":cost,
+			"delay_months":int(selected_option.get("delay_months", 0)),
+			"month":TimeManager.month,
+			"year":TimeManager.year
+		})
+		if history.size() > 12:
+			history.pop_back()
+		project["decision_history"] = history
+		project["pending_decision"] = {}
+		CompanyManager.add_alert("%s : décision prototype — %s." % [str(project.get("name", "CPU")), str(selected_option.get("label", choice_id))])
+		projects_changed.emit()
+		return true
+	return false
 
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
@@ -1010,6 +1160,11 @@ func load_state(state: Dictionary):
 		project["ip_term"] = str(project.get("ip_term", saved_sourcing.get("ip_term", "SHARED")))
 		project["volume_term"] = str(project.get("volume_term", saved_sourcing.get("volume_term", "NONE")))
 		project["supplier_contract_id"] = str(project.get("supplier_contract_id", saved_sourcing.get("id", "")))
+		var pending_decision_value = project.get("pending_decision", {})
+		project["pending_decision"] = pending_decision_value.duplicate(true) if typeof(pending_decision_value) == TYPE_DICTIONARY else {}
+		var decision_history_value = project.get("decision_history", [])
+		project["decision_history"] = decision_history_value.duplicate(true) if typeof(decision_history_value) == TYPE_ARRAY else []
+		project["decision_delay_months_remaining"] = maxi(int(project.get("decision_delay_months_remaining", 0)), 0)
 		if str(project.get("sector", "")) == "CPU":
 			var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
 			var saved_capability_snapshot = project.get("technical_capabilities_snapshot", {})
