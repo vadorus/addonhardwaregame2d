@@ -633,6 +633,29 @@ func get_ceo_decisions() -> Array:
 			"can_defer":false
 		})
 
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "LAUNCHED" or int(product.get("months_on_market", 0)) != 1:
+			continue
+		var feedback := ProductManager.get_market_feedback(str(product.get("id", "")))
+		if feedback.is_empty():
+			continue
+		decisions.append({
+			"id":"MARKET_FEEDBACK:%s" % str(product.get("id", "")),
+			"category":"MARCHÉ",
+			"severity":68.0,
+			"title":"Premier retour marché — %s" % str(product.get("name", "CPU")),
+			"text":"%s • %d ventes • contribution %d € • capacité %.0f%%." % [
+				str(feedback.get("verdict", "Retour disponible")),
+				int(feedback.get("units", 0)),
+				int(feedback.get("net_contribution", 0)),
+				float(feedback.get("capacity_utilization", 0.0)) * 100.0
+			],
+			"recommendation":"Ouvrez Marché et comparez la prévision au réel. %s" % str(feedback.get("lesson", "")),
+			"target_tab":5,
+			"can_defer":true
+		})
+
 	for tender_value in MarketManager.open_tenders():
 		var tender: Dictionary = tender_value
 		if str(tender.get("status", "")) != "OPEN":
@@ -769,6 +792,21 @@ func get_executive_brief() -> Dictionary:
 		if str(product.get("status", "")) == "READY":
 			priorities.append({"category":"LANCEMENT","severity":64,"text":"%s est prêt mais pas encore commercialisé." % str(product.get("name", "Un CPU")),"action":"Décidez du prix et de la capacité avant le lancement."})
 			break
+
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "LAUNCHED" or int(product.get("months_on_market", 0)) != 1:
+			continue
+		var feedback := ProductManager.get_market_feedback(str(product.get("id", "")))
+		if feedback.is_empty():
+			continue
+		priorities.append({
+			"category":"MARCHÉ",
+			"severity":68,
+			"text":"Premier retour marché disponible pour %s : %s." % [str(product.get("name", "CPU")), str(feedback.get("verdict", "résultats mesurés")).to_lower()],
+			"action":"Comparez le plan de lancement au réel. %s" % str(feedback.get("lesson", ""))
+		})
+		break
 
 	priorities.sort_custom(func(a, b): return float(a.get("severity", 0.0)) > float(b.get("severity", 0.0)))
 	if priorities.size() > 3:
