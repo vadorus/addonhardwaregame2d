@@ -1610,7 +1610,7 @@ func _start_new_game():
 	game_over_layer.visible = false
 	if tabs != null:
 		tabs.current_tab = 0
-	status_label.text = "Nora : bienvenue. Pour l'instant, oubliez les tableaux de gestion. Touchez l'établi CPU et décidons quel processeur nous voulons construire."
+	status_label.text = "Nora est votre bras droit : son panneau de guide reste visible au QG et vous indique la prochaine décision utile."
 	_refresh_all()
 
 func _load_game():
