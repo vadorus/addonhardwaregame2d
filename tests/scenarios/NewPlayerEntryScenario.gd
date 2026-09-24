@@ -75,19 +75,47 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "V0.5 entry: opening garage did not enter the first-idea onboarding stage"
 
-	if not ResearchManager.start_project(
-		"CI First Idea",
-		"CPU",
-		MarketManager.default_segment(),
-		"INTERNAL",
-		"BALANCED",
-		45000,
-		CPU_DESIGN.default_design()
-	):
+	if TimeManager.time_scale != 0.0:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: first CPU project could not start from the opening state"
-	game.call("_refresh_all")
+		return "V0.5 entry: time is running before the player has chosen the first CPU"
+
+	game.call("_on_dashboard_navigation", 3, "Établi CPU")
+	var workshop: Control = game.get("first_cpu_workshop")
+	if workshop == null or not workshop.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: touching the CPU workbench did not open the guided workshop"
+	if int(workshop.call("get_brief_count")) != 4:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: first CPU workshop does not offer the four opening intents"
+	workshop.call("select_brief", "EMBEDDED")
+	var spec_value = workshop.call("current_spec")
+	if typeof(spec_value) != TYPE_DICTIONARY:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: first CPU workshop did not create a launch specification"
+	var spec: Dictionary = spec_value
+	spec["name"] = "CI First Idea"
+	if str(spec.get("segment", "")) != "EMBEDDED" or int(spec.get("budget", 0)) != 45000:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: embedded brief did not configure the expected target and budget"
+
+	game.call("_launch_first_cpu_from_workshop", spec)
+	if ResearchManager.projects.size() != 1:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: guided workshop could not launch the first CPU project"
+	if workshop.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: guided workshop stayed open after project launch"
+	if TimeManager.time_scale <= 0.0:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: simulation did not start when the first CPU entered development"
 
 	if not nav_panel.visible:
 		game.queue_free()
