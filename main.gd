@@ -768,6 +768,17 @@ func _format_lab_value(value: float, suffix: String, decimals: int) -> String:
 		return ("%.1f" % value) + suffix
 	return ("%d" % int(round(value))) + suffix
 
+func _add_inline_metric(parent: GridContainer, title: String, value: String) -> Label:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 8, 0, APP_PANEL_ALT, 8))
+	parent.add_child(panel)
+	var box := VBoxContainer.new()
+	panel.add_child(box)
+	box.add_child(_muted_label(title, 11))
+	var value_label := _label(value, 14)
+	box.add_child(value_label)
+	return value_label
+
 func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 	var metric_box := VBoxContainer.new()
 	metric_box.add_theme_constant_override("separation", 3)
@@ -2023,7 +2034,9 @@ func _refresh_top():
 
 func _refresh_all():
 	_refresh_navigation_progression()
-	_refresh_top(); _refresh_dashboard(); _refresh_research(); _refresh_products(); _refresh_market()
+	_refresh_top(); _refresh_research(); _refresh_products(); _refresh_market()
+	if dashboard_screen != null:
+		dashboard_screen.call("refresh")
 	if company_screen != null:
 		company_screen.call("refresh")
 	if personnel_screen != null:
