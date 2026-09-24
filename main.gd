@@ -1374,18 +1374,18 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	# Calcul local avec le profil sélectionné, sans modifier une partie en cours.
-	var base_company := 21000
+	# Projection locale du garage + budget CPU par défaut, sans modifier une partie en cours.
+	var base_company := 10500
 	var base_payroll := 32800
-	var base_research := 12000
-	var projected := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
-	projected += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
-	projected += int(round(float(base_research) * float(data.get("research_cost", 1.0))))
-	var capital := int(data.get("starting_capital", 500000))
-	var runway := float(capital) / maxf(float(projected), 1.0)
+	var base_first_cpu := 45000
+	var structural := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
+	structural += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
+	var with_first_cpu := structural + int(round(float(base_first_cpu) * float(data.get("research_cost", 1.0))))
+	var capital := int(data.get("starting_capital", 1450000))
+	var runway := float(capital) / maxf(float(with_first_cpu), 1.0)
 	var ai_profile := BalanceManager.company_ai_profile(key)
-	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
-		BalanceManager.profile_description(key), _money(capital), _money(projected), runway,
+	setup_difficulty_label.text = "%s\nCapital de lancement : %s € • structure garage ~%s €/mois • avec un premier CPU à 45 000 €/mois : ~%s €/mois, soit %.1f mois de marge théorique.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
+		BalanceManager.profile_description(key), _money(capital), _money(structural), _money(with_first_cpu), runway,
 		int(ai_profile.get("decision_interval_months", 2)),
 		float(ai_profile.get("decision_quality", 0.74)) * 100.0,
 		float(ai_profile.get("commercial_aggression", 1.0)) * 100.0
