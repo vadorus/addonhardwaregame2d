@@ -89,6 +89,17 @@ func get_support_modifier() -> float:
 		"MINIMAL": return 0.78
 		_: return 1.0
 
+func set_policies(marketing_budget: int, support_budget: int, environment_budget: int, support_level: String) -> bool:
+	var normalized_level := support_level.strip_edges().to_upper()
+	if normalized_level not in ["MINIMAL", "STANDARD", "PREMIUM"]:
+		return false
+	policies["marketing_budget"] = clampi(marketing_budget, 0, 200000)
+	policies["support_budget"] = clampi(support_budget, 0, 200000)
+	policies["environment_budget"] = clampi(environment_budget, 0, 200000)
+	policies["support_level"] = normalized_level
+	company_changed.emit()
+	return true
+
 func set_department_autonomy(department: String, autonomy: String):
 	if departments.has(department):
 		departments[department].autonomy = autonomy
@@ -141,7 +152,14 @@ func load_state(state: Dictionary):
 	starting_sector = str(state.get("starting_sector", "CPU"))
 	created = bool(state.get("created", false))
 	reputation = state.get("reputation", reputation).duplicate(true)
-	policies = state.get("policies", policies).duplicate(true)
+	var saved_policies = state.get("policies", {})
+	if typeof(saved_policies) == TYPE_DICTIONARY:
+		set_policies(
+			int(saved_policies.get("marketing_budget", policies.get("marketing_budget", 6000))),
+			int(saved_policies.get("support_budget", policies.get("support_budget", 5000))),
+			int(saved_policies.get("environment_budget", policies.get("environment_budget", 2500))),
+			str(saved_policies.get("support_level", policies.get("support_level", "STANDARD")))
+		)
 	departments = state.get("departments", departments).duplicate(true)
 	if not departments.has("Développement"):
 		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
