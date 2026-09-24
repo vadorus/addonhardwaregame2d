@@ -60,7 +60,7 @@ func _build() -> void:
 	heading_copy.add_child(UI.eyebrow("CENTRE DE COMMANDEMENT"))
 	var title := UI.label("Votre entreprise, en un coup d'œil", 27)
 	heading_copy.add_child(title)
-	heading_copy.add_child(_mutedUI.label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+	heading_copy.add_child(UI.muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
 
 	var garage_card := UI.card(UI.APP_PANEL, 14, 10)
 	garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -76,7 +76,7 @@ func _build() -> void:
 	garage_header.add_child(garage_copy)
 	garage_copy.add_child(UI.eyebrow("VOTRE QG"))
 	garage_copy.add_child(UI.label("Dirigez depuis votre garage", 20))
-	var garage_hint := _mutedUI.label("Les zones du décor deviennent des raccourcis vers les décisions du patron. Les fonctions apparaissent avec la croissance de l'entreprise.", 11)
+	var garage_hint := UI.muted_label("Les zones du décor deviennent des raccourcis vers les décisions du patron. Les fonctions apparaissent avec la croissance de l'entreprise.", 11)
 	garage_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	garage_copy.add_child(garage_hint)
 	var garage_script: Script = load("res://ui/GarageHub.gd")
@@ -85,7 +85,7 @@ func _build() -> void:
 	dashboard_garage.connect("zone_requested", Callable(self, "_on_garage_zone_requested"))
 	garage_box.add_child(dashboard_garage)
 
-	var priority_card := UI.card(UI.UI.APP_AMBER_DARK, 12, 12)
+	var priority_card := UI.card(UI.APP_AMBER_DARK, 12, 12)
 	priority_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(priority_card)
 	var priority_box := VBoxContainer.new()
@@ -102,7 +102,7 @@ func _build() -> void:
 	dashboard_priority_select = OptionButton.new()
 	dashboard_priority_select.item_selected.connect(func(_index): _refresh_selected_ceo_decision())
 	priority_box.add_child(dashboard_priority_select)
-	dashboard_priority_text = _richUI.label()
+	dashboard_priority_text = UI.rich_label()
 	dashboard_priority_text.custom_minimum_size.y = 78
 	dashboard_priority_text.add_theme_font_size_override("font_size", 14)
 	priority_box.add_child(dashboard_priority_text)
@@ -139,7 +139,7 @@ func _build() -> void:
 	project_kicker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	project_head.add_child(project_kicker)
 	var phase_badge := PanelContainer.new()
-	phase_badge.add_theme_stylebox_override("panel", UI.stylebox(UI.UI.APP_AMBER_DARK, 99, 0, UI.UI.APP_AMBER_DARK, 6))
+	phase_badge.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_AMBER_DARK, 99, 0, UI.APP_AMBER_DARK, 6))
 	dashboard_project_phase_label = UI.label("EN ATTENTE", 11)
 	dashboard_project_phase_label.add_theme_color_override("font_color", UI.APP_AMBER)
 	phase_badge.add_child(dashboard_project_phase_label)
@@ -152,7 +152,7 @@ func _build() -> void:
 	project_box.add_child(dashboard_project_grid)
 	var chip_frame := PanelContainer.new()
 	chip_frame.custom_minimum_size = Vector2(175, 175)
-	chip_frame.add_theme_stylebox_override("panel", UI.stylebox(UI.UI.APP_PANEL_ALT, 13, 0, UI.UI.APP_PANEL_ALT, 0))
+	chip_frame.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL_ALT, 13, 0, UI.APP_PANEL_ALT, 0))
 	var chip_script: Script = load("res://ui/ChipPreview.gd")
 	dashboard_chip = chip_script.new() as Control
 	chip_frame.add_child(dashboard_chip)
@@ -165,7 +165,7 @@ func _build() -> void:
 	dashboard_label = UI.label("Votre première génération", 24)
 	dashboard_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	project_info.add_child(dashboard_label)
-	dashboard_project_meta_label = _mutedUI.label("Définissez votre premier processeur.", 13)
+	dashboard_project_meta_label = UI.muted_label("Définissez votre premier processeur.", 13)
 	dashboard_project_meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	project_info.add_child(dashboard_project_meta_label)
 	dashboard_project_progress = ProgressBar.new()
@@ -197,7 +197,7 @@ func _build() -> void:
 	advisor_box.add_child(advisor_head)
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(46, 46)
-	avatar.add_theme_stylebox_override("panel", UI.stylebox(UI.UI.APP_AMBER_DARK, 12, 0, UI.UI.APP_AMBER_DARK, 0))
+	avatar.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_AMBER_DARK, 12, 0, UI.APP_AMBER_DARK, 0))
 	var avatar_label := UI.label("CD", 15)
 	avatar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	avatar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -208,8 +208,8 @@ func _build() -> void:
 	advisor_identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	advisor_head.add_child(advisor_identity)
 	advisor_identity.add_child(UI.label("Nora Bernard", 16))
-	advisor_identity.add_child(_mutedUI.label("Bras droit • Vice-présidente", 12))
-	dashboard_cto_label = _richUI.label()
+	advisor_identity.add_child(UI.muted_label("Bras droit • Vice-présidente", 12))
+	dashboard_cto_label = UI.rich_label()
 	dashboard_cto_label.custom_minimum_size.y = 125
 	dashboard_cto_label.add_theme_font_size_override("font_size", 15)
 	advisor_box.add_child(dashboard_cto_label)
@@ -224,10 +224,10 @@ func _build() -> void:
 	dashboard_stats_grid.add_theme_constant_override("h_separation", 10)
 	dashboard_stats_grid.add_theme_constant_override("v_separation", 10)
 	box.add_child(dashboard_stats_grid)
-	dashboard_cash_value = _add_statUI.card(dashboard_stats_grid, "TRÉSORERIE")
-	dashboard_result_value = _add_statUI.card(dashboard_stats_grid, "DERNIER RÉSULTAT")
-	dashboard_staff_value = _add_statUI.card(dashboard_stats_grid, "ÉQUIPE")
-	dashboard_brand_value = _add_statUI.card(dashboard_stats_grid, "IMAGE DE MARQUE")
+	dashboard_cash_value = _add_stat_card(dashboard_stats_grid, "TRÉSORERIE")
+	dashboard_result_value = _add_stat_card(dashboard_stats_grid, "DERNIER RÉSULTAT")
+	dashboard_staff_value = _add_stat_card(dashboard_stats_grid, "ÉQUIPE")
+	dashboard_brand_value = _add_stat_card(dashboard_stats_grid, "IMAGE DE MARQUE")
 
 	dashboard_lower_grid = GridContainer.new()
 	dashboard_lower_grid.columns = 2
@@ -242,7 +242,7 @@ func _build() -> void:
 	activity_box.add_theme_constant_override("separation", 10)
 	activity_card.add_child(activity_box)
 	activity_box.add_child(UI.eyebrow("CE QUI VIENT DE SE PASSER"))
-	alerts_label = _richUI.label()
+	alerts_label = UI.rich_label()
 	alerts_label.custom_minimum_size.y = 128
 	activity_box.add_child(alerts_label)
 
@@ -253,11 +253,11 @@ func _build() -> void:
 	market_box.add_theme_constant_override("separation", 10)
 	market_card.add_child(market_box)
 	market_box.add_child(UI.eyebrow("RADAR DU MARCHÉ CPU"))
-	dashboard_market_outlook_label = _richUI.label()
+	dashboard_market_outlook_label = UI.rich_label()
 	dashboard_market_outlook_label.custom_minimum_size.y = 128
 	market_box.add_child(dashboard_market_outlook_label)
 
-func _add_statUI.card(parent: GridContainer, title: String) -> Label:
+func _add_stat_card(parent: GridContainer, title: String) -> Label:
 	var panel := UI.card(UI.APP_PANEL, 12, 12)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(panel)
@@ -271,11 +271,11 @@ func _add_statUI.card(parent: GridContainer, title: String) -> Label:
 
 func _add_inline_metric(parent: GridContainer, title: String, value: String) -> Label:
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.stylebox(UI.UI.APP_PANEL_ALT, 8, 0, UI.UI.APP_PANEL_ALT, 8))
+	panel.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL_ALT, 8, 0, UI.APP_PANEL_ALT, 8))
 	parent.add_child(panel)
 	var box := VBoxContainer.new()
 	panel.add_child(box)
-	box.add_child(_mutedUI.label(title, 11))
+	box.add_child(UI.muted_label(title, 11))
 	var value_label := UI.label(value, 14)
 	box.add_child(value_label)
 	return value_label
@@ -294,7 +294,7 @@ func _refresh_dashboard_priority(brief: Dictionary):
 				dashboard_priority_select.add_item(label)
 				dashboard_priority_select.set_item_metadata(dashboard_priority_select.item_count - 1, str(decision.get("id", "")))
 			if previous_id != "":
-				UI.selectUI.option_meta(dashboard_priority_select, previous_id)
+				UI.select_meta(dashboard_priority_select, previous_id)
 			if dashboard_priority_select.selected < 0 and dashboard_priority_select.item_count > 0:
 				dashboard_priority_select.select(0)
 			dashboard_priority_select.visible = dashboard_priority_decisions.size() > 1
@@ -417,7 +417,7 @@ func _refresh_dashboard_priority(brief: Dictionary):
 				dashboard_priority_select.add_item(label)
 				dashboard_priority_select.set_item_metadata(dashboard_priority_select.item_count - 1, str(decision.get("id", "")))
 			if previous_id != "":
-				UI.selectUI.option_meta(dashboard_priority_select, previous_id)
+				UI.select_meta(dashboard_priority_select, previous_id)
 			if dashboard_priority_select.selected < 0 and dashboard_priority_select.item_count > 0:
 				dashboard_priority_select.select(0)
 			dashboard_priority_select.visible = dashboard_priority_decisions.size() > 1
