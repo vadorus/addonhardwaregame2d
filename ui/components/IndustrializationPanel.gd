@@ -6,6 +6,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const UI := preload("res://ui/UiKit.gd")
 
 var production_label: Label
+var production_grid: GridContainer
 var industrialization_select: OptionButton
 var industrialization_strategy: OptionButton
 var industrialization_binning: OptionButton
