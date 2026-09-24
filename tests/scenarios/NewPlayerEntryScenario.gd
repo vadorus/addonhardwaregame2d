@@ -161,15 +161,14 @@ static func run(host: Node) -> String:
 		return "V0.5 entry: Team screen is missing"
 	personnel_screen.call("refresh")
 	var team_explainer: Label = personnel_screen.get("team_explainer_label")
-	var staff_label: Label = personnel_screen.get("staff_label")
 	if team_explainer == null or not team_explainer.text.contains("R&D — INVENTER ET APPRENDRE") or not team_explainer.text.contains("DÉVELOPPEMENT CPU — TRANSFORMER L'IDÉE EN PRODUIT"):
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: Team screen does not clearly explain the two CPU technical groups"
-	if staff_label == null or not staff_label.text.contains("Camille Durand") or not staff_label.text.contains("Samira Lefèvre"):
+	if int(personnel_screen.call("department_card_count")) < 5:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: Team screen no longer identifies the people behind R&D and Development"
+		return "V0.5 entry: Team screen did not separate staff into visual department cards"
 
 	game.queue_free()
 	_restore(snapshot)
