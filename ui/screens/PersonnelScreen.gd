@@ -88,7 +88,7 @@ func refresh() -> void:
 
 	var rd_count := PersonnelManager.count_department("R&D")
 	var dev_count := PersonnelManager.count_department("Développement")
-	team_explainer_label.text = "[b]R&D — inventer et apprendre[/b]\n%d personne(s). Travaille sur l'architecture, l'efficacité et la fiabilité. Ce savoir-faire améliore les générations présentes et futures.\n\n[b]Développement CPU — transformer l'idée en produit[/b]\n%d personne(s). Leur compétence, leur charge et leur expérience influencent directement la vitesse, la qualité et la confiance du projet CPU.\n\nÉquipe Développement : %.0f/100 • confiance actuelle %.0f%% • capacité %.0f%%." % [
+	team_explainer_label.text = "R&D — INVENTER ET APPRENDRE\n%d personne(s). Travaille sur l'architecture, l'efficacité et la fiabilité. Ce savoir-faire améliore les générations présentes et futures.\n\nDÉVELOPPEMENT CPU — TRANSFORMER L'IDÉE EN PRODUIT\n%d personne(s). Leur compétence, leur charge et leur expérience influencent directement la vitesse, la qualité et la confiance du projet CPU.\n\nÉquipe Développement : %.0f/100 • confiance actuelle %.0f%% • capacité %.0f%%." % [
 		rd_count,
 		dev_count,
 		ResearchManager.development_team_score(),
@@ -108,7 +108,7 @@ func refresh() -> void:
 			continue
 
 		var purpose := _department_purpose(department)
-		lines.append("[b]%s[/b] — %s" % [department, purpose])
+		lines.append("%s — %s" % [department.to_upper(), purpose])
 		for employee in members:
 			var leader_mark := _leader_mark(employee)
 			lines.append("• %s — %s%s" % [
@@ -130,7 +130,7 @@ func refresh() -> void:
 		return
 	var candidate: Dictionary = PersonnelManager.candidate
 	var profile: Dictionary = candidate.get("profile", {})
-	candidate_label.text = "[b]%s — %s[/b]\nCompétence %d • aptitude %d • expérience %.1f ans • leadership %d\nSpécialisation : %s\nRigueur %.0f • résolution %.0f • travail d'équipe %.0f • stress %.0f • process %.0f\nSalaire : %s €/mois • prime d'embauche : %s €" % [
+	candidate_label.text = "%s — %s\nCompétence %d • aptitude %d • expérience %.1f ans • leadership %d\nSpécialisation : %s\nRigueur %.0f • résolution %.0f • travail d'équipe %.0f • stress %.0f • process %.0f\nSalaire : %s €/mois • prime d'embauche : %s €" % [
 		str(candidate.get("name", "")), str(candidate.get("department", "")), int(candidate.get("skill", 0)), int(candidate.get("aptitude", 0)),
 		float(candidate.get("experience_years", 0.0)), int(candidate.get("leadership", 0)), str(candidate.get("specialization", "")),
 		float(profile.get("rigor", 50.0)), float(profile.get("problem_solving", 50.0)),
