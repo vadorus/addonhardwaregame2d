@@ -200,13 +200,13 @@ func _displayed_art_rect() -> Rect2:
 
 func set_viewport_width(width: float) -> void:
 	if width >= 1500.0:
-		custom_minimum_size.y = 440.0
+		custom_minimum_size.y = 600.0
 	elif width >= 1000.0:
-		custom_minimum_size.y = 400.0
+		custom_minimum_size.y = 520.0
 	elif width >= 700.0:
-		custom_minimum_size.y = 350.0
+		custom_minimum_size.y = 440.0
 	else:
-		custom_minimum_size.y = 300.0
+		custom_minimum_size.y = 340.0
 	call_deferred("_layout_zones")
 
 func displayed_art_rect() -> Rect2:
