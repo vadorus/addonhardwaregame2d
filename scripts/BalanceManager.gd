@@ -8,7 +8,7 @@ const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
 		"description":"Simulation complète, avec davantage de marge financière et des entreprises concurrentes moins réactives et plus imparfaites.",
-		"starting_capital":600000,
+		"starting_capital":1650000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
 		"research_cost":0.88,
@@ -20,12 +20,12 @@ const PROFILES := {
 		"ai_decision_interval_months":3,
 		"ai_action_threshold":56.0,
 		"ai_commercial_aggression":0.82,
-		"first_generation_runway_target":9.5
+		"first_generation_runway_target":18.0
 	},
 	"STANDARD":{
 		"label":"Standard",
 		"description":"Équilibre de référence : entreprises autonomes cohérentes, réactives sans être omniscientes.",
-		"starting_capital":500000,
+		"starting_capital":1450000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
 		"research_cost":1.00,
@@ -37,12 +37,12 @@ const PROFILES := {
 		"ai_decision_interval_months":2,
 		"ai_action_threshold":52.0,
 		"ai_commercial_aggression":1.00,
-		"first_generation_runway_target":7.5
+		"first_generation_runway_target":15.0
 	},
 	"REALISTIC":{
 		"label":"Réaliste",
 		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
-		"starting_capital":420000,
+		"starting_capital":1400000,
 		"operating_cost":1.10,
 		"salary_cost":1.08,
 		"research_cost":1.12,
@@ -54,7 +54,7 @@ const PROFILES := {
 		"ai_decision_interval_months":1,
 		"ai_action_threshold":49.0,
 		"ai_commercial_aggression":1.14,
-		"first_generation_runway_target":5.8
+		"first_generation_runway_target":13.0
 	}
 }
 
@@ -136,11 +136,13 @@ func first_generation_runway_target() -> float:
 	return float(profile_data().get("first_generation_runway_target", 7.5))
 
 func projected_starting_monthly_burn() -> int:
-	# Base de départ : locaux/politiques + les sept salaires initiaux + recherche continue.
-	var company_base := expense_amount(7500 + 6000 + 5000 + 2500, "Bureaux et infrastructure")
+	# Au garage, la recherche continue n'est facturée que si le joueur affecte réellement des chercheurs.
+	var company_base := expense_amount(7500 + 1500 + 1000 + 500, "Bureaux et infrastructure")
 	var payroll_base := expense_amount(32800, "Salaires")
-	var research_base := expense_amount(12000, "Recherche CPU")
-	return company_base + payroll_base + research_base
+	return company_base + payroll_base
+
+func projected_first_cpu_monthly_burn(monthly_budget: int = 45000) -> int:
+	return projected_starting_monthly_burn() + expense_amount(maxi(monthly_budget, 10000), "Développement — premier CPU")
 
 func starting_runway_months() -> float:
 	return float(starting_capital()) / maxf(float(projected_starting_monthly_burn()), 1.0)
