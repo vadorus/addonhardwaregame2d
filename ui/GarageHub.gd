@@ -19,7 +19,9 @@ const ZONES := [
 	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.48,0.18,0.20,0.15)}
 ]
 
+var _ambient_background: TextureRect
 var _background: TextureRect
+var _title_panel: PanelContainer
 var _title_label: Label
 var _subtitle_label: Label
 var _zone_buttons: Array[Button] = []
@@ -27,7 +29,7 @@ var _workplace_tier := 0
 var _workplace_condition := 62.0
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(0, 410)
+	custom_minimum_size = Vector2(0, 360)
 	clip_contents = true
 	_build_background()
 	_build_overlay()
@@ -41,11 +43,20 @@ func _build_background() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(backdrop)
 
+	_ambient_background = TextureRect.new()
+	_ambient_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_ambient_background.texture = _load_workplace_texture(_workplace_tier)
+	_ambient_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_ambient_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_ambient_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_ambient_background.self_modulate = Color(0.26, 0.31, 0.36, 0.42)
+	_ambient_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_ambient_background)
+
 	_background = TextureRect.new()
-	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_background.texture = _load_workplace_texture(_workplace_tier)
 	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_background.stretch_mode = TextureRect.STRETCH_SCALE
 	_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
@@ -79,13 +90,16 @@ func _apply_workplace_art() -> void:
 	if _background.texture != null:
 		current_path = str(_background.texture.resource_path)
 	if current_path != wanted_path:
-		_background.texture = _load_workplace_texture(_workplace_tier)
+		var texture := _load_workplace_texture(_workplace_tier)
+		_background.texture = texture
+		if _ambient_background != null:
+			_ambient_background.texture = texture
 		call_deferred("_layout_zones")
 
 func _build_overlay() -> void:
-	var title_panel := PanelContainer.new()
-	title_panel.position = Vector2(16, 14)
-	title_panel.size = Vector2(330, 64)
+	_title_panel = PanelContainer.new()
+	_title_panel.position = Vector2(16, 14)
+	_title_panel.size = Vector2(330, 64)
 	var title_style := StyleBoxFlat.new()
 	title_style.bg_color = Color(0.035, 0.055, 0.085, 0.88)
 	title_style.corner_radius_top_left = 12
@@ -96,12 +110,12 @@ func _build_overlay() -> void:
 	title_style.content_margin_right = 14
 	title_style.content_margin_top = 10
 	title_style.content_margin_bottom = 10
-	title_panel.add_theme_stylebox_override("panel", title_style)
-	add_child(title_panel)
+	_title_panel.add_theme_stylebox_override("panel", title_style)
+	add_child(_title_panel)
 
 	var title_box := VBoxContainer.new()
 	title_box.add_theme_constant_override("separation", 1)
-	title_panel.add_child(title_box)
+	_title_panel.add_child(title_box)
 	_title_label = Label.new()
 	_title_label.text = "Garage aménagé"
 	_title_label.add_theme_font_size_override("font_size", 16)
@@ -156,11 +170,18 @@ func _layout_zones() -> void:
 	if size.x <= 0.0 or size.y <= 0.0:
 		return
 	var art_rect := _displayed_art_rect()
+	if _background != null:
+		_background.position = art_rect.position
+		_background.size = art_rect.size
+	if _title_panel != null:
+		var title_width := clampf(art_rect.size.x * 0.44, 240.0, 330.0)
+		_title_panel.position = art_rect.position + Vector2(12.0, 12.0)
+		_title_panel.size = Vector2(title_width, 64.0)
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
 		button.position = art_rect.position + Vector2(r.position.x * art_rect.size.x, r.position.y * art_rect.size.y)
-		button.size = Vector2(maxf(r.size.x * art_rect.size.x, 104.0), maxf(r.size.y * art_rect.size.y, 50.0))
-		button.size.y = minf(button.size.y, 64.0)
+		button.size = Vector2(maxf(r.size.x * art_rect.size.x, 118.0), maxf(r.size.y * art_rect.size.y, 56.0))
+		button.size.y = minf(button.size.y, 72.0)
 
 func _displayed_art_rect() -> Rect2:
 	if _background == null or _background.texture == null:
@@ -168,9 +189,28 @@ func _displayed_art_rect() -> Rect2:
 	var texture_size := _background.texture.get_size()
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return Rect2(Vector2.ZERO, size)
-	var scale_factor := minf(size.x / texture_size.x, size.y / texture_size.y)
-	var displayed_size := texture_size * scale_factor
+	var aspect := texture_size.x / texture_size.y
+	var stage_height := size.y
+	var stage_width := stage_height * aspect
+	if stage_width > size.x:
+		stage_width = size.x
+		stage_height = stage_width / aspect
+	var displayed_size := Vector2(stage_width, stage_height)
 	return Rect2((size - displayed_size) * 0.5, displayed_size)
+
+func set_viewport_width(width: float) -> void:
+	if width >= 1500.0:
+		custom_minimum_size.y = 440.0
+	elif width >= 1000.0:
+		custom_minimum_size.y = 400.0
+	elif width >= 700.0:
+		custom_minimum_size.y = 350.0
+	else:
+		custom_minimum_size.y = 300.0
+	call_deferred("_layout_zones")
+
+func displayed_art_rect() -> Rect2:
+	return _displayed_art_rect()
 
 func _on_zone_pressed(button: Button) -> void:
 	zone_requested.emit(int(button.get_meta("tab", 0)), str(button.get_meta("zone_name", "")))
