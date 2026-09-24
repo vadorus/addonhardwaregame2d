@@ -987,8 +987,10 @@ func _build_setup_layer():
 	setup_creation_box.add_child(setup_name)
 
 	setup_sector = OptionButton.new()
+	setup_sector.visible = false
 	_fill_sector_options(setup_sector)
 	_select_meta(setup_sector, "CPU")
+	setup_creation_box.add_child(setup_sector)
 
 	setup_difficulty = OptionButton.new()
 	for difficulty_value in BalanceManager.profile_keys():
