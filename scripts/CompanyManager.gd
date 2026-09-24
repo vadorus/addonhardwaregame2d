@@ -20,9 +20,9 @@ var reputation := {
 }
 
 var policies := {
-	"marketing_budget": 6000,
-	"support_budget": 5000,
-	"environment_budget": 2500,
+	"marketing_budget": 1500,
+	"support_budget": 1000,
+	"environment_budget": 500,
 	"support_level": "STANDARD"
 }
 
@@ -48,7 +48,7 @@ func reset(name: String, sector: String, capital: int = 500_000):
 		"innovation":50.0,"reliability":50.0,"value":50.0,"support":50.0,
 		"sustainability":50.0,"prestige":35.0,"professional":45.0
 	}
-	policies = {"marketing_budget":6000,"support_budget":5000,"environment_budget":2500,"support_level":"STANDARD"}
+	policies = {"marketing_budget":1500,"support_budget":1000,"environment_budget":500,"support_level":"STANDARD"}
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
 		"Développement":{"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0},
