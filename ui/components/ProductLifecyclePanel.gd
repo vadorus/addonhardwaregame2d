@@ -7,6 +7,8 @@ const UI := preload("res://ui/UiKit.gd")
 
 var products_label: Label
 var product_select: OptionButton
+var launch_grid: GridContainer
+var lifecycle_grid: GridContainer
 var product_details_label: Label
 var product_price: SpinBox
 var product_capacity: SpinBox
@@ -36,17 +38,17 @@ func _build() -> void:
 	product_details_label = UI.rich_label()
 	add_child(product_details_label)
 
-	var grid := GridContainer.new()
-	grid.columns = 2
-	add_child(grid)
-	grid.add_child(UI.label("Prix de vente", 14))
+	launch_grid = GridContainer.new()
+	launch_grid.columns = 2
+	add_child(launch_grid)
+	launch_grid.add_child(UI.label("Prix de vente", 14))
 	product_price = UI.spin(1, 1000000, 5, 300)
 	product_price.value_changed.connect(func(_value): _refresh_launch_intel())
-	grid.add_child(product_price)
-	grid.add_child(UI.label("Capacité mensuelle", 14))
+	launch_grid.add_child(product_price)
+	launch_grid.add_child(UI.label("Capacité mensuelle", 14))
 	product_capacity = UI.spin(1, 1000000, 100, 5000)
 	product_capacity.value_changed.connect(func(_value): _refresh_launch_intel())
-	grid.add_child(product_capacity)
+	launch_grid.add_child(product_capacity)
 
 	var intel_card := UI.card(UI.APP_CYAN_DARK, 10, 10)
 	add_child(intel_card)
@@ -73,7 +75,7 @@ func _build() -> void:
 	post_launch_label = UI.rich_label()
 	post_launch_group.add_child(post_launch_label)
 
-	var lifecycle_grid := GridContainer.new()
+	lifecycle_grid = GridContainer.new()
 	lifecycle_grid.columns = 2
 	post_launch_group.add_child(lifecycle_grid)
 
@@ -128,6 +130,13 @@ func _build() -> void:
 	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
 	control_software_button.pressed.connect(_emit_control_software)
 	actions.add_child(control_software_button)
+
+func set_viewport_width(width: float) -> void:
+	var columns := 1 if width < 700.0 else 2
+	if launch_grid != null:
+		launch_grid.columns = columns
+	if lifecycle_grid != null:
+		lifecycle_grid.columns = columns
 
 func refresh() -> void:
 	_refresh_product_list()
