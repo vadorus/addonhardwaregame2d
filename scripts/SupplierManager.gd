@@ -783,8 +783,8 @@ func get_state() -> Dictionary:
 		"suppliers":suppliers,
 		"contracts":contracts,
 		"next_contract_id":_next_contract_id,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -804,7 +804,7 @@ func load_state(state: Dictionary):
 	var saved_contracts = state.get("contracts", {})
 	contracts = saved_contracts.duplicate(true) if typeof(saved_contracts) == TYPE_DICTIONARY else {}
 	_next_contract_id = int(state.get("next_contract_id", contracts.size() + 1))
-	rng.seed = int(state.get("rng_seed", 19471))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "19471"), 19471)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	suppliers_changed.emit()
 	contracts_changed.emit()
