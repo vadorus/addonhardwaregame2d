@@ -122,6 +122,50 @@ func _ready() -> void:
 	if not CompanyManager.created:
 		_fail("Company was not created")
 		return
+
+	var exact_rng_probe: int = 2993618119687409726
+	var rng_json := JSON.stringify({"rng_state":SaveCodec.int64_to_json(exact_rng_probe)})
+	var rng_parsed = JSON.parse_string(rng_json)
+	if typeof(rng_parsed) != TYPE_DICTIONARY or SaveCodec.int64_from_json(rng_parsed.get("rng_state", ""), 0) != exact_rng_probe:
+		_fail("64-bit RNG state lost precision through JSON")
+		return
+	for rng_state_value in [
+		PersonnelManager.get_state(),
+		SupplierManager.get_state(),
+		ResearchManager.get_state(),
+		FoundryManager.get_state(),
+		ProductionManager.get_state(),
+		AfterSalesManager.get_state(),
+		MarketManager.get_state()
+	]:
+		var rng_state_data: Dictionary = rng_state_value
+		if typeof(rng_state_data.get("rng_seed", null)) != TYPE_STRING or typeof(rng_state_data.get("rng_state", null)) != TYPE_STRING:
+			_fail("A random manager still serializes 64-bit RNG values as JSON numbers")
+			return
+
+	SaveManager.save_game()
+	if not FileAccess.file_exists(SaveManager.SAVE_PATH):
+		_fail("Atomic save did not create the final save file")
+		return
+	if FileAccess.file_exists(SaveManager.TEMP_SAVE_PATH):
+		_fail("Atomic save left a temporary save file behind")
+		return
+	var save_probe_file := FileAccess.open(SaveManager.SAVE_PATH, FileAccess.READ)
+	if save_probe_file == null:
+		_fail("Could not inspect the atomic save")
+		return
+	var saved_probe = JSON.parse_string(save_probe_file.get_as_text())
+	save_probe_file.close()
+	if typeof(saved_probe) != TYPE_DICTIONARY or int(saved_probe.get("version", 0)) != SaveManager.SAVE_VERSION:
+		_fail("Save file version is missing or stale")
+		return
+	if typeof(saved_probe.get("market", {}).get("rng_state", null)) != TYPE_STRING:
+		_fail("Saved JSON does not preserve RNG state as text")
+		return
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.SAVE_PATH))
+	if FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.BACKUP_SAVE_PATH))
+
 	if Economy.money != 500_000:
 		_fail("Unexpected starting money: %s" % Economy.money)
 		return
