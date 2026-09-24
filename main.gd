@@ -437,13 +437,28 @@ func _refresh_generation_plan_summary():
 	var deltas: Dictionary = proposal.get("metric_deltas", {})
 	var strengths: Array = proposal.get("strengths", [])
 	var risks: Array = proposal.get("risks", [])
+	var market_learning_value = proposal.get("market_learning", {})
+	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var market_line := "Retour marché : aucune donnée exploitable sur cette cible."
+	if bool(market_learning.get("has_data", false)):
+		market_line = "Retour marché : %d mois • %s unités • satisfaction %.1f/100 • retours %.1f%% • capacité %.0f%% • demande non servie %.1f%% • confiance %.0f%%\n%s" % [
+			int(market_learning.get("sample_months", 0)),
+			_money(int(market_learning.get("total_units", 0))),
+			float(market_learning.get("satisfaction", 50.0)),
+			float(market_learning.get("return_rate", 0.0)) * 100.0,
+			float(market_learning.get("capacity_utilization", 0.0)) * 100.0,
+			float(market_learning.get("unserved_ratio", 0.0)) * 100.0,
+			float(market_learning.get("confidence", 0.0)),
+			str(market_learning.get("summary", ""))
+		]
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
-	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœur(s) • %s • %s • %s • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
+	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœur(s) • %s • %s • %s • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\n%s\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
 		str(proposal.get("promise", "")),
 		int(design.get("cores", 0)), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.get("node_nm", 10000))), int(design.get("tdp_w", 0)),
 		int(proposal.get("estimated_months", 0)), _money(int(proposal.get("program_cost", 0))), float(proposal.get("competitive_months", 0)) / 12.0, int(proposal.get("potential_models", 0)),
 		float(proposal.get("risk", 0.0)), float(proposal.get("confidence", 0.0)), float(proposal.get("research_confidence", 50.0)), float(proposal.get("development_confidence", 50.0)), float(proposal.get("field_experience", 0.0)), float(proposal.get("target_fit", 0.0)),
+		market_line,
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
 		" • ".join(strengths), " • ".join(risks), str(proposal.get("recommendation", ""))
 	]
