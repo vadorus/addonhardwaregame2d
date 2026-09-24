@@ -2,6 +2,7 @@ extends RefCounted
 class_name CpuGenerationPlannerModel
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
 
 const PLAN_PROFILES := [
 	{
@@ -186,17 +187,28 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	var budget_ratio := clampf(float(monthly_budget) / base_development_cost, 0.25, 2.2)
 	var approach_speed := maxf(float(context.get("approach_speed", 1.0)), 0.25)
 	var approach_cost := maxf(float(context.get("approach_cost", 1.0)), 0.25)
-	var budget_time_factor := clampf(1.0 - (budget_ratio - 1.0) * 0.22, 0.74, 1.24)
-	var estimated_months := maxi(1, int(ceil(float(evaluation.estimated_months) * float(profile.duration_factor) * budget_time_factor / approach_speed)))
+	var management_modifier := float(context.get("management_modifier", 1.0))
+	var simulation_technology := float(context.get("simulation_technology_score", context.get("technology_score", 18.0)))
+	var progress_per_month := DEVELOPMENT_ESTIMATOR.monthly_progress(
+		float(context.get("team_score", 20.0)),
+		simulation_technology,
+		budget_ratio,
+		approach_speed,
+		1.0,
+		1.0,
+		management_modifier,
+		float(evaluation.get("complexity", 50.0))
+	) / maxf(float(profile.duration_factor), 0.25)
+	var estimated_months := DEVELOPMENT_ESTIMATOR.estimated_months_from_progress(progress_per_month, int(context.get("phase_count", 6)))
 	var prototype_cost := int(float(evaluation.unit_cost) * (120.0 + float(evaluation.complexity) * 3.0))
-	var program_cost := int(float(estimated_months * monthly_budget) * approach_cost) + prototype_cost
+	var monthly_program_cost := BalanceManager.expense_amount(int(float(monthly_budget) * approach_cost), "Développement — plan CPU")
+	var program_cost := int(float(estimated_months * monthly_program_cost)) + prototype_cost
 
 	var capability_gap := maxf(float(evaluation.complexity) - capability, 0.0)
 	var risk := float(evaluation.risk) + float(profile.risk_delta) + capability_gap * 0.28
 	risk += maxf(1.0 - budget_ratio, 0.0) * 14.0
 	risk = clampf(risk, 5.0, 95.0)
 
-	var management_modifier := float(context.get("management_modifier", 1.0))
 	var confidence := 45.0 + float(context.get("team_score", 20.0)) * 0.30
 	confidence += float(context.get("technology_score", 0.0)) * 0.12
 	confidence += float(context.get("division_maturity", 0.0)) * 0.08
