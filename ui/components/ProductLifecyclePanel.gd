@@ -45,6 +45,7 @@ func _build() -> void:
 	grid.add_child(product_price)
 	grid.add_child(UI.label("Capacité mensuelle", 14))
 	product_capacity = UI.spin(1, 1000000, 100, 5000)
+	product_capacity.value_changed.connect(func(_value): _refresh_launch_intel())
 	grid.add_child(product_capacity)
 
 	var intel_card := UI.card(UI.APP_CYAN_DARK, 10, 10)
@@ -266,10 +267,30 @@ func _refresh_post_launch(product: Dictionary) -> void:
 		]
 	var firmware_access := "disponible" if bool(lifecycle.get("firmware_available", false)) else "à débloquer par le savoir-faire logiciel/architecture"
 	var software_access := "disponible" if bool(lifecycle.get("control_software_available", false)) else "à débloquer par logiciel + intégration"
-	post_launch_label.text = "Révision actuelle %s • firmware v%d (%s)\nPromotion : %s\nLogiciel de contrôle : %s\nAccès firmware : %s • contrôle logiciel : %s\nHistorique : %d révision(s) matérielle(s) • %d firmware(s)" % [
+	var feedback: Dictionary = lifecycle.get("last_market_feedback", {})
+	var feedback_text := "Aucun mois de vente mesuré pour l'instant."
+	if not feedback.is_empty():
+		var forecast_text := "sans prévision initiale"
+		if int(feedback.get("expected_units", 0)) > 0:
+			forecast_text = "prévision %s–%s (centre %s)" % [
+				UI.money(int(feedback.get("min_units", 0))),
+				UI.money(int(feedback.get("max_units", 0))),
+				UI.money(int(feedback.get("expected_units", 0)))
+			]
+		feedback_text = "%s : %s ventes • %s • contribution %s € • capacité %.0f%% • satisfaction %.1f/100\n%s" % [
+			str(feedback.get("verdict", "Retour marché")),
+			UI.money(int(feedback.get("units", 0))),
+			forecast_text,
+			UI.money(int(feedback.get("net_contribution", 0))),
+			float(feedback.get("capacity_utilization", 0.0)) * 100.0,
+			float(feedback.get("satisfaction", 50.0)),
+			str(feedback.get("lesson", ""))
+		]
+	post_launch_label.text = "Révision actuelle %s • firmware v%d (%s)\nPromotion : %s\nLogiciel de contrôle : %s\nAccès firmware : %s • contrôle logiciel : %s\n\nRetour marché\n%s\n\nHistorique : %d révision(s) matérielle(s) • %d firmware(s) • %d rapport(s) marché" % [
 		str(lifecycle.get("revision", "A0")), int(lifecycle.get("firmware_version", 1)),
 		str(lifecycle.get("firmware_profile", "ORIGINAL")).to_lower(), promotion_text, software_text,
-		firmware_access, software_access, int(lifecycle.get("revision_count", 0)), int(lifecycle.get("firmware_count", 0))
+		firmware_access, software_access, feedback_text,
+		int(lifecycle.get("revision_count", 0)), int(lifecycle.get("firmware_count", 0)), int(lifecycle.get("market_feedback_count", 0))
 	]
 	firmware_release_button.disabled = not bool(lifecycle.get("firmware_available", false))
 	control_software_button.disabled = not bool(lifecycle.get("control_software_available", false))
@@ -287,6 +308,7 @@ func _refresh_launch_intel() -> void:
 		return
 	var candidate: Dictionary = product.duplicate(true)
 	candidate["price"] = int(product_price.value)
+	candidate["production_capacity"] = int(product_capacity.value)
 	var target := MarketManager.normalize_segment(str(candidate.get("target_segment", MarketManager.default_segment())))
 	var unit_cost := int(candidate.get("unit_cost", 0))
 	var planned_price := int(candidate.get("price", 0))
@@ -308,6 +330,12 @@ func _refresh_launch_intel() -> void:
 			UI.money(int(forecast.get("min_units", 0))), UI.money(int(forecast.get("max_units", 0))),
 			UI.money(int(forecast.get("expected_units", 0))),
 			float(forecast.get("min_share", 0.0)) * 100.0, float(forecast.get("max_share", 0.0)) * 100.0
+		])
+		var chosen_capacity := int(product_capacity.value)
+		var expected_units := int(forecast.get("expected_units", 0))
+		lines.append("Capacité choisie : %s unités/mois%s" % [
+			UI.money(chosen_capacity),
+			" • ⚠ inférieure à la demande centrale estimée" if expected_units > chosen_capacity else ""
 		])
 		lines.append(str(forecast.get("value_signal", "")))
 		lines.append(str(forecast.get("trust_signal", "")))
