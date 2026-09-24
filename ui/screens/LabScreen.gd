@@ -9,6 +9,7 @@ const APP_PANEL := UI.APP_PANEL
 const APP_PANEL_ALT := UI.APP_PANEL_ALT
 const APP_SHELL := UI.APP_SHELL
 const APP_CYAN := UI.APP_CYAN
+const APP_CYAN_DARK := UI.APP_CYAN_DARK
 const APP_AMBER := UI.APP_AMBER
 const APP_AMBER_DARK := UI.APP_AMBER_DARK
 const APP_GREEN := UI.APP_GREEN
@@ -519,6 +520,25 @@ func _add_inline_metric(parent: GridContainer, title: String, value: String) -> 
 	var value_label := _label(value, 14)
 	box.add_child(value_label)
 	return value_label
+
+
+func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
+	var metric_box := VBoxContainer.new()
+	metric_box.add_theme_constant_override("separation", 3)
+	parent.add_child(metric_box)
+	var row := HBoxContainer.new()
+	metric_box.add_child(row)
+	var title_label := _muted_label(title, 12)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title_label)
+	var value_label := _label("—", 12)
+	row.add_child(value_label)
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 8
+	metric_box.add_child(bar)
+	cpu_metric_bars[key] = bar
+	cpu_metric_labels[key] = value_label
 
 
 func _emit_action(action: String, payload: Variant = null) -> void:
