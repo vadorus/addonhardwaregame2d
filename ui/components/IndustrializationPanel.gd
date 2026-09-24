@@ -122,9 +122,10 @@ func _refresh_production_overview() -> void:
 			var route := ProductionManager.manufacturing_route_quote(str(job.get("id", "")))
 			var route_name := str(route.get("provider_name", "route à choisir")) if not route.is_empty() else "route incompatible"
 			var route_error := str(job.get("route_error", ""))
-			lines.append("\n%s — %s — %.0f%% • %d mois • %s • coût mensuel base %s €%s" % [
+			var route_status := "engagée" if bool(job.get("route_committed", false)) else ("validée, démarrage au prochain mois" if bool(job.get("route_selected", false)) else "à confirmer par le joueur")
+			lines.append("\n%s — %s — %.0f%% • %d mois • %s • route %s • coût mensuel base %s €%s" % [
 				str(job.get("name", "CPU")), ProductionManager.strategy_label(str(job.get("strategy", "BALANCED"))),
-				float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), route_name,
+				float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), route_name, route_status,
 				UI.money(int(job.get("monthly_cost", 0))), ("\n  ⚠ " + route_error) if route_error != "" else ""
 			])
 		else:
