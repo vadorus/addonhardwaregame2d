@@ -350,11 +350,11 @@ func _refresh_selected_ceo_decision():
 
 func _priority_action_text(category: String) -> String:
 	match category:
-		"DÉMARRAGE", "TECHNIQUE", "PROJET":
+		"DÉMARRAGE", "TECHNIQUE", "PROJET", "DÉVELOPPEMENT", "PROTOTYPE", "VALIDATION":
 			return "Ouvrir le laboratoire CPU"
-		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
+		"LANCEMENT", "FONDERIE", "FOURNISSEUR", "PRODUCTION":
 			return "Ouvrir Production & Produits"
-		"SAV", "CONTRAT":
+		"SAV", "CONTRAT", "MARCHÉ":
 			return "Ouvrir Marché & SAV"
 		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
 			return "Ouvrir le comité de direction"
@@ -362,11 +362,11 @@ func _priority_action_text(category: String) -> String:
 
 func _priority_category_target_tab(category: String) -> int:
 	match category:
-		"DÉMARRAGE", "TECHNIQUE", "PROJET":
+		"DÉMARRAGE", "TECHNIQUE", "PROJET", "DÉVELOPPEMENT", "PROTOTYPE", "VALIDATION":
 			return 3
-		"LANCEMENT", "FONDERIE", "FOURNISSEUR":
+		"LANCEMENT", "FONDERIE", "FOURNISSEUR", "PRODUCTION":
 			return 4
-		"SAV", "CONTRAT":
+		"SAV", "CONTRAT", "MARCHÉ":
 			return 5
 		"ARBITRAGE", "RH", "LOCAUX", "FINANCE":
 			return 1
