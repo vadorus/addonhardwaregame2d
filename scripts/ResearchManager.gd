@@ -665,9 +665,9 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	return get_cpu_generation_proposals()
 
-func estimate_cpu_development(design_input: Dictionary, approach: String, monthly_budget: int, sourcing: Dictionary = {}, extra_months: int = 0, upfront_cost: int = 0) -> Dictionary:
+func estimate_cpu_development(design_input: Dictionary, approach: String, monthly_budget: int, sourcing: Dictionary = {}, extra_months: int = 0, upfront_cost: int = 0, evaluation_override: Dictionary = {}) -> Dictionary:
 	var design := CPU_DESIGN.normalize(design_input)
-	var evaluation := CPU_DESIGN.evaluate(design, cpu_capabilities)
+	var evaluation := evaluation_override.duplicate(true) if not evaluation_override.is_empty() else CPU_DESIGN.evaluate(design, cpu_capabilities)
 	var resolved_sourcing := sourcing
 	if resolved_sourcing.is_empty():
 		resolved_sourcing = GameData.sourcing_profile(approach)
