@@ -27,17 +27,17 @@ static func run(host: Node) -> String:
 			garage_hub.queue_free()
 			return "Garage HQ visual tier did not track the simulated workplace tier"
 	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
-	garage_hub.size = Vector2(1900, 440)
 	garage_hub.call("set_viewport_width", 1900.0)
+	garage_hub.size = Vector2(1900, garage_hub.custom_minimum_size.y)
 	garage_hub.call("_layout_zones")
 	var wide_art_rect: Rect2 = garage_hub.call("displayed_art_rect")
-	if wide_art_rect.size.y < 400.0 or wide_art_rect.size.x < 600.0:
+	if wide_art_rect.size.y < 560.0 or wide_art_rect.size.x < 560.0:
 		garage_hub.queue_free()
 		return "Garage HQ remains too small on a wide Android landscape viewport (%s)" % wide_art_rect
 	if absf((wide_art_rect.position.x + wide_art_rect.size.x * 0.5) - 950.0) > 2.0:
 		garage_hub.queue_free()
 		return "Garage HQ artwork is not centered on wide landscape screens"
-	if garage_hub.custom_minimum_size.y < 430.0:
+	if garage_hub.custom_minimum_size.y < 590.0:
 		garage_hub.queue_free()
 		return "Garage HQ did not expand its touch stage on wide Android screens"
 	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":false,"PRODUCTS":false,"MARKET":false,"PRESS":false})
