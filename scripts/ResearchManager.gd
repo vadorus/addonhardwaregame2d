@@ -1026,6 +1026,8 @@ func resolve_project_decision(project_id: String, choice_id: String) -> bool:
 				break
 		if selected_option.is_empty():
 			return false
+		if not _is_supported_project_decision_choice(decision, choice_id):
+			return false
 		var cost := maxi(int(selected_option.get("cost", 0)), 0)
 		if cost > 0 and not Economy.can_afford(cost, "Revue prototype — %s" % str(project.get("name", "CPU"))):
 			return false
@@ -1073,6 +1075,13 @@ func resolve_project_decision(project_id: String, choice_id: String) -> bool:
 		projects_changed.emit()
 		return true
 	return false
+
+func _is_supported_project_decision_choice(decision: Dictionary, choice_id: String) -> bool:
+	match str(decision.get("type", "")):
+		"PROTOTYPE_REVIEW":
+			return choice_id in ["FIX", "BALANCE", "PUSH"]
+		_:
+			return false
 
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
