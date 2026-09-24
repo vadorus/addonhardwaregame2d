@@ -402,44 +402,169 @@ func set_viewport_width(width: float) -> void:
 	if dashboard_garage != null:
 		dashboard_garage.custom_minimum_size.y = 250.0 if compact else 330.0
 
+func refresh() -> void:
+	if dashboard_label == null:
+		return
+	if dashboard_cto_button != null:
+		dashboard_cto_button.visible = not CompanyManager.created or ExecutiveManager.is_interface_feature_unlocked("COMPANY")
+	if dashboard_garage != null:
+		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
+		dashboard_garage.call("set_progression", ExecutiveManager.get_interface_unlocks())
+	if not CompanyManager.created:
+		if dashboard_priority_category != null:
+			dashboard_priority_category.text = "CRÉATION"
+			dashboard_priority_text.text = "Créez votre entreprise pour commencer à prendre les décisions du dirigeant."
+			dashboard_priority_action.text = "Créer l'entreprise"
+			dashboard_priority_target_tab = 0
+		dashboard_label.text = "Votre première génération"
+		dashboard_project_meta_label.text = "Créez votre entreprise pour ouvrir le laboratoire CPU."
+		dashboard_project_phase_label.text = "EN ATTENTE"
+		dashboard_project_progress.value = 0.0
+		dashboard_metric_a.text = "—"
+		dashboard_metric_b.text = "—"
+		dashboard_metric_c.text = "—"
+		dashboard_cto_label.text = "Je suis prête à constituer l'équipe et à transformer votre première idée en processeur."
+		dashboard_cash_value.text = "500 000 €"
+		dashboard_result_value.text = "—"
+		dashboard_staff_value.text = "—"
+		dashboard_brand_value.text = "—"
+		alerts_label.text = "Aucun événement pour le moment."
+		dashboard_market_outlook_label.text = "Le marché CPU sera analysé après la création de l'entreprise."
+		dashboard_action_button.text = "Créer l'entreprise"
+		dashboard_target_tab = 0
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 0.0, false)
+		return
 
-func _refresh_dashboard_priority(brief: Dictionary):
-	if dashboard_priority_text == null or dashboard_priority_category == null or dashboard_priority_action == null:
-		return
-	dashboard_priority_decisions = ExecutiveManager.get_ceo_decisions()
-	if not dashboard_priority_decisions.is_empty():
-		if dashboard_priority_select != null:
-			var previous_id := dashboard_priority_selected_id
-			dashboard_priority_select.clear()
-			for decision_value in dashboard_priority_decisions:
-				var decision: Dictionary = decision_value
-				var label := "[%s] %s" % [str(decision.get("category", "DIRECTION")), str(decision.get("title", "Décision"))]
-				dashboard_priority_select.add_item(label)
-				dashboard_priority_select.set_item_metadata(dashboard_priority_select.item_count - 1, str(decision.get("id", "")))
-			if previous_id != "":
-				UI.select_meta(dashboard_priority_select, previous_id)
-			if dashboard_priority_select.selected < 0 and dashboard_priority_select.item_count > 0:
-				dashboard_priority_select.select(0)
-			dashboard_priority_select.visible = dashboard_priority_decisions.size() > 1
-		_refresh_selected_ceo_decision()
-		return
+	var active_project: Dictionary = {}
+	for project in ResearchManager.projects:
+		if str(project.get("status", "")) == "DEVELOPMENT":
+			active_project = project
+			break
 
-	dashboard_priority_selected_id = ""
-	if dashboard_priority_select != null:
-		dashboard_priority_select.clear()
-		dashboard_priority_select.visible = false
-	if dashboard_priority_defer != null:
-		dashboard_priority_defer.visible = false
-	var priorities: Array = brief.get("priorities", [])
-	if priorities.is_empty():
-		dashboard_priority_category.text = "AUCUNE URGENCE"
-		dashboard_priority_text.text = "Aucun arbitrage critique. L'équipe peut continuer à exécuter la stratégie actuelle."
-		dashboard_priority_action.text = "Retour au QG"
-		dashboard_priority_target_tab = 0
-		return
-	var priority: Dictionary = priorities[0]
-	var category := str(priority.get("category", "DIRECTION"))
-	dashboard_priority_category.text = category
-	dashboard_priority_text.text = "%s\n%s" % [str(priority.get("text", "")), str(priority.get("action", ""))]
-	dashboard_priority_target_tab = _priority_category_target_tab(category)
-	dashboard_priority_action.text = _priority_action_text(category)
+	var ready_product: Dictionary = {}
+	var launched_product: Dictionary = {}
+	for product in ProductManager.products:
+		if str(product.get("status", "")) == "READY" and ready_product.is_empty():
+			ready_product = product
+		elif str(product.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
+			launched_product = product
+
+	if not active_project.is_empty():
+		var phase_index: int = clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		var phase_progress: float = float(active_project.get("phase_progress", 0.0))
+		var remediation_remaining := int(active_project.get("remediation_months_remaining", 0))
+		var remediation_total := maxi(int(active_project.get("remediation_total_months", 0)), 1)
+		var overall_progress: float = (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		if remediation_remaining > 0:
+			overall_progress = (1.0 - float(remediation_remaining) / float(remediation_total)) * 10.0
+		var approach_key := str(active_project.get("approach", "INTERNAL"))
+		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
+		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
+		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
+		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, MarketManager.segment_label(MarketManager.normalize_segment(str(active_project.get("segment", MarketManager.default_segment()))))]
+		if remediation_remaining > 0:
+			var remediation: Dictionary = active_project.get("technical_remediation", {})
+			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining
+			dashboard_cto_label.text = "« Nous développons %s avant de reprendre le CPU. Ce détour réduit le risque et transforme une limite actuelle en savoir-faire réutilisable. »" % str(remediation.get("title", "la solution validée"))
+		else:
+			dashboard_project_phase_label.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]).to_upper(), phase_progress]
+			if not active_project.get("reports", []).is_empty():
+				dashboard_cto_label.text = "« %s »" % str(active_project.reports[0].text)
+			else:
+				dashboard_cto_label.text = "« L'équipe travaille sur la phase %s. Je vous préviendrai dès qu'un arbitrage sera nécessaire. »" % str(GameData.PHASES[phase_index])
+		dashboard_project_progress.value = overall_progress
+		dashboard_metric_a.text = "%s €/mois" % UI.money(int(active_project.get("monthly_budget", 0)))
+		dashboard_metric_b.text = "%d mois" % int(active_project.get("months_spent", 0))
+		dashboard_metric_c.text = str(active_project.get("focus_label", "Équilibré"))
+		dashboard_action_button.text = "Ouvrir le laboratoire CPU"
+		dashboard_target_tab = 3
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
+	elif not ready_product.is_empty():
+		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
+		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
+		dashboard_project_phase_label.text = "PRÊT AU LANCEMENT"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % UI.money(int(ready_product.get("unit_cost", 0)))
+		dashboard_metric_b.text = "Validation OK"
+		dashboard_metric_c.text = MarketManager.segment_label(MarketManager.normalize_segment(str(ready_product.get("target_segment", MarketManager.default_segment()))))
+		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
+		dashboard_action_button.text = "Préparer le lancement"
+		dashboard_target_tab = 4
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
+	elif not launched_product.is_empty():
+		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
+		var lifecycle := MarketManager.product_lifecycle_label(launched_product)
+		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées • %s" % [int(launched_product.get("months_on_market", 0)), UI.money(int(launched_product.get("units_sold_total", 0))), lifecycle]
+		dashboard_project_phase_label.text = "SUR LE MARCHÉ • %s" % lifecycle.to_upper()
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % UI.money(int(launched_product.get("price", 0)))
+		dashboard_metric_b.text = "%s ventes" % UI.money(int(launched_product.get("last_month_sales", 0)))
+		dashboard_metric_c.text = "%.1f/100" % float(launched_product.get("customer_satisfaction", 50.0))
+		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
+		dashboard_action_button.text = "Analyser le marché"
+		dashboard_target_tab = 5
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
+	else:
+		dashboard_label.text = "Votre première génération"
+		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."
+		dashboard_project_phase_label.text = "NOUVEAU PROJET"
+		dashboard_project_progress.value = 0.0
+		dashboard_metric_a.text = "À définir"
+		dashboard_metric_b.text = "À définir"
+		dashboard_metric_c.text = "Équilibré"
+		dashboard_cto_label.text = "« Commençons par une promesse simple : pour qui construisons-nous ce processeur, et pourquoi devrait-il exister ? »"
+		dashboard_action_button.text = "Concevoir le premier CPU"
+		dashboard_target_tab = 3
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", CPU_DESIGN.default_design(), 8.0, false)
+
+	var executive_brief := ExecutiveManager.get_executive_brief()
+	_refresh_dashboard_priority(executive_brief)
+	if dashboard_cto_label != null:
+		var advisor_lines: Array[String] = [
+			"« %s »" % str(executive_brief.get("headline", "")),
+			"",
+			str(executive_brief.get("text", ""))
+		]
+		var brief_priorities: Array = executive_brief.get("priorities", [])
+		if brief_priorities.size() > 1:
+			advisor_lines.append("")
+			advisor_lines.append("Ensuite :")
+			for priority_value in brief_priorities.slice(1, 3):
+				var priority: Dictionary = priority_value
+				advisor_lines.append("• %s" % str(priority.get("text", "")))
+		dashboard_cto_label.text = "\n".join(advisor_lines)
+
+		dashboard_cash_value.text = "%s €" % UI.money(Economy.money)
+	if Economy.history.is_empty():
+		dashboard_result_value.text = "Mois en cours"
+	else:
+		var last_report: Dictionary = Economy.history[-1]
+		dashboard_result_value.text = "%s €" % UI.money(int(last_report.get("result", 0)))
+		dashboard_result_value.add_theme_color_override("font_color", UI.APP_GREEN if int(last_report.get("result", 0)) >= 0 else UI.APP_RED)
+	dashboard_staff_value.text = "%d personnes" % PersonnelManager.staff.size()
+	dashboard_brand_value.text = "%.0f / 100" % CompanyManager.get_brand_score()
+
+	var event_lines: Array[String] = []
+	for alert in CompanyManager.alerts.slice(0, 5):
+		event_lines.append("●  %s" % str(alert))
+	alerts_label.text = "\n\n".join(event_lines) if not event_lines.is_empty() else "●  Aucun événement important. Le monde réagira à vos prochaines décisions."
+
+	if not launched_product.is_empty():
+		var rows := MarketManager.benchmark_for(launched_product)
+		var rank := MarketManager.benchmark_rank(launched_product)
+		var aging_penalty := float(launched_product.get("last_month_age_penalty", MarketManager.product_age_penalty(launched_product)))
+		dashboard_market_outlook_label.text = "%s occupe la position %d/%d au benchmark.\n\nPart estimée : %.1f%%\nSatisfaction : %.1f/100\nCycle commercial : %s\nPression d'âge : -%.1f pts\nMarché en évolution depuis %d mois" % [str(launched_product.get("name", "Votre CPU")), rank, rows.size(), float(launched_product.get("last_month_share", 0.0)) * 100.0, float(launched_product.get("customer_satisfaction", 50.0)), MarketManager.product_lifecycle_label(launched_product), aging_penalty, MarketManager.market_age_months]
+	else:
+		var competitors: Array = MarketManager.competitors.get("CPU", [])
+		if competitors.is_empty():
+			dashboard_market_outlook_label.text = "Les concurrents seront révélés au lancement de la simulation."
+		else:
+			var lines: Array[String] = ["Trois concurrents occupent déjà le terrain :"]
+			for competitor in competitors:
+				lines.append("• %s — prix repère %s €" % [str(competitor.get("company", "Concurrent")), UI.money(int(competitor.get("price", 0)))])
+			dashboard_market_outlook_label.text = "\n".join(lines)
