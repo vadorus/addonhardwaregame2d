@@ -539,16 +539,22 @@ func _refresh_cpu_preview():
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
 	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
-	var approach_data: Dictionary = GameData.approach_data(approach_key)
 	var sourcing: Dictionary = _selected_supplier_quote()
 	if sourcing.is_empty():
 		sourcing = GameData.sourcing_profile(approach_key)
-	var effective_speed := float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0))
-	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / maxf(effective_speed, 0.10))))
 	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
-	var months := base_months + extra_months
 	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
-	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0))) + int(active_cpu_remediation.get("upfront_cost", 0)) + int(sourcing.get("setup_cost", 0))
+	var development_estimate := ResearchManager.estimate_cpu_development(
+		design,
+		approach_key,
+		monthly_budget,
+		sourcing,
+		extra_months,
+		int(active_cpu_remediation.get("upfront_cost", 0)),
+		evaluation
+	)
+	var months := int(development_estimate.get("months", 1))
+	var estimated_program_cost := int(development_estimate.get("program_cost", 0))
 	var risk := float(evaluation.risk)
 	var risk_label := "faible"
 	if risk >= 60.0:
@@ -558,7 +564,16 @@ func _refresh_cpu_preview():
 	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
 	var reference_design := lab_reference_design if not lab_reference_design.is_empty() else CPU_DESIGN.default_design()
 	var reference_evaluation := CPU_DESIGN.evaluate(reference_design, ResearchManager.get_cpu_capabilities())
-	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / maxf(effective_speed, 0.10))))
+	var reference_estimate := ResearchManager.estimate_cpu_development(
+		reference_design,
+		approach_key,
+		monthly_budget,
+		sourcing,
+		0,
+		0,
+		reference_evaluation
+	)
+	var reference_months := int(reference_estimate.get("months", 1))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
 	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
 	var focus_key := _meta(rd_focus) if rd_focus != null else "BALANCED"
@@ -621,9 +636,9 @@ func _refresh_cpu_preview():
 				supplier_public_action,
 				acceptance_text, float(sourcing.get("acceptance_score", 0.0))
 			]
-	lab_dev_time_value.text = "~%d mois" % months
+	lab_dev_time_value.text = "~%d mois*" % months
 	lab_fit_value.text = "%.0f / 100" % fit
-	lab_warning_label.text = str(evaluation.tradeoff)
+	lab_warning_label.text = "%s\n* Estimation basée sur la vraie vitesse de simulation actuelle, hors mois optionnels décidés aux revues Prototype/Validation et retards fournisseur aléatoires." % str(evaluation.tradeoff)
 	lab_warning_label.add_theme_color_override("font_color", APP_RED if risk >= 60.0 else (APP_AMBER if risk >= 40.0 else APP_GREEN))
 
 	lab_tradeoff_summary_label.text = CPU_DESIGN.decision_summary(decision_axes)
