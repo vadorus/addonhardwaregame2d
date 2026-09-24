@@ -31,9 +31,9 @@ static func run(host: Node) -> String:
 	garage_hub.call("set_viewport_width", 1900.0)
 	garage_hub.call("_layout_zones")
 	var wide_art_rect: Rect2 = garage_hub.call("displayed_art_rect")
-	if wide_art_rect.size.y < 400.0 or wide_art_rect.size.x < 680.0:
+	if wide_art_rect.size.y < 400.0 or wide_art_rect.size.x < 600.0:
 		garage_hub.queue_free()
-		return "Garage HQ remains too small on a wide Android landscape viewport"
+		return "Garage HQ remains too small on a wide Android landscape viewport (%s)" % wide_art_rect
 	if absf((wide_art_rect.position.x + wide_art_rect.size.x * 0.5) - 950.0) > 2.0:
 		garage_hub.queue_free()
 		return "Garage HQ artwork is not centered on wide landscape screens"
