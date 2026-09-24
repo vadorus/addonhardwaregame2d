@@ -196,8 +196,8 @@ func _ready() -> void:
 	if FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.BACKUP_SAVE_PATH))
 
-	if Economy.money != 500_000:
-		_fail("Unexpected starting money: %s" % Economy.money)
+	if Economy.money != BalanceManager.starting_capital():
+		_fail("Unexpected starting money: %s (expected %s for %s)" % [Economy.money, BalanceManager.starting_capital(), BalanceManager.active_profile])
 		return
 	var difficulty_error := DIFFICULTY_SCENARIO.run()
 	if difficulty_error != "":
