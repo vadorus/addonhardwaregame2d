@@ -340,8 +340,8 @@ func get_state() -> Dictionary:
 		"cases":cases,
 		"field_experience":field_experience,
 		"next_case_id":_next_case_id,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -357,7 +357,7 @@ func load_state(state: Dictionary):
 		for key in ISSUE_TYPES:
 			field_experience[key] = clampf(float(saved_exp.get(key, 0.0)), 0.0, 100.0)
 	_next_case_id = int(state.get("next_case_id", cases.size() + 1))
-	rng.seed = int(state.get("rng_seed", 91421))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "91421"), 91421)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	cases_changed.emit()
 	field_experience_changed.emit()
