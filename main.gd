@@ -23,8 +23,11 @@ var date_label: Label
 var money_label: Label
 var status_label: Label
 var tabs: TabContainer
+var nav_panel: PanelContainer
 var setup_layer: Control
 var setup_panel: PanelContainer
+var setup_title_box: VBoxContainer
+var setup_creation_box: VBoxContainer
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
@@ -119,6 +122,8 @@ func _ready():
 	resized.connect(_update_responsive_layout)
 	_refresh_all()
 	setup_layer.visible = not CompanyManager.created
+	if setup_layer.visible:
+		_show_title_screen()
 	call_deferred("_update_responsive_layout")
 
 func _process(_delta):
@@ -241,7 +246,7 @@ func _build_ui():
 	load_btn.pressed.connect(_load_game)
 	top.add_child(load_btn)
 
-	var nav_panel := _card(APP_SHELL, 12, 6)
+	nav_panel = _card(APP_SHELL, 12, 6)
 	root_box.add_child(nav_panel)
 	var nav_scroll := ScrollContainer.new()
 	nav_scroll.custom_minimum_size.y = 48
@@ -911,17 +916,80 @@ func _create_media_tab():
 
 func _build_setup_layer():
 	setup_layer = ColorRect.new()
-	setup_layer.color = Color(0.05,0.06,0.08,0.97)
+	setup_layer.color = Color(0.018, 0.026, 0.040, 0.985)
 	setup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(setup_layer)
-	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); setup_layer.add_child(center)
-	setup_panel=PanelContainer.new(); setup_panel.custom_minimum_size=Vector2(560,420); center.add_child(setup_panel)
-	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); setup_panel.add_child(box)
-	var brand:=_label("TECH EMPIRE",30); brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; brand.add_theme_color_override("font_color", APP_CYAN); box.add_child(brand)
-	var title:=_label("Du garage à l'empire technologique",20); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("1971. Vous démarrez avec une petite équipe et un objectif : apprendre à concevoir, industrialiser et vendre vos propres CPU. Les autres secteurs viendront avec la croissance de l'entreprise.",14); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(desc)
-	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
-	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	setup_layer.add_child(center)
+
+	setup_panel = _card(APP_SHELL, 18, 24)
+	setup_panel.custom_minimum_size = Vector2(560, 430)
+	center.add_child(setup_panel)
+
+	var shell := VBoxContainer.new()
+	shell.add_theme_constant_override("separation", 16)
+	setup_panel.add_child(shell)
+
+	setup_title_box = VBoxContainer.new()
+	setup_title_box.add_theme_constant_override("separation", 14)
+	shell.add_child(setup_title_box)
+
+	var brand := _label("TECH EMPIRE", 34)
+	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	brand.add_theme_color_override("font_color", APP_CYAN)
+	setup_title_box.add_child(brand)
+	var version := _eyebrow("V0.5 • NEW PLAYER EXPERIENCE")
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_title_box.add_child(version)
+	var title := _label("Du garage à l'empire technologique", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_title_box.add_child(title)
+	var desc := _muted_label("1971. Un garage, une petite équipe et une première idée de processeur. Le reste de l'entreprise apparaîtra quand vous en aurez réellement besoin.", 14)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_title_box.add_child(desc)
+
+	var new_game := Button.new()
+	new_game.text = "Nouvelle entreprise"
+	new_game.custom_minimum_size.y = 54
+	new_game.pressed.connect(_show_creation_screen)
+	setup_title_box.add_child(new_game)
+
+	var continue_game := Button.new()
+	continue_game.text = "Continuer"
+	continue_game.custom_minimum_size.y = 48
+	continue_game.disabled = not FileAccess.file_exists(SaveManager.SAVE_PATH) and not FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH)
+	continue_game.pressed.connect(_load_game)
+	setup_title_box.add_child(continue_game)
+
+	setup_creation_box = VBoxContainer.new()
+	setup_creation_box.add_theme_constant_override("separation", 12)
+	setup_creation_box.visible = false
+	shell.add_child(setup_creation_box)
+
+	var create_kicker := _eyebrow("CRÉER VOTRE ENTREPRISE")
+	create_kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_creation_box.add_child(create_kicker)
+	var create_title := _label("Tout commence dans le garage", 22)
+	create_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_creation_box.add_child(create_title)
+	var create_desc := _muted_label("Choisissez simplement un nom et le niveau de difficulté. Nora vous guidera ensuite vers votre première vraie décision.", 13)
+	create_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	create_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_creation_box.add_child(create_desc)
+
+	setup_name = LineEdit.new()
+	setup_name.placeholder_text = "Nom de l'entreprise"
+	setup_name.text = "Nova Technologies"
+	setup_name.custom_minimum_size.y = 46
+	setup_creation_box.add_child(setup_name)
+
+	setup_sector = OptionButton.new()
+	_fill_sector_options(setup_sector)
+	_select_meta(setup_sector, "CPU")
+
 	setup_difficulty = OptionButton.new()
 	for difficulty_value in BalanceManager.profile_keys():
 		var difficulty := str(difficulty_value)
@@ -929,13 +997,38 @@ func _build_setup_layer():
 		setup_difficulty.set_item_metadata(setup_difficulty.item_count - 1, difficulty)
 	_select_meta(setup_difficulty, "STANDARD")
 	setup_difficulty.item_selected.connect(func(_i): _refresh_setup_difficulty())
-	box.add_child(setup_difficulty)
+	setup_creation_box.add_child(setup_difficulty)
+
 	setup_difficulty_label = _muted_label("", 12)
 	setup_difficulty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(setup_difficulty_label)
+	setup_creation_box.add_child(setup_difficulty_label)
 	_refresh_setup_difficulty()
-	var start:=Button.new(); start.text="Créer l'entreprise"; start.custom_minimum_size.y=48; start.pressed.connect(_start_new_game); box.add_child(start)
-	var load:=Button.new(); load.text="Charger une sauvegarde"; load.pressed.connect(_load_game); box.add_child(load)
+
+	var start := Button.new()
+	start.text = "Entrer dans le garage"
+	start.custom_minimum_size.y = 52
+	start.pressed.connect(_start_new_game)
+	setup_creation_box.add_child(start)
+
+	var back := Button.new()
+	back.text = "Retour"
+	back.custom_minimum_size.y = 42
+	back.pressed.connect(_show_title_screen)
+	setup_creation_box.add_child(back)
+
+func _show_title_screen() -> void:
+	if setup_title_box != null:
+		setup_title_box.visible = true
+	if setup_creation_box != null:
+		setup_creation_box.visible = false
+
+func _show_creation_screen() -> void:
+	if setup_title_box != null:
+		setup_title_box.visible = false
+	if setup_creation_box != null:
+		setup_creation_box.visible = true
+	if setup_name != null:
+		setup_name.grab_focus()
 
 func _build_month_layer():
 	month_layer=ColorRect.new(); month_layer.color=Color(0,0,0,0.72); month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.visible=false; add_child(month_layer)
@@ -1180,6 +1273,9 @@ func _show_tab(index: int):
 func _update_nav_state():
 	if tabs == null:
 		return
+	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
+	if nav_panel != null:
+		nav_panel.visible = not garage_intro
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
@@ -1405,28 +1501,19 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	# Projection locale du garage + budget CPU par défaut, sans modifier une partie en cours.
-	var base_company := 10500
-	var base_payroll := 32800
-	var base_first_cpu := 45000
-	var structural := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
-	structural += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
-	var with_first_cpu := structural + int(round(float(base_first_cpu) * float(data.get("research_cost", 1.0))))
 	var capital := int(data.get("starting_capital", 1450000))
-	var runway := float(capital) / maxf(float(with_first_cpu), 1.0)
-	var ai_profile := BalanceManager.company_ai_profile(key)
-	setup_difficulty_label.text = "%s\nCapital de lancement : %s € • structure garage ~%s €/mois • avec un premier CPU à 45 000 €/mois : ~%s €/mois, soit %.1f mois de marge théorique.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
-		BalanceManager.profile_description(key), _money(capital), _money(structural), _money(with_first_cpu), runway,
-		int(ai_profile.get("decision_interval_months", 2)),
-		float(ai_profile.get("decision_quality", 0.74)) * 100.0,
-		float(ai_profile.get("commercial_aggression", 1.0)) * 100.0
+	setup_difficulty_label.text = "%s\nCapital de lancement : %s €. Les règles économiques restent identiques ; seule la marge d'erreur change." % [
+		BalanceManager.profile_description(key),
+		_money(capital)
 	]
 
 func _start_new_game():
-	SimulationManager.reset_all(setup_name.text,_meta(setup_sector),_meta(setup_difficulty))
-	setup_layer.visible=false
-	game_over_layer.visible=false
-	status_label.text="Nora : au début, gardons seulement le QG et le Laboratoire CPU. Lancez votre premier projet pour élargir l'interface."
+	SimulationManager.reset_all(setup_name.text, _meta(setup_sector), _meta(setup_difficulty))
+	setup_layer.visible = false
+	game_over_layer.visible = false
+	if tabs != null:
+		tabs.current_tab = 0
+	status_label.text = "Nora : bienvenue. Pour l'instant, oubliez les tableaux de gestion. Touchez l'établi CPU et décidons quel processeur nous voulons construire."
 	_refresh_all()
 
 func _load_game():
@@ -1476,8 +1563,9 @@ func _restart_from_game_over():
 	game_over_layer.visible = false
 	month_layer.visible = false
 	setup_layer.visible = true
+	_show_title_screen()
 	TimeManager.time_scale = 0.0
-	status_label.text = "Créez une nouvelle entreprise pour recommencer."
+	status_label.text = ""
 
 func _refresh_top():
 	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
