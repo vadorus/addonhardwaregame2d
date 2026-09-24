@@ -544,6 +544,19 @@ func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Di
 func get_ceo_decisions() -> Array:
 	var decisions: Array = []
 
+	for project_decision_value in ResearchManager.get_pending_project_decisions():
+		var project_decision: Dictionary = project_decision_value
+		decisions.append({
+			"id":"PROJECT:%s:%s" % [str(project_decision.get("project_id", "")), str(project_decision.get("id", "DECISION"))],
+			"category":"PROTOTYPE",
+			"severity":82.0,
+			"title":str(project_decision.get("title", "Revue du prototype")),
+			"text":str(project_decision.get("text", "L'équipe attend votre décision.")),
+			"recommendation":"Ouvrez le Laboratoire CPU et choisissez l'orientation du prototype. Le développement reste en pause jusque-là.",
+			"target_tab":3,
+			"can_defer":false
+		})
+
 	for escalation_value in DivisionManager.get_pending_escalations():
 		var escalation: Dictionary = escalation_value
 		decisions.append({
@@ -646,6 +659,15 @@ func get_ceo_decisions() -> Array:
 
 func get_executive_brief() -> Dictionary:
 	var priorities: Array = []
+	var pending_project_decisions := ResearchManager.get_pending_project_decisions()
+	if not pending_project_decisions.is_empty():
+		var project_decision: Dictionary = pending_project_decisions[0]
+		priorities.append({
+			"category":"PROTOTYPE",
+			"severity":82,
+			"text":"%s attend votre arbitrage." % str(project_decision.get("project_name", "Le prototype CPU")),
+			"action":"Ouvrez le Laboratoire CPU : corriger, rééquilibrer ou pousser les performances changera réellement la suite du projet."
+		})
 	var finance := financial_advice()
 	if str(finance.level) in ["IMPOSSIBLE","DANGEREUX","TENDU"]:
 		priorities.append({"category":"FINANCE","severity":90 if str(finance.level) in ["IMPOSSIBLE","DANGEREUX"] else 68,"text":"Trésorerie : environ %.1f mois de marge structurelle." % float(finance.runway_months),"action":"Surveiller les dépenses avant tout nouvel engagement."})
