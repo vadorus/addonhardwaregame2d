@@ -17,14 +17,14 @@ static func run(host: Node) -> String:
 		var spec_value = workshop.call("current_spec")
 		if typeof(spec_value) != TYPE_DICTIONARY:
 			workshop.queue_free()
-				return "First CPU workshop did not produce a spec for %s" % key
+			return "First CPU workshop did not produce a spec for %s" % key
 		var spec: Dictionary = spec_value
 		if str(spec.get("brief_id", "")) != key or str(spec.get("approach", "")) != "INTERNAL":
 			workshop.queue_free()
-				return "First CPU workshop corrupted the %s intent" % key
+			return "First CPU workshop corrupted the %s intent" % key
 		if int(spec.get("budget", 0)) < 10000 or spec.get("design", {}).is_empty():
 			workshop.queue_free()
-				return "First CPU workshop produced an incomplete technical spec for %s" % key
+			return "First CPU workshop produced an incomplete technical spec for %s" % key
 		workshop.call("_show_choices")
 
 	workshop.call("set_viewport_width", 700.0)
