@@ -400,7 +400,10 @@ func set_viewport_width(width: float) -> void:
 	if dashboard_project_grid != null:
 		dashboard_project_grid.columns = 1 if narrow else 2
 	if dashboard_garage != null:
-		dashboard_garage.custom_minimum_size.y = 250.0 if compact else 330.0
+		if dashboard_garage.has_method("set_viewport_width"):
+			dashboard_garage.call("set_viewport_width", width)
+		else:
+			dashboard_garage.custom_minimum_size.y = 300.0 if compact else 360.0
 
 func refresh() -> void:
 	if dashboard_label == null:
