@@ -39,19 +39,19 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --path . --import 2>&1 | tee /tmp/import.log
-          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log; then exit 1; fi
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log; then exit 1; fi
 
       - name: Boot main scene
         shell: bash
         run: |
           set -o pipefail
           godot --headless --path . --quit-after 2 2>&1 | tee /tmp/boot.log
-          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/boot.log; then exit 1; fi
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/boot.log; then exit 1; fi
 
       - name: Smoke test
         shell: bash
         run: |
           set -o pipefail
           timeout 120s godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
-          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|ERROR: \[CI\]' /tmp/smoke.log; then exit 1; fi
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/smoke.log; then exit 1; fi
 

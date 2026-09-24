@@ -296,7 +296,7 @@ func move_employee(employee_id: String, department: String):
 			return
 
 func get_state() -> Dictionary:
-	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"rng_seed":rng.seed,"rng_state":rng.state}
+	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
@@ -313,6 +313,6 @@ func load_state(state: Dictionary):
 		CompanyManager.departments["Développement"]["leader_id"] = migrated_development_leader
 	candidate = state.get("candidate", {}).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
-	rng.seed = int(state.get("rng_seed", 1947))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	staff_changed.emit()

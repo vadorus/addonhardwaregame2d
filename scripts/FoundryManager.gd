@@ -433,8 +433,8 @@ func get_state() -> Dictionary:
 		"internal_fab":internal_fab,
 		"contracts":contracts,
 		"next_contract_id":_next_contract_id,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -461,6 +461,6 @@ func load_state(state: Dictionary):
 	internal_fab["condition"] = clampf(float(internal_fab.get("condition", 100.0)), 0.0, 100.0)
 	contracts = state.get("contracts", []).duplicate(true)
 	_next_contract_id = int(state.get("next_contract_id", contracts.size() + 1))
-	rng.seed = int(state.get("rng_seed", 91827))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "91827"), 91827)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	foundries_changed.emit()
