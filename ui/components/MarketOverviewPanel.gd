@@ -140,6 +140,23 @@ func _refresh_overview() -> void:
 				UI.money(int(product.get("last_month_sales", 0))), float(product.get("last_month_share", 0.0)) * 100.0,
 				int(product.get("last_month_returns", 0)), float(product.get("customer_satisfaction", 50.0))
 			])
+			var feedback := ProductManager.get_market_feedback(str(product.get("id", "")))
+			if not feedback.is_empty():
+				var forecast_text := "prévision initiale indisponible"
+				if int(feedback.get("expected_units", 0)) > 0:
+					forecast_text = "prévision %s–%s, centre %s" % [
+						UI.money(int(feedback.get("min_units", 0))),
+						UI.money(int(feedback.get("max_units", 0))),
+						UI.money(int(feedback.get("expected_units", 0)))
+					]
+				lines.append("Retour marché : %s • %s • contribution %s € • capacité %.0f%% • demande non servie %s" % [
+					str(feedback.get("verdict", "Mesuré")),
+					forecast_text,
+					UI.money(int(feedback.get("net_contribution", 0))),
+					float(feedback.get("capacity_utilization", 0.0)) * 100.0,
+					UI.money(int(feedback.get("unserved_demand", 0)))
+				])
+				lines.append("Leçon : %s" % str(feedback.get("lesson", "")))
 	market_label.text = "\n".join(lines)
 
 func _refresh_comparison() -> void:
