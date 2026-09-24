@@ -25,6 +25,8 @@ var _title_panel: PanelContainer
 var _title_label: Label
 var _subtitle_label: Label
 var _zone_buttons: Array[Button] = []
+var _last_unlocks: Dictionary = {}
+var _onboarding_stage := "NORMAL"
 var _workplace_tier := 0
 var _workplace_condition := 62.0
 
@@ -216,9 +218,30 @@ func _on_zone_pressed(button: Button) -> void:
 	zone_requested.emit(int(button.get_meta("tab", 0)), str(button.get_meta("zone_name", "")))
 
 func set_progression(unlocks: Dictionary) -> void:
+	_last_unlocks = unlocks.duplicate(true)
+	_refresh_zone_visibility()
+
+func set_onboarding_stage(stage: String) -> void:
+	_onboarding_stage = stage
+	if _title_label != null and _subtitle_label != null:
+		if stage == "FIRST_IDEA":
+			_title_label.text = "Votre premier garage"
+			_subtitle_label.text = "Nora : commencez par l'établi CPU"
+		else:
+			_title_label.text = str(ExecutiveManager.workplace_data().get("name", "Garage aménagé"))
+			var condition := float(ExecutiveManager.workplace_data().get("condition", 62.0))
+			var condition_word := "à rafraîchir" if condition < 45.0 else ("correct" if condition < 75.0 else "soigné")
+			_subtitle_label.text = "QG niveau %d • état %s • cliquez sur une zone" % [int(ExecutiveManager.workplace_data().get("tier", 0)) + 1, condition_word]
+	_refresh_zone_visibility()
+
+func _refresh_zone_visibility() -> void:
 	for button in _zone_buttons:
 		var feature := str(button.get_meta("feature", "QG"))
-		button.visible = bool(unlocks.get(feature, feature in ["QG", "LAB"]))
+		var zone_name := str(button.get_meta("zone_name", ""))
+		if _onboarding_stage == "FIRST_IDEA":
+			button.visible = zone_name == "Établi CPU"
+		else:
+			button.visible = bool(_last_unlocks.get(feature, feature in ["QG", "LAB"]))
 
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)
