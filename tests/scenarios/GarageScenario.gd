@@ -67,6 +67,11 @@ static func run(host: Node) -> String:
 		garage_hub.queue_free()
 		return "Garage HQ did not use the large-tablet touch-stage height"
 	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":false,"PRODUCTS":false,"MARKET":false,"PRESS":false})
+	garage_hub.call("set_onboarding_stage", "FIRST_IDEA")
+	if int(garage_hub.call("visible_zone_count")) != 1:
+		garage_hub.queue_free()
+		return "Garage onboarding did not focus the player on the CPU workbench"
+	garage_hub.call("set_onboarding_stage", "NORMAL")
 	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
 		garage_hub.queue_free()
 		return "Garage onboarding exposed advanced management zones too early"

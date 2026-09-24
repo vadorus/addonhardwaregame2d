@@ -2,6 +2,7 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
+const NEW_PLAYER_ENTRY_SCENARIO := preload("res://tests/scenarios/NewPlayerEntryScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
@@ -19,6 +20,10 @@ func _ready() -> void:
 	var garage_error := GARAGE_SCENARIO.run(self)
 	if garage_error != "":
 		_fail(garage_error)
+		return
+	var new_player_entry_error := NEW_PLAYER_ENTRY_SCENARIO.run(self)
+	if new_player_entry_error != "":
+		_fail(new_player_entry_error)
 		return
 	var industrialization_gate_error := INDUSTRIALIZATION_GATE_SCENARIO.run(self)
 	if industrialization_gate_error != "":
