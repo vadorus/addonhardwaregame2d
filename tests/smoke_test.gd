@@ -3,6 +3,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
+const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
 const PROTOTYPE_DECISION_SCENARIO := preload("res://tests/scenarios/PrototypeDecisionScenario.gd")
 const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
@@ -13,6 +14,10 @@ func _ready() -> void:
 	var garage_error := GARAGE_SCENARIO.run(self)
 	if garage_error != "":
 		_fail(garage_error)
+		return
+	var industrialization_gate_error := INDUSTRIALIZATION_GATE_SCENARIO.run(self)
+	if industrialization_gate_error != "":
+		_fail(industrialization_gate_error)
 		return
 	SimulationManager.reset_all("CI Test", "GPU")
 	if CompanyManager.starting_sector != "CPU":

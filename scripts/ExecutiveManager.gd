@@ -717,7 +717,7 @@ func get_executive_brief() -> Dictionary:
 			"action":"Surveillez la trésorerie : les appels de fonds continuent jusqu'à la mise en service."
 		})
 	for foundry_job in ProductionManager.get_active_jobs():
-		if str(foundry_job.get("manufacturing_mode", "EXTERNAL")) == "EXTERNAL":
+		if bool(foundry_job.get("route_selected", false)) and str(foundry_job.get("manufacturing_mode", "EXTERNAL")) == "EXTERNAL":
 			var quote := ProductionManager.manufacturing_route_quote(str(foundry_job.get("id", "")))
 			if not quote.is_empty() and float(quote.get("dependency", 0.0)) >= 50.0:
 				priorities.append({
@@ -732,8 +732,10 @@ func get_executive_brief() -> Dictionary:
 	if not active_industrial_jobs.is_empty():
 		var industrial_job: Dictionary = active_industrial_jobs[0]
 		var industrial_action := "La route est engagée : surveillez rendement, qualité, coût et capacité jusqu'à la création de la gamme."
-		if not bool(industrial_job.get("route_committed", false)):
+		if not bool(industrial_job.get("route_selected", false)):
 			industrial_action = "Ouvrez Production & Produits pour choisir stratégie industrielle, binning et fonderie avant de laisser avancer le temps."
+		elif not bool(industrial_job.get("route_committed", false)):
+			industrial_action = "La configuration industrielle est validée. Le prochain mois engagera la route et lancera réellement l'industrialisation."
 		priorities.append({
 			"category":"PRODUCTION",
 			"severity":60,

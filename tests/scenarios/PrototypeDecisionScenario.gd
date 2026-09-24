@@ -94,6 +94,21 @@ static func run(host: Node) -> String:
 			selected_cost = int(option.get("cost", 0))
 			break
 	var cash_before_resolution := Economy.money
+	var rogue_option := {"id":"UNSUPPORTED", "label":"Option invalide CI", "cost":10000, "delay_months":0}
+	decision.get("options", []).append(rogue_option)
+	project["pending_decision"] = decision
+	if ResearchManager.resolve_project_decision("PRJ-CI-PROTOTYPE", "UNSUPPORTED"):
+		lab.queue_free()
+		_restore(research_state, economy_state, company_state)
+		return "Unsupported prototype choice was accepted"
+	if Economy.money != cash_before_resolution:
+		lab.queue_free()
+		_restore(research_state, economy_state, company_state)
+		return "Unsupported prototype choice charged money before validation"
+	if project.get("pending_decision", {}).is_empty():
+		lab.queue_free()
+		_restore(research_state, economy_state, company_state)
+		return "Unsupported prototype choice cleared the pending decision"
 	if not ResearchManager.resolve_project_decision("PRJ-CI-PROTOTYPE", "FIX"):
 		lab.queue_free()
 		_restore(research_state, economy_state, company_state)

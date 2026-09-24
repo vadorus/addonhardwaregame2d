@@ -110,6 +110,7 @@ func _on_project_completed(project: Dictionary):
 		"binning_strategy":"BALANCED",
 		"manufacturing_mode":"EXTERNAL",
 		"foundry_id":default_foundry,
+		"route_selected":false,
 		"route_committed":false,
 		"foundry_contract_id":"",
 		"route_error":"",
@@ -188,6 +189,7 @@ func set_manufacturing_route(job_id: String, mode: String, foundry_id: String = 
 		return false
 	job["manufacturing_mode"] = mode
 	job["foundry_id"] = str(quote.get("provider_id", selected_foundry))
+	job["route_selected"] = true
 	job["route_error"] = ""
 	CompanyManager.add_alert("%s : route de fabrication « %s » sélectionnée." % [str(job.get("name", "CPU")), str(quote.get("provider_name", mode))])
 	jobs_changed.emit()
@@ -227,6 +229,10 @@ func process_month():
 	jobs_changed.emit()
 
 func _process_job_month(job: Dictionary):
+	if not bool(job.get("route_selected", false)):
+		job["route_error"] = "Choisissez et validez une route de fabrication avant de lancer l'industrialisation."
+		job["last_progress"] = 0.0
+		return
 	var strategy: Dictionary = STRATEGIES.get(str(job.get("strategy", "BALANCED")), STRATEGIES.BALANCED)
 	var node_nm := int(job.get("node_nm", 10000))
 	var route := manufacturing_route_quote(str(job.get("id", "")))
@@ -431,6 +437,7 @@ func load_state(state: Dictionary):
 		if str(job.get("foundry_id", "")) == "":
 			job["foundry_id"] = FoundryManager.recommended_external_foundry(int(job.get("node_nm", 10000)))
 		job["route_committed"] = bool(job.get("route_committed", false))
+		job["route_selected"] = bool(job.get("route_selected", bool(job.get("route_committed", false)) or float(job.get("progress", 0.0)) > 0.001))
 		job["foundry_contract_id"] = str(job.get("foundry_contract_id", ""))
 		job["route_error"] = str(job.get("route_error", ""))
 		var result_value = job.get("result", {})

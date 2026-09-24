@@ -508,6 +508,8 @@ func refresh() -> void:
 		dashboard_metric_c.text = ProductionManager.strategy_label(str(active_production_job.get("strategy", "BALANCED")))
 		if bool(active_production_job.get("route_committed", false)):
 			dashboard_cto_label.text = "« La fabrication est engagée. Surveillez le rendement, la qualité et la capacité avant le lancement commercial. »"
+		elif bool(active_production_job.get("route_selected", false)):
+			dashboard_cto_label.text = "« Votre route industrielle est validée. Elle sera engagée au prochain passage de mois ; vous pouvez encore la modifier avant ce premier lancement. »"
 		else:
 			dashboard_cto_label.text = "« Le développement est terminé. Choisissez maintenant la stratégie industrielle, le binning et la fonderie. »"
 		dashboard_action_button.text = "Piloter l'industrialisation"
