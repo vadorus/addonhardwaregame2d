@@ -3,6 +3,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 const DEVELOPMENT_GATES := preload("res://scripts/DevelopmentGates.gd")
+const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
 
 signal projects_changed
 signal generation_proposals_changed(proposals)
@@ -664,6 +665,52 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	return get_cpu_generation_proposals()
 
+func estimate_cpu_development(design_input: Dictionary, approach: String, monthly_budget: int, sourcing: Dictionary = {}, extra_months: int = 0, upfront_cost: int = 0) -> Dictionary:
+	var design := CPU_DESIGN.normalize(design_input)
+	var evaluation := CPU_DESIGN.evaluate(design, cpu_capabilities)
+	var resolved_sourcing := sourcing
+	if resolved_sourcing.is_empty():
+		resolved_sourcing = GameData.sourcing_profile(approach)
+	var approach_data: Dictionary = GameData.approach_data(approach)
+	var team := development_team_score() * development_capacity_factor()
+	var management := CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
+	var technology := float(technologies.get("cpu", 18.0))
+	var base_cost := float(GameData.SECTORS.CPU.base_dev_cost)
+	var budget_ratio := clampf(float(monthly_budget) / base_cost, 0.25, 2.2)
+	var months := DEVELOPMENT_ESTIMATOR.estimated_months(
+		team,
+		technology,
+		budget_ratio,
+		float(approach_data.get("speed", 1.0)),
+		float(resolved_sourcing.get("speed_factor", 1.0)),
+		management,
+		float(evaluation.get("complexity", 50.0)),
+		extra_months,
+		GameData.PHASES.size()
+	)
+	var monthly_raw := int(float(monthly_budget) * float(approach_data.get("cost", 1.0)) * float(resolved_sourcing.get("monthly_cost_factor", 1.0)))
+	var monthly_charged := Economy.quoted_expense(monthly_raw, "Développement — estimation CPU")
+	var setup_charged := Economy.quoted_expense(int(resolved_sourcing.get("setup_cost", 0)), "Accès technologique")
+	var upfront_charged := Economy.quoted_expense(upfront_cost, "Programme technique")
+	return {
+		"months":months,
+		"base_months":maxi(months - maxi(extra_months, 0), 1),
+		"extra_months":maxi(extra_months, 0),
+		"monthly_cost":monthly_charged,
+		"program_cost":DEVELOPMENT_ESTIMATOR.estimated_program_cost(months, monthly_charged, setup_charged, upfront_charged),
+		"progress_per_month":DEVELOPMENT_ESTIMATOR.monthly_progress(
+			team,
+			technology,
+			budget_ratio,
+			float(approach_data.get("speed", 1.0)),
+			float(resolved_sourcing.get("speed_factor", 1.0)),
+			1.0,
+			management,
+			float(evaluation.get("complexity", 50.0))
+		),
+		"complexity":float(evaluation.get("complexity", 50.0))
+	}
+
 func get_cpu_generation_proposals() -> Array:
 	return cpu_generation_proposals.duplicate(true)
 
@@ -885,10 +932,18 @@ func _process_project_month(project: Dictionary):
 		return
 	var tech := float(technologies.get(specialization, 5.0))
 	var supplier_execution := SupplierManager.monthly_execution_factor(project)
-	var progress := (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0)) * supplier_execution * management
-	if str(project.sector) == "CPU":
-		var complexity_factor := lerpf(0.86, 1.28, clampf(float(project.get("complexity", 50.0)) / 100.0, 0.0, 1.0))
-		progress /= complexity_factor
+	var progress := DEVELOPMENT_ESTIMATOR.monthly_progress(
+		team,
+		tech,
+		budget_ratio,
+		float(approach_data.speed),
+		float(sourcing.get("speed_factor", 1.0)),
+		supplier_execution,
+		management,
+		float(project.get("complexity", 50.0)) if str(project.sector) == "CPU" else 50.0
+	)
+	if str(project.sector) != "CPU":
+		progress = (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0)) * supplier_execution * management
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
