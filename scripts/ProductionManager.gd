@@ -419,8 +419,8 @@ func get_state() -> Dictionary:
 		"quality_knowledge":quality_knowledge,
 		"maintenance_knowledge":maintenance_knowledge,
 		"next_job_id":_next_job_id,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -459,6 +459,6 @@ func load_state(state: Dictionary):
 	quality_knowledge = float(state.get("quality_knowledge", 18.0))
 	maintenance_knowledge = float(state.get("maintenance_knowledge", 16.0))
 	_next_job_id = int(state.get("next_job_id", jobs.size() + 1))
-	rng.seed = int(state.get("rng_seed", 61337))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "61337"), 61337)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	jobs_changed.emit()
