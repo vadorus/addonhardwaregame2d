@@ -1367,9 +1367,8 @@ func _show_tab(index: int):
 func _update_nav_state():
 	if tabs == null:
 		return
-	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
 	if nav_panel != null:
-		nav_panel.visible = not garage_intro
+		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
