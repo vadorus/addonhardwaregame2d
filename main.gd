@@ -28,6 +28,7 @@ var setup_layer: Control
 var setup_panel: PanelContainer
 var setup_title_box: VBoxContainer
 var setup_creation_box: VBoxContainer
+var first_cpu_workshop: Control
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
@@ -282,6 +283,7 @@ func _build_ui():
 	_build_month_layer()
 	_build_game_over_layer()
 	_build_research_event_layer()
+	_build_first_cpu_workshop_layer()
 
 func _create_dashboard_tab():
 	var dashboard_script: Script = load("res://ui/screens/DashboardScreen.gd")
@@ -294,6 +296,9 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if CompanyManager.created and ResearchManager.projects.is_empty() and tab_index == 3 and context == "Établi CPU":
+		_show_first_cpu_workshop()
+		return
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
 	if context != "" and tabs != null and tabs.current_tab == tab_index and before != tab_index:
@@ -366,6 +371,10 @@ func _on_lab_action(action: String, payload: Variant = null):
 			_accept_cpu_remediation()
 		"start_project":
 			_start_project()
+		"return_to_garage":
+			_show_tab(0)
+			if ResearchManager.projects.is_empty():
+				TimeManager.time_scale = 0.0
 		"resolve_project_decision":
 			var decision_payload: Dictionary = payload if typeof(payload) == TYPE_DICTIONARY else {}
 			var project_id := str(decision_payload.get("project_id", ""))
@@ -1032,6 +1041,89 @@ func _show_creation_screen() -> void:
 	if setup_name != null:
 		setup_name.grab_focus()
 
+func _build_first_cpu_workshop_layer() -> void:
+	var workshop_script: Script = load("res://ui/FirstCpuWorkshop.gd")
+	first_cpu_workshop = workshop_script.new() as Control
+	first_cpu_workshop.connect("launch_requested", _launch_first_cpu_from_workshop)
+	first_cpu_workshop.connect("advanced_requested", _open_advanced_first_cpu)
+	first_cpu_workshop.connect("cancel_requested", _close_first_cpu_workshop)
+	add_child(first_cpu_workshop)
+
+func _show_first_cpu_workshop() -> void:
+	if first_cpu_workshop == null:
+		return
+	TimeManager.time_scale = 0.0
+	first_cpu_workshop.call("open")
+	status_label.text = "Nora : choisissez d'abord ce que ce premier processeur doit accomplir."
+
+func _close_first_cpu_workshop() -> void:
+	if first_cpu_workshop != null:
+		first_cpu_workshop.call("close")
+	if tabs != null:
+		tabs.current_tab = 0
+	TimeManager.time_scale = 0.0
+	status_label.text = "Nora : l'établi reste prêt quand vous voudrez reprendre."
+
+func _apply_first_cpu_spec_to_lab(spec: Dictionary) -> void:
+	if spec.is_empty():
+		return
+	if rd_name != null:
+		rd_name.text = str(spec.get("name", "Nova 1"))
+	if rd_segment != null:
+		_select_meta(rd_segment, str(spec.get("segment", MarketManager.default_segment())))
+	if rd_application != null:
+		_select_meta(rd_application, str(spec.get("application", "GENERAL")))
+	if rd_approach != null:
+		_select_meta(rd_approach, "INTERNAL")
+	if rd_focus != null:
+		_select_meta(rd_focus, str(spec.get("focus", "BALANCED")))
+	if rd_budget != null:
+		rd_budget.value = int(spec.get("budget", 45000))
+	_set_cpu_design_controls(CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design())), "Brief premier CPU")
+	_refresh_supplier_options()
+	_refresh_cpu_node_options()
+	_refresh_cpu_preview()
+
+func _open_advanced_first_cpu(spec: Dictionary) -> void:
+	_apply_first_cpu_spec_to_lab(spec)
+	if first_cpu_workshop != null:
+		first_cpu_workshop.call("close")
+	_show_tab(3)
+	TimeManager.time_scale = 0.0
+	status_label.text = "Mode avancé : le brief est appliqué. Vous pouvez maintenant modifier tous les paramètres avant de lancer le projet."
+
+func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
+	if spec.is_empty() or not ResearchManager.projects.is_empty():
+		if first_cpu_workshop != null:
+			first_cpu_workshop.call("show_error", "Ce premier atelier n'est disponible qu'avant le lancement de votre première génération.")
+		return
+	var project_name := str(spec.get("name", "")).strip_edges()
+	if project_name == "":
+		project_name = "Nova 1"
+	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
+	var ok := ResearchManager.start_project(
+		project_name,
+		"CPU",
+		str(spec.get("segment", MarketManager.default_segment())),
+		"INTERNAL",
+		str(spec.get("focus", "BALANCED")),
+		int(spec.get("budget", 45000)),
+		design,
+		{},
+		{},
+		str(spec.get("application", "GENERAL"))
+	)
+	if not ok:
+		if first_cpu_workshop != null:
+			first_cpu_workshop.call("show_error", "Le projet ne peut pas démarrer. Vérifiez la trésorerie ou choisissez un design moins ambitieux.")
+		return
+	if first_cpu_workshop != null:
+		first_cpu_workshop.call("close")
+	TimeManager.time_scale = 1.0
+	status_label.text = "%s entre en développement. Nora ouvre maintenant les outils de direction utiles au suivi du projet." % project_name
+	_refresh_all()
+	_show_tab(0)
+
 func _build_month_layer():
 	month_layer=ColorRect.new(); month_layer.color=Color(0,0,0,0.72); month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.visible=false; add_child(month_layer)
 	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.add_child(center)
@@ -1309,6 +1401,8 @@ func _update_responsive_layout():
 		game_over_panel.custom_minimum_size.x = minf(popup_width, 560.0)
 	if research_event_panel != null:
 		research_event_panel.custom_minimum_size.x = popup_width
+	if first_cpu_workshop != null and first_cpu_workshop.has_method("set_viewport_width"):
+		first_cpu_workshop.call("set_viewport_width", size.x)
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
@@ -1511,6 +1605,7 @@ func _refresh_setup_difficulty():
 
 func _start_new_game():
 	SimulationManager.reset_all(setup_name.text, _meta(setup_sector), _meta(setup_difficulty))
+	TimeManager.time_scale = 0.0
 	setup_layer.visible = false
 	game_over_layer.visible = false
 	if tabs != null:
@@ -1687,6 +1782,8 @@ func _start_project():
 		status_label.text = "%s entre en développement — %s • usage %s%s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text, supplier_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
+		if TimeManager.time_scale <= 0.0:
+			TimeManager.time_scale = 1.0
 	else:
 		status_label.text = "Impossible de lancer le projet : vérifiez la trésorerie, la capacité R&D et la disponibilité du partenaire."
 	_refresh_all()
