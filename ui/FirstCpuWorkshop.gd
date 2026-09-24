@@ -69,6 +69,7 @@ var _budget: SpinBox
 var _cores: HSlider
 var _frequency: HSlider
 var _cache: HSlider
+var _cache_field_root: Control
 var _tdp: HSlider
 var _cores_value: Label
 var _frequency_value: Label
@@ -221,6 +222,7 @@ func _build() -> void:
 	var cache_field := _slider_field("Cache intégré", 0.0, 32.0, 1.0, 0.0)
 	_cache = cache_field.slider
 	_cache_value = cache_field.value_label
+	_cache_field_root = cache_field.root
 	tech_grid.add_child(cache_field.root)
 
 	var tdp_field := _slider_field("Enveloppe thermique", 1.0, 25.0, 1.0, 2.0)
@@ -397,21 +399,78 @@ func _refresh_preview() -> void:
 		int(_budget.value),
 		GameData.sourcing_profile("INTERNAL")
 	)
-	_preview_label.text = "Nora et l'équipe anticipent :\n%s • %s • %s • %d W\nPerformance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100\nDéveloppement ~%d mois • programme ~%s € • coût technique ~%s €/unité\nCible : %s • priorité : %s" % [
+	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("segment", "EMBEDDED")))
+	var detail_level := int(advice.get("level", 0))
+	if _cache_field_root != null:
+		_cache_field_root.visible = detail_level >= 1
+	if _advisor_label != null:
+		_advisor_label.text = "%s : « %s »\nConfiance %s. %s" % [
+			str(advice.get("speaker", "Camille")),
+			str(advice.get("text", "")),
+			str(advice.get("confidence", "faible")),
+			str(advice.get("detail", ""))
+		]
+
+	var metric_text := ""
+	var timing_text := ""
+	if detail_level <= 0:
+		metric_text = "Performance %s • efficacité %s • fiabilité %s" % [
+			_qualitative_metric(float(evaluation.get("performance", 0.0))),
+			_qualitative_metric(float(evaluation.get("efficiency", 0.0))),
+			_qualitative_metric(float(evaluation.get("reliability", 0.0)))
+		]
+		var months := int(estimate.get("months", 0))
+		var program_cost := int(estimate.get("program_cost", 0))
+		timing_text = "Développement probablement %d–%d mois • budget programme ~%s–%s €" % [
+			maxi(months - 2, 1),
+			months + 3,
+			UI.money(int(round(float(program_cost) * 0.78))),
+			UI.money(int(round(float(program_cost) * 1.28)))
+		]
+	elif detail_level == 1:
+		metric_text = "Performance ~%.0f • efficacité ~%.0f • fiabilité ~%.0f" % [
+			round(float(evaluation.get("performance", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("efficiency", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("reliability", 0.0)) / 5.0) * 5.0
+		]
+		var months := int(estimate.get("months", 0))
+		timing_text = "Développement ~%d–%d mois • programme ~%s €" % [
+			maxi(months - 1, 1),
+			months + 1,
+			UI.money(int(estimate.get("program_cost", 0)))
+		]
+	else:
+		metric_text = "Performance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100" % [
+			float(evaluation.get("performance", 0.0)),
+			float(evaluation.get("efficiency", 0.0)),
+			float(evaluation.get("reliability", 0.0))
+		]
+		timing_text = "Développement ~%d mois • programme ~%s € • coût technique ~%s €/unité" % [
+			int(estimate.get("months", 0)),
+			UI.money(int(estimate.get("program_cost", 0))),
+			UI.money(int(evaluation.get("unit_cost", 0)))
+		]
+
+	_preview_label.text = "Estimation actuelle :\n%s • %s • %s • %d W\n%s\n%s\nCible : %s • priorité : %s" % [
 		"%d cœur(s)" % int(design.get("cores", 1)),
 		CPU_DESIGN.format_frequency(design),
-		CPU_DESIGN.format_cache(design),
+		CPU_DESIGN.format_cache(design) if detail_level >= 1 else "cache géré par l'équipe",
 		int(design.get("tdp_w", 2)),
-		float(evaluation.get("performance", 0.0)),
-		float(evaluation.get("efficiency", 0.0)),
-		float(evaluation.get("reliability", 0.0)),
-		int(estimate.get("months", 0)),
-		UI.money(int(estimate.get("program_cost", 0))),
-		UI.money(int(evaluation.get("unit_cost", 0))),
+		metric_text,
+		timing_text,
 		MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
 		str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
 	]
 	_update_slider_labels()
+
+func _qualitative_metric(value: float) -> String:
+	if value >= 72.0:
+		return "élevée"
+	if value >= 55.0:
+		return "correcte"
+	if value >= 42.0:
+		return "incertaine"
+	return "faible"
 
 func _update_slider_labels() -> void:
 	if _cores_value != null:
