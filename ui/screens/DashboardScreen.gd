@@ -442,6 +442,12 @@ func refresh() -> void:
 			active_project = project
 			break
 
+	var active_production_job: Dictionary = {}
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		active_production_job = job
+		break
+
 	var ready_product: Dictionary = {}
 	var launched_product: Dictionary = {}
 	for product in ProductManager.products:
@@ -481,33 +487,61 @@ func refresh() -> void:
 		dashboard_target_tab = 3
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", active_project.get("cpu_design", {}), overall_progress, false)
-	elif not ready_product.is_empty():
-		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
-		dashboard_project_meta_label.text = "Développement terminé • prêt pour l'industrialisation"
-		dashboard_project_phase_label.text = "PRÊT AU LANCEMENT"
-		dashboard_project_progress.value = 100.0
-		dashboard_metric_a.text = "%s €" % UI.money(int(ready_product.get("unit_cost", 0)))
-		dashboard_metric_b.text = "Validation OK"
-		dashboard_metric_c.text = MarketManager.segment_label(MarketManager.normalize_segment(str(ready_product.get("target_segment", MarketManager.default_segment()))))
-		dashboard_cto_label.text = "« Le CPU est prêt. La prochaine décision importante concerne le prix et la capacité de production. »"
-		dashboard_action_button.text = "Préparer le lancement"
+	elif not active_production_job.is_empty():
+		var production_project_value = active_production_job.get("project", {})
+		var production_project: Dictionary = production_project_value if typeof(production_project_value) == TYPE_DICTIONARY else {}
+		var production_design := CPU_DESIGN.normalize(production_project.get("cpu_design", {}))
+		var production_progress := clampf(float(active_production_job.get("progress", 0.0)), 0.0, 100.0)
+		var production_route := ProductionManager.manufacturing_route_quote(str(active_production_job.get("id", "")))
+		var route_name := str(production_route.get("provider_name", "route à choisir")) if not production_route.is_empty() else "route de fabrication à confirmer"
+		dashboard_label.text = str(active_production_job.get("name", "CPU en industrialisation"))
+		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s" % [
+			int(production_design.cores),
+			CPU_DESIGN.format_frequency(production_design),
+			CPU_DESIGN.node_label(int(production_design.node_nm)),
+			route_name
+		]
+		dashboard_project_phase_label.text = "INDUSTRIALISATION • %.0f%%" % production_progress
+		dashboard_project_progress.value = production_progress
+		dashboard_metric_a.text = "%s €/mois" % UI.money(int(active_production_job.get("monthly_cost", 0)))
+		dashboard_metric_b.text = "%d mois" % int(active_production_job.get("months_spent", 0))
+		dashboard_metric_c.text = ProductionManager.strategy_label(str(active_production_job.get("strategy", "BALANCED")))
+		if bool(active_production_job.get("route_committed", false)):
+			dashboard_cto_label.text = "« La fabrication est engagée. Surveillez le rendement, la qualité et la capacité avant le lancement commercial. »"
+		else:
+			dashboard_cto_label.text = "« Le développement est terminé. Choisissez maintenant la stratégie industrielle, le binning et la fonderie. »"
+		dashboard_action_button.text = "Piloter l'industrialisation"
 		dashboard_target_tab = 4
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
-			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
+			dashboard_chip.call("set_design", production_design, 100.0, false)
 	elif not launched_product.is_empty():
 		dashboard_label.text = str(launched_product.get("name", "CPU commercialisé"))
 		var lifecycle := MarketManager.product_lifecycle_label(launched_product)
-		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées • %s" % [int(launched_product.get("months_on_market", 0)), UI.money(int(launched_product.get("units_sold_total", 0))), lifecycle]
+		var months_on_market := int(launched_product.get("months_on_market", 0))
+		dashboard_project_meta_label.text = "En vente depuis %d mois • %s unités écoulées • %s" % [months_on_market, UI.money(int(launched_product.get("units_sold_total", 0))), lifecycle]
 		dashboard_project_phase_label.text = "SUR LE MARCHÉ • %s" % lifecycle.to_upper()
 		dashboard_project_progress.value = 100.0
 		dashboard_metric_a.text = "%s €" % UI.money(int(launched_product.get("price", 0)))
 		dashboard_metric_b.text = "%s ventes" % UI.money(int(launched_product.get("last_month_sales", 0)))
 		dashboard_metric_c.text = "%.1f/100" % float(launched_product.get("customer_satisfaction", 50.0))
-		dashboard_cto_label.text = "« Les premiers résultats sont disponibles. Utilisons les retours du marché pour préparer la génération suivante. »"
-		dashboard_action_button.text = "Analyser le marché"
+		dashboard_cto_label.text = "« Le CPU est lancé. %s »" % ("Faites passer un mois pour obtenir les premières ventes et les premiers retours." if months_on_market == 0 else "Les premiers résultats sont disponibles : ventes, satisfaction et presse doivent nourrir la génération suivante.")
+		dashboard_action_button.text = "Suivre le lancement" if months_on_market == 0 else "Analyser le marché"
 		dashboard_target_tab = 5
 		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
 			dashboard_chip.call("set_design", launched_product.get("cpu_design", {}), 100.0, true)
+	elif not ready_product.is_empty():
+		dashboard_label.text = str(ready_product.get("name", "Nouveau CPU"))
+		dashboard_project_meta_label.text = "Industrialisation terminée • prêt au lancement commercial"
+		dashboard_project_phase_label.text = "PRÊT AU LANCEMENT"
+		dashboard_project_progress.value = 100.0
+		dashboard_metric_a.text = "%s €" % UI.money(int(ready_product.get("unit_cost", 0)))
+		dashboard_metric_b.text = "Validation OK"
+		dashboard_metric_c.text = MarketManager.segment_label(MarketManager.normalize_segment(str(ready_product.get("target_segment", MarketManager.default_segment()))))
+		dashboard_cto_label.text = "« La gamme est prête. Fixez le prix et la capacité d'au moins un modèle pour commencer à apprendre du marché réel. »"
+		dashboard_action_button.text = "Préparer le lancement"
+		dashboard_target_tab = 4
+		if dashboard_chip != null and dashboard_chip.has_method("set_design"):
+			dashboard_chip.call("set_design", ready_product.get("cpu_design", {}), 100.0, false)
 	else:
 		dashboard_label.text = "Votre première génération"
 		dashboard_project_meta_label.text = "Choisissez une cible et donnez une identité à votre premier CPU."

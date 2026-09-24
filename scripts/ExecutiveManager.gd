@@ -706,6 +706,19 @@ func get_executive_brief() -> Dictionary:
 				})
 				break
 
+	var active_industrial_jobs := ProductionManager.get_active_jobs()
+	if not active_industrial_jobs.is_empty():
+		var industrial_job: Dictionary = active_industrial_jobs[0]
+		var industrial_action := "La route est engagée : surveillez rendement, qualité, coût et capacité jusqu'à la création de la gamme."
+		if not bool(industrial_job.get("route_committed", false)):
+			industrial_action = "Ouvrez Production & Produits pour choisir stratégie industrielle, binning et fonderie avant de laisser avancer le temps."
+		priorities.append({
+			"category":"PRODUCTION",
+			"severity":60,
+			"text":"%s est en industrialisation (%.0f%%)." % [str(industrial_job.get("name", "Votre CPU")), float(industrial_job.get("progress", 0.0))],
+			"action":industrial_action
+		})
+
 	var remediation_project: Dictionary = {}
 	var active_project: Dictionary = {}
 	for project in ResearchManager.projects:

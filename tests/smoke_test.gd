@@ -2,6 +2,7 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
+const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
 const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
 const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicyScenario.gd")
@@ -122,6 +123,10 @@ func _ready() -> void:
 		return
 	if not CompanyManager.created:
 		_fail("Company was not created")
+		return
+	var first_cpu_journey_error := FIRST_CPU_JOURNEY_SCENARIO.run(self)
+	if first_cpu_journey_error != "":
+		_fail(first_cpu_journey_error)
 		return
 	var company_policy_error := COMPANY_POLICY_SCENARIO.run()
 	if company_policy_error != "":
