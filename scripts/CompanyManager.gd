@@ -89,14 +89,22 @@ func get_support_modifier() -> float:
 		"MINIMAL": return 0.78
 		_: return 1.0
 
-func set_policies(marketing_budget: int, support_budget: int, environment_budget: int, support_level: String) -> bool:
+func _validated_policies(marketing_budget: int, support_budget: int, environment_budget: int, support_level: String) -> Dictionary:
 	var normalized_level := support_level.strip_edges().to_upper()
 	if normalized_level not in ["MINIMAL", "STANDARD", "PREMIUM"]:
+		return {}
+	return {
+		"marketing_budget":clampi(marketing_budget, 0, 200000),
+		"support_budget":clampi(support_budget, 0, 200000),
+		"environment_budget":clampi(environment_budget, 0, 200000),
+		"support_level":normalized_level
+	}
+
+func set_policies(marketing_budget: int, support_budget: int, environment_budget: int, support_level: String) -> bool:
+	var validated := _validated_policies(marketing_budget, support_budget, environment_budget, support_level)
+	if validated.is_empty():
 		return false
-	policies["marketing_budget"] = clampi(marketing_budget, 0, 200000)
-	policies["support_budget"] = clampi(support_budget, 0, 200000)
-	policies["environment_budget"] = clampi(environment_budget, 0, 200000)
-	policies["support_level"] = normalized_level
+	policies = validated
 	company_changed.emit()
 	return true
 
@@ -154,12 +162,14 @@ func load_state(state: Dictionary):
 	reputation = state.get("reputation", reputation).duplicate(true)
 	var saved_policies = state.get("policies", {})
 	if typeof(saved_policies) == TYPE_DICTIONARY:
-		set_policies(
+		var migrated_policies := _validated_policies(
 			int(saved_policies.get("marketing_budget", policies.get("marketing_budget", 6000))),
 			int(saved_policies.get("support_budget", policies.get("support_budget", 5000))),
 			int(saved_policies.get("environment_budget", policies.get("environment_budget", 2500))),
 			str(saved_policies.get("support_level", policies.get("support_level", "STANDARD")))
 		)
+		if not migrated_policies.is_empty():
+			policies = migrated_policies
 	departments = state.get("departments", departments).duplicate(true)
 	if not departments.has("Développement"):
 		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
