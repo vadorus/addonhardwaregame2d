@@ -1,21 +1,22 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const UI := preload("res://ui/UiKit.gd")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
-const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
-const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
-const APP_PANEL := Color(0.071, 0.106, 0.161, 1.0)
-const APP_PANEL_ALT := Color(0.094, 0.141, 0.212, 1.0)
-const APP_TEXT := Color(0.933, 0.965, 1.0, 1.0)
-const APP_MUTED := Color(0.565, 0.635, 0.718, 1.0)
-const APP_LINE := Color(0.149, 0.212, 0.290, 1.0)
-const APP_CYAN := Color(0.306, 0.843, 0.910, 1.0)
-const APP_CYAN_DARK := Color(0.071, 0.200, 0.239, 1.0)
-const APP_AMBER := Color(1.000, 0.741, 0.353, 1.0)
-const APP_AMBER_DARK := Color(0.224, 0.165, 0.086, 1.0)
-const APP_GREEN := Color(0.361, 0.878, 0.643, 1.0)
-const APP_RED := Color(1.000, 0.482, 0.482, 1.0)
+const APP_BG := UI.APP_BG
+const APP_SHELL := UI.APP_SHELL
+const APP_PANEL := UI.APP_PANEL
+const APP_PANEL_ALT := UI.APP_PANEL_ALT
+const APP_TEXT := UI.APP_TEXT
+const APP_MUTED := UI.APP_MUTED
+const APP_LINE := UI.APP_LINE
+const APP_CYAN := UI.APP_CYAN
+const APP_CYAN_DARK := UI.APP_CYAN_DARK
+const APP_AMBER := UI.APP_AMBER
+const APP_AMBER_DARK := UI.APP_AMBER_DARK
+const APP_GREEN := UI.APP_GREEN
+const APP_RED := UI.APP_RED
 
 var company_label: Label
 var date_label: Label
