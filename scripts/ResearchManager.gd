@@ -418,13 +418,16 @@ func get_available_development_engineers() -> int:
 	return maxi(get_development_team_size() - get_active_development_project_count(), 0)
 
 func development_capacity_factor() -> float:
+	return development_capacity_factor_for_active(get_active_development_project_count())
+
+func development_capacity_factor_for_active(active_projects: int) -> float:
 	var capacity := get_development_team_size()
 	if capacity <= 0:
 		return 0.45
-	var active_projects := get_active_development_project_count()
-	if active_projects <= 0:
+	var active := maxi(active_projects, 0)
+	if active <= 0:
 		return clampf(0.78 + float(capacity) * 0.12, 0.65, 1.05)
-	var workload := float(active_projects) / float(capacity)
+	var workload := float(active) / float(capacity)
 	return clampf(1.04 - workload * 0.24, 0.55, 1.02)
 
 func development_team_score() -> float:
@@ -620,7 +623,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		return []
 	var division := DivisionManager.get_division("CPU")
 	var approach_data: Dictionary = GameData.APPROACHES.get(approach, GameData.APPROACHES.INTERNAL)
-	var team_score := development_team_score() * development_capacity_factor()
+	var projected_capacity_factor := development_capacity_factor_for_active(get_active_development_project_count() + 1)
+	var team_score := development_team_score() * projected_capacity_factor
 	var management_modifier := CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var research_score := research_score_for_focus(focus)
 	var research_confidence_score := research_confidence_for_focus(focus)
@@ -654,7 +658,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"research_score":research_score,
 		"research_confidence":research_confidence_score,
 		"field_experience":field_experience_score,
-		"development_capacity_factor":development_capacity_factor(),
+		"development_capacity_factor":projected_capacity_factor,
 		"development_team_size":get_development_team_size(),
 		"development_confidence":development_confidence(),
 		"equipment_score":equipment_score,
@@ -674,7 +678,7 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 	if resolved_sourcing.is_empty():
 		resolved_sourcing = GameData.sourcing_profile(approach)
 	var approach_data: Dictionary = GameData.approach_data(approach)
-	var team := development_team_score() * development_capacity_factor()
+	var team := development_team_score() * development_capacity_factor_for_active(get_active_development_project_count() + 1)
 	var management := CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var technology := float(technologies.get("cpu", 18.0))
 	var base_cost := float(GameData.SECTORS.CPU.base_dev_cost)
