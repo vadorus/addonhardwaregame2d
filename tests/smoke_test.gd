@@ -5,6 +5,7 @@ const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
 const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
 const PROTOTYPE_DECISION_SCENARIO := preload("res://tests/scenarios/PrototypeDecisionScenario.gd")
+const VALIDATION_DECISION_SCENARIO := preload("res://tests/scenarios/ValidationDecisionScenario.gd")
 const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
 const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicyScenario.gd")
@@ -137,6 +138,10 @@ func _ready() -> void:
 	var prototype_decision_error := PROTOTYPE_DECISION_SCENARIO.run(self)
 	if prototype_decision_error != "":
 		_fail(prototype_decision_error)
+		return
+	var validation_decision_error := VALIDATION_DECISION_SCENARIO.run(self)
+	if validation_decision_error != "":
+		_fail(validation_decision_error)
 		return
 	var company_policy_error := COMPANY_POLICY_SCENARIO.run()
 	if company_policy_error != "":
