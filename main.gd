@@ -137,6 +137,7 @@ var tender_label: Label
 var tender_submit_button: Button
 
 var nav_buttons: Array[Button] = []
+var _refresh_all_pending := false
 
 func _ready():
 	theme = _create_app_theme()
@@ -155,33 +156,33 @@ func _process(_delta):
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
-	CompanyManager.company_changed.connect(_refresh_all)
-	CompanyManager.reputation_changed.connect(_refresh_all)
-	DivisionManager.divisions_changed.connect(_refresh_all)
-	PersonnelManager.staff_changed.connect(_refresh_all)
+	CompanyManager.company_changed.connect(_request_refresh_all)
+	CompanyManager.reputation_changed.connect(_request_refresh_all)
+	DivisionManager.divisions_changed.connect(_request_refresh_all)
+	PersonnelManager.staff_changed.connect(_request_refresh_all)
 	PersonnelManager.candidate_changed.connect(func(_c):
 		if personnel_screen != null:
 			personnel_screen.call("refresh")
 	)
-	ExecutiveManager.executive_changed.connect(_refresh_all)
-	ResearchManager.projects_changed.connect(_refresh_all)
+	ExecutiveManager.executive_changed.connect(_request_refresh_all)
+	ResearchManager.projects_changed.connect(_request_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
-	ResearchManager.phase_report_created.connect(func(_p,_r): _refresh_all())
+	ResearchManager.phase_report_created.connect(func(_p,_r): _request_refresh_all())
 	ResearchManager.research_changed.connect(_refresh_research)
 	ResearchManager.research_event_created.connect(_on_research_event)
 	SupplierManager.suppliers_changed.connect(_refresh_research)
 	SupplierManager.contracts_changed.connect(_refresh_research)
-	ProductionManager.jobs_changed.connect(_refresh_all)
-	FoundryManager.foundries_changed.connect(_refresh_all)
-	ProductManager.products_changed.connect(_refresh_all)
+	ProductionManager.jobs_changed.connect(_request_refresh_all)
+	FoundryManager.foundries_changed.connect(_request_refresh_all)
+	ProductManager.products_changed.connect(_request_refresh_all)
 	AfterSalesManager.cases_changed.connect(_refresh_market)
-	AfterSalesManager.field_experience_changed.connect(_refresh_all)
-	MarketManager.market_changed.connect(_refresh_all)
+	AfterSalesManager.field_experience_changed.connect(_request_refresh_all)
+	MarketManager.market_changed.connect(_request_refresh_all)
 	MediaManager.news_changed.connect(func():
 		if media_screen != null:
 			media_screen.call("refresh")
 	)
-	PatentManager.patents_changed.connect(_refresh_all)
+	PatentManager.patents_changed.connect(_request_refresh_all)
 	SaveManager.save_completed.connect(_on_save_message)
 	SimulationManager.game_over.connect(_on_game_over)
 
@@ -1627,7 +1628,20 @@ func _refresh_top():
 		cash_color = APP_AMBER
 	money_label.add_theme_color_override("font_color", cash_color)
 
+func _request_refresh_all():
+	if _refresh_all_pending:
+		return
+	_refresh_all_pending = true
+	call_deferred("_flush_refresh_all")
+
+func _flush_refresh_all():
+	if not _refresh_all_pending:
+		return
+	_refresh_all_pending = false
+	_refresh_all()
+
 func _refresh_all():
+	_refresh_all_pending = false
 	_refresh_navigation_progression()
 	_refresh_top(); _refresh_research(); _refresh_products(); _refresh_market()
 	if dashboard_screen != null:

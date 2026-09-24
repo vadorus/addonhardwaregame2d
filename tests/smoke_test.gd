@@ -4,6 +4,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
+const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicyScenario.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
@@ -121,6 +122,10 @@ func _ready() -> void:
 		return
 	if not CompanyManager.created:
 		_fail("Company was not created")
+		return
+	var company_policy_error := COMPANY_POLICY_SCENARIO.run()
+	if company_policy_error != "":
+		_fail(company_policy_error)
 		return
 
 	var exact_rng_probe: int = 2993618119687409726

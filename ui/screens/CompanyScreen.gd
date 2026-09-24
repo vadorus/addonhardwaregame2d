@@ -564,12 +564,15 @@ func _resolve_hr_case(action: String) -> void:
 	refresh()
 
 func _apply_policies() -> void:
-	CompanyManager.policies.marketing_budget = int(policy_marketing.value)
-	CompanyManager.policies.support_budget = int(policy_support.value)
-	CompanyManager.policies.environment_budget = int(policy_environment.value)
-	CompanyManager.policies.support_level = UI.option_meta(policy_support_level)
-	CompanyManager.company_changed.emit()
-	_status("Politiques mises à jour.")
+	if CompanyManager.set_policies(
+		int(policy_marketing.value),
+		int(policy_support.value),
+		int(policy_environment.value),
+		UI.option_meta(policy_support_level)
+	):
+		_status("Politiques mises à jour.")
+	else:
+		_status("Politique refusée : vérifiez les valeurs sélectionnées.")
 	refresh()
 
 func _refresh_leader_choices() -> void:
