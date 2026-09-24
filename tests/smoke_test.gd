@@ -3,6 +3,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
+const PROTOTYPE_DECISION_SCENARIO := preload("res://tests/scenarios/PrototypeDecisionScenario.gd")
 const DIFFICULTY_SCENARIO := preload("res://tests/scenarios/DifficultyScenario.gd")
 const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
 const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicyScenario.gd")
@@ -127,6 +128,10 @@ func _ready() -> void:
 	var first_cpu_journey_error := FIRST_CPU_JOURNEY_SCENARIO.run(self)
 	if first_cpu_journey_error != "":
 		_fail(first_cpu_journey_error)
+		return
+	var prototype_decision_error := PROTOTYPE_DECISION_SCENARIO.run(self)
+	if prototype_decision_error != "":
+		_fail(prototype_decision_error)
 		return
 	var company_policy_error := COMPANY_POLICY_SCENARIO.run()
 	if company_policy_error != "":
