@@ -1494,7 +1494,7 @@ func _start_cpu_concept_program():
 	_refresh_all()
 
 func _refresh_research():
-	if tech_label == null:
+	if lab_screen == null:
 		return
 	if rd_segment != null:
 		_refresh_segment_options(rd_segment)
@@ -1502,133 +1502,7 @@ func _refresh_research():
 	_refresh_cpu_preview()
 	_refresh_generation_plan_options()
 	_refresh_supplier_contracts()
-	var capacity := ResearchManager.get_cpu_research_capacity()
-	var allocated := ResearchManager.get_total_cpu_research_allocation()
-	var dev_size := ResearchManager.get_development_team_size()
-	var active_dev_projects := ResearchManager.get_active_development_project_count()
-	if research_overview_label != null:
-		research_overview_label.text = "Recherche : %d personne(s) • %d affectée(s) aux pistes CPU\nDéveloppement : %d personne(s) • %d projet(s) actif(s) • charge/capacité %.0f%% • confiance %.0f%%" % [
-			capacity, allocated, dev_size, active_dev_projects,
-			ResearchManager.development_capacity_factor() * 100.0,
-			ResearchManager.development_confidence()
-		]
-	if research_budget != null:
-		research_budget.value = ResearchManager.continuous_research_budget
-	for research_key in ResearchManager.get_cpu_research_domain_keys():
-		var key := str(research_key)
-		var data := ResearchManager.get_cpu_research_domain(key)
-		if research_alloc_controls.has(key):
-			var allocation: SpinBox = research_alloc_controls[key]
-			allocation.max_value = maxf(float(capacity), 0.0)
-			allocation.value = int(data.get("allocated", 0))
-	var tech_lines: Array[String] = [
-		"Recherche CPU :",
-		"",
-		"Équipe Développement — %d personne(s) • score %.0f/100 • confiance %.0f%% • capacité %.0f%%" % [
-			ResearchManager.get_development_team_size(),
-			ResearchManager.development_team_score(),
-			ResearchManager.development_confidence(),
-			ResearchManager.development_capacity_factor() * 100.0
-		],
-		""
-	]
-	for research_key in ResearchManager.get_cpu_research_domain_keys():
-		var key := str(research_key)
-		var data := ResearchManager.get_cpu_research_domain(key)
-		tech_lines.append("• %s — connaissance %.1f/100 • expérience %.1f • confiance %.0f%% • %d chercheur(s)" % [
-			ResearchManager.get_cpu_research_label(key),
-			float(data.get("knowledge", 0.0)), float(data.get("experience", 0.0)),
-			ResearchManager.research_confidence(key), int(data.get("allocated", 0))
-		])
-	tech_lines.append("\nCompétences techniques de l'entreprise :")
-	for capability_value in ResearchManager.get_cpu_capability_keys():
-		var capability_key := str(capability_value)
-		tech_lines.append("• %s : %.1f/100" % [ResearchManager.get_cpu_capability_label(capability_key), ResearchManager.get_cpu_capability(capability_key)])
-	tech_lines.append("\nExpérience terrain CPU : fabrication %.1f • thermique %.1f • stabilité %.1f • firmware %.1f" % [
-		AfterSalesManager.cpu_field_experience("MANUFACTURING"),
-		AfterSalesManager.cpu_field_experience("THERMAL"),
-		AfterSalesManager.cpu_field_experience("STABILITY"),
-		AfterSalesManager.cpu_field_experience("FIRMWARE")
-	])
-	tech_lines.append("\nSavoir-faire techniques hérités :")
-	for key in ResearchManager.technologies.keys():
-		tech_lines.append("• %s : %.1f" % [str(key).capitalize(), float(ResearchManager.technologies[key])])
-	tech_label.text = "\n".join(tech_lines)
-
-	if concept_status_label != null:
-		var concept_lines: Array[String] = []
-		for program in ResearchManager.get_cpu_concept_programs():
-			var result: Dictionary = program.get("result", {})
-			var result_text := ""
-			if not result.is_empty():
-				result_text = " • %s" % str(result.get("summary", "technologie transférable"))
-			concept_lines.append("• %s — %s — %.0f%% • %d mois • confiance %.0f%%%s" % [
-				str(program.get("name", "Concept CPU")), str(program.get("stage", "ÉTUDE")),
-				float(program.get("progress", 0.0)), int(program.get("months_spent", 0)),
-				float(program.get("confidence", 0.0)), result_text
-			])
-		concept_status_label.text = "\n".join(concept_lines) if not concept_lines.is_empty() else "Aucun programme Concept actif ou terminé."
-
-	var lines: Array[String] = []
-	for project in ResearchManager.projects:
-		var phase := "Terminé"
-		if str(project.status) == "DEVELOPMENT":
-			if int(project.get("remediation_months_remaining", 0)) > 0:
-				phase = "Mise au point technique — %d mois restant(s)" % int(project.get("remediation_months_remaining", 0))
-			else:
-				phase = "%s — %.0f%%" % [GameData.PHASES[int(project.phase_index)], float(project.phase_progress)]
-		var design := CPU_DESIGN.normalize(project.get("cpu_design", {}))
-		var capability_value = project.get("technical_capabilities_snapshot", {})
-		var capability_snapshot: Dictionary = capability_value if typeof(capability_value) == TYPE_DICTIONARY else {}
-		var estimate := CPU_DESIGN.evaluate(design, capability_snapshot)
-		lines.append("%s — %s — %d mois" % [str(project.name), phase, int(project.months_spent)])
-		var development_snapshot: Dictionary = project.get("development_snapshot", {})
-		if not development_snapshot.is_empty():
-			lines.append("  Équipe Développement au lancement : %d personne(s) • score %.0f/100 • confiance %.0f%%" % [
-				int(development_snapshot.get("team_size", 0)),
-				float(development_snapshot.get("team_score", 0.0)),
-				float(development_snapshot.get("confidence", 0.0))
-			])
-		lines.append("  %d cœur(s) • %s • %s • %s • %d W • coût cible %s €" % [
-			int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w), _money(int(estimate.unit_cost))
-		])
-		lines.append("  Cible %s • %s • priorité %s" % [
-			str(GameData.SEGMENTS.get(str(project.segment), {}).get("label", str(project.segment))),
-			str(GameData.APPROACHES[str(project.approach)].label),
-			str(project.get("focus_label", "Équilibré"))
-		])
-		var supplier_contract_id := str(project.get("supplier_contract_id", ""))
-		if supplier_contract_id != "":
-			var supplier_contract := SupplierManager.get_contract(supplier_contract_id)
-			lines.append("  Contrat %s • %s • %s • %s • royalty %.1f%% • IP %.0f%%" % [
-				supplier_contract_id,
-				str(supplier_contract.get("supplier_name", project.get("supplier_name", "Partenaire"))),
-				str(supplier_contract.get("contract_term_label", "")),
-				str(supplier_contract.get("exclusivity_label", "")),
-				float(supplier_contract.get("royalty_rate", 0.0)) * 100.0,
-				float(supplier_contract.get("ip_ownership", 0.0))
-			])
-		var generation_plan: Dictionary = project.get("generation_plan", {})
-		if not generation_plan.is_empty():
-			lines.append("  Génération G%d • plan %s — %s%s" % [int(generation_plan.get("generation_index", 1)), str(generation_plan.get("tag", "PLAN")), str(generation_plan.get("title", "Architecture")), " • personnalisé" if bool(generation_plan.get("customized", false)) else ""])
-		var remediation: Dictionary = project.get("technical_remediation", {})
-		if not remediation.is_empty():
-			lines.append("  Solution équipe : %s • +%d mois • coût technique %s € • %s" % [
-				str(remediation.get("title", "solution technique")),
-				int(project.get("remediation_total_months", remediation.get("extra_months", 0))),
-				_money(int(remediation.get("upfront_cost", 0))),
-				"validée" if bool(project.get("remediation_transfer_applied", false)) else "en cours"
-			])
-		if not project.reports.is_empty():
-			lines.append("  Camille : %s" % str(project.reports[0].text))
-	projects_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
-
-	var patent_lines: Array[String] = []
-	for candidate in PatentManager.candidates:
-		patent_lines.append("Candidat : %s — force %d" % [str(candidate.title), int(candidate.strength)])
-	for patent in PatentManager.patents:
-		patent_lines.append("Brevet : %s — %s" % [str(patent.title), "licencié" if bool(patent.licensed) else "exclusif"])
-	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
+	lab_screen.call("refresh_research_content")
 
 func _start_project():
 	var name := rd_name.text.strip_edges()
