@@ -114,6 +114,28 @@ func _build() -> void:
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shell.add_child(brand)
 
+	var guide_card := UI.card(UI.APP_CYAN_DARK, 12, 10)
+	var guide_row := HBoxContainer.new()
+	guide_row.add_theme_constant_override("separation", 10)
+	guide_card.add_child(guide_row)
+	var guide_avatar := PanelContainer.new()
+	guide_avatar.custom_minimum_size = Vector2(44, 44)
+	guide_avatar.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_CYAN, 99, 0, UI.APP_CYAN, 0))
+	var guide_initial := UI.label("N", 18)
+	guide_initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	guide_initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	guide_initial.add_theme_color_override("font_color", UI.APP_BG)
+	guide_avatar.add_child(guide_initial)
+	guide_row.add_child(guide_avatar)
+	var guide_copy := VBoxContainer.new()
+	guide_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	guide_row.add_child(guide_copy)
+	guide_copy.add_child(UI.label("Nora Bernard — votre bras droit", 15))
+	var guide_text := UI.muted_label("Je reste avec vous pendant cette première décision. Choisissez d'abord l'objectif du produit ; l'équipe traduira ensuite ce choix en architecture.", 12)
+	guide_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guide_copy.add_child(guide_text)
+	shell.add_child(guide_card)
+
 	_choice_view = VBoxContainer.new()
 	_choice_view.add_theme_constant_override("separation", 12)
 	shell.add_child(_choice_view)
@@ -121,7 +143,7 @@ func _build() -> void:
 	var choice_title := UI.label("Quel processeur voulons-nous construire ?", 26)
 	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_title)
-	var choice_intro := UI.muted_label("Nora : commençons par l'intention du produit. L'équipe traduira ensuite ce choix en architecture. Rien ne vous interdit de personnaliser le design.", 13)
+	var choice_intro := UI.muted_label("Commencez par l'intention du produit. Rien ne vous interdit ensuite de personnaliser complètement le design.", 13)
 	choice_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	choice_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_intro)

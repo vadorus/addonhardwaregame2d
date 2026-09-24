@@ -10,6 +10,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 var dashboard_label: Label
 var alerts_label: Label
 var dashboard_heading: Control
+var dashboard_nora_guide: Control
 var dashboard_garage_card: PanelContainer
 var dashboard_garage_header: Control
 var dashboard_priority_card: PanelContainer
@@ -66,6 +67,16 @@ func _build() -> void:
 	var title := UI.label("Votre entreprise, en un coup d'œil", 27)
 	heading_copy.add_child(title)
 	heading_copy.add_child(UI.muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
+
+	var guide_script: Script = load("res://ui/components/NoraGuidePanel.gd")
+	dashboard_nora_guide = guide_script.new() as Control
+	dashboard_nora_guide.connect("action_requested", func(tab_index: int, context: String):
+		navigate_requested.emit(tab_index, context)
+	)
+	dashboard_nora_guide.connect("team_requested", func():
+		navigate_requested.emit(2, "Équipe")
+	)
+	box.add_child(dashboard_nora_guide)
 
 	dashboard_garage_card = UI.card(UI.APP_PANEL, 14, 10)
 	dashboard_garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -407,6 +418,8 @@ func set_viewport_width(width: float) -> void:
 		dashboard_lower_grid.columns = 1 if compact else 2
 	if dashboard_project_grid != null:
 		dashboard_project_grid.columns = 1 if narrow else 2
+	if dashboard_nora_guide != null and dashboard_nora_guide.has_method("set_viewport_width"):
+		dashboard_nora_guide.call("set_viewport_width", width)
 	if dashboard_garage != null:
 		if dashboard_garage.has_method("set_viewport_width"):
 			dashboard_garage.call("set_viewport_width", width)
@@ -417,6 +430,10 @@ func refresh() -> void:
 	if dashboard_label == null:
 		return
 	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
+	if dashboard_nora_guide != null:
+		dashboard_nora_guide.visible = CompanyManager.created
+		if dashboard_nora_guide.has_method("refresh"):
+			dashboard_nora_guide.call("refresh")
 	if dashboard_heading != null:
 		dashboard_heading.visible = not garage_intro
 	if dashboard_garage_header != null:
