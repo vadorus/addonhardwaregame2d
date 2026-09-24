@@ -6,6 +6,7 @@ const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourn
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
+const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
 const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
 const PROTOTYPE_DECISION_SCENARIO := preload("res://tests/scenarios/PrototypeDecisionScenario.gd")
 const VALIDATION_DECISION_SCENARIO := preload("res://tests/scenarios/ValidationDecisionScenario.gd")
@@ -149,6 +150,10 @@ func _ready() -> void:
 	var next_gen_market_learning_error := NEXT_GENERATION_MARKET_LEARNING_SCENARIO.run()
 	if next_gen_market_learning_error != "":
 		_fail(next_gen_market_learning_error)
+		return
+	var full_cpu_player_journey_error := FULL_CPU_PLAYER_JOURNEY_SCENARIO.run()
+	if full_cpu_player_journey_error != "":
+		_fail(full_cpu_player_journey_error)
 		return
 	var prototype_decision_error := PROTOTYPE_DECISION_SCENARIO.run(self)
 	if prototype_decision_error != "":
