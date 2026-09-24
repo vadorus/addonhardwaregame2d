@@ -226,7 +226,7 @@ func set_onboarding_stage(stage: String) -> void:
 	if _title_label != null and _subtitle_label != null:
 		if stage == "FIRST_IDEA":
 			_title_label.text = "Votre premier garage"
-			_subtitle_label.text = "Nora : commencez par l'établi CPU"
+			_subtitle_label.text = "Première étape : utiliser l'établi CPU"
 		else:
 			_title_label.text = str(ExecutiveManager.workplace_data().get("name", "Garage aménagé"))
 			var condition := float(ExecutiveManager.workplace_data().get("condition", 62.0))
