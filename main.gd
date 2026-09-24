@@ -24,11 +24,15 @@ var money_label: Label
 var status_label: Label
 var tabs: TabContainer
 var setup_layer: Control
+var setup_panel: PanelContainer
 var month_layer: Control
+var month_panel: PanelContainer
 var month_report_label: Label
 var game_over_layer: Control
+var game_over_panel: PanelContainer
 var game_over_label: Label
 var research_event_layer: Control
+var research_event_panel: PanelContainer
 var research_event_label: Label
 var active_research_event_id := ""
 
@@ -911,10 +915,11 @@ func _build_setup_layer():
 	setup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(setup_layer)
 	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); setup_layer.add_child(center)
-	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,420); center.add_child(panel)
-	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); panel.add_child(box)
-	var title:=_label("Créer votre entreprise technologique",26); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var desc:=_label("1971. La vertical slice commence aux débuts du microprocesseur : votre petite équipe doit apprendre à concevoir, industrialiser et faire évoluer ses propres CPU avant d’ouvrir d’autres secteurs.",15); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; box.add_child(desc)
+	setup_panel=PanelContainer.new(); setup_panel.custom_minimum_size=Vector2(560,420); center.add_child(setup_panel)
+	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",14); setup_panel.add_child(box)
+	var brand:=_label("TECH EMPIRE",30); brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; brand.add_theme_color_override("font_color", APP_CYAN); box.add_child(brand)
+	var title:=_label("Du garage à l'empire technologique",20); title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
+	var desc:=_label("1971. Vous démarrez avec une petite équipe et un objectif : apprendre à concevoir, industrialiser et vendre vos propres CPU. Les autres secteurs viendront avec la croissance de l'entreprise.",14); desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; box.add_child(desc)
 	setup_name=LineEdit.new(); setup_name.placeholder_text="Nom de l'entreprise"; setup_name.text="Nova Technologies"; box.add_child(setup_name)
 	setup_sector=OptionButton.new(); _fill_sector_options(setup_sector); box.add_child(setup_sector)
 	setup_difficulty = OptionButton.new()
@@ -935,8 +940,8 @@ func _build_setup_layer():
 func _build_month_layer():
 	month_layer=ColorRect.new(); month_layer.color=Color(0,0,0,0.72); month_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.visible=false; add_child(month_layer)
 	var center:=CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); month_layer.add_child(center)
-	var panel:=PanelContainer.new(); panel.custom_minimum_size=Vector2(560,430); center.add_child(panel)
-	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",12); panel.add_child(box)
+	month_panel=PanelContainer.new(); month_panel.custom_minimum_size=Vector2(560,430); center.add_child(month_panel)
+	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",12); month_panel.add_child(box)
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
@@ -949,12 +954,12 @@ func _build_game_over_layer():
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	game_over_layer.add_child(center)
-	var panel := _card(APP_SHELL, 16, 20)
-	panel.custom_minimum_size = Vector2(560, 360)
-	center.add_child(panel)
+	game_over_panel = _card(APP_SHELL, 16, 20)
+	game_over_panel.custom_minimum_size = Vector2(560, 360)
+	center.add_child(game_over_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
-	panel.add_child(box)
+	game_over_panel.add_child(box)
 	var title := _label("Entreprise en cessation de paiement", 25)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", APP_RED)
@@ -982,12 +987,12 @@ func _build_research_event_layer():
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	research_event_layer.add_child(center)
-	var panel := _card(APP_SHELL, 16, 20)
-	panel.custom_minimum_size = Vector2(600, 360)
-	center.add_child(panel)
+	research_event_panel = _card(APP_SHELL, 16, 20)
+	research_event_panel.custom_minimum_size = Vector2(600, 360)
+	center.add_child(research_event_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
-	panel.add_child(box)
+	research_event_panel.add_child(box)
 	box.add_child(_eyebrow("DÉCOUVERTE R&D"))
 	var title := _label("L'équipe a trouvé une nouvelle piste", 24)
 	title.add_theme_color_override("font_color", APP_CYAN)
@@ -1189,12 +1194,23 @@ func _update_nav_state():
 func _update_responsive_layout():
 	if dashboard_screen != null and dashboard_screen.has_method("set_viewport_width"):
 		dashboard_screen.call("set_viewport_width", size.x)
+	if products_screen != null and products_screen.has_method("set_viewport_width"):
+		products_screen.call("set_viewport_width", size.x)
 	var compact := size.x < 900.0
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
 	if lab_stats_grid != null:
 		lab_stats_grid.columns = 1 if narrow else 3
+	var popup_width := clampf(size.x - 32.0, 300.0, 600.0)
+	if setup_panel != null:
+		setup_panel.custom_minimum_size.x = minf(popup_width, 560.0)
+	if month_panel != null:
+		month_panel.custom_minimum_size.x = minf(popup_width, 560.0)
+	if game_over_panel != null:
+		game_over_panel.custom_minimum_size.x = minf(popup_width, 560.0)
+	if research_event_panel != null:
+		research_event_panel.custom_minimum_size.x = popup_width
 
 func _fill_text(option: OptionButton, items: Array):
 	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
