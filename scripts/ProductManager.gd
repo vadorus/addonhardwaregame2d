@@ -177,6 +177,12 @@ func _ensure_lifecycle_fields(product: Dictionary) -> void:
 	product["revision_label"] = str(product.get("revision_label", "A0"))
 	product["firmware_version"] = maxi(int(product.get("firmware_version", 1)), 1)
 	product["firmware_profile"] = str(product.get("firmware_profile", "ORIGINAL"))
+	var launch_plan_value = product.get("launch_plan", {})
+	product["launch_plan"] = launch_plan_value.duplicate(true) if typeof(launch_plan_value) == TYPE_DICTIONARY else {}
+	var feedback_value = product.get("last_market_feedback", {})
+	product["last_market_feedback"] = feedback_value.duplicate(true) if typeof(feedback_value) == TYPE_DICTIONARY else {}
+	var feedback_history_value = product.get("market_feedback_history", [])
+	product["market_feedback_history"] = feedback_history_value.duplicate(true) if typeof(feedback_history_value) == TYPE_ARRAY else []
 	var software_value = product.get("control_software", {})
 	var software: Dictionary = software_value.duplicate(true) if typeof(software_value) == TYPE_DICTIONARY else {}
 	software["released"] = bool(software.get("released", false))
@@ -412,15 +418,34 @@ func get_post_launch_summary(product_id: String) -> Dictionary:
 		"binning_strategy":str(product.get("binning_strategy", "BALANCED")),
 		"supported_products":software.get("supported_product_ids", []).duplicate(true),
 		"revision_count":product.get("revision_history", []).size(),
-		"firmware_count":product.get("firmware_history", []).size()
+		"firmware_count":product.get("firmware_history", []).size(),
+		"launch_plan":product.get("launch_plan", {}).duplicate(true),
+		"last_market_feedback":product.get("last_market_feedback", {}).duplicate(true),
+		"market_feedback_count":product.get("market_feedback_history", []).size()
 	}
 
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
+			_ensure_lifecycle_fields(product)
 			product.price = maxi(price, 1)
 			var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
 			product.production_capacity = clampi(production_capacity, 1, max_capacity)
+			var launch_forecast := MarketManager.forecast_cpu_launch(product, int(product.price)) if str(product.get("sector", "")) == "CPU" else {}
+			var royalty_per_unit := int(round(float(product.price) * float(product.get("royalty_rate", 0.0))))
+			var gross_margin_per_unit := int(product.price) - int(product.get("unit_cost", 0)) - royalty_per_unit
+			product["launch_plan"] = {
+				"month":TimeManager.month,
+				"year":TimeManager.year,
+				"price":int(product.price),
+				"capacity":int(product.production_capacity),
+				"unit_cost":int(product.get("unit_cost", 0)),
+				"royalty_per_unit":royalty_per_unit,
+				"gross_margin_per_unit":gross_margin_per_unit,
+				"forecast":launch_forecast.duplicate(true)
+			}
+			product["last_market_feedback"] = {}
+			product["market_feedback_history"] = []
 			product.status = "LAUNCHED"
 			product.months_on_market = 0
 			product.last_month_age_penalty = 0.0
@@ -504,7 +529,23 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var report := {"product_id":product.id,"units":total_units,"consumer_units":sold_consumer,"b2b_units":sold_b2b,"revenue":revenue,"production_cost":production_cost,"royalty_cost":royalty_cost,"warranty_cost":warranty_cost,"satisfaction":satisfaction,"share":demand.get("share", 0.0)}
+	var net_contribution := revenue - production_cost - royalty_cost - warranty_cost
+	var report := {
+		"product_id":product.id,
+		"units":total_units,
+		"consumer_units":sold_consumer,
+		"b2b_units":sold_b2b,
+		"revenue":revenue,
+		"production_cost":production_cost,
+		"royalty_cost":royalty_cost,
+		"warranty_cost":warranty_cost,
+		"net_contribution":net_contribution,
+		"satisfaction":satisfaction,
+		"share":demand.get("share", 0.0),
+		"capacity":capacity,
+		"demand_units":consumer_units + b2b_units
+	}
+	_record_market_feedback(product, report)
 	sales_report_created.emit(report)
 	if not contract.is_empty():
 		MarketManager.advance_contract(str(product.id), sold_b2b)
@@ -513,6 +554,74 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		var rows := MarketManager.benchmark_for(product)
 		MediaManager.publish_product_review(product, scores, MarketManager.benchmark_rank(product), rows.size())
 		_reviewed_products[str(product.id)] = true
+
+func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
+	_ensure_lifecycle_fields(product)
+	var launch_plan: Dictionary = product.get("launch_plan", {})
+	var forecast_value = launch_plan.get("forecast", {})
+	var forecast: Dictionary = forecast_value if typeof(forecast_value) == TYPE_DICTIONARY else {}
+	var actual_units := int(report.get("units", 0))
+	var capacity := maxi(int(report.get("capacity", product.get("production_capacity", 1))), 1)
+	var demand_units := maxi(int(report.get("demand_units", actual_units)), 0)
+	var utilization := clampf(float(actual_units) / float(capacity), 0.0, 1.0)
+	var expected_units := int(forecast.get("expected_units", 0))
+	var min_units := int(forecast.get("min_units", expected_units))
+	var max_units := int(forecast.get("max_units", expected_units))
+	var verdict := "Premières données disponibles"
+	if not forecast.is_empty():
+		if actual_units > max_units:
+			verdict = "Au-dessus de la prévision"
+		elif actual_units < min_units:
+			verdict = "Sous la prévision"
+		else:
+			verdict = "Dans la prévision"
+	var lesson := "Le lancement fournit maintenant une base réelle pour ajuster prix, capacité et produit."
+	if utilization >= 0.95 and demand_units > capacity:
+		lesson = "La capacité limite les ventes : augmenter la capacité peut convertir une partie de la demande non servie."
+	elif int(report.get("net_contribution", 0)) <= 0:
+		lesson = "Le mois détruit de la marge : revoyez prix, coût, royalties ou qualité avant d'augmenter les volumes."
+	elif not forecast.is_empty() and actual_units < min_units:
+		lesson = "La demande est sous la fourchette prévue : vérifiez le prix, le positionnement et la comparaison concurrentielle."
+	elif float(report.get("satisfaction", 50.0)) < 50.0:
+		lesson = "Les ventes existent mais la satisfaction est faible : fiabilité, SAV et adéquation au besoin doivent guider la suite."
+	elif utilization >= 0.85:
+		lesson = "Le lancement utilise fortement la capacité avec une marge positive : surveillez la demande avant d'élargir la production."
+	var feedback := {
+		"month":TimeManager.month,
+		"year":TimeManager.year,
+		"market_month":int(product.get("months_on_market", 0)),
+		"units":actual_units,
+		"expected_units":expected_units,
+		"min_units":min_units,
+		"max_units":max_units,
+		"revenue":int(report.get("revenue", 0)),
+		"net_contribution":int(report.get("net_contribution", 0)),
+		"capacity":capacity,
+		"capacity_utilization":utilization,
+		"unserved_demand":maxi(demand_units - capacity, 0),
+		"share":float(report.get("share", 0.0)),
+		"satisfaction":float(report.get("satisfaction", 50.0)),
+		"returns":int(product.get("last_month_returns", 0)),
+		"verdict":verdict,
+		"lesson":lesson
+	}
+	product["last_market_feedback"] = feedback
+	var history: Array = product.get("market_feedback_history", [])
+	history.push_front(feedback.duplicate(true))
+	if history.size() > 12:
+		history.pop_back()
+	product["market_feedback_history"] = history
+	if int(product.get("months_on_market", 0)) == 1:
+		CompanyManager.add_alert("%s : premier retour marché — %s, %d ventes, contribution %d €." % [
+			str(product.get("name", "CPU")), verdict.to_lower(), actual_units, int(report.get("net_contribution", 0))
+		])
+
+func get_market_feedback(product_id: String) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty():
+		return {}
+	_ensure_lifecycle_fields(product)
+	return product.get("last_market_feedback", {}).duplicate(true)
 
 func get_product(product_id: String) -> Dictionary:
 	for product in products:

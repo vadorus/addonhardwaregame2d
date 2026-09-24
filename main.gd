@@ -1622,7 +1622,7 @@ func _on_products_action(action: String, payload: Dictionary):
 				FoundryManager.set_sell_spare_capacity(not bool(fab.get("sell_spare_capacity", false)))
 		"launch_product":
 			if ProductManager.launch_product(str(payload.get("product_id", "")), int(payload.get("price", 0)), int(payload.get("capacity", 0))):
-				status_label.text = "Produit lancé : la presse et les clients vont maintenant le juger."
+				status_label.text = "Produit lancé : le plan commercial est mémorisé. Faites passer un mois pour comparer la prévision aux ventes réelles."
 			else:
 				status_label.text = "Ce produit est déjà lancé ou indisponible."
 		"update_price":
