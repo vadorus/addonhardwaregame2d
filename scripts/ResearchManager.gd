@@ -983,8 +983,8 @@ func get_state() -> Dictionary:
 		"next_research_event_id":_next_research_event_id,
 		"next_concept_id":_next_concept_id,
 		"next_id":_next_id,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func load_state(state: Dictionary):
@@ -1063,8 +1063,8 @@ func load_state(state: Dictionary):
 	_next_research_event_id = int(state.get("next_research_event_id", research_events.size() + 1))
 	_next_concept_id = int(state.get("next_concept_id", concept_programs.size() + 1))
 	_next_id = int(state.get("next_id", 1))
-	rng.seed = int(state.get("rng_seed", 8282))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "8282"), 8282)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	research_changed.emit()
 	projects_changed.emit()
