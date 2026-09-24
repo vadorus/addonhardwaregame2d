@@ -3,6 +3,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
+const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
 const PROTOTYPE_DECISION_SCENARIO := preload("res://tests/scenarios/PrototypeDecisionScenario.gd")
 const VALIDATION_DECISION_SCENARIO := preload("res://tests/scenarios/ValidationDecisionScenario.gd")
@@ -135,6 +136,10 @@ func _ready() -> void:
 	if first_cpu_journey_error != "":
 		_fail(first_cpu_journey_error)
 		return
+	var first_cpu_runway_error := FIRST_CPU_RUNWAY_SCENARIO.run()
+	if first_cpu_runway_error != "":
+		_fail(first_cpu_runway_error)
+		return
 	var prototype_decision_error := PROTOTYPE_DECISION_SCENARIO.run(self)
 	if prototype_decision_error != "":
 		_fail(prototype_decision_error)
@@ -191,8 +196,8 @@ func _ready() -> void:
 	if FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.BACKUP_SAVE_PATH))
 
-	if Economy.money != 500_000:
-		_fail("Unexpected starting money: %s" % Economy.money)
+	if Economy.money != BalanceManager.starting_capital():
+		_fail("Unexpected starting money: %s (expected %s for %s)" % [Economy.money, BalanceManager.starting_capital(), BalanceManager.active_profile])
 		return
 	var difficulty_error := DIFFICULTY_SCENARIO.run()
 	if difficulty_error != "":

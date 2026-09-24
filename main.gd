@@ -539,16 +539,22 @@ func _refresh_cpu_preview():
 	var application_key := _meta(rd_application) if rd_application != null else "GENERAL"
 	var application_assessment := CPU_DESIGN.application_assessment(evaluation, application_key)
 	var approach_key := _meta(rd_approach) if rd_approach != null else "INTERNAL"
-	var approach_data: Dictionary = GameData.approach_data(approach_key)
 	var sourcing: Dictionary = _selected_supplier_quote()
 	if sourcing.is_empty():
 		sourcing = GameData.sourcing_profile(approach_key)
-	var effective_speed := float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0))
-	var base_months := maxi(1, int(ceil(float(evaluation.estimated_months) / maxf(effective_speed, 0.10))))
 	var extra_months := int(active_cpu_remediation.get("extra_months", 0))
-	var months := base_months + extra_months
 	var monthly_budget := int(rd_budget.value) if rd_budget != null else 45000
-	var estimated_program_cost := int(float(months * monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0))) + int(active_cpu_remediation.get("upfront_cost", 0)) + int(sourcing.get("setup_cost", 0))
+	var development_estimate := ResearchManager.estimate_cpu_development(
+		design,
+		approach_key,
+		monthly_budget,
+		sourcing,
+		extra_months,
+		int(active_cpu_remediation.get("upfront_cost", 0)),
+		evaluation
+	)
+	var months := int(development_estimate.get("months", 1))
+	var estimated_program_cost := int(development_estimate.get("program_cost", 0))
 	var risk := float(evaluation.risk)
 	var risk_label := "faible"
 	if risk >= 60.0:
@@ -558,7 +564,16 @@ func _refresh_cpu_preview():
 	var decision_axes := CPU_DESIGN.decision_axes(evaluation, months)
 	var reference_design := lab_reference_design if not lab_reference_design.is_empty() else CPU_DESIGN.default_design()
 	var reference_evaluation := CPU_DESIGN.evaluate(reference_design, ResearchManager.get_cpu_capabilities())
-	var reference_months := maxi(1, int(ceil(float(reference_evaluation.estimated_months) / maxf(effective_speed, 0.10))))
+	var reference_estimate := ResearchManager.estimate_cpu_development(
+		reference_design,
+		approach_key,
+		monthly_budget,
+		sourcing,
+		0,
+		0,
+		reference_evaluation
+	)
+	var reference_months := int(reference_estimate.get("months", 1))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
 	var axis_delta := CPU_DESIGN.decision_axis_delta(decision_axes, reference_axes)
 	var focus_key := _meta(rd_focus) if rd_focus != null else "BALANCED"
@@ -621,9 +636,9 @@ func _refresh_cpu_preview():
 				supplier_public_action,
 				acceptance_text, float(sourcing.get("acceptance_score", 0.0))
 			]
-	lab_dev_time_value.text = "~%d mois" % months
+	lab_dev_time_value.text = "~%d mois*" % months
 	lab_fit_value.text = "%.0f / 100" % fit
-	lab_warning_label.text = str(evaluation.tradeoff)
+	lab_warning_label.text = "%s\n* Estimation basée sur la vraie vitesse de simulation actuelle, hors mois optionnels décidés aux revues Prototype/Validation et retards fournisseur aléatoires." % str(evaluation.tradeoff)
 	lab_warning_label.add_theme_color_override("font_color", APP_RED if risk >= 60.0 else (APP_AMBER if risk >= 40.0 else APP_GREEN))
 
 	lab_tradeoff_summary_label.text = CPU_DESIGN.decision_summary(decision_axes)
@@ -1359,18 +1374,18 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	# Calcul local avec le profil sélectionné, sans modifier une partie en cours.
-	var base_company := 21000
+	# Projection locale du garage + budget CPU par défaut, sans modifier une partie en cours.
+	var base_company := 10500
 	var base_payroll := 32800
-	var base_research := 12000
-	var projected := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
-	projected += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
-	projected += int(round(float(base_research) * float(data.get("research_cost", 1.0))))
-	var capital := int(data.get("starting_capital", 500000))
-	var runway := float(capital) / maxf(float(projected), 1.0)
+	var base_first_cpu := 45000
+	var structural := int(round(float(base_company) * float(data.get("operating_cost", 1.0))))
+	structural += int(round(float(base_payroll) * float(data.get("salary_cost", 1.0))))
+	var with_first_cpu := structural + int(round(float(base_first_cpu) * float(data.get("research_cost", 1.0))))
+	var capital := int(data.get("starting_capital", 1450000))
+	var runway := float(capital) / maxf(float(with_first_cpu), 1.0)
 	var ai_profile := BalanceManager.company_ai_profile(key)
-	setup_difficulty_label.text = "%s\nCapital : %s € • dépenses structurelles de départ ~%s €/mois • marge théorique %.1f mois.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
-		BalanceManager.profile_description(key), _money(capital), _money(projected), runway,
+	setup_difficulty_label.text = "%s\nCapital de lancement : %s € • structure garage ~%s €/mois • avec un premier CPU à 45 000 €/mois : ~%s €/mois, soit %.1f mois de marge théorique.\nEntreprises IA : décisions tous les ~%d mois • précision %.0f/100 • agressivité commerciale %.0f%% • aucune triche technique." % [
+		BalanceManager.profile_description(key), _money(capital), _money(structural), _money(with_first_cpu), runway,
 		int(ai_profile.get("decision_interval_months", 2)),
 		float(ai_profile.get("decision_quality", 0.74)) * 100.0,
 		float(ai_profile.get("commercial_aggression", 1.0)) * 100.0
