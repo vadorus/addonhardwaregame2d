@@ -62,6 +62,26 @@ static func run(host: Node) -> String:
 	var heading: Control = dashboard.get("dashboard_heading")
 	var management_grid: GridContainer = dashboard.get("dashboard_grid")
 	var garage: Control = dashboard.get("dashboard_garage")
+	var nora_guide: Control = dashboard.get("dashboard_nora_guide")
+	if nora_guide == null or not nora_guide.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Nora guide is not visibly present in the opening garage"
+	var nora_message: Label = nora_guide.get("_message_label")
+	var nora_team: Label = nora_guide.get("_team_label")
+	var nora_action: Button = nora_guide.get("_action_button")
+	if nora_message == null or not nora_message.text.contains("bras droit"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Nora is visible but her guide role is not explained"
+	if nora_team == null or not nora_team.text.contains("R&D = recherche") or not nora_team.text.contains("Développement = transforme"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Nora guide does not explain R&D versus Development"
+	if nora_action == null or nora_action.text != "Aller à l'établi CPU":
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Nora guide does not expose the first useful action"
 	if heading == null or heading.visible or management_grid == null or management_grid.visible:
 		game.queue_free()
 		_restore(snapshot)
@@ -129,6 +149,27 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: garage did not expand its available zones after onboarding"
+	if not ExecutiveManager.is_interface_feature_unlocked("TEAM"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Team panel did not unlock after the first CPU project"
+
+	var personnel_screen: Control = game.get("personnel_screen")
+	if personnel_screen == null:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Team screen is missing"
+	personnel_screen.call("refresh")
+	var team_explainer: Label = personnel_screen.get("team_explainer_label")
+	var staff_label: Label = personnel_screen.get("staff_label")
+	if team_explainer == null or not team_explainer.text.contains("R&D — INVENTER ET APPRENDRE") or not team_explainer.text.contains("DÉVELOPPEMENT CPU — TRANSFORMER L'IDÉE EN PRODUIT"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Team screen does not clearly explain the two CPU technical groups"
+	if staff_label == null or not staff_label.text.contains("Camille Durand") or not staff_label.text.contains("Samira Lefèvre"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.5 entry: Team screen no longer identifies the people behind R&D and Development"
 
 	game.queue_free()
 	_restore(snapshot)
