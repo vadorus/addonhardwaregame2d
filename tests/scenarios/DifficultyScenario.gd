@@ -6,6 +6,7 @@ static func run() -> String:
 	var balance_state := BalanceManager.get_state().duplicate(true)
 	var standard_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
 	var standard_market_units := MarketManager.segment_market_units("EMBEDDED")
+	var standard_capital := BalanceManager.starting_capital()
 	var standard_runway := BalanceManager.starting_runway_months()
 
 	BalanceManager.reset("ACCESSIBLE")
@@ -26,9 +27,9 @@ static func run() -> String:
 	if not (accessible_market_units > standard_market_units and standard_market_units > realistic_market_units):
 		BalanceManager.load_state(balance_state)
 		return "Difficulty profiles do not change available market demand"
-	if accessible_capital <= 500000 or realistic_capital >= 500000:
+	if not (accessible_capital > standard_capital and standard_capital > realistic_capital):
 		BalanceManager.load_state(balance_state)
-		return "Difficulty profiles do not change starting liquidity"
+		return "Difficulty profiles do not change starting liquidity progressively"
 	if accessible_runway <= standard_runway or realistic_runway >= standard_runway:
 		BalanceManager.load_state(balance_state)
 		return "Difficulty profiles do not create distinct starting runway pressure"
