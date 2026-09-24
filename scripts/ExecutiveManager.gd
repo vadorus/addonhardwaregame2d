@@ -548,11 +548,11 @@ func get_ceo_decisions() -> Array:
 		var project_decision: Dictionary = project_decision_value
 		decisions.append({
 			"id":"PROJECT:%s:%s" % [str(project_decision.get("project_id", "")), str(project_decision.get("id", "DECISION"))],
-			"category":"PROTOTYPE",
-			"severity":82.0,
-			"title":str(project_decision.get("title", "Revue du prototype")),
+			"category":str(project_decision.get("category", "DÉVELOPPEMENT")),
+			"severity":float(project_decision.get("severity", 82.0)),
+			"title":str(project_decision.get("title", "Arbitrage développement")),
 			"text":str(project_decision.get("text", "L'équipe attend votre décision.")),
-			"recommendation":"Ouvrez le Laboratoire CPU et choisissez l'orientation du prototype. Le développement reste en pause jusque-là.",
+			"recommendation":"Ouvrez le Laboratoire CPU. %s" % str(project_decision.get("recommendation", "Le développement reste en pause jusque-là.")),
 			"target_tab":3,
 			"can_defer":false
 		})
@@ -663,10 +663,10 @@ func get_executive_brief() -> Dictionary:
 	if not pending_project_decisions.is_empty():
 		var project_decision: Dictionary = pending_project_decisions[0]
 		priorities.append({
-			"category":"PROTOTYPE",
-			"severity":82,
-			"text":"%s attend votre arbitrage." % str(project_decision.get("project_name", "Le prototype CPU")),
-			"action":"Ouvrez le Laboratoire CPU : corriger, rééquilibrer ou pousser les performances changera réellement la suite du projet."
+			"category":str(project_decision.get("category", "DÉVELOPPEMENT")),
+			"severity":float(project_decision.get("severity", 82.0)),
+			"text":"%s attend votre arbitrage." % str(project_decision.get("project_name", "Le projet CPU")),
+			"action":"Ouvrez le Laboratoire CPU : %s" % str(project_decision.get("recommendation", "le développement reste en pause jusqu'à votre décision."))
 		})
 	var finance := financial_advice()
 	if str(finance.level) in ["IMPOSSIBLE","DANGEREUX","TENDU"]:

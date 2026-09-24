@@ -461,15 +461,29 @@ func refresh() -> void:
 		var phase_progress: float = float(active_project.get("phase_progress", 0.0))
 		var remediation_remaining := int(active_project.get("remediation_months_remaining", 0))
 		var remediation_total := maxi(int(active_project.get("remediation_total_months", 0)), 1)
+		var decision_delay := int(active_project.get("decision_delay_months_remaining", 0))
+		var pending_gate_value = active_project.get("pending_decision", {})
+		var pending_gate: Dictionary = pending_gate_value if typeof(pending_gate_value) == TYPE_DICTIONARY else {}
 		var overall_progress: float = (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
-		if remediation_remaining > 0:
+		if int(active_project.get("phase_index", 0)) >= GameData.PHASES.size():
+			overall_progress = 100.0
+		elif remediation_remaining > 0:
 			overall_progress = (1.0 - float(remediation_remaining) / float(remediation_total)) * 10.0
 		var approach_key := str(active_project.get("approach", "INTERNAL"))
 		var approach_label := str(GameData.APPROACHES.get(approach_key, {}).get("label", approach_key))
 		dashboard_label.text = str(active_project.get("name", "Projet CPU"))
 		var active_design := CPU_DESIGN.normalize(active_project.get("cpu_design", {}))
 		dashboard_project_meta_label.text = "%d cœur(s) • %s • %s • %s • cible %s" % [int(active_design.cores), CPU_DESIGN.format_frequency(active_design), CPU_DESIGN.node_label(int(active_design.node_nm)), approach_label, MarketManager.segment_label(MarketManager.normalize_segment(str(active_project.get("segment", MarketManager.default_segment()))))]
-		if remediation_remaining > 0:
+		if not pending_gate.is_empty():
+			dashboard_project_phase_label.text = str(pending_gate.get("kicker", "ARBITRAGE DÉVELOPPEMENT"))
+			dashboard_cto_label.text = "« %s »" % str(pending_gate.get("text", "L'équipe attend votre décision."))
+		elif decision_delay > 0:
+			dashboard_project_phase_label.text = "%s • %d MOIS RESTANTS" % [
+				"CORRECTION VALIDATION" if int(active_project.get("phase_index", 0)) >= GameData.PHASES.size() else "CORRECTION PROTOTYPE",
+				decision_delay
+			]
+			dashboard_cto_label.text = "« L'équipe applique votre décision. La progression normale est suspendue pendant cette passe de correction. »"
+		elif remediation_remaining > 0:
 			var remediation: Dictionary = active_project.get("technical_remediation", {})
 			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining
 			dashboard_cto_label.text = "« Nous développons %s avant de reprendre le CPU. Ce détour réduit le risque et transforme une limite actuelle en savoir-faire réutilisable. »" % str(remediation.get("title", "la solution validée"))

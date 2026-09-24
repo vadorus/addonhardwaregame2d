@@ -369,7 +369,7 @@ func _on_lab_action(action: String, payload: Variant = null):
 					choice_label = str(option.get("label", choice_id))
 					break
 			if project_id != "" and choice_id != "" and ResearchManager.resolve_project_decision(project_id, choice_id):
-				status_label.text = "Décision prototype validée : %s." % choice_label
+				status_label.text = "Décision %s validée : %s." % [str(decision.get("category", "développement")).to_lower(), choice_label]
 			else:
 				status_label.text = "Décision impossible : vérifiez la trésorerie et l'état du projet."
 			_refresh_all()

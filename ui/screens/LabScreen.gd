@@ -20,6 +20,7 @@ const APP_LINE := UI.APP_LINE
 var tech_label: Label
 var projects_label: Label
 var project_decision_card: PanelContainer
+var project_decision_kicker: Label
 var project_decision_label: Label
 var project_decision_buttons: Array[Button] = []
 var patents_label: Label
@@ -450,7 +451,8 @@ func _build() -> void:
 	var decision_box := VBoxContainer.new()
 	decision_box.add_theme_constant_override("separation", 8)
 	project_decision_card.add_child(decision_box)
-	decision_box.add_child(_eyebrow("ARBITRAGE PROTOTYPE"))
+	project_decision_kicker = _eyebrow("ARBITRAGE DÉVELOPPEMENT")
+	decision_box.add_child(project_decision_kicker)
 	project_decision_label = _rich_label()
 	decision_box.add_child(project_decision_label)
 	var decision_actions := HFlowContainer.new()
@@ -578,11 +580,22 @@ func refresh_research_content() -> void:
 		var project: Dictionary = project_value
 		var phase := "Terminé"
 		if str(project.get("status", "")) == "DEVELOPMENT":
-			if int(project.get("remediation_months_remaining", 0)) > 0:
+			var pending_gate_value = project.get("pending_decision", {})
+			var pending_gate: Dictionary = pending_gate_value if typeof(pending_gate_value) == TYPE_DICTIONARY else {}
+			var decision_delay := int(project.get("decision_delay_months_remaining", 0))
+			if not pending_gate.is_empty():
+				phase = str(pending_gate.get("kicker", "ARBITRAGE DÉVELOPPEMENT")).capitalize()
+			elif decision_delay > 0:
+				phase = "%s — %d mois restant(s)" % [
+					"Correction validation" if int(project.get("phase_index", 0)) >= GameData.PHASES.size() else "Correction prototype",
+					decision_delay
+				]
+			elif int(project.get("remediation_months_remaining", 0)) > 0:
 				phase = "Mise au point technique — %d mois restant(s)" % int(project.get("remediation_months_remaining", 0))
 			else:
+				var safe_phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 				phase = "%s — %.0f%%" % [
-					GameData.PHASES[int(project.get("phase_index", 0))],
+					GameData.PHASES[safe_phase_index],
 					float(project.get("phase_progress", 0.0))
 				]
 
@@ -763,6 +776,8 @@ func _refresh_project_decision() -> void:
 		return
 	var decision: Dictionary = decisions[0]
 	project_decision_card.visible = true
+	if project_decision_kicker != null:
+		project_decision_kicker.text = str(decision.get("kicker", "ARBITRAGE DÉVELOPPEMENT"))
 	project_decision_label.text = "%s\n\n%s" % [
 		str(decision.get("title", "Revue du prototype")),
 		str(decision.get("text", "L'équipe attend votre arbitrage."))
@@ -783,7 +798,7 @@ func _refresh_project_decision() -> void:
 			suffix += " • +%d mois" % delay
 		button.text = "%s%s" % [str(option.get("label", "Décider")), suffix]
 		button.tooltip_text = str(option.get("description", ""))
-		button.disabled = cost > 0 and not Economy.can_afford(cost, "Revue prototype")
+		button.disabled = cost > 0 and not Economy.can_afford(cost, str(decision.get("expense_label", "Arbitrage développement")))
 
 func _on_project_decision_pressed(option_index: int) -> void:
 	var decisions := ResearchManager.get_pending_project_decisions()

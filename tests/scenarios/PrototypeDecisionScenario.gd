@@ -71,8 +71,9 @@ static func run(host: Node) -> String:
 	host.add_child(lab)
 	lab.call("refresh_research_content")
 	var decision_card: PanelContainer = lab.get("project_decision_card")
+	var decision_kicker: Label = lab.get("project_decision_kicker")
 	var decision_buttons: Array = lab.get("project_decision_buttons")
-	if decision_card == null or not decision_card.visible or decision_buttons.size() != 3:
+	if decision_card == null or not decision_card.visible or decision_kicker == null or decision_kicker.text != "ARBITRAGE PROTOTYPE" or decision_buttons.size() != 3:
 		lab.queue_free()
 		_restore(research_state, economy_state, company_state)
 		return "Lab did not expose the prototype review controls"
@@ -141,7 +142,13 @@ static func run(host: Node) -> String:
 		return "Resolved prototype review remained visible in the Lab"
 
 	var phase_progress_before_delay := float(project.get("phase_progress", 0.0))
+	var quality_average_before_delay := float(project.get("quality_accumulator", 0.0)) / float(maxi(int(project.get("months_spent", 0)), 1))
 	ResearchManager._process_project_month(project)
+	var quality_average_after_delay := float(project.get("quality_accumulator", 0.0)) / float(maxi(int(project.get("months_spent", 0)), 1))
+	if absf(quality_average_after_delay - quality_average_before_delay) > 0.001:
+		lab.queue_free()
+		_restore(research_state, economy_state, company_state)
+		return "Prototype correction month diluted average project quality"
 	if int(project.get("decision_delay_months_remaining", -1)) != 0:
 		lab.queue_free()
 		_restore(research_state, economy_state, company_state)
