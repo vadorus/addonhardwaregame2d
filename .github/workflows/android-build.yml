@@ -1,0 +1,136 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Godot 4.7.2 with export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Prepare Android SDK and debug keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_ROOT" ]; then
+            echo "Android SDK root is not available on this runner."
+            exit 1
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "build-tools;35.0.1" "platforms;android-35"
+
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v               -keystore "$HOME/.android/debug.keystore"               -storepass android               -alias androiddebugkey               -keypass android               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Configure Godot Android editor settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --editor --path . --quit
+          SETTINGS="$(find "$HOME/.config/godot" -maxdepth 1 -name 'editor_settings-*.tres' | head -n 1)"
+          if [ -z "$SETTINGS" ] || [ ! -f "$SETTINGS" ]; then
+            echo "Godot editor settings file not found"
+            exit 1
+          fi
+          python3 - "$SETTINGS" <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          text = path.read_text()
+          values = {
+              "export/android/android_sdk_path": os.environ["ANDROID_SDK_ROOT"],
+              "export/android/java_sdk_path": os.environ["JAVA_HOME"],
+              "export/android/debug_keystore": str(Path.home() / ".android" / "debug.keystore"),
+              "export/android/debug_keystore_user": "androiddebugkey",
+              "export/android/debug_keystore_pass": "android",
+          }
+          for key, value in values.items():
+              escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+              line = f'{key} = "{escaped}"'
+              pattern = rf'(?m)^{re.escape(key)}\s*=.*$'
+              if re.search(pattern, text):
+                  text = re.sub(pattern, line, text)
+              else:
+                  text += "\n" + line
+          path.write_text(text)
+          PY
+          grep -E 'export/android/(android_sdk_path|java_sdk_path|debug_keystore)' "$SETTINGS"
+
+      - name: Import project
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --import 2>&1 | tee /tmp/import.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log; then exit 1; fi
+
+      - name: Export Android debug APK
+        shell: bash
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.ci-debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          cp "$HOME/.android/debug.keystore" "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
+          mkdir -p build/android
+          set -o pipefail
+          godot --headless --path . --export-debug "Android APK" build/android/TechEmpire-v0.4-debug.apk 2>&1 | tee /tmp/android-export.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/android-export.log; then exit 1; fi
+          test -s build/android/TechEmpire-v0.4-debug.apk
+
+      - name: Inspect APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh build/android
+          file build/android/TechEmpire-v0.4-debug.apk
+          sha256sum build/android/TechEmpire-v0.4-debug.apk | tee build/android/SHA256SUMS.txt
+          unzip -l build/android/TechEmpire-v0.4-debug.apk | grep -E 'AndroidManifest.xml|lib/arm64-v8a/libgodot_android.so'
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TechEmpire-Android-v0.4-debug
+          path: |
+            build/android/TechEmpire-v0.4-debug.apk
+            build/android/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
