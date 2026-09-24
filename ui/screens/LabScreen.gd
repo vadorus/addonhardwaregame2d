@@ -597,6 +597,14 @@ func _fill_focus_options(option: OptionButton) -> void:
 		option.add_item(str(GameData.FOCUS_OPTIONS[key].label))
 		option.set_item_metadata(option.item_count - 1, key)
 
+func set_viewport_width(width: float) -> void:
+	var compact := width < 900.0
+	var narrow := width < 620.0
+	if lab_layout_grid != null:
+		lab_layout_grid.columns = 1 if compact else 2
+	if lab_stats_grid != null:
+		lab_stats_grid.columns = 1 if narrow else 3
+
 func get_control_map() -> Dictionary:
 	return {
 		"tech_label":tech_label,
