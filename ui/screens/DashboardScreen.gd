@@ -9,6 +9,10 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
 var dashboard_label: Label
 var alerts_label: Label
+var dashboard_heading: Control
+var dashboard_garage_card: PanelContainer
+var dashboard_garage_header: Control
+var dashboard_priority_card: PanelContainer
 var dashboard_garage: Control
 var dashboard_priority_category: Label
 var dashboard_priority_select: OptionButton
@@ -51,9 +55,10 @@ func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
 
-	var heading := HBoxContainer.new()
-	heading.add_theme_constant_override("separation", 12)
-	box.add_child(heading)
+	dashboard_heading = HBoxContainer.new()
+	dashboard_heading.add_theme_constant_override("separation", 12)
+	box.add_child(dashboard_heading)
+	var heading := dashboard_heading as HBoxContainer
 	var heading_copy := VBoxContainer.new()
 	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(heading_copy)
@@ -62,15 +67,17 @@ func _build() -> void:
 	heading_copy.add_child(title)
 	heading_copy.add_child(UI.muted_label("Une priorité claire, les signaux importants et la prochaine décision.", 13))
 
-	var garage_card := UI.card(UI.APP_PANEL, 14, 10)
-	garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(garage_card)
+	dashboard_garage_card = UI.card(UI.APP_PANEL, 14, 10)
+	dashboard_garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(dashboard_garage_card)
+	var garage_card := dashboard_garage_card
 	var garage_box := VBoxContainer.new()
 	garage_box.add_theme_constant_override("separation", 7)
 	garage_card.add_child(garage_box)
-	var garage_header := HBoxContainer.new()
-	garage_header.add_theme_constant_override("separation", 8)
-	garage_box.add_child(garage_header)
+	dashboard_garage_header = HBoxContainer.new()
+	dashboard_garage_header.add_theme_constant_override("separation", 8)
+	garage_box.add_child(dashboard_garage_header)
+	var garage_header := dashboard_garage_header as HBoxContainer
 	var garage_copy := VBoxContainer.new()
 	garage_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	garage_header.add_child(garage_copy)
@@ -85,9 +92,10 @@ func _build() -> void:
 	dashboard_garage.connect("zone_requested", Callable(self, "_on_garage_zone_requested"))
 	garage_box.add_child(dashboard_garage)
 
-	var priority_card := UI.card(UI.APP_AMBER_DARK, 12, 12)
-	priority_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(priority_card)
+	dashboard_priority_card = UI.card(UI.APP_AMBER_DARK, 12, 12)
+	dashboard_priority_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(dashboard_priority_card)
+	var priority_card := dashboard_priority_card
 	var priority_box := VBoxContainer.new()
 	priority_box.add_theme_constant_override("separation", 7)
 	priority_card.add_child(priority_box)
@@ -408,11 +416,26 @@ func set_viewport_width(width: float) -> void:
 func refresh() -> void:
 	if dashboard_label == null:
 		return
+	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
+	if dashboard_heading != null:
+		dashboard_heading.visible = not garage_intro
+	if dashboard_garage_header != null:
+		dashboard_garage_header.visible = not garage_intro
+	if dashboard_priority_card != null:
+		dashboard_priority_card.visible = not garage_intro
+	if dashboard_grid != null:
+		dashboard_grid.visible = not garage_intro
+	if dashboard_stats_grid != null:
+		dashboard_stats_grid.visible = not garage_intro
+	if dashboard_lower_grid != null:
+		dashboard_lower_grid.visible = not garage_intro
 	if dashboard_cto_button != null:
-		dashboard_cto_button.visible = not CompanyManager.created or ExecutiveManager.is_interface_feature_unlocked("COMPANY")
+		dashboard_cto_button.visible = not garage_intro and (not CompanyManager.created or ExecutiveManager.is_interface_feature_unlocked("COMPANY"))
 	if dashboard_garage != null:
 		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
 		dashboard_garage.call("set_progression", ExecutiveManager.get_interface_unlocks())
+		if dashboard_garage.has_method("set_onboarding_stage"):
+			dashboard_garage.call("set_onboarding_stage", "FIRST_IDEA" if garage_intro else "NORMAL")
 	if not CompanyManager.created:
 		if dashboard_priority_category != null:
 			dashboard_priority_category.text = "CRÉATION"
