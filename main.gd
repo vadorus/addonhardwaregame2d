@@ -357,6 +357,22 @@ func _on_lab_action(action: String, payload: Variant = null):
 			_accept_cpu_remediation()
 		"start_project":
 			_start_project()
+		"resolve_project_decision":
+			var decision_payload: Dictionary = payload if typeof(payload) == TYPE_DICTIONARY else {}
+			var project_id := str(decision_payload.get("project_id", ""))
+			var choice_id := str(decision_payload.get("choice_id", ""))
+			var decision := ResearchManager.get_project_decision(project_id)
+			var choice_label := choice_id
+			for option_value in decision.get("options", []):
+				var option: Dictionary = option_value
+				if str(option.get("id", "")) == choice_id:
+					choice_label = str(option.get("label", choice_id))
+					break
+			if project_id != "" and choice_id != "" and ResearchManager.resolve_project_decision(project_id, choice_id):
+				status_label.text = "Décision prototype validée : %s." % choice_label
+			else:
+				status_label.text = "Décision impossible : vérifiez la trésorerie et l'état du projet."
+			_refresh_all()
 		"file_patent":
 			_file_patent()
 		"toggle_patent_license":
