@@ -1740,8 +1740,8 @@ func get_state() -> Dictionary:
 		"next_contract_id":_next_contract_id,
 		"next_tender_id":_next_tender_id,
 		"market_age_months":market_age_months,
-		"rng_seed":rng.seed,
-		"rng_state":rng.state
+		"rng_seed":SaveCodec.int64_to_json(rng.seed),
+		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
 
 func _migrate_competitor(competitor: Dictionary, sector: String) -> Dictionary:
@@ -1825,6 +1825,6 @@ func load_state(state: Dictionary):
 	_next_contract_id = int(state.get("next_contract_id", 1))
 	_next_tender_id = int(state.get("next_tender_id", tenders.size() + 1))
 	market_age_months = int(state.get("market_age_months", 0))
-	rng.seed = int(state.get("rng_seed", 43021))
-	rng.state = int(state.get("rng_state", rng.state))
+	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "43021"), 43021)
+	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	market_changed.emit()
