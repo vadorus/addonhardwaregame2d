@@ -5,7 +5,7 @@ signal data_changed
 
 const UI := preload("res://ui/UiKit.gd")
 
-var staff_label: Label
+var staff_container: VBoxContainer
 var team_explainer_label: Label
 var candidate_label: Label
 var recruit_department: OptionButton
@@ -53,9 +53,9 @@ func _build() -> void:
 	box.add_child(explainer_card)
 
 	box.add_child(UI.section("Membres de l'équipe"))
-	staff_label = UI.rich_label()
-	staff_label.add_theme_font_size_override("font_size", 13)
-	box.add_child(staff_label)
+	staff_container = VBoxContainer.new()
+	staff_container.add_theme_constant_override("separation", 10)
+	box.add_child(staff_container)
 
 	box.add_child(UI.section("Recrutement"))
 	var recruit_intro := UI.muted_label("Recrutez seulement quand vous avez identifié un besoin. Renforcer la R&D améliore la recherche ; renforcer Développement augmente la capacité à mener les projets produits.", 12)
@@ -83,7 +83,7 @@ func _build() -> void:
 	refresh()
 
 func refresh() -> void:
-	if staff_label == null or candidate_label == null or team_explainer_label == null:
+	if staff_container == null or candidate_label == null or team_explainer_label == null:
 		return
 
 	var rd_count := PersonnelManager.count_department("R&D")
@@ -96,34 +96,7 @@ func refresh() -> void:
 		ResearchManager.development_capacity_factor() * 100.0
 	]
 
-	var departments := ["R&D","Développement","Production","Marketing","Support","Finance"]
-	var lines: Array[String] = []
-	for department in departments:
-		var members: Array[Dictionary] = []
-		for employee_value in PersonnelManager.staff:
-			var employee: Dictionary = employee_value
-			if str(employee.get("department", "")) == department:
-				members.append(employee)
-		if members.is_empty():
-			continue
-
-		var purpose := _department_purpose(department)
-		lines.append("%s — %s" % [department.to_upper(), purpose])
-		for employee in members:
-			var leader_mark := _leader_mark(employee)
-			lines.append("• %s — %s%s" % [
-				str(employee.get("name", "")),
-				str(employee.get("role", "")),
-				leader_mark
-			])
-			lines.append("  Compétence %d • expérience %.1f ans • spé. %s • %s €/mois" % [
-				int(employee.get("skill", 0)),
-				float(employee.get("experience_years", 0.0)),
-				str(employee.get("specialization", "")),
-				UI.money(int(employee.get("salary", 0)))
-			])
-		lines.append("")
-	staff_label.text = "\n".join(lines)
+	_rebuild_department_cards()
 
 	if PersonnelManager.candidate.is_empty():
 		candidate_label.text = "Aucun candidat sélectionné."
@@ -138,6 +111,70 @@ func refresh() -> void:
 		float(profile.get("process_quality", 50.0)), UI.money(int(candidate.get("salary", 0))),
 		UI.money(int(candidate.get("salary", 0)) * 2)
 	]
+
+func _rebuild_department_cards() -> void:
+	for child in staff_container.get_children():
+		child.queue_free()
+
+	for department in ["R&D","Développement","Production","Marketing","Support","Finance"]:
+		var members: Array[Dictionary] = []
+		for employee_value in PersonnelManager.staff:
+			var employee: Dictionary = employee_value
+			if str(employee.get("department", "")) == department:
+				members.append(employee)
+		if members.is_empty():
+			continue
+
+		var card := UI.card(UI.APP_PANEL if department not in ["R&D","Développement"] else UI.APP_CYAN_DARK, 12, 12)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		card.add_child(box)
+
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 8)
+		box.add_child(head)
+		var title := UI.label(department, 17)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(title)
+		var count := UI.label("%d pers." % members.size(), 11)
+		count.add_theme_color_override("font_color", UI.APP_CYAN)
+		head.add_child(count)
+
+		var purpose := UI.muted_label(_department_purpose(department), 11)
+		purpose.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(purpose)
+
+		for employee in members:
+			var person := UI.card(UI.APP_PANEL_ALT, 9, 9)
+			var person_box := VBoxContainer.new()
+			person_box.add_theme_constant_override("separation", 3)
+			person.add_child(person_box)
+			var line := HBoxContainer.new()
+			person_box.add_child(line)
+			var name := UI.label(str(employee.get("name", "")), 14)
+			name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			line.add_child(name)
+			var leader_mark := _leader_mark(employee)
+			if leader_mark != "":
+				var badge := UI.label("RESPONSABLE", 10)
+				badge.add_theme_color_override("font_color", UI.APP_AMBER)
+				line.add_child(badge)
+			var role := UI.muted_label(str(employee.get("role", "")), 11)
+			role.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			person_box.add_child(role)
+			var stats := UI.muted_label("Compétence %d • expérience %.1f ans • %s" % [
+				int(employee.get("skill", 0)),
+				float(employee.get("experience_years", 0.0)),
+				str(employee.get("specialization", ""))
+			], 11)
+			stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			person_box.add_child(stats)
+			box.add_child(person)
+
+		staff_container.add_child(card)
+
+func department_card_count() -> int:
+	return staff_container.get_child_count() if staff_container != null else 0
 
 func _department_purpose(department: String) -> String:
 	match department:
