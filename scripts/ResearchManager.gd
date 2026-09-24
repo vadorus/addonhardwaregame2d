@@ -644,6 +644,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"team_score":team_score,
 		"management_modifier":management_modifier,
 		"technology_score":technology_score,
+		"simulation_technology_score":float(technologies.get("cpu", 18.0)),
+		"phase_count":GameData.PHASES.size(),
 		"architecture_capability":architecture_capability,
 		"layout_score":layout_score,
 		"miniaturization_score":miniaturization_score,
