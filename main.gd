@@ -37,13 +37,10 @@ var dashboard_screen: Control
 var personnel_screen: Control
 var lab_screen: Control
 var products_screen: Control
+var market_screen: Control
 var tech_label: Label
 var projects_label: Label
 var patents_label: Label
-var market_label: Label
-var contract_label: Label
-var after_sales_label: Label
-var after_sales_case_select: OptionButton
 var media_screen: Control
 
 var setup_name: LineEdit
@@ -107,14 +104,6 @@ var lab_remediation_options: Array = []
 var active_cpu_remediation: Dictionary = {}
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
-var market_product_select: OptionButton
-var market_competitor_select: OptionButton
-var market_comparison_label: Label
-var tender_select: OptionButton
-var tender_product_select: OptionButton
-var tender_bid_price: SpinBox
-var tender_label: Label
-var tender_submit_button: Button
 
 var nav_buttons: Array[Button] = []
 var _refresh_all_pending := false
@@ -830,71 +819,40 @@ func _create_products_tab():
 	tabs.add_child(products_screen)
 
 func _create_market_tab():
-	var scroll := _tab_scroll("Marché")
-	var box: VBoxContainer = scroll.get_child(0)
-	box.add_child(_section("Votre produit"))
-	market_product_select=OptionButton.new(); market_product_select.item_selected.connect(func(_i): _refresh_market()); box.add_child(market_product_select)
-	market_label=_rich_label(); box.add_child(market_label)
-	box.add_child(_section("Comparaison concurrentielle"))
-	var comparison_intro := _muted_label("Comparez les informations publiques disponibles. Les données internes des concurrents restent cachées : la simulation les utilise, mais votre entreprise ne les connaît pas automatiquement.", 12)
-	comparison_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(comparison_intro)
-	market_competitor_select = OptionButton.new()
-	market_competitor_select.item_selected.connect(func(_i): _refresh_market_comparison())
-	box.add_child(market_competitor_select)
-	market_comparison_label = _rich_label()
-	market_comparison_label.custom_minimum_size.y = 150
-	box.add_child(market_comparison_label)
+	var market_script: Script = load("res://ui/screens/MarketScreen.gd")
+	market_screen = market_script.new() as Control
+	market_screen.connect("action_requested", _on_market_action)
+	tabs.add_child(market_screen)
 
-	box.add_child(_section("Appels d'offres & partenariats"))
-	var tender_intro := _muted_label("Les clients B2B publient un cahier des charges. Vous pouvez proposer un CPU prêt ou déjà lancé. Une offre acceptée avant lancement réserve le contrat jusqu'à la commercialisation.", 12)
-	tender_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(tender_intro)
-	tender_select = OptionButton.new()
-	tender_select.item_selected.connect(func(_i): _refresh_tender_detail())
-	box.add_child(tender_select)
-	tender_product_select = OptionButton.new()
-	tender_product_select.item_selected.connect(func(_i): _refresh_tender_detail())
-	box.add_child(tender_product_select)
-	tender_bid_price = _spin(1, 1000000, 1, 100)
-	tender_bid_price.value_changed.connect(func(_value): _refresh_tender_detail())
-	box.add_child(tender_bid_price)
-	tender_label = _rich_label()
-	tender_label.custom_minimum_size.y = 170
-	box.add_child(tender_label)
-	tender_submit_button = Button.new()
-	tender_submit_button.text = "Soumettre l'offre"
-	tender_submit_button.custom_minimum_size.y = 42
-	tender_submit_button.pressed.connect(_submit_tender_bid)
-	box.add_child(tender_submit_button)
-
-	box.add_child(_section("Contrats B2B")); contract_label=_rich_label(); box.add_child(contract_label)
-	var accept:=Button.new(); accept.text="Accepter la première proposition B2B"; accept.pressed.connect(_accept_contract); box.add_child(accept)
-	box.add_child(_section("SAV & expérience terrain"))
-	after_sales_label = _rich_label()
-	box.add_child(after_sales_label)
-	after_sales_case_select = OptionButton.new()
-	after_sales_case_select.item_selected.connect(func(_i): _refresh_after_sales())
-	box.add_child(after_sales_case_select)
-	var sav_actions := HFlowContainer.new()
-	sav_actions.add_theme_constant_override("h_separation", 8)
-	box.add_child(sav_actions)
-	var investigate := Button.new()
-	investigate.text = "Enquêter"
-	investigate.pressed.connect(_investigate_sav_case)
-	sav_actions.add_child(investigate)
-	var monitor := Button.new()
-	monitor.text = "Surveiller"
-	monitor.pressed.connect(_monitor_sav_case)
-	sav_actions.add_child(monitor)
-	var correct := Button.new()
-	correct.text = "Appliquer un correctif"
-	correct.pressed.connect(_correct_sav_case)
-	sav_actions.add_child(correct)
-	var recall := Button.new()
-	recall.text = "Rappeler le produit"
-	recall.pressed.connect(_recall_sav_case)
-	sav_actions.add_child(recall)
+func _on_market_action(action: String, payload: Dictionary):
+	match action:
+		"submit_tender":
+			if payload.is_empty():
+				status_label.text = "Aucun appel d'offres ou CPU disponible."
+			else:
+				var ok := MarketManager.submit_tender_bid(
+					str(payload.get("tender_id", "")),
+					str(payload.get("product_id", "")),
+					int(payload.get("price", 0))
+				)
+				status_label.text = "Offre B2B envoyée. Le client rendra sa décision au prochain cycle mensuel." if ok else "Impossible d'envoyer cette offre : vérifiez le statut du CPU, du contrat et de l'appel d'offres."
+		"accept_pending_contract":
+			status_label.text = "Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."
+		"investigate_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête : dossier absent ou trésorerie insuffisante."
+		"monitor_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Dossier placé sous surveillance." if case_id != "" and AfterSalesManager.monitor_case(case_id) else "Aucun dossier SAV disponible."
+		"correct_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Correctif SAV appliqué." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et la trésorerie doit permettre le correctif."
+		"recall_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."
+		_:
+			return
+	_request_refresh_all()
 
 func _create_media_tab():
 	var media_script: Script = load("res://ui/screens/MediaScreen.gd")
@@ -1713,7 +1671,6 @@ func _toggle_patent_license(): PatentManager.toggle_license_first(); _refresh_al
 func _refresh_products():
 	if products_screen != null:
 		products_screen.call("refresh")
-	_refresh_market_product_options()
 
 func _on_products_action(action: String, payload: Dictionary):
 	match action:
@@ -1792,339 +1749,9 @@ func _on_products_action(action: String, payload: Dictionary):
 			return
 	_refresh_all()
 
-func _refresh_market_product_options():
-	if market_product_select==null: return
-	var current:=_meta(market_product_select) if market_product_select.item_count>0 else ""; market_product_select.clear()
-	for p in ProductManager.products:
-		if str(p.status)=="LAUNCHED": market_product_select.add_item(str(p.name)); market_product_select.set_item_metadata(market_product_select.item_count-1,str(p.id))
-	if current!="": _select_meta(market_product_select,current)
-	_refresh_market_competitor_options()
-
-func _refresh_market_competitor_options():
-	if market_competitor_select == null:
-		return
-	var current := _meta(market_competitor_select) if market_competitor_select.item_count > 0 else ""
-	market_competitor_select.clear()
-	for profile_value in MarketManager.cpu_competitor_public_profiles():
-		var profile: Dictionary = profile_value
-		market_competitor_select.add_item("%s — %s" % [str(profile.get("company", "")), str(profile.get("product", ""))])
-		market_competitor_select.set_item_metadata(market_competitor_select.item_count - 1, str(profile.get("id", "")))
-	if current != "":
-		_select_meta(market_competitor_select, current)
-	if market_competitor_select.selected < 0 and market_competitor_select.item_count > 0:
-		market_competitor_select.select(0)
-
 func _refresh_market():
-	if market_label == null:
-		return
-	_refresh_market_product_options()
-	_refresh_after_sales()
-
-	var lines: Array[String] = [
-		"Marché CPU — %d • signal technologique %.0f/100" % [TimeManager.year, MarketManager.market_technology_signal()],
-		"",
-		"Besoins actifs :"
-	]
-	for row_value in MarketManager.market_landscape():
-		var row: Dictionary = row_value
-		lines.append("• %s — marché ~%s unités/mois • repère prix %s €" % [
-			str(row.get("label", "")), _money(int(row.get("units", 0))), _money(int(row.get("reference_price", 0)))
-		])
-		lines.append("  %s" % str(row.get("description", "")))
-
-	var next_needs := MarketManager.next_market_needs()
-	if not next_needs.is_empty():
-		lines.append("\nBesoins susceptibles d'émerger ensuite :")
-		for next_value in next_needs:
-			var next_need: Dictionary = next_value
-			lines.append("• %s — repère historique %d, ou plus tôt si le signal techno atteint %.0f/100" % [
-				str(next_need.get("label", "")), int(next_need.get("historical_year", 0)), float(next_need.get("tech_trigger", 0.0))
-			])
-
-	lines.append("\nConcurrents CPU — informations publiques :")
-	for competitor_value in MarketManager.cpu_competitor_public_profiles():
-		var competitor: Dictionary = competitor_value
-		lines.append("• %s — %s G%d • %s • cible %s • %s €" % [
-			str(competitor.get("company", "")), str(competitor.get("product", "")), int(competitor.get("generation", 1)),
-			CPU_DESIGN.node_label(int(competitor.get("node_nm", 10000))),
-			MarketManager.segment_label(str(competitor.get("target_segment", "EMBEDDED"))),
-			_money(int(competitor.get("price", 0)))
-		])
-		lines.append("  benchmark %.1f • %s • %d mois sur le marché" % [
-			float(competitor.get("benchmark_score", 0.0)), str(competitor.get("market_signal", "Présence limitée")),
-			int(competitor.get("months_on_market", 0))
-		])
-		var technology_partner := str(competitor.get("technology_partner", ""))
-		if technology_partner != "":
-			lines.append("  Partenariat technologique public : %s" % technology_partner)
-		var public_b2b_customer := str(competitor.get("public_b2b_customer", ""))
-		if public_b2b_customer != "":
-			lines.append("  Contrat B2B public : %s" % public_b2b_customer)
-		var public_action := str(competitor.get("recent_public_action", ""))
-		if public_action != "":
-			lines.append("  Mouvement observé : %s" % public_action)
-
-	if market_product_select.item_count == 0:
-		lines.append("\nAucun de vos CPU n'est encore commercialisé. Le marché et les concurrents continuent néanmoins d'évoluer.")
-		market_label.text = "\n".join(lines)
-	else:
-		var product := ProductManager.get_product(_meta(market_product_select))
-		if not product.is_empty():
-			var benchmark := MarketManager.benchmark_for(product)
-			lines.append("\nBenchmark %s :" % str(product.get("name", "CPU")))
-			for i in range(benchmark.size()):
-				lines.append("%d. %s — %.1f pts — %s €%s" % [
-					i + 1, str(benchmark[i].name), float(benchmark[i].score), _money(int(benchmark[i].price)),
-					" ← vous" if bool(benchmark[i].player) else ""
-				])
-			lines.append("\nÉvaluation sur les marchés actuellement ouverts :")
-			for segment_value in MarketManager.available_segment_keys():
-				var segment := str(segment_value)
-				lines.append("• %s : %.1f/100" % [MarketManager.segment_label(segment), MarketManager.evaluate_product(product, segment)])
-			var age_penalty := float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))
-			lines.append("\nCycle commercial : %s | %d mois sur le marché | pression d'âge -%.1f pts" % [
-				MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)), age_penalty
-			])
-			var lifecycle := ProductManager.get_post_launch_summary(str(product.get("id", "")))
-			var promotion_note := "aucune promotion"
-			if str(lifecycle.get("promotion_type", "NONE")) != "NONE":
-				promotion_note = "%s • %d mois restants" % [
-					ProductManager.promotion_label(str(lifecycle.promotion_type)), int(lifecycle.promotion_months_remaining)
-				]
-			lines.append("Suivi produit : stepping %s • firmware v%d • %s" % [
-				str(lifecycle.get("revision", "A0")), int(lifecycle.get("firmware_version", 1)), promotion_note
-			])
-			lines.append("Dernier mois : %s ventes | %.1f%% part estimée | %d retours SAV | satisfaction %.1f/100" % [
-				_money(int(product.get("last_month_sales", 0))), float(product.get("last_month_share", 0.0)) * 100.0,
-				int(product.get("last_month_returns", 0)), float(product.get("customer_satisfaction", 50.0))
-			])
-	market_label.text = "\n".join(lines)
-	_refresh_market_comparison()
-	_refresh_tenders()
-
-	var contract_lines: Array[String] = []
-	for contract in MarketManager.contracts:
-		contract_lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [
-			str(contract.get("customer", "")), str(contract.get("product_name", "")), _money(int(contract.get("units_per_month", 0))),
-			_money(int(contract.get("unit_price", 0))), int(contract.get("remaining_months", 0)), str(contract.get("status", ""))
-		])
-	contract_label.text = "\n".join(contract_lines) if not contract_lines.is_empty() else "Aucune proposition. Les marchés industriels, scientifiques et professionnels peuvent générer des contrats quand un CPU devient crédible."
-
-func _refresh_market_comparison():
-	if market_comparison_label == null:
-		return
-	if market_product_select == null or market_product_select.item_count == 0:
-		market_comparison_label.text = "Commercialisez un CPU pour le comparer directement aux produits concurrents."
-		return
-	if market_competitor_select == null or market_competitor_select.item_count == 0:
-		market_comparison_label.text = "Aucun concurrent public disponible pour cette comparaison."
-		return
-	var product := ProductManager.get_product(_meta(market_product_select))
-	var comparison := MarketManager.compare_cpu_public(product, _meta(market_competitor_select))
-	if comparison.is_empty():
-		market_comparison_label.text = "Comparaison indisponible."
-		return
-	var lines: Array[String] = [
-		"%s face à %s — %s" % [str(product.get("name", "Votre CPU")), str(comparison.get("competitor_name", "Concurrent")), str(comparison.get("competitor_company", ""))],
-		"Cible comparée : %s" % MarketManager.segment_label(str(comparison.get("target_segment", MarketManager.default_segment()))),
-		"",
-		"Votre prix : %s € • concurrent : %s € • écart %+.1f%%" % [
-			_money(int(comparison.get("player_price", 0))), _money(int(comparison.get("competitor_price", 0))), float(comparison.get("price_premium_pct", 0.0))
-		],
-		"Adéquation cible : %.1f vs %.1f • benchmark : %.1f vs %.1f" % [
-			float(comparison.get("player_fit", 0.0)), float(comparison.get("competitor_fit", 0.0)),
-			float(comparison.get("player_benchmark", 0.0)), float(comparison.get("competitor_benchmark", 0.0))
-		]
-	]
-	for row_value in comparison.get("rows", []):
-		var row: Dictionary = row_value
-		lines.append("• %s : %.1f vs %.1f (%+.1f)" % [
-			str(row.get("label", "")), float(row.get("player", 0.0)), float(row.get("competitor", 0.0)), float(row.get("delta", 0.0))
-		])
-	lines.append("")
-	lines.append(str(comparison.get("summary", "")))
-	market_comparison_label.text = "\n".join(lines)
-
-func _refresh_tenders():
-	if tender_select == null or tender_product_select == null or tender_label == null:
-		return
-	var current_tender := _meta(tender_select) if tender_select.item_count > 0 else ""
-	var current_product := _meta(tender_product_select) if tender_product_select.item_count > 0 else ""
-	tender_select.clear()
-	for tender_value in MarketManager.open_tenders():
-		var tender: Dictionary = tender_value
-		tender_select.add_item("%s — %s [%s]" % [
-			str(tender.get("customer", "")), str(tender.get("title", "")), str(tender.get("status", "OPEN"))
-		])
-		tender_select.set_item_metadata(tender_select.item_count - 1, str(tender.get("id", "")))
-	if current_tender != "":
-		_select_meta(tender_select, current_tender)
-	if tender_select.selected < 0 and tender_select.item_count > 0:
-		tender_select.select(0)
-
-	tender_product_select.clear()
-	for product in ProductManager.products:
-		if str(product.get("sector", "")) != "CPU" or str(product.get("status", "")) not in ["READY", "LAUNCHED"]:
-			continue
-		tender_product_select.add_item("%s — %s" % [str(product.get("name", "CPU")), str(product.get("status", ""))])
-		tender_product_select.set_item_metadata(tender_product_select.item_count - 1, str(product.get("id", "")))
-	if current_product != "":
-		_select_meta(tender_product_select, current_product)
-	if tender_product_select.selected < 0 and tender_product_select.item_count > 0:
-		tender_product_select.select(0)
-
-	if tender_select.item_count == 0:
-		tender_label.text = "Aucun appel d'offres ouvert pour le moment. Les opportunités apparaissent selon l'époque, le progrès technologique et la réputation professionnelle."
-		if tender_submit_button != null:
-			tender_submit_button.disabled = true
-		return
-	var tender := MarketManager.get_tender(_meta(tender_select))
-	if tender.is_empty():
-		return
-	if tender_product_select.item_count > 0 and int(tender_bid_price.value) <= 1:
-		var selected_product := ProductManager.get_product(_meta(tender_product_select))
-		tender_bid_price.value = float(mini(int(selected_product.get("price", 100)), int(tender.get("max_unit_price", 100))))
-	_refresh_tender_detail()
-
-func _refresh_tender_detail():
-	if tender_label == null or tender_select == null:
-		return
-	if tender_select.item_count == 0:
-		tender_label.text = "Aucun appel d'offres ouvert."
-		if tender_submit_button != null:
-			tender_submit_button.disabled = true
-		return
-	var tender := MarketManager.get_tender(_meta(tender_select))
-	if tender.is_empty():
-		return
-	var application := CPU_DESIGN.application_label(str(tender.get("application_profile", "GENERAL")))
-	var requirements: Dictionary = tender.get("requirements", {})
-	var exclusivity := "oui" if bool(tender.get("exclusivity", false)) else "non"
-	var lines: Array[String] = [
-		"%s — %s" % [str(tender.get("customer", "")), str(tender.get("title", ""))],
-		"Usage demandé : %s • délai offre %d mois • confidentialité %.0f/100 • exclusivité %s" % [
-			application, int(tender.get("deadline_months", 0)), float(tender.get("confidentiality", 0.0)), exclusivity
-		],
-		"Cahier des charges : perf ≥ %.0f • efficacité ≥ %.0f • fiabilité ≥ %.0f" % [
-			float(requirements.get("performance", 0.0)), float(requirements.get("efficiency", 0.0)), float(requirements.get("reliability", 0.0))
-		],
-		"Volume : %s unités/mois pendant %d mois • prix plafond %s € • pénalité livraison %.0f%%" % [
-			_money(int(tender.get("units_per_month", 0))), int(tender.get("duration_months", 0)),
-			_money(int(tender.get("max_unit_price", 0))), float(tender.get("penalty_rate", 0.0)) * 100.0
-		]
-	]
-	var rival_interest := MarketManager.estimated_rival_tender_interest(tender)
-	lines.append("Concurrence estimée : %d entreprise(s) susceptible(s) de répondre. Leurs offres restent confidentielles jusqu'à la décision." % rival_interest)
-	var status := str(tender.get("status", "OPEN"))
-	if status == "SUBMITTED":
-		var bid: Dictionary = tender.get("bid", {})
-		lines.append("Offre soumise : %s à %s €/unité. Décision attendue au prochain cycle mensuel face aux offres concurrentes éventuelles." % [
-			str(bid.get("product_name", "CPU")), _money(int(bid.get("unit_price", 0)))
-		])
-		if tender_submit_button != null:
-			tender_submit_button.disabled = true
-	elif tender_product_select == null or tender_product_select.item_count == 0:
-		lines.append("Aucun CPU prêt ou lancé n'est disponible pour répondre.")
-		if tender_submit_button != null:
-			tender_submit_button.disabled = true
-	else:
-		var product := ProductManager.get_product(_meta(tender_product_select))
-		var bid_price := int(tender_bid_price.value)
-		var preview := MarketManager.tender_fit(tender, product, bid_price)
-		var score := float(preview.get("score", 0.0))
-		var confidence_text := "offre risquée"
-		if score >= 78.0:
-			confidence_text = "offre très compétitive"
-		elif score >= 68.0:
-			confidence_text = "offre crédible"
-		elif score >= 58.0:
-			confidence_text = "offre fragile"
-		var gaps: Array = preview.get("gaps", [])
-		lines.append("Lecture de l'équipe : %s • adéquation usage %.0f/100 • prix %s €" % [
-			confidence_text, float(preview.get("application_fit", 0.0)), _money(bid_price)
-		])
-		if not gaps.is_empty():
-			lines.append("Points faibles face au cahier des charges : %s" % ", ".join(gaps))
-		if bid_price > int(tender.get("max_unit_price", 0)):
-			lines.append("⚠ Le prix dépasse le plafond annoncé ; l'offre peut être rejetée malgré un bon CPU.")
-		if tender_submit_button != null:
-			tender_submit_button.disabled = false
-	tender_label.text = "\n".join(lines)
-
-func _submit_tender_bid():
-	if tender_select == null or tender_select.item_count == 0 or tender_product_select == null or tender_product_select.item_count == 0:
-		status_label.text = "Aucun appel d'offres ou CPU disponible."
-		return
-	var ok := MarketManager.submit_tender_bid(_meta(tender_select), _meta(tender_product_select), int(tender_bid_price.value))
-	status_label.text = "Offre B2B envoyée. Le client rendra sa décision au prochain cycle mensuel." if ok else "Impossible d'envoyer cette offre : vérifiez le statut du CPU, du contrat et de l'appel d'offres."
-	_refresh_all()
-
-func _accept_contract(): status_label.text="Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."; _refresh_all()
-
-func _refresh_after_sales():
-	if after_sales_label == null or after_sales_case_select == null:
-		return
-	var current := _meta(after_sales_case_select) if after_sales_case_select.item_count > 0 else ""
-	after_sales_case_select.clear()
-	var open_cases := AfterSalesManager.get_open_cases()
-	for case_data in open_cases:
-		after_sales_case_select.add_item("%s — %s — %s" % [
-			str(case_data.get("product_name", "Produit")),
-			AfterSalesManager.issue_label(str(case_data.get("issue_type", ""))),
-			str(case_data.get("status", "OPEN"))
-		])
-		after_sales_case_select.set_item_metadata(after_sales_case_select.item_count - 1, str(case_data.get("id", "")))
-	if current != "":
-		_select_meta(after_sales_case_select, current)
-	var lines: Array[String] = [
-		"Équipe SAV : score %.0f/100 • dossiers ouverts %d" % [AfterSalesManager.support_team_score(), open_cases.size()],
-		"Expérience terrain — fabrication %.1f • thermique %.1f • stabilité %.1f • firmware %.1f" % [
-			AfterSalesManager.cpu_field_experience("MANUFACTURING"),
-			AfterSalesManager.cpu_field_experience("THERMAL"),
-			AfterSalesManager.cpu_field_experience("STABILITY"),
-			AfterSalesManager.cpu_field_experience("FIRMWARE")
-		]
-	]
-	if after_sales_case_select.item_count > 0:
-		var case_data := AfterSalesManager.get_case(_meta(after_sales_case_select))
-		lines.append("\n%s — %s" % [str(case_data.get("product_name", "Produit")), AfterSalesManager.issue_label(str(case_data.get("issue_type", "")))])
-		lines.append("Statut %s • gravité %.0f/100 • confiance %.0f%% • retours observés %d/%d (%.1f%%)" % [
-			str(case_data.get("status", "OPEN")), float(case_data.get("severity", 0.0)), float(case_data.get("confidence", 0.0)),
-			int(case_data.get("observed_returns", 0)), int(case_data.get("observed_units", 0)), float(case_data.get("last_return_rate", 0.0)) * 100.0
-		])
-		if str(case_data.get("status", "")) == "INVESTIGATING":
-			lines.append("Enquête technique : %.0f%%" % float(case_data.get("investigation_progress", 0.0)))
-		var history: Array = case_data.get("history", [])
-		if not history.is_empty():
-			lines.append("Dernière note : %s" % str(history[0]))
-	else:
-		lines.append("\nAucun dossier critique ouvert. Les ventes et retours continuent néanmoins d'alimenter l'expérience terrain.")
-	after_sales_label.text = "\n".join(lines)
-
-func _selected_sav_case_id() -> String:
-	if after_sales_case_select == null or after_sales_case_select.item_count == 0:
-		return ""
-	return _meta(after_sales_case_select)
-
-func _investigate_sav_case():
-	var case_id := _selected_sav_case_id()
-	status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête : dossier absent ou trésorerie insuffisante."
-	_refresh_all()
-
-func _monitor_sav_case():
-	var case_id := _selected_sav_case_id()
-	status_label.text = "Dossier placé sous surveillance." if case_id != "" and AfterSalesManager.monitor_case(case_id) else "Aucun dossier SAV disponible."
-	_refresh_all()
-
-func _correct_sav_case():
-	var case_id := _selected_sav_case_id()
-	status_label.text = "Correctif SAV appliqué." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et la trésorerie doit permettre le correctif."
-	_refresh_all()
-
-func _recall_sav_case():
-	var case_id := _selected_sav_case_id()
-	status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."
-	_refresh_all()
+	if market_screen != null:
+		market_screen.call("refresh")
 
 func _select_meta(option: OptionButton, wanted: String):
 	for i in range(option.item_count):
