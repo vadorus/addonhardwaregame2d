@@ -605,12 +605,6 @@ func _update_responsive_layout():
 	if lab_screen != null and lab_screen.has_method("set_viewport_width"):
 		lab_screen.call("set_viewport_width", size.x)
 
-func _fill_text(option: OptionButton, items: Array):
-	option.clear(); for item in items: option.add_item(str(item)); option.set_item_metadata(option.item_count-1,str(item))
-
-func _fill_simple(option: OptionButton, items: Dictionary):
-	option.clear(); for key in items.keys(): option.add_item(str(items[key])); option.set_item_metadata(option.item_count-1,str(key))
-
 func _fill_sector_options(option: OptionButton):
 	option.clear()
 	for key in GameData.get_sector_keys():
@@ -623,15 +617,6 @@ func _fill_sector_options(option: OptionButton):
 		var item_index := option.item_count - 1
 		option.set_item_metadata(item_index, sector_key)
 		option.set_item_disabled(item_index, not active)
-
-func _fill_segment_options(option: OptionButton):
-	_refresh_segment_options(option)
-
-func _fill_approach_options(option: OptionButton):
-	option.clear(); for key in GameData.get_approach_keys(): option.add_item(str(GameData.APPROACHES[key].label)); option.set_item_metadata(option.item_count-1,str(key))
-
-func _fill_focus_options(option: OptionButton):
-	option.clear(); for key in GameData.get_focus_keys(): option.add_item(str(GameData.FOCUS_OPTIONS[key].label)); option.set_item_metadata(option.item_count-1,str(key))
 
 func _meta(option: OptionButton) -> String:
 	if option.item_count == 0: return ""
