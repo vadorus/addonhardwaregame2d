@@ -6,6 +6,7 @@ signal cancel_requested
 
 const UI := preload("res://ui/UiKit.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_ADVICE := preload("res://scripts/CpuAdvice.gd")
 
 const BRIEFS := [
 	{
@@ -73,6 +74,7 @@ var _cores_value: Label
 var _frequency_value: Label
 var _cache_value: Label
 var _tdp_value: Label
+var _advisor_label: Label
 var _preview_label: Label
 var _error_label: Label
 
@@ -239,6 +241,16 @@ func _build() -> void:
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_config_view.add_child(node_label)
 
+	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
+	var advisor_box := VBoxContainer.new()
+	advisor_box.add_theme_constant_override("separation", 4)
+	advisor_panel.add_child(advisor_box)
+	advisor_box.add_child(UI.eyebrow("AVIS DE L'ÉQUIPE"))
+	_advisor_label = UI.muted_label("", 12)
+	_advisor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	advisor_box.add_child(_advisor_label)
+	_config_view.add_child(advisor_panel)
+
 	var preview_panel := UI.card(UI.APP_CYAN_DARK, 12, 12)
 	_preview_label = UI.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -341,6 +353,12 @@ func get_brief_count() -> int:
 
 func selected_brief_key() -> String:
 	return _selected_key
+
+func advisor_text() -> String:
+	return _advisor_label.text if _advisor_label != null else ""
+
+func advisor_detail_level() -> int:
+	return CPU_ADVICE.detail_level()
 
 func set_viewport_width(width: float) -> void:
 	if _panel != null:
