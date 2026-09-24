@@ -261,7 +261,8 @@ func _build() -> void:
 	set_viewport_width(1280.0)
 
 func open() -> void:
-	_error_label.visible = false if _error_label != null else false
+	if _error_label != null:
+		_error_label.visible = false
 	_show_choices()
 	visible = true
 
