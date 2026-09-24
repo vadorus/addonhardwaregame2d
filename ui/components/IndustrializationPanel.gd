@@ -6,6 +6,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const UI := preload("res://ui/UiKit.gd")
 
 var production_label: Label
+var production_grid: GridContainer
 var industrialization_select: OptionButton
 var industrialization_strategy: OptionButton
 var industrialization_binning: OptionButton
@@ -24,7 +25,7 @@ func _build() -> void:
 	production_label = UI.rich_label()
 	add_child(production_label)
 
-	var production_grid := GridContainer.new()
+	production_grid = GridContainer.new()
 	production_grid.columns = 2
 	add_child(production_grid)
 	production_grid.add_child(UI.label("Projet en industrialisation", 14))
@@ -92,6 +93,10 @@ func _build() -> void:
 	sell_capacity.text = "Activer / couper la vente de capacité libre"
 	sell_capacity.pressed.connect(func(): action_requested.emit("toggle_capacity_sales", {}))
 	actions.add_child(sell_capacity)
+
+func set_viewport_width(width: float) -> void:
+	if production_grid != null:
+		production_grid.columns = 1 if width < 760.0 else 2
 
 func refresh() -> void:
 	_refresh_production_overview()

@@ -30,6 +30,12 @@ func _ready() -> void:
 	lifecycle_panel.connect("action_requested", _relay_action)
 	box.add_child(lifecycle_panel)
 
+func set_viewport_width(width: float) -> void:
+	if industrialization_panel != null and industrialization_panel.has_method("set_viewport_width"):
+		industrialization_panel.call("set_viewport_width", width)
+	if lifecycle_panel != null and lifecycle_panel.has_method("set_viewport_width"):
+		lifecycle_panel.call("set_viewport_width", width)
+
 func refresh() -> void:
 	if industrialization_panel != null:
 		industrialization_panel.call("refresh")

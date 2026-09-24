@@ -1,0 +1,60 @@
+name: Windows Playable Build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-windows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Godot 4.7.2 with export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Import project
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --import 2>&1 | tee /tmp/import.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log; then exit 1; fi
+
+      - name: Export Windows release
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/windows
+          godot --headless --path . --export-release "Windows Desktop" build/windows/TechEmpire.exe 2>&1 | tee /tmp/export.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/export.log; then exit 1; fi
+          test -s build/windows/TechEmpire.exe
+
+      - name: Inspect Windows build
+        shell: bash
+        run: |
+          ls -lh build/windows
+          file build/windows/TechEmpire.exe
+          sha256sum build/windows/TechEmpire.exe | tee build/windows/SHA256SUMS.txt
+
+      - name: Upload Windows playable
+        uses: actions/upload-artifact@v4
+        with:
+          name: TechEmpire-Windows-x86_64
+          path: |
+            build/windows/TechEmpire.exe
+            build/windows/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
