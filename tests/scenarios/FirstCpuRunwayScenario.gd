@@ -24,6 +24,23 @@ static func run() -> String:
 	}
 
 	SimulationManager.reset_all("CI Runway", "CPU", "STANDARD")
+	if PersonnelManager.staff.size() > 3:
+		_restore(snapshot)
+		return "Garage start created a structured-company headcount instead of a founding team"
+	if int(CompanyManager.policies.get("marketing_budget", -1)) != 0 or int(CompanyManager.policies.get("support_budget", -1)) != 0:
+		_restore(snapshot)
+		return "Garage start still pays marketing or support before having a product"
+	if ExecutiveManager.monthly_benefit_cost() != 0:
+		_restore(snapshot)
+		return "Garage start still applies employee benefits before the player chooses them"
+	var garage_burn := BalanceManager.projected_starting_monthly_burn()
+	if garage_burn > 12000:
+		_restore(snapshot)
+		return "Garage structural burn is still implausibly high"
+	var first_cpu_burn := BalanceManager.projected_first_cpu_monthly_burn(45000)
+	if first_cpu_burn > 22000:
+		_restore(snapshot)
+		return "First internal CPU still double-counts payroll through the development budget"
 	var design := CPU_DESIGN.default_design()
 	var sourcing := GameData.sourcing_profile("INTERNAL")
 	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", 45000, sourcing)
