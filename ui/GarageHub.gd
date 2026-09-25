@@ -2,21 +2,23 @@ extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
 
+const ROOM_ART_PATH := "res://assets/ui/garage_hq.svg"
 const WORKPLACE_ART := {
-	0:"res://assets/ui/garage_stage0.webp",
-	1:"res://assets/ui/garage_stage1.webp",
-	2:"res://assets/ui/garage_stage2.webp",
-	3:"res://assets/ui/garage_stage3.webp"
+	0:ROOM_ART_PATH,
+	1:ROOM_ART_PATH,
+	2:ROOM_ART_PATH,
+	3:ROOM_ART_PATH
 }
-const GARAGE_EMPTY_ART_PATH := "res://assets/ui/garage_shell.webp"
-const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
+const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
+const GARAGE_FALLBACK_PATH := ROOM_ART_PATH
 
+# Rectangles normalisés sur le véritable décor paysage 1280x520.
 const ZONES := [
-	{"name":"Établi CPU","subtitle":"Conception processeur","tab":3,"feature":"LAB","rect":Rect2(0.17,0.56,0.25,0.14)},
-	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.43,0.49,0.24,0.14)},
-	{"name":"Table de réunion","subtitle":"Équipe & organisation","tab":2,"feature":"TEAM","rect":Rect2(0.69,0.31,0.21,0.14)},
-	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","rect":Rect2(0.61,0.67,0.25,0.14)},
-	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.48,0.18,0.20,0.15)}
+	{"name":"Établi CPU","subtitle":"Conception processeur","tab":3,"feature":"LAB","rect":Rect2(0.13,0.38,0.25,0.35)},
+	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","rect":Rect2(0.36,0.33,0.24,0.30)},
+	{"name":"Tableau de planification","subtitle":"R&D, pistes et équipe","tab":3,"feature":"LAB","rect":Rect2(0.57,0.11,0.23,0.34)},
+	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","rect":Rect2(0.60,0.30,0.27,0.41)},
+	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","rect":Rect2(0.81,0.22,0.10,0.39)}
 ]
 
 var _ambient_background: TextureRect
@@ -57,7 +59,8 @@ func _build_background() -> void:
 	_ambient_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_ambient_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_ambient_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_ambient_background.self_modulate = Color(0.22, 0.25, 0.29, 0.52)
+	_ambient_background.self_modulate = Color(1, 1, 1, 0)
+	_ambient_background.visible = false
 	_ambient_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_ambient_background)
 
@@ -191,19 +194,15 @@ func _layout_zones() -> void:
 	if _context_panel != null and _context_panel.visible:
 		_layout_context_panel(art_rect)
 
-func _layout_context_panel(art_rect: Rect2) -> void:
+func _layout_context_panel(_art_rect: Rect2) -> void:
 	if size.x >= 1000.0:
-		var panel_width := clampf((size.x - art_rect.size.x) * 0.42, 300.0, 390.0)
-		_context_panel.size = Vector2(panel_width, minf(330.0, size.y - 28.0))
-		var right_space_start := art_rect.position.x + art_rect.size.x
-		var available_right := size.x - right_space_start
-		if available_right >= panel_width + 24.0:
-			_context_panel.position = Vector2(right_space_start + (available_right - panel_width) * 0.5, 92.0)
-		else:
-			_context_panel.position = Vector2(size.x - panel_width - 16.0, size.y - _context_panel.size.y - 16.0)
+		var panel_width := clampf(size.x * 0.23, 320.0, 420.0)
+		var panel_height := minf(350.0, size.y - 32.0)
+		_context_panel.size = Vector2(panel_width, panel_height)
+		_context_panel.position = Vector2(size.x - panel_width - 18.0, size.y - panel_height - 18.0)
 	else:
 		var panel_width := maxf(size.x - 24.0, 280.0)
-		_context_panel.size = Vector2(panel_width, minf(250.0, size.y * 0.46))
+		_context_panel.size = Vector2(panel_width, minf(260.0, size.y * 0.48))
 		_context_panel.position = Vector2(12.0, size.y - _context_panel.size.y - 12.0)
 
 func _displayed_art_rect() -> Rect2:
@@ -212,20 +211,17 @@ func _displayed_art_rect() -> Rect2:
 	var texture_size := _background.texture.get_size()
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return Rect2(Vector2.ZERO, size)
-	var aspect := texture_size.x / texture_size.y
-	var stage_height := size.y
-	var stage_width := stage_height * aspect
-	if stage_width > size.x:
-		stage_width = size.x
-		stage_height = stage_width / aspect
-	var displayed_size := Vector2(stage_width, stage_height)
+	# COVER : la pièce remplit réellement l'écran. Le léger recadrage est volontaire
+	# et les hotspots suivent le même rectangle transformé.
+	var scale_factor := maxf(size.x / texture_size.x, size.y / texture_size.y)
+	var displayed_size := texture_size * scale_factor
 	return Rect2((size - displayed_size) * 0.5, displayed_size)
 
 func set_viewport_width(width: float) -> void:
 	if width >= 1800.0:
-		custom_minimum_size.y = 720.0
+		custom_minimum_size.y = 820.0
 	elif width >= 1400.0:
-		custom_minimum_size.y = 650.0
+		custom_minimum_size.y = 700.0
 	elif width >= 1000.0:
 		custom_minimum_size.y = 560.0
 	elif width >= 700.0:
@@ -291,11 +287,13 @@ func _zone_actions(zone_name: String) -> Array:
 			if _has_active_project():
 				return [{"label":"Voir prototype et validation","tab":3,"context":"","enabled":true}]
 			return [{"label":"Aucun prototype pour le moment","tab":3,"context":"","enabled":false}]
-		"Table de réunion":
-			return [
-				{"label":"Voir l'équipe","tab":2,"context":"Équipe","enabled":true},
-				{"label":"Recrutement & formation","tab":2,"context":"Équipe","enabled":true}
+		"Tableau de planification":
+			var actions: Array = [
+				{"label":"Recherche & technologies","tab":3,"context":"R&D","enabled":true}
 			]
+			if ExecutiveManager.is_interface_feature_unlocked("TEAM"):
+				actions.append({"label":"Réunion d'équipe","tab":2,"context":"Équipe","enabled":true})
+			return actions
 		"Bureau du fondateur":
 			return [{"label":"Gérer l'entreprise","tab":1,"context":"Entreprise","enabled":true}]
 		"Stock & production":
@@ -308,8 +306,8 @@ func _zone_context_text(zone_name: String) -> String:
 			return "Ici, vous imaginez et concevez vos processeurs. Le menu évoluera avec les compétences de l'entreprise."
 		"Banc de test":
 			return "Les prototypes, mesures et validations apparaissent ici quand le projet atteint les phases concernées."
-		"Table de réunion":
-			return "Consultez les personnes, leurs rôles, les affectations et les besoins de recrutement."
+		"Tableau de planification":
+			return "Ici se croisent les pistes R&D, les technologies disponibles et les sujets que l'équipe veut explorer."
 		"Bureau du fondateur":
 			return "Décisions de direction, organisation et fonctionnement général de l'entreprise."
 		"Stock & production":
