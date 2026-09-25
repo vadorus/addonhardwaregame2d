@@ -734,7 +734,7 @@ func development_cash_factor(approach: String) -> float:
 	# En interne, les salaires sont déjà payés par PersonnelManager : on ne
 	# refacture ici que prototypes, composants, outillage et essais.
 	match approach:
-		"INTERNAL": return 0.06
+		"INTERNAL": return 0.04
 		"PARTNER": return 0.62
 		_: return 1.0
 
