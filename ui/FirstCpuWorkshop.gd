@@ -6,6 +6,7 @@ signal cancel_requested
 
 const UI := preload("res://ui/UiKit.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_ADVICE := preload("res://scripts/CpuAdvice.gd")
 
 const BRIEFS := [
 	{
@@ -68,11 +69,13 @@ var _budget: SpinBox
 var _cores: HSlider
 var _frequency: HSlider
 var _cache: HSlider
+var _cache_field_root: Control
 var _tdp: HSlider
 var _cores_value: Label
 var _frequency_value: Label
 var _cache_value: Label
 var _tdp_value: Label
+var _advisor_label: Label
 var _preview_label: Label
 var _error_label: Label
 
@@ -182,7 +185,7 @@ func _build() -> void:
 	_brief_title = UI.label("Premier CPU", 23)
 	_brief_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(_brief_title)
-	var config_intro := UI.muted_label("Gardons seulement les choix qui changent vraiment ce premier projet. Les systèmes avancés resteront disponibles plus tard — ou immédiatement via Réglages avancés.", 12)
+	var config_intro := UI.muted_label("Les réglages restent ouverts : ce qui évolue avec la R&D et l'expérience, c'est surtout ce que l'équipe sait estimer, expliquer et recommander. Les systèmes avancés restent accessibles via Réglages avancés.", 12)
 	config_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
@@ -219,6 +222,7 @@ func _build() -> void:
 	var cache_field := _slider_field("Cache intégré", 0.0, 32.0, 1.0, 0.0)
 	_cache = cache_field.slider
 	_cache_value = cache_field.value_label
+	_cache_field_root = cache_field.root
 	tech_grid.add_child(cache_field.root)
 
 	var tdp_field := _slider_field("Enveloppe thermique", 1.0, 25.0, 1.0, 2.0)
@@ -238,6 +242,16 @@ func _build() -> void:
 	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_config_view.add_child(node_label)
+
+	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
+	var advisor_box := VBoxContainer.new()
+	advisor_box.add_theme_constant_override("separation", 4)
+	advisor_panel.add_child(advisor_box)
+	advisor_box.add_child(UI.eyebrow("AVIS DE L'ÉQUIPE"))
+	_advisor_label = UI.muted_label("", 12)
+	_advisor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	advisor_box.add_child(_advisor_label)
+	_config_view.add_child(advisor_panel)
 
 	var preview_panel := UI.card(UI.APP_CYAN_DARK, 12, 12)
 	_preview_label = UI.muted_label("", 13)
@@ -342,6 +356,13 @@ func get_brief_count() -> int:
 func selected_brief_key() -> String:
 	return _selected_key
 
+func advisor_text() -> String:
+	return _advisor_label.text if _advisor_label != null else ""
+
+func advisor_detail_level() -> int:
+	var focus := str(_selected_brief.get("focus", "BALANCED")) if not _selected_brief.is_empty() else "BALANCED"
+	return CPU_ADVICE.detail_level(focus)
+
 func set_viewport_width(width: float) -> void:
 	if _panel != null:
 		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, 760.0)
@@ -379,21 +400,81 @@ func _refresh_preview() -> void:
 		int(_budget.value),
 		GameData.sourcing_profile("INTERNAL")
 	)
-	_preview_label.text = "Nora et l'équipe anticipent :\n%s • %s • %s • %d W\nPerformance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100\nDéveloppement ~%d mois • programme ~%s € • coût technique ~%s €/unité\nCible : %s • priorité : %s" % [
+	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("focus", "BALANCED")))
+	var detail_level := int(advice.get("level", 0))
+	if _cache_field_root != null:
+		_cache_field_root.visible = detail_level >= 1
+	if _advisor_label != null:
+		var focus := str(_selected_brief.get("focus", "BALANCED"))
+		_advisor_label.text = "%s : « %s »\nConfiance %s. %s\n%s\n%s" % [
+			str(advice.get("speaker", "Équipe CPU")),
+			str(advice.get("text", "")),
+			str(advice.get("confidence", "faible")),
+			str(advice.get("detail", "")),
+			CPU_ADVICE.knowledge_summary(focus),
+			str(advice.get("path", ""))
+		]
+
+	var metric_text := ""
+	var timing_text := ""
+	if detail_level <= 0:
+		metric_text = "Performance %s • efficacité %s • fiabilité %s" % [
+			_qualitative_metric(float(evaluation.get("performance", 0.0))),
+			_qualitative_metric(float(evaluation.get("efficiency", 0.0))),
+			_qualitative_metric(float(evaluation.get("reliability", 0.0)))
+		]
+		var months := int(estimate.get("months", 0))
+		var program_cost := int(estimate.get("program_cost", 0))
+		timing_text = "Développement probablement %d–%d mois • budget programme ~%s–%s €" % [
+			maxi(months - 2, 1),
+			months + 3,
+			UI.money(int(round(float(program_cost) * 0.78))),
+			UI.money(int(round(float(program_cost) * 1.28)))
+		]
+	elif detail_level == 1:
+		metric_text = "Performance ~%.0f • efficacité ~%.0f • fiabilité ~%.0f" % [
+			round(float(evaluation.get("performance", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("efficiency", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("reliability", 0.0)) / 5.0) * 5.0
+		]
+		var months := int(estimate.get("months", 0))
+		timing_text = "Développement ~%d–%d mois • programme ~%s €" % [
+			maxi(months - 1, 1),
+			months + 1,
+			UI.money(int(estimate.get("program_cost", 0)))
+		]
+	else:
+		metric_text = "Performance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100" % [
+			float(evaluation.get("performance", 0.0)),
+			float(evaluation.get("efficiency", 0.0)),
+			float(evaluation.get("reliability", 0.0))
+		]
+		timing_text = "Développement ~%d mois • programme ~%s € • coût technique ~%s €/unité" % [
+			int(estimate.get("months", 0)),
+			UI.money(int(estimate.get("program_cost", 0))),
+			UI.money(int(evaluation.get("unit_cost", 0)))
+		]
+
+	_preview_label.text = "Estimation actuelle :\n%s • %s • %s • %d W\n%s\n%s\nCible : %s • priorité : %s" % [
 		"%d cœur(s)" % int(design.get("cores", 1)),
 		CPU_DESIGN.format_frequency(design),
-		CPU_DESIGN.format_cache(design),
+		CPU_DESIGN.format_cache(design) if detail_level >= 1 else "cache géré par l'équipe",
 		int(design.get("tdp_w", 2)),
-		float(evaluation.get("performance", 0.0)),
-		float(evaluation.get("efficiency", 0.0)),
-		float(evaluation.get("reliability", 0.0)),
-		int(estimate.get("months", 0)),
-		UI.money(int(estimate.get("program_cost", 0))),
-		UI.money(int(evaluation.get("unit_cost", 0))),
+		metric_text,
+		timing_text,
 		MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
 		str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
 	]
 	_update_slider_labels()
+
+func _qualitative_metric(value: float) -> String:
+	if value >= 72.0:
+		return "élevée"
+	if value >= 55.0:
+		return "correcte"
+	if value >= 42.0:
+		return "incertaine"
+	return "faible"
 
 func _update_slider_labels() -> void:
 	if _cores_value != null:
