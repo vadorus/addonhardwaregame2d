@@ -164,3 +164,22 @@ Un auditeur indépendant doit essayer de réfuter les choix actuels, notamment :
 6. Existe-t-il un softlock économique, UX ou de progression entre prototype, industrialisation et première vente ?
 7. Le joueur comprend-il toujours la prochaine action sans transformer le jeu en tutoriel intrusif ?
 8. Les tests automatiques vérifient-ils la vraie viabilité ou seulement un chemin heureux ?
+
+
+## 11. Seconde passe d'audit externe — 25 septembre 2026
+
+Claude a ré-audité la branche au commit `67e1ddc` avec Godot 4.7.2 et des sondes économiques plus longues. Deux blocants ont été confirmés : économie post-lancement trop généreuse et mode Réaliste trop étroit sur les briefs guidés les plus ambitieux.
+
+Les correctifs issus de cette passe sont documentés dans `AUDIT_CLAUDE_V06_2026-09-25_R2.md`.
+
+À partir du commit `b5d670c...` :
+- la demande est fortement élastique au prix ;
+- une marque inconnue ne reçoit plus automatiquement 7 % du marché ;
+- engager de la capacité au lancement coûte de l'argent ;
+- réserver de la capacité génère un coût mensuel, notamment si elle reste inutilisée ;
+- le lancement d'un CPU prêt est une décision bloquante visible dans le garage ;
+- le mode Réaliste conserve 95 000 € de capital mais ses multiplicateurs de coûts de départ ont été recalibrés ;
+- la matrice CI couvre désormais 35 k€, 45 k€ et 55 k€ en Réaliste ;
+- un garde-fou interdit le retour du cas « prix ×5 qui continue à se vendre normalement ».
+
+**Important :** les chiffres de revenus post-lancement de l'ancien audit ne constituent plus une référence d'équilibrage après ces correctifs. Un nouveau playtest long Android doit établir la nouvelle référence.
