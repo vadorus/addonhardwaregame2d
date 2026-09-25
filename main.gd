@@ -301,6 +301,11 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		return
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
+	if tab_index == 3 and context == "PROJECT_DECISION" and lab_screen != null:
+		TimeManager.time_scale = 0.0
+		status_label.text = "Nora : le prototype attend votre décision."
+		lab_screen.call_deferred("focus_project_decision")
+		return
 	if context != "" and tabs != null and tabs.current_tab == tab_index and before != tab_index:
 		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % context
 
