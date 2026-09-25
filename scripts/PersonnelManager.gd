@@ -18,18 +18,16 @@ func reset(starting_sector: String):
 	staff = []
 	_next_id = 1
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
-	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
-	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 4400)
-	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 3700)
-	_add_employee("Thomas Girard", "Responsable production", "Production", 63, 7.0, "manufacturing", 72, 5100)
-	_add_employee("Julie Fontaine", "Responsable marketing", "Marketing", 58, 6.0, "marketing", 70, 4600)
-	_add_employee("Mehdi Colin", "Responsable support", "Support", 57, 5.0, "support", 65, 4100)
+	# Stade garage : le fondateur travaille avec un noyau technique réduit.
+	# Production, marketing et support seront de vraies embauches de croissance.
+	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 3400)
+	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 3200)
+	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 2600)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
-	CompanyManager.set_department_leader("Développement", str(staff[2].id))
-	CompanyManager.set_department_leader("Production", str(staff[4].id))
-	CompanyManager.set_department_leader("Marketing", str(staff[5].id))
-	CompanyManager.set_department_leader("Support", str(staff[6].id))
+	CompanyManager.set_department_leader("Développement", str(staff[1].id))
+	CompanyManager.set_department_leader("Production", "")
+	CompanyManager.set_department_leader("Marketing", "")
+	CompanyManager.set_department_leader("Support", "")
 	generate_candidate("R&D")
 	staff_changed.emit()
 
