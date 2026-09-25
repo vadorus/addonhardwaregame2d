@@ -9,7 +9,7 @@ const CASES := [
 	{"name":"Standard pionnier sécurisé","difficulty":"STANDARD","budget":55000,"focus":"PERFORMANCE","preset":"PERFORMANCE","prototype":"PUSH","validation":"HARDEN","min_cash":3000},
 	{"name":"Réaliste prudent","difficulty":"REALISTIC","budget":35000,"focus":"EFFICIENCY","preset":"EFFICIENT","prototype":"BALANCE","validation":"APPROVE","min_cash":3000},
 	{"name":"Réaliste polyvalent guidé","difficulty":"REALISTIC","budget":45000,"focus":"BALANCED","preset":"BALANCED","prototype":"BALANCE","validation":"APPROVE","min_cash":1500},
-	{"name":"Réaliste pionnier prudent","difficulty":"REALISTIC","budget":55000,"focus":"PERFORMANCE","preset":"PERFORMANCE","prototype":"BALANCE","validation":"APPROVE","min_cash":500}
+	{"name":"Réaliste pionnier prudent","difficulty":"REALISTIC","budget":55000,"focus":"PERFORMANCE","preset":"PERFORMANCE","prototype":"BALANCE","validation":"APPROVE","min_cash":2500}
 ]
 
 static func run() -> String:
