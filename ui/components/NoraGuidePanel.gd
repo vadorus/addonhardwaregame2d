@@ -10,6 +10,9 @@ var _objective_label: Label
 var _team_label: Label
 var _action_button: Button
 var _team_button: Button
+var _objective_card: Control
+var _team_card: Control
+var _compact := false
 var _target_tab := 0
 var _target_context := ""
 
@@ -55,25 +58,25 @@ func _build() -> void:
 	_message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(_message_label)
 
-	var objective_card := UI.card(UI.APP_PANEL_ALT, 10, 10)
+	_objective_card = UI.card(UI.APP_PANEL_ALT, 10, 10)
 	var objective_box := VBoxContainer.new()
 	objective_box.add_theme_constant_override("separation", 4)
-	objective_card.add_child(objective_box)
+	_objective_card.add_child(objective_box)
 	objective_box.add_child(UI.eyebrow("OBJECTIF ACTUEL"))
 	_objective_label = UI.label("", 14)
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	objective_box.add_child(_objective_label)
-	root.add_child(objective_card)
+	root.add_child(_objective_card)
 
-	var team_card := UI.card(UI.APP_PANEL, 10, 10)
+	_team_card = UI.card(UI.APP_PANEL, 10, 10)
 	var team_box := VBoxContainer.new()
 	team_box.add_theme_constant_override("separation", 4)
-	team_card.add_child(team_box)
+	_team_card.add_child(team_box)
 	team_box.add_child(UI.eyebrow("QUI TRAVAILLE SUR LE CPU ?"))
 	_team_label = UI.muted_label("", 12)
 	_team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	team_box.add_child(_team_label)
-	root.add_child(team_card)
+	root.add_child(_team_card)
 
 	var actions := HFlowContainer.new()
 	actions.add_theme_constant_override("h_separation", 8)
@@ -93,6 +96,15 @@ func _build() -> void:
 
 	refresh()
 
+func set_compact(compact: bool) -> void:
+	_compact = compact
+	if _objective_card != null:
+		_objective_card.visible = not compact
+	if _team_card != null:
+		_team_card.visible = not compact
+	if _team_button != null:
+		_team_button.visible = not compact and ExecutiveManager.is_interface_feature_unlocked("TEAM")
+
 func refresh() -> void:
 	if _message_label == null:
 		return
@@ -107,7 +119,7 @@ func refresh() -> void:
 		team_score,
 		confidence
 	]
-	_team_button.visible = ExecutiveManager.is_interface_feature_unlocked("TEAM")
+	_team_button.visible = not _compact and ExecutiveManager.is_interface_feature_unlocked("TEAM")
 
 	var active_project := _active_project()
 	var active_job := _active_production_job()

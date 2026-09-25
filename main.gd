@@ -32,6 +32,7 @@ var first_cpu_workshop: Control
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
+var month_ticker_timer: Timer
 var game_over_layer: Control
 var game_over_panel: PanelContainer
 var game_over_label: Label
@@ -264,6 +265,14 @@ func _build_ui():
 	status_label.custom_minimum_size.y = 24
 	status_label.add_theme_color_override("font_color", APP_CYAN)
 	root_box.add_child(status_label)
+	month_ticker_timer = Timer.new()
+	month_ticker_timer.one_shot = true
+	month_ticker_timer.wait_time = 3.0
+	month_ticker_timer.timeout.connect(func():
+		if status_label != null and status_label.text.begins_with("Bilan "):
+			status_label.text = ""
+	)
+	add_child(month_ticker_timer)
 
 	tabs = TabContainer.new()
 	tabs.tabs_visible = false
@@ -1388,7 +1397,9 @@ func _update_nav_state():
 	if nav_panel != null:
 		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
 	if status_label != null:
-		status_label.visible = not CompanyManager.created or tabs.current_tab != 0
+		# V0.7: the room-first QG keeps one thin status line so Nora/blocking
+		# decisions and non-blocking monthly tickers remain visible.
+		status_label.visible = true
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
@@ -1647,11 +1658,26 @@ func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
 
 func _on_month_closed(report: Dictionary):
-	TimeManager.time_scale=0.0
-	var inc_lines:=_breakdown(report.income_breakdown)
-	var exp_lines:=_breakdown(report.expense_breakdown)
-	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
-	month_layer.visible=true
+	# V0.7: a month is information, not a decision. Never pause just to show
+	# accounting. Preserve x1/x2/x3 unless a real blocking decision appeared.
+	month_layer.visible = false
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		_show_tab(0)
+		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+	else:
+		var result := int(report.get("result", 0))
+		var result_prefix := "+" if result >= 0 else ""
+		status_label.text = "Bilan M%d/%d • %s%s € • trésorerie %s €" % [
+			int(report.get("month", TimeManager.month)),
+			int(report.get("year", TimeManager.year)),
+			result_prefix,
+			_money(result),
+			_money(int(report.get("money", Economy.money)))
+		]
+		if month_ticker_timer != null:
+			month_ticker_timer.start()
 	_refresh_all()
 
 func _breakdown(data: Dictionary) -> String:
@@ -1707,7 +1733,7 @@ func _close_month_report():
 		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
 		_refresh_all()
 		return
-	TimeManager.time_scale=1.0
+	# Legacy close path: keep the speed selected by the player.
 
 func _on_game_over(reason: String, report: Dictionary):
 	TimeManager.time_scale = 0.0
@@ -1728,14 +1754,15 @@ func _restart_from_game_over():
 	status_label.text = ""
 
 func _refresh_top():
-	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
-	money_label.text="%s €" % _money(Economy.money)
+	company_label.text = CompanyManager.company_name if CompanyManager.created else "Tech Empire"
+	var runway := BalanceManager.starting_runway_months()
+	if CompanyManager.created:
+		runway = float(ExecutiveManager.financial_advice().get("runway_months", runway))
+	money_label.text = "%s € • %.0f mois" % [_money(Economy.money), runway]
 	var cash_color := APP_GREEN
-	if Economy.money <= 0:
+	if Economy.money <= 0 or runway < 3.0:
 		cash_color = APP_RED
-	elif Economy.money < 75000:
-		cash_color = APP_RED
-	elif Economy.money < 175000:
+	elif runway < 12.0:
 		cash_color = APP_AMBER
 	money_label.add_theme_color_override("font_color", cash_color)
 
