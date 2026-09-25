@@ -151,6 +151,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"generation_index":maxi(generation_index, 1),
 		"generation_name":base_name,
 		"generation_plan_id":str(project.get("generation_plan", {}).get("id", "")),
+		"decision_history":project.get("decision_history", []).duplicate(true),
 		"name":product_name,
 		"sector":"CPU",
 		"target_segment":_target_segment(str(project.get("segment", "MAINSTREAM")), tier_key),

@@ -937,6 +937,12 @@ func _on_market_action(action: String, payload: Dictionary):
 		"correct_case":
 			var case_id := str(payload.get("case_id", ""))
 			status_label.text = "Correctif SAV appliqué." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et la trésorerie doit permettre le correctif."
+		"exchange_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Programme d'échange lancé pour les unités touchées." if case_id != "" and AfterSalesManager.exchange_affected_units(case_id) else "L'échange nécessite un diagnostic établi et une trésorerie suffisante."
+		"warranty_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Garantie étendue de 12 mois. Le dossier reste sous surveillance." if case_id != "" and AfterSalesManager.extend_warranty(case_id) else "Extension de garantie impossible : vérifiez le dossier et la trésorerie."
 		"recall_case":
 			var case_id := str(payload.get("case_id", ""))
 			status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."

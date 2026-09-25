@@ -107,6 +107,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"customization_freedom":float(sourcing.get("customization", 100.0)),"ip_ownership":float(sourcing.get("ip_ownership", 100.0)),
 		"application_profile":str(project.get("application_profile", "GENERAL")),
 		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
+		"decision_history":project.get("decision_history", []).duplicate(true),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,

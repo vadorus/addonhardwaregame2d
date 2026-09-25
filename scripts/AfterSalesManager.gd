@@ -49,6 +49,63 @@ func support_team_score() -> float:
 	var teamwork := PersonnelManager.team_attribute("Support", "teamwork")
 	return clampf(base * 0.58 + solving * 0.20 + rigor * 0.13 + teamwork * 0.09, 20.0, 100.0)
 
+func investigation_cost(case_data: Dictionary) -> int:
+	return int(round(3500.0 + float(case_data.get("severity", 40.0)) * 95.0))
+
+func corrective_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
+	var target := product
+	if target.is_empty():
+		target = ProductManager.get_product(str(case_data.get("product_id", "")))
+	var severity := float(case_data.get("severity", 40.0))
+	var units_sold := int(target.get("units_sold_total", 0))
+	return int(round(7000.0 + severity * 145.0 + float(units_sold) * float(target.get("unit_cost", 1)) * 0.008))
+
+func recall_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
+	var target := product
+	if target.is_empty():
+		target = ProductManager.get_product(str(case_data.get("product_id", "")))
+	var units_sold := int(target.get("units_sold_total", 0))
+	var severity := float(case_data.get("severity", 40.0))
+	var unit_cost := int(target.get("unit_cost", 1))
+	return maxi(15000, int(round(float(units_sold) * float(unit_cost) * (0.18 + severity / 420.0))))
+
+func exchange_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
+	var target := product
+	if target.is_empty():
+		target = ProductManager.get_product(str(case_data.get("product_id", "")))
+	var units_sold := int(target.get("units_sold_total", 0))
+	var affected := maxi(
+		int(case_data.get("observed_returns", 0)),
+		int(round(float(units_sold) * float(case_data.get("estimated_affected_rate", 0.02))))
+	)
+	return maxi(8000, int(round(float(affected) * float(target.get("unit_cost", 1)) * 0.95 + 3000.0)))
+
+func warranty_extension_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
+	var target := product
+	if target.is_empty():
+		target = ProductManager.get_product(str(case_data.get("product_id", "")))
+	var units_sold := int(target.get("units_sold_total", 0))
+	var severity := float(case_data.get("severity", 40.0))
+	return maxi(5000, int(round(float(units_sold) * float(target.get("unit_cost", 1)) * (0.025 + severity / 1800.0))))
+
+func action_quote(case_id: String) -> Dictionary:
+	var case_data := get_case(case_id)
+	if case_data.is_empty():
+		return {}
+	var product := ProductManager.get_product(str(case_data.get("product_id", "")))
+	var affected_units := maxi(
+		int(case_data.get("observed_returns", 0)),
+		int(round(float(product.get("units_sold_total", 0)) * float(case_data.get("estimated_affected_rate", 0.0))))
+	)
+	return {
+		"investigation_cost":investigation_cost(case_data),
+		"corrective_cost":corrective_cost(case_data, product),
+		"exchange_cost":exchange_cost(case_data, product),
+		"recall_cost":recall_cost(case_data, product),
+		"warranty_cost":warranty_extension_cost(case_data, product),
+		"affected_units":affected_units
+	}
+
 func cpu_field_experience(issue_type: String = "") -> float:
 	if issue_type != "":
 		return float(field_experience.get(issue_type, 0.0))
@@ -137,6 +194,8 @@ func _create_case(product: Dictionary, units: int, returns: int, return_rate: fl
 		"last_return_rate":return_rate,
 		"action":"",
 		"estimated_affected_rate":clampf(return_rate * lerpf(0.82, 1.18, confidence / 100.0), 0.002, 0.35),
+		"design_context":_design_context_for(product, issue_type),
+		"warranty_active":false,
 		"history":["Signal terrain détecté après %d ventes et %d retours." % [units, returns]]
 	}
 	_next_case_id += 1
@@ -144,6 +203,48 @@ func _create_case(product: Dictionary, units: int, returns: int, return_rate: fl
 	CompanyManager.add_alert("SAV : anomalie détectée sur %s — %s (gravité %.0f/100)." % [str(product.get("name", "Produit")), issue_label(issue_type), severity])
 	case_created.emit(case_data.duplicate(true))
 	cases_changed.emit()
+
+func case_hypothesis(case_data: Dictionary) -> String:
+	var issue_type := str(case_data.get("issue_type", "STABILITY"))
+	var prefix := "Diagnostic probable" if str(case_data.get("status", "")) == "DIAGNOSED" else "Hypothèse actuelle"
+	match issue_type:
+		"MANUFACTURING":
+			return "%s : une partie des retours semble liée à la fabrication ou à la dispersion des lots." % prefix
+		"THERMAL":
+			return "%s : température, enveloppe de puissance ou marge thermique insuffisante dans certains usages." % prefix
+		"FIRMWARE":
+			return "%s : le comportement observé peut être corrigible par microcode/firmware sans remplacer tout le parc." % prefix
+		_:
+			return "%s : instabilité sous charge ou marge de validation trop faible dans certaines conditions." % prefix
+
+func _design_context_for(product: Dictionary, issue_type: String) -> String:
+	var history_value = product.get("decision_history", [])
+	var history: Array = history_value if typeof(history_value) == TYPE_ARRAY else []
+	for entry_value in history:
+		if typeof(entry_value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_value
+		var choice := str(entry.get("choice", ""))
+		if choice == "PUSH" and issue_type in ["THERMAL", "STABILITY", "FIRMWARE"]:
+			return "Lors de la revue prototype, vous aviez choisi « %s ». Ce choix n'est pas présenté comme l'unique cause, mais il a augmenté le profil de risque de cette génération." % str(entry.get("label", "Pousser les performances"))
+	var metrics: Dictionary = product.get("metrics", {})
+	var design: Dictionary = product.get("cpu_design", {})
+	match issue_type:
+		"MANUFACTURING":
+			return "Le signal est surtout corrélé à la qualité de fabrication %.0f/100 et au taux de défaut de %.2f%%." % [
+				float(product.get("manufacturing_quality", 60.0)),
+				float(product.get("defect_rate", 0.025)) * 100.0
+			]
+		"THERMAL":
+			return "Le produit vise %d W et une efficacité de %.0f/100. Le terrain teste maintenant ces marges dans des usages plus variés que le laboratoire." % [
+				int(design.get("tdp_w", 0)), float(metrics.get("efficiency", 55.0))
+			]
+		"FIRMWARE":
+			return "L'architecture combine innovation %.0f/100 et fiabilité %.0f/100 : le terrain peut révéler des cas que la validation n'avait pas reproduits." % [
+				float(metrics.get("innovation", 50.0)), float(metrics.get("reliability", 55.0))
+			]
+		_:
+			return "La fiabilité mesurée avant lancement était de %.0f/100. Le dossier cherche maintenant si certains usages réels dépassent les marges validées." % float(metrics.get("reliability", 55.0))
 
 func _classify_issue(product: Dictionary) -> String:
 	var metrics: Dictionary = product.get("metrics", {})
@@ -181,8 +282,7 @@ func start_investigation(case_id: String) -> bool:
 	var case_data := get_case(case_id)
 	if case_data.is_empty() or str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED"]:
 		return false
-	var severity := float(case_data.get("severity", 40.0))
-	var cost := int(round(3500.0 + severity * 95.0))
+	var cost := investigation_cost(case_data)
 	if not Economy.can_afford(cost, "Enquête SAV — %s" % str(case_data.get("product_name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Enquête SAV — %s" % str(case_data.get("product_name", "Produit")))
@@ -205,6 +305,51 @@ func monitor_case(case_id: String) -> bool:
 	cases_changed.emit()
 	return true
 
+func extend_warranty(case_id: String) -> bool:
+	var case_data := get_case(case_id)
+	if case_data.is_empty() or str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED"]:
+		return false
+	var product := ProductManager.get_product(str(case_data.get("product_id", "")))
+	if product.is_empty():
+		return false
+	var cost := warranty_extension_cost(case_data, product)
+	if not Economy.can_afford(cost, "Extension de garantie — %s" % str(product.get("name", "Produit"))):
+		return false
+	Economy.add_expense(cost, "Extension de garantie — %s" % str(product.get("name", "Produit")))
+	product["warranty_extension_months"] = int(product.get("warranty_extension_months", 0)) + 12
+	case_data["warranty_active"] = true
+	case_data["status"] = "MONITORING"
+	case_data["action"] = "WARRANTY"
+	case_data["history"].push_front("Garantie étendue de 12 mois pour %s € : la confiance client est protégée pendant l'enquête." % cost)
+	CompanyManager.change_reputation({"support":0.65, "professional":0.25})
+	CompanyManager.add_alert("SAV : garantie étendue sur %s. Le problème reste sous surveillance." % str(product.get("name", "Produit")))
+	cases_changed.emit()
+	ProductManager.products_changed.emit()
+	return true
+
+func exchange_affected_units(case_id: String) -> bool:
+	var case_data := get_case(case_id)
+	if case_data.is_empty() or str(case_data.get("status", "")) != "DIAGNOSED":
+		return false
+	var product := ProductManager.get_product(str(case_data.get("product_id", "")))
+	if product.is_empty():
+		return false
+	var severity := float(case_data.get("severity", 40.0))
+	var cost := exchange_cost(case_data, product)
+	if not Economy.can_afford(cost, "Programme d'échange — %s" % str(product.get("name", "Produit"))):
+		return false
+	Economy.add_expense(cost, "Programme d'échange — %s" % str(product.get("name", "Produit")))
+	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, false)
+	case_data["status"] = "RESOLVED"
+	case_data["action"] = "EXCHANGE"
+	case_data["history"].push_front("Programme d'échange ciblé lancé pour %s €." % cost)
+	_learn_from_case(case_data, 4.5 + severity * 0.04)
+	CompanyManager.change_reputation({"support":1.6, "reliability":0.3, "professional":0.55})
+	CompanyManager.add_alert("SAV : les unités touchées de %s sont échangées." % str(product.get("name", "Produit")))
+	cases_changed.emit()
+	ProductManager.products_changed.emit()
+	return true
+
 func apply_corrective_action(case_id: String) -> bool:
 	var case_data := get_case(case_id)
 	if case_data.is_empty() or str(case_data.get("status", "")) != "DIAGNOSED":
@@ -213,8 +358,7 @@ func apply_corrective_action(case_id: String) -> bool:
 	if product.is_empty():
 		return false
 	var severity := float(case_data.get("severity", 40.0))
-	var units_sold := int(product.get("units_sold_total", 0))
-	var cost := int(round(7000.0 + severity * 145.0 + float(units_sold) * float(product.get("unit_cost", 1)) * 0.008))
+	var cost := corrective_cost(case_data, product)
 	if not Economy.can_afford(cost, "Correctif SAV — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Correctif SAV — %s" % str(product.get("name", "Produit")))
@@ -236,10 +380,8 @@ func recall_product(case_id: String) -> bool:
 	var product := ProductManager.get_product(str(case_data.get("product_id", "")))
 	if product.is_empty():
 		return false
-	var units_sold := int(product.get("units_sold_total", 0))
 	var severity := float(case_data.get("severity", 40.0))
-	var unit_cost := int(product.get("unit_cost", 1))
-	var cost := maxi(15000, int(round(float(units_sold) * float(unit_cost) * (0.18 + severity / 420.0))))
+	var cost := recall_cost(case_data, product)
 	if not Economy.can_afford(cost, "Rappel produit — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Rappel produit — %s" % str(product.get("name", "Produit")))
@@ -327,8 +469,12 @@ func _process_monitoring(case_data: Dictionary):
 	var severity := float(case_data.get("severity", 40.0))
 	var rate := float(case_data.get("last_return_rate", 0.0))
 	if severity >= 55.0 and rate >= 0.035:
-		CompanyManager.change_reputation({"support":-0.18, "reliability":-0.12})
-		case_data["history"].push_front("La surveillance seule commence à peser sur la confiance des clients.")
+		var protection := 0.40 if bool(case_data.get("warranty_active", false)) else 1.0
+		CompanyManager.change_reputation({"support":-0.18 * protection, "reliability":-0.12 * protection})
+		case_data["history"].push_front(
+			"La surveillance reste risquée, mais l'extension de garantie limite la perte de confiance." if protection < 1.0
+			else "La surveillance seule commence à peser sur la confiance des clients."
+		)
 
 func active_departments() -> Array:
 	if not get_open_cases().is_empty():

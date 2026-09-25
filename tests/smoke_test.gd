@@ -8,6 +8,7 @@ const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourn
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
+const AFTER_SALES_DOSSIER_SCENARIO := preload("res://tests/scenarios/AfterSalesDossierScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -166,6 +167,10 @@ func _ready() -> void:
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
 		_fail(launch_feedback_error)
+		return
+	var after_sales_dossier_error := AFTER_SALES_DOSSIER_SCENARIO.run(self)
+	if after_sales_dossier_error != "":
+		_fail(after_sales_dossier_error)
 		return
 	var next_gen_market_learning_error := NEXT_GENERATION_MARKET_LEARNING_SCENARIO.run()
 	if next_gen_market_learning_error != "":
