@@ -56,6 +56,7 @@ const BRIEFS := [
 ]
 
 var _panel: PanelContainer
+var _guide_card: PanelContainer
 var _choice_view: VBoxContainer
 var _config_view: VBoxContainer
 var _brief_grid: GridContainer
@@ -117,7 +118,8 @@ func _build() -> void:
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shell.add_child(brand)
 
-	var guide_card := UI.card(UI.APP_CYAN_DARK, 12, 10)
+	_guide_card = UI.card(UI.APP_CYAN_DARK, 12, 10)
+	var guide_card := _guide_card
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 10)
 	guide_card.add_child(guide_row)
@@ -314,6 +316,8 @@ func select_brief(key: String) -> void:
 		_selected_key = key
 		_choice_view.visible = false
 		_config_view.visible = true
+		if _guide_card != null:
+			_guide_card.visible = false
 		_brief_title.text = "%s — %s" % [str(brief.get("title", "Premier CPU")), str(brief.get("subtitle", ""))]
 		_select_meta(_preset_select, str(brief.get("preset", "BALANCED")))
 		_budget.value = int(brief.get("budget", 45000))
@@ -326,6 +330,8 @@ func _show_choices() -> void:
 	_selected_key = ""
 	_choice_view.visible = true
 	_config_view.visible = false
+	if _guide_card != null:
+		_guide_card.visible = true
 	if _error_label != null:
 		_error_label.visible = false
 
@@ -365,7 +371,8 @@ func advisor_detail_level() -> int:
 
 func set_viewport_width(width: float) -> void:
 	if _panel != null:
-		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, 760.0)
+		var max_width := 1080.0 if width >= 1000.0 else 760.0
+		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, max_width)
 	if _brief_grid != null:
 		_brief_grid.columns = 1 if width < 760.0 else 2
 
@@ -455,16 +462,30 @@ func _refresh_preview() -> void:
 			UI.money(int(evaluation.get("unit_cost", 0)))
 		]
 
-	_preview_label.text = "Estimation actuelle :\n%s • %s • %s • %d W\n%s\n%s\nCible : %s • priorité : %s" % [
-		"%d cœur(s)" % int(design.get("cores", 1)),
-		CPU_DESIGN.format_frequency(design),
-		CPU_DESIGN.format_cache(design) if detail_level >= 1 else "cache géré par l'équipe",
-		int(design.get("tdp_w", 2)),
-		metric_text,
-		timing_text,
-		MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
-		str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
-	]
+	if detail_level <= 0:
+		_preview_label.text = "Estimation large : %s\nDélai probable %s • cible : %s • priorité : %s" % [
+			metric_text,
+			timing_text.replace("Développement probablement ", ""),
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
+			str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
+		]
+	elif detail_level == 1:
+		_preview_label.text = "Estimation : %s\n%s • cible : %s" % [
+			metric_text,
+			timing_text,
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED")))
+		]
+	else:
+		_preview_label.text = "Estimation actuelle :\n%s • %s • %s • %d W\n%s\n%s\nCible : %s • priorité : %s" % [
+			"%d cœur(s)" % int(design.get("cores", 1)),
+			CPU_DESIGN.format_frequency(design),
+			CPU_DESIGN.format_cache(design),
+			int(design.get("tdp_w", 2)),
+			metric_text,
+			timing_text,
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
+			str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
+		]
 	_update_slider_labels()
 
 func _qualitative_metric(value: float) -> String:
