@@ -306,6 +306,11 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		status_label.text = "Nora : le prototype attend votre décision."
 		lab_screen.call_deferred("focus_project_decision")
 		return
+	if tab_index == 4 and context == "PRODUCT_LAUNCH" and products_screen != null:
+		TimeManager.time_scale = 0.0
+		status_label.text = "Nora : le CPU est prêt. Choisissez un prix et une capacité que la trésorerie peut réellement soutenir."
+		products_screen.call_deferred("focus_product_launch")
+		return
 	if context != "" and tabs != null and tabs.current_tab == tab_index and before != tab_index:
 		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % context
 
@@ -1672,6 +1677,12 @@ func _blocking_company_decision() -> Dictionary:
 				"tab":4,
 				"message":"Nora : l'industrialisation attend votre choix de fabrication. Le temps reste en pause — ouvrez Stock & production."
 			}
+	if ProductManager.has_ready_product_to_launch():
+		return {
+			"type":"PRODUCT_LAUNCH",
+			"tab":4,
+			"message":"Nora : votre premier CPU est prêt. Le temps reste en pause — préparez son prix et sa capacité dans Stock & production."
+		}
 	return {}
 
 func _request_time_scale(speed: float) -> void:
@@ -1893,10 +1904,16 @@ func _on_products_action(action: String, payload: Dictionary):
 			else:
 				FoundryManager.set_sell_spare_capacity(not bool(fab.get("sell_spare_capacity", false)))
 		"launch_product":
-			if ProductManager.launch_product(str(payload.get("product_id", "")), int(payload.get("price", 0)), int(payload.get("capacity", 0))):
-				status_label.text = "Produit lancé : le plan commercial est mémorisé. Faites passer un mois pour comparer la prévision aux ventes réelles."
+			var launch_product_id := str(payload.get("product_id", ""))
+			var launch_product_data := ProductManager.get_product(launch_product_id)
+			var launch_capacity := int(payload.get("capacity", 0))
+			var launch_cost := ProductManager.launch_capacity_commitment_cost(launch_product_data, launch_capacity) if not launch_product_data.is_empty() else 0
+			if ProductManager.launch_product(launch_product_id, int(payload.get("price", 0)), launch_capacity):
+				status_label.text = "Produit lancé : %s € engagés pour la capacité. Le prochain mois comparera prévision et ventes réelles." % _money(launch_cost)
+				if _blocking_company_decision().is_empty() and not month_layer.visible:
+					TimeManager.time_scale = 1.0
 			else:
-				status_label.text = "Ce produit est déjà lancé ou indisponible."
+				status_label.text = "Lancement impossible : produit indisponible ou trésorerie insuffisante pour engager la capacité demandée (~%s €)." % _money(launch_cost)
 		"update_price":
 			if ProductManager.update_product_price(str(payload.get("product_id", "")), int(payload.get("price", 0))):
 				status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."
