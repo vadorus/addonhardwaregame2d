@@ -136,13 +136,20 @@ func first_generation_runway_target() -> float:
 	return float(profile_data().get("first_generation_runway_target", 7.5))
 
 func projected_starting_monthly_burn() -> int:
-	# Au garage, la recherche continue n'est facturée que si le joueur affecte réellement des chercheurs.
-	var company_base := expense_amount(7500 + 1500 + 1000 + 500, "Bureaux et infrastructure")
-	var payroll_base := expense_amount(32800, "Salaires")
-	return company_base + payroll_base
+	# Projection du vrai stade garage, sans inventer de bureaux, marketing ou SAV.
+	var payroll := 0
+	for emp in PersonnelManager.staff:
+		payroll += int(emp.get("salary", 0))
+	var result := expense_amount(payroll, "Salaires")
+	result += expense_amount(CompanyManager.monthly_infrastructure_cost(), "Bureaux et infrastructure")
+	result += expense_amount(ExecutiveManager.monthly_workplace_cost(), "Entretien / locaux")
+	result += expense_amount(ExecutiveManager.monthly_benefit_cost(), "Avantages salariés")
+	result += expense_amount(CompanyManager.estimated_policy_monthly_cost(), "Frais entreprise")
+	return result
 
 func projected_first_cpu_monthly_burn(monthly_budget: int = 45000) -> int:
-	return projected_starting_monthly_burn() + expense_amount(maxi(monthly_budget, 10000), "Développement — premier CPU")
+	var sourcing := GameData.sourcing_profile("INTERNAL")
+	return projected_starting_monthly_burn() + ResearchManager.quoted_development_monthly_cost("INTERNAL", monthly_budget, sourcing)
 
 func starting_runway_months() -> float:
 	return float(starting_capital()) / maxf(float(projected_starting_monthly_burn()), 1.0)
