@@ -446,26 +446,10 @@ func _build() -> void:
 	projects_card.add_child(projects_label)
 	box.add_child(projects_card)
 
-	project_decision_card = _card(APP_AMBER_DARK, 12, 12)
+	var decision_script: Script = load("res://ui/components/DecisionCard.gd")
+	project_decision_card = decision_script.new() as PanelContainer
 	project_decision_card.visible = false
-	var decision_box := VBoxContainer.new()
-	decision_box.add_theme_constant_override("separation", 8)
-	project_decision_card.add_child(decision_box)
-	project_decision_kicker = _eyebrow("ARBITRAGE DÉVELOPPEMENT")
-	decision_box.add_child(project_decision_kicker)
-	project_decision_label = _rich_label()
-	decision_box.add_child(project_decision_label)
-	var decision_actions := HFlowContainer.new()
-	decision_actions.add_theme_constant_override("h_separation", 8)
-	decision_actions.add_theme_constant_override("v_separation", 8)
-	decision_box.add_child(decision_actions)
-	for option_index in range(3):
-		var decision_button := Button.new()
-		decision_button.text = "Décision %d" % (option_index + 1)
-		decision_button.custom_minimum_size.y = 44
-		decision_button.pressed.connect(_on_project_decision_pressed.bind(option_index))
-		decision_actions.add_child(decision_button)
-		project_decision_buttons.append(decision_button)
+	project_decision_card.connect("option_selected", Callable(self, "_on_project_decision_pressed"))
 	box.add_child(project_decision_card)
 
 	box.add_child(_section("Brevets"))
@@ -768,37 +752,27 @@ func _add_lab_metric(parent: VBoxContainer, key: String, title: String):
 
 
 func _refresh_project_decision() -> void:
-	if project_decision_card == null or project_decision_label == null:
+	if project_decision_card == null:
 		return
 	var decisions := ResearchManager.get_pending_project_decisions()
 	if decisions.is_empty():
 		project_decision_card.visible = false
+		project_decision_kicker = null
+		project_decision_label = null
+		project_decision_buttons = []
 		return
 	var decision: Dictionary = decisions[0]
 	project_decision_card.visible = true
-	if project_decision_kicker != null:
-		project_decision_kicker.text = str(decision.get("kicker", "ARBITRAGE DÉVELOPPEMENT"))
-	project_decision_label.text = "%s\n\n%s" % [
-		str(decision.get("title", "Revue du prototype")),
-		str(decision.get("text", "L'équipe attend votre arbitrage."))
-	]
-	var options: Array = decision.get("options", [])
-	for index in range(project_decision_buttons.size()):
-		var button := project_decision_buttons[index]
-		button.visible = index < options.size()
-		if not button.visible:
-			continue
-		var option: Dictionary = options[index]
-		var cost := int(option.get("cost", 0))
-		var delay := int(option.get("delay_months", 0))
-		var suffix := ""
-		if cost > 0:
-			suffix += " • %s €" % UI.money(cost)
-		if delay > 0:
-			suffix += " • +%d mois" % delay
-		button.text = "%s%s" % [str(option.get("label", "Décider")), suffix]
-		button.tooltip_text = str(option.get("description", ""))
-		button.disabled = cost > 0 and not Economy.can_afford(cost, str(decision.get("expense_label", "Arbitrage développement")))
+	project_decision_card.call("set_decision", decision)
+	project_decision_kicker = project_decision_card.get("kicker_label") as Label
+	project_decision_label = project_decision_card.get("body_label") as Label
+	project_decision_buttons.clear()
+	var decision_buttons_value = project_decision_card.get("option_buttons")
+	if typeof(decision_buttons_value) == TYPE_ARRAY:
+		for button_value in decision_buttons_value:
+			var button := button_value as Button
+			if button != null:
+				project_decision_buttons.append(button)
 
 func _on_project_decision_pressed(option_index: int) -> void:
 	var decisions := ResearchManager.get_pending_project_decisions()
