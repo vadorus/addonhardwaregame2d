@@ -1416,6 +1416,8 @@ func _update_responsive_layout():
 		dashboard_screen.call("set_viewport_width", size.x)
 	if products_screen != null and products_screen.has_method("set_viewport_width"):
 		products_screen.call("set_viewport_width", size.x)
+	if market_screen != null and market_screen.has_method("set_viewport_width"):
+		market_screen.call("set_viewport_width", size.x)
 	var compact := size.x < 900.0
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:

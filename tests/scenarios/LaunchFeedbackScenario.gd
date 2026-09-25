@@ -127,6 +127,22 @@ static func run(host: Node) -> String:
 		lifecycle_panel.queue_free()
 		_restore(snapshot)
 		return "Product lifecycle UI did not expose the market feedback lesson"
+	var lifecycle_pulse: Control = lifecycle_panel.get("product_pulse_panel")
+	if lifecycle_pulse == null:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product lifecycle UI did not create the V0.7 product pulse"
+	var pulse_sales: Label = lifecycle_pulse.get("sales_value")
+	var pulse_demand: Label = lifecycle_pulse.get("demand_value")
+	var pulse_signal: Label = lifecycle_pulse.get("signal_label")
+	if pulse_sales == null or pulse_sales.text.find("10") < 0 or pulse_demand == null or pulse_demand.text.find("100%") < 0:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product pulse did not expose actual sales and saturated capacity"
+	if pulse_signal == null or pulse_signal.text.find("capacité") < 0:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product pulse did not turn the first month into a readable market lesson"
 
 	var market_script: Script = load("res://ui/components/MarketOverviewPanel.gd")
 	var market_panel: Control = market_script.new() as Control
@@ -138,6 +154,19 @@ static func run(host: Node) -> String:
 		lifecycle_panel.queue_free()
 		_restore(snapshot)
 		return "Market screen did not compare the launch plan with actual results"
+	var market_pulse: Control = market_panel.get("product_pulse_panel")
+	if market_pulse == null:
+		market_panel.queue_free()
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Market screen did not reuse the V0.7 product pulse"
+	var market_returns: Label = market_pulse.get("returns_value")
+	var market_contribution: Label = market_pulse.get("contribution_value")
+	if market_returns == null or market_contribution == null or market_contribution.text.find("€") < 0:
+		market_panel.queue_free()
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Market product pulse is missing returns or contribution"
 
 	var round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()
