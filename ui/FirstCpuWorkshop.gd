@@ -68,6 +68,7 @@ var _brief_title: Label
 var _name_edit: LineEdit
 var _preset_select: OptionButton
 var _budget: SpinBox
+var _budget_cost_label: Label
 var _cores: HSlider
 var _frequency: HSlider
 var _cache: HSlider
@@ -291,7 +292,10 @@ func _build() -> void:
 	_budget.value = 45000
 	_budget.custom_minimum_size.y = 42
 	_budget.value_changed.connect(func(_v): _refresh_preview())
-	left_column.add_child(_field("Budget mensuel de développement", _budget))
+	left_column.add_child(_field("Intensité R&D mensuelle (référence)", _budget))
+	_budget_cost_label = UI.muted_label("", 12)
+	_budget_cost_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	left_column.add_child(_budget_cost_label)
 
 	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -433,6 +437,14 @@ func _refresh_preview() -> void:
 		int(_budget.value),
 		GameData.sourcing_profile("INTERNAL")
 	)
+	if _budget_cost_label != null:
+		var garage_cash_cost := ResearchManager.quoted_development_monthly_cost(
+			"INTERNAL",
+			int(_budget.value),
+			GameData.sourcing_profile("INTERNAL")
+		)
+		_budget_cost_label.text = "Sortie de caisse estimée au garage : ~%s €/mois pour prototypes, composants et essais (hors rémunération de l'équipe et local)." % UI.money(garage_cash_cost)
+
 	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("focus", "BALANCED")))
 	var detail_level := int(advice.get("level", 0))
 	if _cache_field_root != null:
