@@ -33,12 +33,15 @@ static func run() -> String:
 	if ExecutiveManager.monthly_benefit_cost() != 0:
 		_restore(snapshot)
 		return "Garage start still applies employee benefits before the player chooses them"
+	if BalanceManager.starting_capital() < 60000 or BalanceManager.starting_capital() > 150000:
+		_restore(snapshot)
+		return "Garage start no longer represents believable personal savings"
 	var garage_burn := BalanceManager.projected_starting_monthly_burn()
-	if garage_burn > 12000:
+	if garage_burn > 5000:
 		_restore(snapshot)
 		return "Garage structural burn is still implausibly high"
 	var first_cpu_burn := BalanceManager.projected_first_cpu_monthly_burn(45000)
-	if first_cpu_burn > 22000:
+	if first_cpu_burn > 9000:
 		_restore(snapshot)
 		return "First internal CPU still double-counts payroll through the development budget"
 	var design := CPU_DESIGN.default_design()
@@ -94,7 +97,7 @@ static func run() -> String:
 	if abs(actual_months - estimated_months) > 2:
 		_restore(snapshot)
 		return "Displayed first CPU duration diverges by more than two months from the real simulation"
-	if Economy.money < 100000:
+	if Economy.money < 15000:
 		_restore(snapshot)
 		return "Standard first CPU reaches industrialization with too little reserve for a meaningful production choice"
 
