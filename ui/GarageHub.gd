@@ -284,8 +284,10 @@ func _zone_actions(zone_name: String) -> Array:
 				{"label":"Conception & R&D avancées","tab":3,"context":"Réglages avancés","enabled":true}
 			]
 		"Banc de test":
+			if _has_pending_project_decision():
+				return [{"label":"Décision prototype / validation","tab":3,"context":"PROJECT_DECISION","enabled":true}]
 			if _has_active_project():
-				return [{"label":"Voir prototype et validation","tab":3,"context":"PROJECT_DECISION","enabled":true}]
+				return [{"label":"Tests en cours — aucune décision requise","tab":3,"context":"","enabled":false}]
 			return [{"label":"Aucun prototype pour le moment","tab":3,"context":"","enabled":false}]
 		"Tableau de planification":
 			var actions: Array = [
@@ -297,6 +299,8 @@ func _zone_actions(zone_name: String) -> Array:
 		"Bureau du fondateur":
 			return [{"label":"Gérer l'entreprise","tab":1,"context":"Entreprise","enabled":true}]
 		"Stock & production":
+			if _has_pending_production_route():
+				return [{"label":"Choisir la route de fabrication","tab":4,"context":"Production","enabled":true}]
 			return [{"label":"Industrialisation & produits","tab":4,"context":"Production","enabled":true}]
 	return []
 
@@ -335,6 +339,24 @@ func _has_active_project() -> bool:
 			return true
 	return false
 
+func _has_pending_project_decision() -> bool:
+	return not ResearchManager.get_pending_project_decisions().is_empty()
+
+func _has_pending_production_route() -> bool:
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		if not bool(job.get("route_selected", false)):
+			return true
+	return false
+
+func _apply_attention_style(button: Button) -> void:
+	var hint := StyleBoxFlat.new()
+	hint.bg_color = Color(0.95, 0.70, 0.25, 0.16)
+	hint.border_color = Color(1.0, 0.77, 0.35, 0.95)
+	hint.set_border_width_all(3)
+	button.add_theme_stylebox_override("normal", hint)
+	button.add_theme_stylebox_override("focus", hint)
+
 func set_progression(unlocks: Dictionary) -> void:
 	_last_unlocks = unlocks.duplicate(true)
 	_refresh_zone_visibility()
@@ -347,7 +369,12 @@ func set_onboarding_stage(stage: String) -> void:
 			_room_subtitle.text = "Touchez l'établi pour commencer"
 		else:
 			_room_title.text = str(ExecutiveManager.workplace_data().get("name", "Garage aménagé"))
-			_room_subtitle.text = "Touchez un élément du décor"
+			if _has_pending_project_decision():
+				_room_subtitle.text = "Décision requise • Banc de test"
+			elif _has_pending_production_route():
+				_room_subtitle.text = "Décision requise • Stock & production"
+			else:
+				_room_subtitle.text = "Touchez un élément du décor"
 	_refresh_zone_visibility()
 	close_context_menu()
 
@@ -362,6 +389,10 @@ func _refresh_zone_visibility() -> void:
 			hint.border_color = Color(0.35, 0.90, 0.96, 0.85)
 			hint.set_border_width_all(2)
 			button.add_theme_stylebox_override("normal", hint)
+		elif str(button.get_meta("zone_name", "")) == "Banc de test" and _has_pending_project_decision() and button.visible:
+			_apply_attention_style(button)
+		elif str(button.get_meta("zone_name", "")) == "Stock & production" and _has_pending_production_route() and button.visible:
+			_apply_attention_style(button)
 
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)
