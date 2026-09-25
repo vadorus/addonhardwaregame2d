@@ -301,6 +301,8 @@ func _zone_actions(zone_name: String) -> Array:
 		"Stock & production":
 			if _has_pending_production_route():
 				return [{"label":"Choisir la route de fabrication","tab":4,"context":"Production","enabled":true}]
+			if _has_ready_product_to_launch():
+				return [{"label":"Préparer le lancement commercial","tab":4,"context":"PRODUCT_LAUNCH","enabled":true}]
 			return [{"label":"Industrialisation & produits","tab":4,"context":"Production","enabled":true}]
 	return []
 
@@ -349,6 +351,9 @@ func _has_pending_production_route() -> bool:
 			return true
 	return false
 
+func _has_ready_product_to_launch() -> bool:
+	return ProductManager.has_ready_product_to_launch()
+
 func _apply_attention_style(button: Button) -> void:
 	var hint := StyleBoxFlat.new()
 	hint.bg_color = Color(0.95, 0.70, 0.25, 0.16)
@@ -373,6 +378,8 @@ func set_onboarding_stage(stage: String) -> void:
 				_room_subtitle.text = "Décision requise • Banc de test"
 			elif _has_pending_production_route():
 				_room_subtitle.text = "Décision requise • Stock & production"
+			elif _has_ready_product_to_launch():
+				_room_subtitle.text = "Décision requise • Lancement CPU"
 			else:
 				_room_subtitle.text = "Touchez un élément du décor"
 	_refresh_zone_visibility()
@@ -391,7 +398,7 @@ func _refresh_zone_visibility() -> void:
 			button.add_theme_stylebox_override("normal", hint)
 		elif str(button.get_meta("zone_name", "")) == "Banc de test" and _has_pending_project_decision() and button.visible:
 			_apply_attention_style(button)
-		elif str(button.get_meta("zone_name", "")) == "Stock & production" and _has_pending_production_route() and button.visible:
+		elif str(button.get_meta("zone_name", "")) == "Stock & production" and (_has_pending_production_route() or _has_ready_product_to_launch()) and button.visible:
 			_apply_attention_style(button)
 
 func set_workplace(data: Dictionary) -> void:
