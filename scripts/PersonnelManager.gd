@@ -20,9 +20,9 @@ func reset(starting_sector: String):
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
 	# Stade garage : le fondateur travaille avec un noyau technique réduit.
 	# Production, marketing et support seront de vraies embauches de croissance.
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 3400)
-	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 3200)
-	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 2600)
+	_add_employee("Camille Durand", "Cofondatrice technique / R&D", "R&D", 72, 8.0, spec, 68, 3400, {}, true)
+	_add_employee("Samira Lefèvre", "Cofondatrice développement CPU", "Développement", 64, 4.0, "product", 58, 3200, {}, true)
+	_add_employee("Noah Leroy", "Associé validation CPU", "Développement", 59, 3.0, "validation", 35, 2600, {}, true)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
 	CompanyManager.set_department_leader("Développement", str(staff[1].id))
 	CompanyManager.set_department_leader("Production", "")
@@ -31,7 +31,7 @@ func reset(starting_sector: String):
 	generate_candidate("R&D")
 	staff_changed.emit()
 
-func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}):
+func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}, founding_member: bool = false):
 	var resolved_profile := profile.duplicate(true)
 	if resolved_profile.is_empty():
 		resolved_profile = _generate_profile(department, specialization, skill, experience)
@@ -41,7 +41,7 @@ func _add_employee(full_name: String, role: String, department: String, skill: i
 		"skill":skill,"aptitude":clampi(skill + rng.randi_range(-8, 8), 35, 95),
 		"experience_years":experience,"specialization":specialization,
 		"domain_experience":{specialization: experience},"leadership":leadership,
-		"salary":salary,"morale":75.0,"profile":resolved_profile
+		"salary":salary,"morale":75.0,"profile":resolved_profile,"founding_member":founding_member
 	}
 	_next_id += 1
 	staff.append(emp)
@@ -140,10 +140,33 @@ func team_attribute(department: String, attribute: String) -> float:
 		return 35.0
 	return clampf(total / float(count), 0.0, 100.0)
 
-func process_month(active_departments: Array):
-	var payroll := 0
+func founding_stage_active() -> bool:
+	if int(ExecutiveManager.workplace.get("tier", 0)) > 0:
+		return false
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED":
+			return false
+	return true
+
+func employee_monthly_pay(emp: Dictionary) -> int:
+	var salary := int(emp.get("salary", 0))
+	if bool(emp.get("founding_member", false)) and founding_stage_active():
+		# Les fondateurs vivent sur une indemnité minimale et reportent une partie
+		# de leur rémunération tant que l'entreprise travaille encore dans le garage.
+		return maxi(400, int(round(float(salary) * 0.25)))
+	return salary
+
+func monthly_payroll_cost() -> int:
+	var base := 0
 	for emp in staff:
-		payroll += int(emp.salary)
+		base += employee_monthly_pay(emp)
+	return BalanceManager.expense_amount(base, "Salaires")
+
+func process_month(active_departments: Array):
+	var payroll_base := 0
+	for emp in staff:
+		payroll_base += employee_monthly_pay(emp)
 		var dept := str(emp.department)
 		if active_departments.has(dept):
 			emp.experience_years = float(emp.experience_years) + (1.0 / 12.0)
@@ -152,7 +175,7 @@ func process_month(active_departments: Array):
 			emp.morale = clampf(float(emp.morale) + 0.2, 0.0, 100.0)
 		else:
 			emp.morale = clampf(float(emp.morale) - 0.05, 0.0, 100.0)
-	Economy.add_expense(payroll, "Salaires")
+	Economy.add_expense(payroll_base, "Rémunération équipe fondatrice" if founding_stage_active() else "Salaires")
 	for dept in CompanyManager.departments:
 		if active_departments.has(dept):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
