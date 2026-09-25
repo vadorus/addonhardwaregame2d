@@ -1603,7 +1603,7 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	var capital := int(data.get("starting_capital", 1450000))
+	var capital := int(data.get("starting_capital", 100000))
 	setup_difficulty_label.text = "%s\nCapital de lancement : %s €. Les règles économiques restent identiques ; seule la marge d'erreur change." % [
 		BalanceManager.profile_description(key),
 		_money(capital)
