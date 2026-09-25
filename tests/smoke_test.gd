@@ -541,8 +541,8 @@ func _ready() -> void:
 		_fail("CPU research must start with three clear domains")
 		return
 	var research_capacity := ResearchManager.get_cpu_research_capacity()
-	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 2:
-		_fail("CPU research capacity does not match the R&D staff")
+	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 1:
+		_fail("CPU research capacity does not match the garage R&D staff")
 		return
 	var development_size := ResearchManager.get_development_team_size()
 	if development_size != PersonnelManager.count_department("Développement") or development_size < 2:
@@ -551,17 +551,14 @@ func _ready() -> void:
 	if not CompanyManager.departments.has("Développement"):
 		_fail("Company organization is missing the Development department")
 		return
-	if PersonnelManager.count_department("Production") < 1:
-		_fail("Starting company has no Production team")
-		return
-	if PersonnelManager.team_attribute("Production", "process_quality") <= 0.0:
-		_fail("Production employee profiles were not initialized")
+	if PersonnelManager.count_department("Production") != 0:
+		_fail("Garage start created a Production department before industrialization needs it")
 		return
 	if ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":research_capacity + 1, "EFFICIENCY":0, "RELIABILITY":0}):
 		_fail("CPU research accepted more researchers than available")
 		return
-	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":1, "RELIABILITY":0}):
-		_fail("CPU research rejected a valid team split")
+	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":0, "RELIABILITY":0}):
+		_fail("CPU research rejected a valid garage-stage allocation")
 		return
 	if ResearchManager.get_development_team_size() != development_size:
 		_fail("Research allocation incorrectly changed the Development team size")
