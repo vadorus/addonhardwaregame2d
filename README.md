@@ -100,6 +100,7 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 - [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
 - [`docs/V06_PLAYTEST_ECONOMY.md`](docs/V06_PLAYTEST_ECONOMY.md) — économie garage V0.6, chiffres de playtest, garde-fous et état de validation ;
+- [`docs/AUDIT_CLAUDE_V06_2026-09-25_R2.md`](docs/AUDIT_CLAUDE_V06_2026-09-25_R2.md) — seconde passe d’audit Claude et résolution des blocants économie/viabilité ;
 - [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — historique du prototype V0.2 ;
 - [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — historique / procédure d'import du projet local.
 
