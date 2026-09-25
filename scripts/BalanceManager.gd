@@ -42,7 +42,7 @@ const PROFILES := {
 	"REALISTIC":{
 		"label":"Réaliste",
 		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
-		"starting_capital":70000,
+		"starting_capital":95000,
 		"operating_cost":1.10,
 		"salary_cost":1.08,
 		"research_cost":1.12,
