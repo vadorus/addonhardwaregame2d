@@ -223,7 +223,7 @@ func _build_ui():
 	var money_box := VBoxContainer.new()
 	money_box.custom_minimum_size.x = 120
 	money_box.add_child(_eyebrow("TRÉSORERIE"))
-	money_label = _label("500 000 €", 16)
+	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 16)
 	money_label.add_theme_color_override("font_color", APP_GREEN)
 	money_box.add_child(money_label)
 	top.add_child(money_box)
@@ -233,7 +233,7 @@ func _build_ui():
 		speed_button.text = str(data[0])
 		speed_button.custom_minimum_size = Vector2(44, 42)
 		var speed := float(data[1])
-		speed_button.pressed.connect(func(): TimeManager.time_scale = speed)
+		speed_button.pressed.connect(_request_time_scale.bind(speed))
 		top.add_child(speed_button)
 
 	var save_btn := Button.new()
@@ -301,6 +301,16 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		return
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
+	if tab_index == 3 and context == "PROJECT_DECISION" and lab_screen != null:
+		TimeManager.time_scale = 0.0
+		status_label.text = "Nora : le prototype attend votre décision."
+		lab_screen.call_deferred("focus_project_decision")
+		return
+	if tab_index == 4 and context == "PRODUCT_LAUNCH" and products_screen != null:
+		TimeManager.time_scale = 0.0
+		status_label.text = "Nora : le CPU est prêt. Choisissez un prix et une capacité que la trésorerie peut réellement soutenir."
+		products_screen.call_deferred("focus_product_launch")
+		return
 	if context != "" and tabs != null and tabs.current_tab == tab_index and before != tab_index:
 		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % context
 
@@ -388,6 +398,8 @@ func _on_lab_action(action: String, payload: Variant = null):
 					break
 			if project_id != "" and choice_id != "" and ResearchManager.resolve_project_decision(project_id, choice_id):
 				status_label.text = "Décision %s validée : %s." % [str(decision.get("category", "développement")).to_lower(), choice_label]
+				if _blocking_company_decision().is_empty() and not month_layer.visible:
+					TimeManager.time_scale = 1.0
 			else:
 				status_label.text = "Décision impossible : vérifiez la trésorerie et l'état du projet."
 			_refresh_all()
@@ -949,7 +961,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.5 • NEW PLAYER EXPERIENCE")
+	var version := _eyebrow("V0.6 • ROOM-FIRST PROTOTYPE")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
@@ -1223,7 +1235,13 @@ func _resolve_research_event(pursue: bool):
 	if not pending.is_empty():
 		_on_research_event(pending[0])
 	elif not month_layer.visible and not SimulationManager.is_game_over:
-		TimeManager.time_scale = 1.0
+		var blocker := _blocking_company_decision()
+		if blocker.is_empty():
+			TimeManager.time_scale = 1.0
+		else:
+			TimeManager.time_scale = 0.0
+			_show_tab(0)
+			status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
 	_refresh_all()
 
 func _tab_scroll(title: String) -> ScrollContainer:
@@ -1367,9 +1385,10 @@ func _show_tab(index: int):
 func _update_nav_state():
 	if tabs == null:
 		return
-	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
 	if nav_panel != null:
-		nav_panel.visible = not garage_intro
+		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
+	if status_label != null:
+		status_label.visible = not CompanyManager.created or tabs.current_tab != 0
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
@@ -1597,7 +1616,7 @@ func _refresh_setup_difficulty():
 		return
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
-	var capital := int(data.get("starting_capital", 1450000))
+	var capital := int(data.get("starting_capital", 100000))
 	setup_difficulty_label.text = "%s\nCapital de lancement : %s €. Les règles économiques restent identiques ; seule la marge d'erreur change." % [
 		BalanceManager.profile_description(key),
 		_money(capital)
@@ -1641,10 +1660,54 @@ func _breakdown(data: Dictionary) -> String:
 	for key in data: lines.append("  • %s : %s €" % [str(key),_money(int(data[key]))])
 	return "\n".join(lines)
 
+func _blocking_company_decision() -> Dictionary:
+	var project_decisions := ResearchManager.get_pending_project_decisions()
+	if not project_decisions.is_empty():
+		var decision: Dictionary = project_decisions[0]
+		return {
+			"type":"PROJECT_DECISION",
+			"tab":3,
+			"message":"Nora : le projet attend votre décision. Le temps reste en pause — ouvrez le Banc de test."
+		}
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		if not bool(job.get("route_selected", false)):
+			return {
+				"type":"PRODUCTION_ROUTE",
+				"tab":4,
+				"message":"Nora : l'industrialisation attend votre choix de fabrication. Le temps reste en pause — ouvrez Stock & production."
+			}
+	if ProductManager.has_ready_product_to_launch():
+		return {
+			"type":"PRODUCT_LAUNCH",
+			"tab":4,
+			"message":"Nora : votre premier CPU est prêt. Le temps reste en pause — préparez son prix et sa capacité dans Stock & production."
+		}
+	return {}
+
+func _request_time_scale(speed: float) -> void:
+	if speed > 0.0:
+		var blocker := _blocking_company_decision()
+		if not blocker.is_empty():
+			TimeManager.time_scale = 0.0
+			_show_tab(0)
+			status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+			_refresh_all()
+			return
+	TimeManager.time_scale = speed
+
 func _close_month_report():
 	month_layer.visible=false
-	if not SimulationManager.is_game_over:
-		TimeManager.time_scale=1.0
+	if SimulationManager.is_game_over:
+		return
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		_show_tab(0)
+		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+		_refresh_all()
+		return
+	TimeManager.time_scale=1.0
 
 func _on_game_over(reason: String, report: Dictionary):
 	TimeManager.time_scale = 0.0
@@ -1811,6 +1874,8 @@ func _on_products_action(action: String, payload: Dictionary):
 				var route_ok := ProductionManager.set_manufacturing_route(job_id, mode, provider)
 				if strategy_ok and binning_ok and route_ok:
 					var quote := ProductionManager.manufacturing_route_quote(job_id)
+					if _blocking_company_decision().is_empty() and not month_layer.visible:
+						TimeManager.time_scale = 1.0
 					status_label.text = "Production : %s • %s • %s." % [
 						ProductionManager.strategy_label(strategy),
 						ProductionManager.binning_strategy_label(binning),
@@ -1839,10 +1904,16 @@ func _on_products_action(action: String, payload: Dictionary):
 			else:
 				FoundryManager.set_sell_spare_capacity(not bool(fab.get("sell_spare_capacity", false)))
 		"launch_product":
-			if ProductManager.launch_product(str(payload.get("product_id", "")), int(payload.get("price", 0)), int(payload.get("capacity", 0))):
-				status_label.text = "Produit lancé : le plan commercial est mémorisé. Faites passer un mois pour comparer la prévision aux ventes réelles."
+			var launch_product_id := str(payload.get("product_id", ""))
+			var launch_product_data := ProductManager.get_product(launch_product_id)
+			var launch_capacity := int(payload.get("capacity", 0))
+			var launch_cost := ProductManager.launch_capacity_commitment_cost(launch_product_data, launch_capacity) if not launch_product_data.is_empty() else 0
+			if ProductManager.launch_product(launch_product_id, int(payload.get("price", 0)), launch_capacity):
+				status_label.text = "Produit lancé : %s € engagés pour la capacité. Le prochain mois comparera prévision et ventes réelles." % _money(launch_cost)
+				if _blocking_company_decision().is_empty() and not month_layer.visible:
+					TimeManager.time_scale = 1.0
 			else:
-				status_label.text = "Ce produit est déjà lancé ou indisponible."
+				status_label.text = "Lancement impossible : produit indisponible ou trésorerie insuffisante pour engager la capacité demandée (~%s €)." % _money(launch_cost)
 		"update_price":
 			if ProductManager.update_product_price(str(payload.get("product_id", "")), int(payload.get("price", 0))):
 				status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."

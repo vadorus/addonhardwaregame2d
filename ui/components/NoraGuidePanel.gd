@@ -128,7 +128,7 @@ func refresh() -> void:
 			_objective_label.text = str(pending.get("text", "Prendre la décision de développement en attente."))
 		else:
 			var phase_index := clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
-			_message_label.text = "Samira et Noah portent le développement du produit. Camille et Alex font progresser le savoir-faire qui améliorera ce CPU et les générations suivantes."
+			_message_label.text = "Samira et Noah portent le développement du produit. Camille et l’équipe développement font progresser le savoir-faire qui améliorera ce CPU et les générations suivantes."
 			_objective_label.text = "Suivre %s — phase %s à %.0f%%." % [
 				str(active_project.get("name", "votre CPU")),
 				str(GameData.PHASES[phase_index]),

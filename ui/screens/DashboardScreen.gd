@@ -45,7 +45,7 @@ var dashboard_cto_button: Button
 var dashboard_target_tab := 3
 
 func _ready() -> void:
-	name = "Tableau de bord"
+	name = "Bureau"
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -78,7 +78,8 @@ func _build() -> void:
 	)
 	box.add_child(dashboard_nora_guide)
 
-	dashboard_garage_card = UI.card(UI.APP_PANEL, 14, 10)
+	dashboard_garage_card = UI.card(Color(0, 0, 0, 0), 0, 0)
+	dashboard_garage_card.add_theme_stylebox_override("panel", UI.stylebox(Color(0, 0, 0, 0), 0, 0, Color(0, 0, 0, 0), 0))
 	dashboard_garage_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(dashboard_garage_card)
 	var garage_card := dashboard_garage_card
@@ -430,24 +431,23 @@ func refresh() -> void:
 	if dashboard_label == null:
 		return
 	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
+	var room_first := CompanyManager.created
 	if dashboard_nora_guide != null:
-		dashboard_nora_guide.visible = CompanyManager.created
-		if dashboard_nora_guide.has_method("refresh"):
-			dashboard_nora_guide.call("refresh")
+		dashboard_nora_guide.visible = false
 	if dashboard_heading != null:
-		dashboard_heading.visible = not garage_intro
+		dashboard_heading.visible = not room_first
 	if dashboard_garage_header != null:
-		dashboard_garage_header.visible = not garage_intro
+		dashboard_garage_header.visible = false
 	if dashboard_priority_card != null:
-		dashboard_priority_card.visible = not garage_intro
+		dashboard_priority_card.visible = not room_first
 	if dashboard_grid != null:
-		dashboard_grid.visible = not garage_intro
+		dashboard_grid.visible = not room_first
 	if dashboard_stats_grid != null:
-		dashboard_stats_grid.visible = not garage_intro
+		dashboard_stats_grid.visible = not room_first
 	if dashboard_lower_grid != null:
-		dashboard_lower_grid.visible = not garage_intro
+		dashboard_lower_grid.visible = not room_first
 	if dashboard_cto_button != null:
-		dashboard_cto_button.visible = not garage_intro and (not CompanyManager.created or ExecutiveManager.is_interface_feature_unlocked("COMPANY"))
+		dashboard_cto_button.visible = false
 	if dashboard_garage != null:
 		dashboard_garage.call("set_workplace", ExecutiveManager.workplace_data())
 		dashboard_garage.call("set_progression", ExecutiveManager.get_interface_unlocks())
@@ -467,7 +467,7 @@ func refresh() -> void:
 		dashboard_metric_b.text = "—"
 		dashboard_metric_c.text = "—"
 		dashboard_cto_label.text = "Je suis prête à constituer l'équipe et à transformer votre première idée en processeur."
-		dashboard_cash_value.text = "500 000 €"
+		dashboard_cash_value.text = "%s €" % UI.money(BalanceManager.starting_capital())
 		dashboard_result_value.text = "—"
 		dashboard_staff_value.text = "—"
 		dashboard_brand_value.text = "—"

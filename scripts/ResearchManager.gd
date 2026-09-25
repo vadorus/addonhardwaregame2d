@@ -133,7 +133,8 @@ func get_active_cpu_concept_programs() -> Array:
 func start_cpu_concept_program(axis: String, monthly_budget: int, ambition: int) -> bool:
 	if not CPU_CONCEPT_AXES.has(axis):
 		return false
-	if not Economy.can_afford(maxi(monthly_budget, 5000), "R&D Concept"):
+	var concept_cash_cost := internal_research_monthly_base_cost(clampi(monthly_budget, 5000, 150000))
+	if not Economy.can_afford(concept_cash_cost, "R&D Concept"):
 		return false
 	if get_cpu_research_capacity() <= 0:
 		return false
@@ -185,7 +186,8 @@ func _process_concept_programs():
 		if str(program.get("status", "")) != "ACTIVE":
 			continue
 		var budget := int(program.get("monthly_budget", 5000))
-		Economy.add_expense(budget, "R&D Concept — %s" % get_cpu_concept_axis_label(str(program.get("axis", ""))))
+		var cash_cost := internal_research_monthly_base_cost(budget)
+		Economy.add_expense(cash_cost, "R&D Concept — %s" % get_cpu_concept_axis_label(str(program.get("axis", ""))))
 		var ambition := clampi(int(program.get("ambition", 1)), 1, 3)
 		var domain := str(program.get("domain", "ARCHITECTURE"))
 		var knowledge := float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
@@ -561,7 +563,7 @@ func _process_continuous_research():
 	var total_allocation := get_total_cpu_research_allocation()
 	if total_allocation <= 0:
 		return
-	Economy.add_expense(continuous_research_budget, "Recherche fondamentale CPU")
+	Economy.add_expense(internal_research_monthly_base_cost(continuous_research_budget), "Recherche fondamentale CPU")
 	var team := PersonnelManager.team_score("R&D", "cpu")
 	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
 	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
@@ -647,6 +649,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"base_development_cost":float(GameData.SECTORS.CPU.base_dev_cost),
 		"approach_speed":float(approach_data.speed),
 		"approach_cost":float(approach_data.cost),
+		"development_cash_factor":development_cash_factor(approach),
+		"sourcing_monthly_cost_factor":float(GameData.sourcing_profile(approach).get("monthly_cost_factor", 1.0)),
 		"team_score":team_score,
 		"management_modifier":management_modifier,
 		"technology_score":technology_score,
@@ -697,7 +701,7 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 		extra_months,
 		GameData.PHASES.size()
 	)
-	var monthly_raw := int(float(monthly_budget) * float(approach_data.get("cost", 1.0)) * float(resolved_sourcing.get("monthly_cost_factor", 1.0)))
+	var monthly_raw := development_monthly_base_cost(approach, monthly_budget, resolved_sourcing)
 	var monthly_charged := Economy.quoted_expense(monthly_raw, "Développement — estimation CPU")
 	var setup_charged := Economy.quoted_expense(int(resolved_sourcing.get("setup_cost", 0)), "Accès technologique")
 	var upfront_charged := Economy.quoted_expense(upfront_cost, "Programme technique")
@@ -729,6 +733,40 @@ func get_cpu_generation_proposal(proposal_id: String) -> Dictionary:
 			return proposal.duplicate(true)
 	return {}
 
+func development_cash_factor(approach: String) -> float:
+	# Le budget de développement représente l'intensité du programme.
+	# En interne, les salaires sont déjà payés par PersonnelManager : on ne
+	# refacture ici que prototypes, composants, outillage et essais.
+	match approach:
+		"INTERNAL": return 0.04
+		"PARTNER": return 0.62
+		_: return 1.0
+
+func development_monthly_base_cost(approach: String, monthly_budget: int, sourcing: Dictionary = {}) -> int:
+	var approach_data: Dictionary = GameData.approach_data(approach)
+	var monthly_factor := float(sourcing.get("monthly_cost_factor", 1.0))
+	return maxi(500, int(round(
+		float(maxi(monthly_budget, 1000))
+		* float(approach_data.get("cost", 1.0))
+		* monthly_factor
+		* development_cash_factor(approach)
+	)))
+
+func quoted_development_monthly_cost(approach: String, monthly_budget: int, sourcing: Dictionary = {}) -> int:
+	return Economy.quoted_expense(
+		development_monthly_base_cost(approach, monthly_budget, sourcing),
+		"Développement"
+	)
+
+func internal_research_monthly_base_cost(intensity: int) -> int:
+	# Recherche et programmes Concept mobilisent d'abord des personnes déjà payées.
+	# L'intensité pilote la vitesse/ambition ; la sortie de caisse couvre matériel,
+	# prototypes, mesures et consommables.
+	return maxi(250, int(round(float(maxi(intensity, 1000)) * development_cash_factor("INTERNAL"))))
+
+func quoted_internal_research_monthly_cost(intensity: int, category: String = "Recherche fondamentale CPU") -> int:
+	return Economy.quoted_expense(internal_research_monthly_base_cost(intensity), category)
+
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE") -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
@@ -747,7 +785,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if approach != "INTERNAL" and (not bool(sourcing_profile.get("accepted", false)) or not SupplierManager.can_accept_project(approach, resolved_supplier_id)):
 		return false
 	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
-	var first_month_commitment := Economy.quoted_expense(maxi(monthly_budget, 10000), "Développement — %s" % project_name)
+	var first_month_commitment := Economy.quoted_expense(development_monthly_base_cost(approach, monthly_budget, sourcing_profile), "Développement — %s" % project_name)
 	if remediation_upfront > 0:
 		first_month_commitment += Economy.quoted_expense(remediation_upfront, "Programme technique")
 	if sourcing_setup_cost > 0:
@@ -833,7 +871,9 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"volume_term":str(sourcing_profile.get("volume_term", volume_term)),
 		"supplier_contract_id":"",
 		"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
-		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
+		"monthly_budget":monthly_budget,
+		"monthly_cash_cost":development_monthly_base_cost(approach, monthly_budget, sourcing_profile),
+		"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"validation_metrics":{},"validation_rechecks":0,
@@ -863,6 +903,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			return false
 		project["supplier_contract_id"] = str(signed_contract.get("id", ""))
 		project["sourcing"] = signed_contract.duplicate(true)
+		project["monthly_cash_cost"] = development_monthly_base_cost(approach, monthly_budget, project["sourcing"])
 	if sector == "CPU" and not stored_remediation.is_empty():
 		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
 	if sourcing_setup_cost > 0:
@@ -902,7 +943,8 @@ func _process_project_month(project: Dictionary):
 		management = CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
-	var expense := int(float(project.monthly_budget) * float(approach_data.cost) * float(sourcing.get("monthly_cost_factor", 1.0)))
+	var expense := development_monthly_base_cost(str(project.approach), int(project.monthly_budget), sourcing)
+	project["monthly_cash_cost"] = expense
 	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
 	if str(project.sector) == "CPU" and int(project.get("decision_delay_months_remaining", 0)) > 0:
@@ -1204,6 +1246,11 @@ func load_state(state: Dictionary):
 			saved_sourcing["knowledge_transfer_factor"] = float(saved_sourcing.get("knowledge_transfer_factor", 1.0))
 			saved_sourcing["monthly_cost_factor"] = float(saved_sourcing.get("monthly_cost_factor", 1.0))
 		project["sourcing"] = saved_sourcing
+		project["monthly_cash_cost"] = development_monthly_base_cost(
+			saved_approach,
+			int(project.get("monthly_budget", 42000)),
+			saved_sourcing
+		)
 		project["supplier_id"] = str(project.get("supplier_id", saved_sourcing.get("supplier_id", "")))
 		project["supplier_name"] = str(project.get("supplier_name", saved_sourcing.get("supplier_name", "Équipe interne")))
 		project["negotiation"] = str(project.get("negotiation", saved_sourcing.get("negotiation", "BALANCED")))

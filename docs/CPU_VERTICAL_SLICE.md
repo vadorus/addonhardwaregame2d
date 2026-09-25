@@ -2,7 +2,11 @@
 
 > Objectif : transformer le laboratoire actuel en une boucle CPU complète, crédible et amusante, tout en gardant les détails avancés facultatifs.
 
-## État d’implémentation — V0.3
+## État d’implémentation — V0.6
+
+La V0.6 valide désormais le démarrage « room-first » : le joueur part en 1971 dans un garage avec une petite équipe fondatrice, une trésorerie Standard de 100 000 €, des charges adaptées au stade réel de l'entreprise et une première industrialisation sous-traitée à petite échelle. Le budget de développement interne affiché comme intensité de programme est distingué de la sortie de caisse réelle afin de ne pas compter deux fois les salaires.
+
+Le playtest Android de référence observe 4 452 € de dépenses au premier mois (2 300 € équipe fondatrice, 500 € local, 1 652 € développement Nova 1). Le parcours automatisé couvre ensuite développement, prototype/validation, industrialisation, gamme, ventes, retours terrain et préparation de la génération suivante. Voir `V06_PLAYTEST_ECONOMY.md`.
 
 Le conseil d’architecture est jouable : à partir du brief courant, l’équipe prépare trois plans (prudent, équilibré, audacieux). Les prévisions tiennent compte des compétences R&D, du management, du savoir-faire CPU, de la maturité de la division, de l’équipement estimé, du budget, de l’approche et de la trésorerie. Le joueur peut appliquer un plan, le personnaliser puis le lancer.
 

@@ -6,7 +6,9 @@ const NEW_PLAYER_ENTRY_SCENARIO := preload("res://tests/scenarios/NewPlayerEntry
 const FIRST_CPU_WORKSHOP_SCENARIO := preload("res://tests/scenarios/FirstCpuWorkshopScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
+const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
+const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
 const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
@@ -18,6 +20,10 @@ const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicySce
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
+	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
+	if market_guard_error != "":
+		_fail(market_guard_error)
+		return
 	var garage_error := GARAGE_SCENARIO.run(self)
 	if garage_error != "":
 		_fail(garage_error)
@@ -152,6 +158,10 @@ func _ready() -> void:
 	var first_cpu_runway_error := FIRST_CPU_RUNWAY_SCENARIO.run()
 	if first_cpu_runway_error != "":
 		_fail(first_cpu_runway_error)
+		return
+	var garage_economy_matrix_error := GARAGE_ECONOMY_MATRIX_SCENARIO.run()
+	if garage_economy_matrix_error != "":
+		_fail("Garage economy matrix: " + garage_economy_matrix_error)
 		return
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
@@ -541,8 +551,8 @@ func _ready() -> void:
 		_fail("CPU research must start with three clear domains")
 		return
 	var research_capacity := ResearchManager.get_cpu_research_capacity()
-	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 2:
-		_fail("CPU research capacity does not match the R&D staff")
+	if research_capacity != PersonnelManager.count_department("R&D") or research_capacity < 1:
+		_fail("CPU research capacity does not match the garage R&D staff")
 		return
 	var development_size := ResearchManager.get_development_team_size()
 	if development_size != PersonnelManager.count_department("Développement") or development_size < 2:
@@ -551,17 +561,14 @@ func _ready() -> void:
 	if not CompanyManager.departments.has("Développement"):
 		_fail("Company organization is missing the Development department")
 		return
-	if PersonnelManager.count_department("Production") < 1:
-		_fail("Starting company has no Production team")
-		return
-	if PersonnelManager.team_attribute("Production", "process_quality") <= 0.0:
-		_fail("Production employee profiles were not initialized")
+	if PersonnelManager.count_department("Production") != 0:
+		_fail("Garage start created a Production department before industrialization needs it")
 		return
 	if ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":research_capacity + 1, "EFFICIENCY":0, "RELIABILITY":0}):
 		_fail("CPU research accepted more researchers than available")
 		return
-	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":1, "RELIABILITY":0}):
-		_fail("CPU research rejected a valid team split")
+	if not ResearchManager.set_cpu_research_allocations({"ARCHITECTURE":1, "EFFICIENCY":0, "RELIABILITY":0}):
+		_fail("CPU research rejected a valid garage-stage allocation")
 		return
 	if ResearchManager.get_development_team_size() != development_size:
 		_fail("Research allocation incorrectly changed the Development team size")
@@ -890,6 +897,10 @@ func _ready() -> void:
 	if not ProductManager.products.is_empty():
 		_fail("CPU became sellable before industrialization completed")
 		return
+	# Ce bloc teste la mécanique de fonderie/industrialisation, pas le runway.
+	# Les scénarios FirstCpuRunway et FullCpuPlayerJourney couvrent séparément
+	# la viabilité économique avec la vraie épargne de départ.
+	Economy.money = maxi(Economy.money, 75000)
 	var industrial_job: Dictionary = ProductionManager.get_active_jobs()[0]
 	if str(industrial_job.get("manufacturing_mode", "")) != "EXTERNAL" or str(industrial_job.get("foundry_id", "")) == "":
 		_fail("CPU industrialization did not receive a default external foundry route")
@@ -1278,6 +1289,10 @@ func _ready() -> void:
 		_fail("Expired promotion did not clear its temporary demand bonus")
 		return
 
+	# Test fonctionnel SAV isolé : la viabilité financière est couverte par
+	# FullCpuPlayerJourneyScenario, on ne laisse pas les dépenses des probes
+	# précédents empêcher l'ouverture d'une enquête.
+	Economy.money = maxi(Economy.money, 75000)
 	var field_before := AfterSalesManager.cpu_field_experience()
 	apex_model["defect_rate"] = 0.085
 	apex_model["manufacturing_quality"] = 42.0

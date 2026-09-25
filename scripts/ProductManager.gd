@@ -424,13 +424,43 @@ func get_post_launch_summary(product_id: String) -> Dictionary:
 		"market_feedback_count":product.get("market_feedback_history", []).size()
 	}
 
+func has_ready_product_to_launch() -> bool:
+	for product_value in products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "READY":
+			return true
+	return false
+
+func launch_capacity_commitment_cost(product: Dictionary, requested_capacity: int) -> int:
+	var max_capacity := maxi(int(product.get("max_monthly_capacity", requested_capacity)), 1)
+	var capacity := clampi(requested_capacity, 1, max_capacity)
+	var recommended := maxi(int(product.get("recommended_capacity", capacity)), 1)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var reservation := 500.0 + float(capacity * unit_cost) * 0.010
+	var stretch_units := maxi(capacity - recommended, 0)
+	reservation += float(stretch_units * unit_cost) * 0.025
+	return BalanceManager.expense_amount(maxi(500, int(round(reservation))), "Mise en production")
+
+func monthly_capacity_reservation_cost(product: Dictionary, sold_units: int) -> int:
+	var capacity := maxi(int(product.get("production_capacity", 1)), 1)
+	var unit_cost := maxi(int(product.get("unit_cost", 1)), 1)
+	var unused := maxi(capacity - maxi(sold_units, 0), 0)
+	var base_reservation := float(capacity * unit_cost) * 0.004
+	var idle_reservation := float(unused * unit_cost) * 0.006
+	return maxi(0, int(round(base_reservation + idle_reservation)))
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
 			_ensure_lifecycle_fields(product)
-			product.price = maxi(price, 1)
 			var max_capacity := maxi(int(product.get("max_monthly_capacity", production_capacity)), 1)
-			product.production_capacity = clampi(production_capacity, 1, max_capacity)
+			var chosen_capacity := clampi(production_capacity, 1, max_capacity)
+			var commitment_cost := launch_capacity_commitment_cost(product, chosen_capacity)
+			if not Economy.can_afford(commitment_cost, "Mise en production — %s" % str(product.get("name", "Produit"))):
+				return false
+			product.price = maxi(price, 1)
+			product.production_capacity = chosen_capacity
+			Economy.add_expense(commitment_cost, "Mise en production — %s" % str(product.get("name", "Produit")))
 			var launch_forecast := MarketManager.forecast_cpu_launch(product, int(product.price)) if str(product.get("sector", "")) == "CPU" else {}
 			var royalty_per_unit := int(round(float(product.price) * float(product.get("royalty_rate", 0.0))))
 			var gross_margin_per_unit := int(product.price) - int(product.get("unit_cost", 0)) - royalty_per_unit
@@ -442,6 +472,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 				"unit_cost":int(product.get("unit_cost", 0)),
 				"royalty_per_unit":royalty_per_unit,
 				"gross_margin_per_unit":gross_margin_per_unit,
+				"capacity_commitment_cost":commitment_cost,
 				"forecast":launch_forecast.duplicate(true)
 			}
 			product["last_market_feedback"] = {}
@@ -496,8 +527,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var total_units := sold_b2b + sold_consumer
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
 	var production_cost := total_units * int(product.unit_cost)
+	var capacity_reservation_cost := monthly_capacity_reservation_cost(product, total_units)
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if capacity_reservation_cost > 0:
+		Economy.add_expense(capacity_reservation_cost, "Réservation capacité — %s" % str(product.name))
 	var supplier_contract_id := str(product.get("supplier_contract_id", ""))
 	var fallback_royalty := float(product.get("royalty_rate", product.get("sourcing", {}).get("royalty_rate", 0.0)))
 	var royalty_rate := clampf(SupplierManager.effective_royalty_rate(supplier_contract_id, fallback_royalty), 0.0, 0.50)
@@ -529,7 +563,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
 	})
-	var net_contribution := revenue - production_cost - royalty_cost - warranty_cost
+	var net_contribution := revenue - production_cost - capacity_reservation_cost - royalty_cost - warranty_cost
 	var report := {
 		"product_id":product.id,
 		"units":total_units,
@@ -537,6 +571,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"b2b_units":sold_b2b,
 		"revenue":revenue,
 		"production_cost":production_cost,
+		"capacity_reservation_cost":capacity_reservation_cost,
 		"royalty_cost":royalty_cost,
 		"warranty_cost":warranty_cost,
 		"net_contribution":net_contribution,
@@ -596,6 +631,7 @@ func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
 		"max_units":max_units,
 		"revenue":int(report.get("revenue", 0)),
 		"net_contribution":int(report.get("net_contribution", 0)),
+		"capacity_reservation_cost":int(report.get("capacity_reservation_cost", 0)),
 		"capacity":capacity,
 		"capacity_utilization":utilization,
 		"unserved_demand":maxi(demand_units - capacity, 0),

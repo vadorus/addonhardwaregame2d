@@ -31,7 +31,7 @@ const BENEFIT_OPTIONS := {
 }
 
 const WORKPLACE_TIERS := {
-	0: {"name":"Garage aménagé","capacity":8,"environment":38.0,"upgrade_cost":0,"monthly_cost":900},
+	0: {"name":"Garage aménagé","capacity":8,"environment":38.0,"upgrade_cost":0,"monthly_cost":500},
 	1: {"name":"Atelier + bureaux","capacity":16,"environment":54.0,"upgrade_cost":75000,"monthly_cost":2100},
 	2: {"name":"Siège technique","capacity":36,"environment":70.0,"upgrade_cost":220000,"monthly_cost":5600},
 	3: {"name":"Campus R&D","capacity":80,"environment":84.0,"upgrade_cost":650000,"monthly_cost":15500}
@@ -43,10 +43,10 @@ var right_hand := {
 	"strengths":["priorisation","coordination","lecture des risques"]
 }
 var benefit_policy := {
-	"HEALTH":"BASIC",
+	"HEALTH":"NONE",
 	"MEALS":"NONE",
 	"TRAINING":"NONE",
-	"REST":"BASIC"
+	"REST":"NONE"
 }
 var workplace := {
 	"tier":0,
@@ -70,7 +70,7 @@ var interface_unlocks := {
 var unlock_history: Array = []
 
 func reset():
-	benefit_policy = {"HEALTH":"BASIC","MEALS":"NONE","TRAINING":"NONE","REST":"BASIC"}
+	benefit_policy = {"HEALTH":"NONE","MEALS":"NONE","TRAINING":"NONE","REST":"NONE"}
 	workplace = {"tier":0,"condition":62.0,"last_renovation_year":TimeManager.year,"last_renovation_month":TimeManager.month,"upgrade_reminder_at":-1}
 	hr_issues = []
 	_next_hr_issue_id = 1
@@ -497,11 +497,14 @@ func staff_average_morale() -> float:
 	return total / float(PersonnelManager.staff.size())
 
 func estimated_structural_monthly_cost() -> int:
-	var payroll := 0
-	for emp in PersonnelManager.staff:
-		payroll += int(emp.get("salary", 0))
-	var policy_cost := int(CompanyManager.policies.get("marketing_budget", 0)) + int(CompanyManager.policies.get("support_budget", 0)) + int(CompanyManager.policies.get("environment_budget", 0))
-	return 7500 + payroll + policy_cost + monthly_benefit_cost() + monthly_workplace_cost() + FoundryManager.current_monthly_overhead()
+	return (
+		CompanyManager.monthly_infrastructure_cost()
+		+ PersonnelManager.monthly_payroll_cost()
+		+ CompanyManager.estimated_policy_monthly_cost()
+		+ monthly_benefit_cost()
+		+ monthly_workplace_cost()
+		+ FoundryManager.current_monthly_overhead()
+	)
 
 func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Dictionary:
 	var cash_after := Economy.money - maxi(proposed_cost, 0)

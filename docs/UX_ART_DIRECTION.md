@@ -238,3 +238,17 @@ Au garage, seuls **QG** et **Laboratoire CPU** sont disponibles. Les fonctions a
 Les déblocages sont permanents et sauvegardés. Nora annonce chaque nouvelle fonction et explique pourquoi elle apparaît. Un écran encore verrouillé ne doit jamais être présenté comme une punition : le QG indique la prochaine fonction à découvrir et la condition logique qui la rendra pertinente.
 
 Ce système doit rester extensible aux futures divisions. Une nouvelle branche ne doit pas ajouter immédiatement cinq nouveaux onglets ; ses outils apparaissent au fur et à mesure que le joueur rencontre leurs décisions.
+
+
+## V0.6 — cohérence visuelle et économique du garage
+
+Le garage est désormais un **vrai stade d'entreprise**, pas seulement un fond graphique. Son économie, ses fonctions visibles et son mobilier doivent raconter la même chose :
+
+- trésorerie limitée issue des économies du fondateur ;
+- petite équipe fondatrice ;
+- aucun service Marketing/SAV/Production complet tant qu'il n'est pas nécessaire ;
+- charges de local faibles ;
+- outils et postes visibles uniquement quand leur fonction existe ;
+- montée des coûts et de la densité visuelle lors du passage à l'atelier, au siège puis au campus.
+
+Le playtest mobile a aussi fixé deux règles UX : l'action principale d'un écran de décision doit rester visible sans défilement ambigu en paysage, et un hotspot essentiel au tout premier onboarding peut recevoir un indice visuel temporaire discret. Une décision bloquante de prototype/validation doit ouvrir directement au bon endroit et mettre le temps en pause.
