@@ -39,7 +39,7 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 
 La vertical slice est volontairement limitée à la branche **CPU**. Les autres secteurs restent paramétrés dans les données afin de préparer les futures extensions, mais ils sont affichés comme « à venir », désactivés dans l’interface et refusés par le moteur de R&D. Ils ne doivent pas être développés avant que la boucle CPU soit profonde, équilibrée et amusante.
 
-L’interface V0.2.8 propose un véritable laboratoire CPU : le joueur définit son brief, demande trois plans générationnels à l’équipe, choisit une recommandation puis peut encore régler les cœurs, la fréquence, le cache, la finesse de gravure et le TDP. Une architecture terminée devient ensuite une famille de trois références aux performances, coûts, rendements, capacités et clientèles distincts. Le QG réutilise le design choisi dans son aperçu graphique.
+L’interface V0.6 démarre désormais dans le garage et révèle les fonctions lorsqu’elles deviennent utiles. Le joueur choisit d’abord l’intention de son premier CPU, peut ensuite personnaliser sa conception, suivre son développement, arbitrer prototype/validation puis passer à l’industrialisation et au marché. Une architecture terminée devient une famille de références aux performances, coûts, rendements, capacités et clientèles distincts. Le QG isométrique sert de point d’entrée spatial vers ces décisions et évolue avec l’entreprise.
 
 ## Vision
 
