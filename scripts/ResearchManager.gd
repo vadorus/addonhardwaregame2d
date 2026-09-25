@@ -133,7 +133,8 @@ func get_active_cpu_concept_programs() -> Array:
 func start_cpu_concept_program(axis: String, monthly_budget: int, ambition: int) -> bool:
 	if not CPU_CONCEPT_AXES.has(axis):
 		return false
-	if not Economy.can_afford(maxi(monthly_budget, 5000), "R&D Concept"):
+	var concept_cash_cost := internal_research_monthly_base_cost(clampi(monthly_budget, 5000, 150000))
+	if not Economy.can_afford(concept_cash_cost, "R&D Concept"):
 		return false
 	if get_cpu_research_capacity() <= 0:
 		return false
@@ -185,7 +186,8 @@ func _process_concept_programs():
 		if str(program.get("status", "")) != "ACTIVE":
 			continue
 		var budget := int(program.get("monthly_budget", 5000))
-		Economy.add_expense(budget, "R&D Concept — %s" % get_cpu_concept_axis_label(str(program.get("axis", ""))))
+		var cash_cost := internal_research_monthly_base_cost(budget)
+		Economy.add_expense(cash_cost, "R&D Concept — %s" % get_cpu_concept_axis_label(str(program.get("axis", ""))))
 		var ambition := clampi(int(program.get("ambition", 1)), 1, 3)
 		var domain := str(program.get("domain", "ARCHITECTURE"))
 		var knowledge := float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
@@ -561,7 +563,7 @@ func _process_continuous_research():
 	var total_allocation := get_total_cpu_research_allocation()
 	if total_allocation <= 0:
 		return
-	Economy.add_expense(continuous_research_budget, "Recherche fondamentale CPU")
+	Economy.add_expense(internal_research_monthly_base_cost(continuous_research_budget), "Recherche fondamentale CPU")
 	var team := PersonnelManager.team_score("R&D", "cpu")
 	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
 	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
@@ -647,6 +649,8 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"base_development_cost":float(GameData.SECTORS.CPU.base_dev_cost),
 		"approach_speed":float(approach_data.speed),
 		"approach_cost":float(approach_data.cost),
+		"development_cash_factor":development_cash_factor(approach),
+		"sourcing_monthly_cost_factor":float(GameData.sourcing_profile(approach).get("monthly_cost_factor", 1.0)),
 		"team_score":team_score,
 		"management_modifier":management_modifier,
 		"technology_score":technology_score,
@@ -754,6 +758,15 @@ func quoted_development_monthly_cost(approach: String, monthly_budget: int, sour
 		"Développement"
 	)
 
+func internal_research_monthly_base_cost(intensity: int) -> int:
+	# Recherche et programmes Concept mobilisent d'abord des personnes déjà payées.
+	# L'intensité pilote la vitesse/ambition ; la sortie de caisse couvre matériel,
+	# prototypes, mesures et consommables.
+	return maxi(250, int(round(float(maxi(intensity, 1000)) * development_cash_factor("INTERNAL"))))
+
+func quoted_internal_research_monthly_cost(intensity: int, category: String = "Recherche fondamentale CPU") -> int:
+	return Economy.quoted_expense(internal_research_monthly_base_cost(intensity), category)
+
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE") -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
@@ -858,7 +871,9 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"volume_term":str(sourcing_profile.get("volume_term", volume_term)),
 		"supplier_contract_id":"",
 		"focus":focus,"focus_label":GameData.FOCUS_OPTIONS[focus].label,
-		"monthly_budget":monthly_budget,"phase_index":0,"phase_progress":0.0,
+		"monthly_budget":monthly_budget,
+		"monthly_cash_cost":development_monthly_base_cost(approach, monthly_budget, sourcing_profile),
+		"phase_index":0,"phase_progress":0.0,
 		"status":"DEVELOPMENT","months_spent":0,"desired_metrics":desired,
 		"quality_accumulator":0.0,"reports":[],"issues":[],"final_metrics":{},
 		"validation_metrics":{},"validation_rechecks":0,
@@ -888,6 +903,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			return false
 		project["supplier_contract_id"] = str(signed_contract.get("id", ""))
 		project["sourcing"] = signed_contract.duplicate(true)
+		project["monthly_cash_cost"] = development_monthly_base_cost(approach, monthly_budget, project["sourcing"])
 	if sector == "CPU" and not stored_remediation.is_empty():
 		Economy.add_expense(remediation_upfront, "Programme technique — %s" % str(stored_remediation.get("title", "solution équipe")))
 	if sourcing_setup_cost > 0:
@@ -928,6 +944,7 @@ func _process_project_month(project: Dictionary):
 	var base_cost := float(sector_data.base_dev_cost)
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
 	var expense := development_monthly_base_cost(str(project.approach), int(project.monthly_budget), sourcing)
+	project["monthly_cash_cost"] = expense
 	Economy.add_expense(expense, "Développement — %s" % str(project.name))
 	project.months_spent = int(project.months_spent) + 1
 	if str(project.sector) == "CPU" and int(project.get("decision_delay_months_remaining", 0)) > 0:
@@ -1229,6 +1246,11 @@ func load_state(state: Dictionary):
 			saved_sourcing["knowledge_transfer_factor"] = float(saved_sourcing.get("knowledge_transfer_factor", 1.0))
 			saved_sourcing["monthly_cost_factor"] = float(saved_sourcing.get("monthly_cost_factor", 1.0))
 		project["sourcing"] = saved_sourcing
+		project["monthly_cash_cost"] = development_monthly_base_cost(
+			saved_approach,
+			int(project.get("monthly_budget", 42000)),
+			saved_sourcing
+		)
 		project["supplier_id"] = str(project.get("supplier_id", saved_sourcing.get("supplier_id", "")))
 		project["supplier_name"] = str(project.get("supplier_name", saved_sourcing.get("supplier_name", "Équipe interne")))
 		project["negotiation"] = str(project.get("negotiation", saved_sourcing.get("negotiation", "BALANCED")))
