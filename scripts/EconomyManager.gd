@@ -11,7 +11,7 @@ var income_breakdown: Dictionary = {}
 var expense_breakdown: Dictionary = {}
 var history: Array = []
 
-func reset(starting_capital: int = 500_000):
+func reset(starting_capital: int = 100_000):
 	money = starting_capital
 	monthly_income = 0
 	monthly_expenses = 0
