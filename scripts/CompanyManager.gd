@@ -39,7 +39,7 @@ var subsidiaries: Array = []
 var brands: Array = []
 var alerts: Array = []
 
-func reset(name: String, sector: String, capital: int = 500_000):
+func reset(name: String, sector: String, capital: int = 100_000):
 	company_name = name.strip_edges() if not name.strip_edges().is_empty() else "Nova Technologies"
 	starting_sector = sector if GameData.is_sector_active(sector) else "CPU"
 	founded_year = TimeManager.year
