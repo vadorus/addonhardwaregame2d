@@ -887,6 +887,10 @@ func _ready() -> void:
 	if not ProductManager.products.is_empty():
 		_fail("CPU became sellable before industrialization completed")
 		return
+	# Ce bloc teste la mécanique de fonderie/industrialisation, pas le runway.
+	# Les scénarios FirstCpuRunway et FullCpuPlayerJourney couvrent séparément
+	# la viabilité économique avec la vraie épargne de départ.
+	Economy.money = maxi(Economy.money, 75000)
 	var industrial_job: Dictionary = ProductionManager.get_active_jobs()[0]
 	if str(industrial_job.get("manufacturing_mode", "")) != "EXTERNAL" or str(industrial_job.get("foundry_id", "")) == "":
 		_fail("CPU industrialization did not receive a default external foundry route")
