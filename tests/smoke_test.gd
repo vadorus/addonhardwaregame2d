@@ -1279,6 +1279,10 @@ func _ready() -> void:
 		_fail("Expired promotion did not clear its temporary demand bonus")
 		return
 
+	# Test fonctionnel SAV isolé : la viabilité financière est couverte par
+	# FullCpuPlayerJourneyScenario, on ne laisse pas les dépenses des probes
+	# précédents empêcher l'ouverture d'une enquête.
+	Economy.money = maxi(Economy.money, 75000)
 	var field_before := AfterSalesManager.cpu_field_experience()
 	apex_model["defect_rate"] = 0.085
 	apex_model["manufacturing_quality"] = 42.0
