@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.2.8 sous Godot 4.7.2.**
+**Projet actif — prototype V0.6 « room-first » sous Godot 4.7.2.**
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
@@ -14,6 +14,7 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - cible Windows / PC + Android ;
 - temps avec pause et vitesses x1/x2/x3 ;
 - économie mensuelle et rapports de clôture ;
+- départ 1971 dans un garage avec capital personnel crédible (Standard : 100 000 €), petite équipe fondatrice et charges progressives ;
 - création d'entreprise avec division CPU active ;
 - socle générique de divisions, maturité et progression par génération ;
 - conseil d’architecture CPU : plans prudent, équilibré et audacieux calculés par l’équipe ;
@@ -98,7 +99,8 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 - [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — interface chaleureuse et progression des bureaux ;
 - [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
-- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — contenu du prototype actuel ;
+- [`docs/V06_PLAYTEST_ECONOMY.md`](docs/V06_PLAYTEST_ECONOMY.md) — économie garage V0.6, chiffres de playtest, garde-fous et état de validation ;
+- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — historique du prototype V0.2 ;
 - [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — historique / procédure d'import du projet local.
 
 ## Organisation actuelle
