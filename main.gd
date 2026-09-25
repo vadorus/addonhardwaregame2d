@@ -223,7 +223,7 @@ func _build_ui():
 	var money_box := VBoxContainer.new()
 	money_box.custom_minimum_size.x = 120
 	money_box.add_child(_eyebrow("TRÉSORERIE"))
-	money_label = _label("500 000 €", 16)
+	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 16)
 	money_label.add_theme_color_override("font_color", APP_GREEN)
 	money_box.add_child(money_label)
 	top.add_child(money_box)
@@ -233,7 +233,7 @@ func _build_ui():
 		speed_button.text = str(data[0])
 		speed_button.custom_minimum_size = Vector2(44, 42)
 		var speed := float(data[1])
-		speed_button.pressed.connect(func(): TimeManager.time_scale = speed)
+		speed_button.pressed.connect(_request_time_scale.bind(speed))
 		top.add_child(speed_button)
 
 	var save_btn := Button.new()
@@ -393,6 +393,8 @@ func _on_lab_action(action: String, payload: Variant = null):
 					break
 			if project_id != "" and choice_id != "" and ResearchManager.resolve_project_decision(project_id, choice_id):
 				status_label.text = "Décision %s validée : %s." % [str(decision.get("category", "développement")).to_lower(), choice_label]
+				if _blocking_company_decision().is_empty() and not month_layer.visible:
+					TimeManager.time_scale = 1.0
 			else:
 				status_label.text = "Décision impossible : vérifiez la trésorerie et l'état du projet."
 			_refresh_all()
@@ -1228,7 +1230,13 @@ func _resolve_research_event(pursue: bool):
 	if not pending.is_empty():
 		_on_research_event(pending[0])
 	elif not month_layer.visible and not SimulationManager.is_game_over:
-		TimeManager.time_scale = 1.0
+		var blocker := _blocking_company_decision()
+		if blocker.is_empty():
+			TimeManager.time_scale = 1.0
+		else:
+			TimeManager.time_scale = 0.0
+			_show_tab(0)
+			status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
 	_refresh_all()
 
 func _tab_scroll(title: String) -> ScrollContainer:
@@ -1647,10 +1655,48 @@ func _breakdown(data: Dictionary) -> String:
 	for key in data: lines.append("  • %s : %s €" % [str(key),_money(int(data[key]))])
 	return "\n".join(lines)
 
+func _blocking_company_decision() -> Dictionary:
+	var project_decisions := ResearchManager.get_pending_project_decisions()
+	if not project_decisions.is_empty():
+		var decision: Dictionary = project_decisions[0]
+		return {
+			"type":"PROJECT_DECISION",
+			"tab":3,
+			"message":"Nora : le projet attend votre décision. Le temps reste en pause — ouvrez le Banc de test."
+		}
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		if not bool(job.get("route_selected", false)):
+			return {
+				"type":"PRODUCTION_ROUTE",
+				"tab":4,
+				"message":"Nora : l'industrialisation attend votre choix de fabrication. Le temps reste en pause — ouvrez Stock & production."
+			}
+	return {}
+
+func _request_time_scale(speed: float) -> void:
+	if speed > 0.0:
+		var blocker := _blocking_company_decision()
+		if not blocker.is_empty():
+			TimeManager.time_scale = 0.0
+			_show_tab(0)
+			status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+			_refresh_all()
+			return
+	TimeManager.time_scale = speed
+
 func _close_month_report():
 	month_layer.visible=false
-	if not SimulationManager.is_game_over:
-		TimeManager.time_scale=1.0
+	if SimulationManager.is_game_over:
+		return
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		_show_tab(0)
+		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+		_refresh_all()
+		return
+	TimeManager.time_scale=1.0
 
 func _on_game_over(reason: String, report: Dictionary):
 	TimeManager.time_scale = 0.0
@@ -1817,6 +1863,8 @@ func _on_products_action(action: String, payload: Dictionary):
 				var route_ok := ProductionManager.set_manufacturing_route(job_id, mode, provider)
 				if strategy_ok and binning_ok and route_ok:
 					var quote := ProductionManager.manufacturing_route_quote(job_id)
+					if _blocking_company_decision().is_empty() and not month_layer.visible:
+						TimeManager.time_scale = 1.0
 					status_label.text = "Production : %s • %s • %s." % [
 						ProductionManager.strategy_label(strategy),
 						ProductionManager.binning_strategy_label(binning),
