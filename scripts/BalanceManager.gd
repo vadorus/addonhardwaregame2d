@@ -78,7 +78,7 @@ func profile_description(profile_key: String = "") -> String:
 	return str(profile_data(profile_key).get("description", ""))
 
 func starting_capital() -> int:
-	return int(profile_data().get("starting_capital", 500000))
+	return int(profile_data().get("starting_capital", 100000))
 
 func expense_amount(base_amount: int, category: String) -> int:
 	if base_amount <= 0:
@@ -133,7 +133,7 @@ func company_ai_profile(profile_key: String = "") -> Dictionary:
 	}
 
 func first_generation_runway_target() -> float:
-	return float(profile_data().get("first_generation_runway_target", 7.5))
+	return float(profile_data().get("first_generation_runway_target", 15.0))
 
 func projected_starting_monthly_burn() -> int:
 	# Projection du vrai stade garage, sans inventer de bureaux, marketing ou SAV.
