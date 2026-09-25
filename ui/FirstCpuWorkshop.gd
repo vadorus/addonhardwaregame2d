@@ -209,6 +209,41 @@ func _build() -> void:
 	right_column.add_theme_constant_override("separation", 9)
 	_config_columns.add_child(right_column)
 
+	var action_hint := UI.muted_label("Quand le compromis vous convient, lancez le projet. Vous pourrez encore apprendre et corriger pendant le développement.", 12)
+	action_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right_column.add_child(action_hint)
+
+	var actions := HFlowContainer.new()
+	actions.add_theme_constant_override("h_separation", 8)
+	actions.add_theme_constant_override("v_separation", 8)
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_child(actions)
+
+	var launch := Button.new()
+	launch.text = "Lancer ce CPU"
+	launch.custom_minimum_size = Vector2(190, 44)
+	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
+	actions.add_child(launch)
+
+	var advanced := Button.new()
+	advanced.text = "Réglages avancés"
+	advanced.custom_minimum_size = Vector2(170, 44)
+	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
+	actions.add_child(advanced)
+
+	var back := Button.new()
+	back.text = "Changer d'objectif"
+	back.custom_minimum_size = Vector2(170, 44)
+	back.pressed.connect(_show_choices)
+	actions.add_child(back)
+
+	var garage := Button.new()
+	garage.text = "Retour au garage"
+	garage.custom_minimum_size = Vector2(170, 44)
+	garage.pressed.connect(func(): cancel_requested.emit())
+	actions.add_child(garage)
+
+
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Nom du premier CPU"
 	_name_edit.text = "Nova 1"
@@ -284,35 +319,6 @@ func _build() -> void:
 	_error_label.visible = false
 	right_column.add_child(_error_label)
 
-	var actions := HFlowContainer.new()
-	actions.add_theme_constant_override("h_separation", 8)
-	actions.add_theme_constant_override("v_separation", 8)
-	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_column.add_child(actions)
-
-	var launch := Button.new()
-	launch.text = "Lancer ce CPU"
-	launch.custom_minimum_size = Vector2(190, 44)
-	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
-	actions.add_child(launch)
-
-	var advanced := Button.new()
-	advanced.text = "Réglages avancés"
-	advanced.custom_minimum_size = Vector2(170, 44)
-	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
-	actions.add_child(advanced)
-
-	var back := Button.new()
-	back.text = "Changer d'objectif"
-	back.custom_minimum_size = Vector2(170, 44)
-	back.pressed.connect(_show_choices)
-	actions.add_child(back)
-
-	var garage := Button.new()
-	garage.text = "Retour au garage"
-	garage.custom_minimum_size = Vector2(170, 44)
-	garage.pressed.connect(func(): cancel_requested.emit())
-	actions.add_child(garage)
 
 	set_viewport_width(1280.0)
 
