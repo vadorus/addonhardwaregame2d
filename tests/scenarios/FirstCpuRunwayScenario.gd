@@ -97,9 +97,9 @@ static func run() -> String:
 	if abs(actual_months - estimated_months) > 2:
 		_restore(snapshot)
 		return "Displayed first CPU duration diverges by more than two months from the real simulation"
-	if Economy.money < 15000:
+	if Economy.money < 30000:
 		_restore(snapshot)
-		return "Standard first CPU reaches industrialization with too little reserve for a meaningful production choice"
+		return "Standard first CPU reaches industrialization with too little reserve to finance a small outsourced pilot run"
 
 	var job: Dictionary = ProductionManager.jobs[0]
 	if bool(job.get("route_selected", false)) or bool(job.get("route_committed", false)):
