@@ -81,6 +81,22 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "CPU launch plan did not preserve the selected price and capacity"
 
+	var launch_moment_script: Script = load("res://ui/components/LaunchMomentPanel.gd")
+	var launch_moment: Control = launch_moment_script.new() as Control
+	host.add_child(launch_moment)
+	launch_moment.call("show_product", product, ProductManager.launch_capacity_commitment_cost(product, 10))
+	var launch_title: Label = launch_moment.get("title_label")
+	var launch_forecast: Label = launch_moment.get("forecast_label")
+	if launch_title == null or launch_title.text.find("CI Feedback CPU") < 0:
+		launch_moment.queue_free()
+		_restore(snapshot)
+		return "V0.7 launch moment did not make the product the hero"
+	if launch_forecast == null or launch_forecast.text.find("Scénario central") < 0:
+		launch_moment.queue_free()
+		_restore(snapshot)
+		return "V0.7 launch moment did not expose the launch forecast"
+	launch_moment.queue_free()
+
 	ProductManager.process_month()
 	var feedback := ProductManager.get_market_feedback("PROD-CI-FEEDBACK")
 	if feedback.is_empty():

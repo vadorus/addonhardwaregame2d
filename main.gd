@@ -40,6 +40,10 @@ var research_event_layer: Control
 var research_event_panel: PanelContainer
 var research_event_label: Label
 var active_research_event_id := ""
+var launch_layer: Control
+var launch_moment_panel: Control
+var launch_moment_timer: Timer
+var _launch_resume_scale := 1.0
 
 var company_screen: Control
 var dashboard_screen: Control
@@ -293,6 +297,7 @@ func _build_ui():
 	_build_game_over_layer()
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
+	_build_launch_moment_layer()
 
 func _create_dashboard_tab():
 	var dashboard_script: Script = load("res://ui/screens/DashboardScreen.gd")
@@ -1153,6 +1158,49 @@ func _build_month_layer():
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
 
+func _build_launch_moment_layer() -> void:
+	launch_layer = ColorRect.new()
+	launch_layer.color = Color(0.015, 0.025, 0.04, 0.95)
+	launch_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	launch_layer.visible = false
+	add_child(launch_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	launch_layer.add_child(center)
+	var launch_script: Script = load("res://ui/components/LaunchMomentPanel.gd")
+	launch_moment_panel = launch_script.new() as Control
+	launch_moment_panel.connect("continue_requested", Callable(self, "_close_launch_moment"))
+	center.add_child(launch_moment_panel)
+	launch_moment_timer = Timer.new()
+	launch_moment_timer.one_shot = true
+	launch_moment_timer.wait_time = 4.0
+	launch_moment_timer.timeout.connect(_close_launch_moment)
+	add_child(launch_moment_timer)
+
+func _show_launch_moment(product: Dictionary, launch_cost: int) -> void:
+	if launch_layer == null or launch_moment_panel == null:
+		return
+	_launch_resume_scale = TimeManager.time_scale if TimeManager.time_scale > 0.0 else 1.0
+	TimeManager.time_scale = 0.0
+	launch_moment_panel.call("show_product", product, launch_cost)
+	if launch_moment_panel.has_method("set_viewport_width"):
+		launch_moment_panel.call("set_viewport_width", size.x)
+	launch_layer.visible = true
+	launch_moment_timer.start()
+	MediaManager.publish_business_event(
+		"%s arrive sur le marché" % str(product.get("name", "Nouveau produit")),
+		"Les premières commandes sont ouvertes. Le marché va maintenant confronter la promesse du produit aux ventes, benchmarks et retours terrain."
+	)
+
+func _close_launch_moment() -> void:
+	if launch_layer == null or not launch_layer.visible:
+		return
+	launch_layer.visible = false
+	if launch_moment_timer != null:
+		launch_moment_timer.stop()
+	if not SimulationManager.is_game_over and _blocking_company_decision().is_empty():
+		TimeManager.time_scale = maxf(_launch_resume_scale, 1.0)
+
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
 	game_over_layer.color = Color(0.02, 0.025, 0.035, 0.96)
@@ -1418,6 +1466,8 @@ func _update_responsive_layout():
 		products_screen.call("set_viewport_width", size.x)
 	if market_screen != null and market_screen.has_method("set_viewport_width"):
 		market_screen.call("set_viewport_width", size.x)
+	if launch_moment_panel != null and launch_moment_panel.has_method("set_viewport_width"):
+		launch_moment_panel.call("set_viewport_width", size.x)
 	var compact := size.x < 900.0
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:
@@ -1939,8 +1989,7 @@ func _on_products_action(action: String, payload: Dictionary):
 			var launch_cost := ProductManager.launch_capacity_commitment_cost(launch_product_data, launch_capacity) if not launch_product_data.is_empty() else 0
 			if ProductManager.launch_product(launch_product_id, int(payload.get("price", 0)), launch_capacity):
 				status_label.text = "Produit lancé : %s € engagés pour la capacité. Le prochain mois comparera prévision et ventes réelles." % _money(launch_cost)
-				if _blocking_company_decision().is_empty() and not month_layer.visible:
-					TimeManager.time_scale = 1.0
+				_show_launch_moment(ProductManager.get_product(launch_product_id), launch_cost)
 			else:
 				status_label.text = "Lancement impossible : produit indisponible ou trésorerie insuffisante pour engager la capacité demandée (~%s €)." % _money(launch_cost)
 		"update_price":
