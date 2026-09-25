@@ -8,6 +8,7 @@ const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourn
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
+const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
 const INDUSTRIALIZATION_GATE_SCENARIO := preload("res://tests/scenarios/IndustrializationGateScenario.gd")
@@ -19,6 +20,10 @@ const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicySce
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
+	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
+	if market_guard_error != "":
+		_fail(market_guard_error)
+		return
 	var garage_error := GARAGE_SCENARIO.run(self)
 	if garage_error != "":
 		_fail(garage_error)
