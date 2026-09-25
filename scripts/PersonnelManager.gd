@@ -6,6 +6,7 @@ signal candidate_changed(candidate)
 var staff: Array = []
 var candidate: Dictionary = {}
 var _next_id := 1
+var founding_stage_open := true
 var rng := RandomNumberGenerator.new()
 
 const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
@@ -17,6 +18,7 @@ func _ready():
 func reset(starting_sector: String):
 	staff = []
 	_next_id = 1
+	founding_stage_open = true
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
 	# Stade garage : le fondateur travaille avec un noyau technique réduit.
 	# Production, marketing et support seront de vraies embauches de croissance.
@@ -140,14 +142,21 @@ func team_attribute(department: String, attribute: String) -> float:
 		return 35.0
 	return clampf(total / float(count), 0.0, 100.0)
 
-func founding_stage_active() -> bool:
+func _refresh_founding_stage() -> void:
+	if not founding_stage_open:
+		return
 	if int(ExecutiveManager.workplace.get("tier", 0)) > 0:
-		return false
+		founding_stage_open = false
+		return
 	for product_value in ProductManager.products:
 		var product: Dictionary = product_value
 		if str(product.get("status", "")) == "LAUNCHED":
-			return false
-	return true
+			founding_stage_open = false
+			return
+
+func founding_stage_active() -> bool:
+	_refresh_founding_stage()
+	return founding_stage_open
 
 func employee_monthly_pay(emp: Dictionary) -> int:
 	var salary := int(emp.get("salary", 0))
@@ -164,9 +173,15 @@ func monthly_payroll_cost() -> int:
 	return BalanceManager.expense_amount(base, "Salaires")
 
 func process_month(active_departments: Array):
-	var payroll_base := 0
+	_refresh_founding_stage()
+	var founder_payroll_base := 0
+	var employee_payroll_base := 0
 	for emp in staff:
-		payroll_base += employee_monthly_pay(emp)
+		var pay := employee_monthly_pay(emp)
+		if bool(emp.get("founding_member", false)) and founding_stage_active():
+			founder_payroll_base += pay
+		else:
+			employee_payroll_base += pay
 		var dept := str(emp.department)
 		if active_departments.has(dept):
 			emp.experience_years = float(emp.experience_years) + (1.0 / 12.0)
@@ -175,7 +190,10 @@ func process_month(active_departments: Array):
 			emp.morale = clampf(float(emp.morale) + 0.2, 0.0, 100.0)
 		else:
 			emp.morale = clampf(float(emp.morale) - 0.05, 0.0, 100.0)
-	Economy.add_expense(payroll_base, "Rémunération équipe fondatrice" if founding_stage_active() else "Salaires")
+	if founder_payroll_base > 0:
+		Economy.add_expense(founder_payroll_base, "Salaires — équipe fondatrice")
+	if employee_payroll_base > 0:
+		Economy.add_expense(employee_payroll_base, "Salaires")
 	for dept in CompanyManager.departments:
 		if active_departments.has(dept):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
@@ -317,12 +335,15 @@ func move_employee(employee_id: String, department: String):
 			return
 
 func get_state() -> Dictionary:
-	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
+	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	founding_stage_open = bool(state.get("founding_stage_open", true))
 	var migrated_development_leader := ""
 	for emp in staff:
+		if not emp.has("founding_member"):
+			emp["founding_member"] = str(emp.get("name", "")) in ["Camille Durand", "Samira Lefèvre", "Noah Leroy"]
 		if not emp.has("profile") or typeof(emp.get("profile", {})) != TYPE_DICTIONARY:
 			emp["profile"] = _legacy_profile(emp)
 		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
@@ -336,4 +357,5 @@ func load_state(state: Dictionary):
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
+	_refresh_founding_stage()
 	staff_changed.emit()
