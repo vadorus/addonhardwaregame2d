@@ -6,6 +6,7 @@ const NEW_PLAYER_ENTRY_SCENARIO := preload("res://tests/scenarios/NewPlayerEntry
 const FIRST_CPU_WORKSHOP_SCENARIO := preload("res://tests/scenarios/FirstCpuWorkshopScenario.gd")
 const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourneyScenario.gd")
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
+const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -152,6 +153,10 @@ func _ready() -> void:
 	var first_cpu_runway_error := FIRST_CPU_RUNWAY_SCENARIO.run()
 	if first_cpu_runway_error != "":
 		_fail(first_cpu_runway_error)
+		return
+	var garage_economy_matrix_error := GARAGE_ECONOMY_MATRIX_SCENARIO.run()
+	if garage_economy_matrix_error != "":
+		_fail("Garage economy matrix: " + garage_economy_matrix_error)
 		return
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
