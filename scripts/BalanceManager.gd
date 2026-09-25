@@ -8,7 +8,7 @@ const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
 		"description":"Simulation complète, avec davantage de marge financière et des entreprises concurrentes moins réactives et plus imparfaites.",
-		"starting_capital":1650000,
+		"starting_capital":150000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
 		"research_cost":0.88,
@@ -25,7 +25,7 @@ const PROFILES := {
 	"STANDARD":{
 		"label":"Standard",
 		"description":"Équilibre de référence : entreprises autonomes cohérentes, réactives sans être omniscientes.",
-		"starting_capital":1450000,
+		"starting_capital":100000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
 		"research_cost":1.00,
@@ -42,7 +42,7 @@ const PROFILES := {
 	"REALISTIC":{
 		"label":"Réaliste",
 		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
-		"starting_capital":1400000,
+		"starting_capital":70000,
 		"operating_cost":1.10,
 		"salary_cost":1.08,
 		"research_cost":1.12,
@@ -137,10 +137,7 @@ func first_generation_runway_target() -> float:
 
 func projected_starting_monthly_burn() -> int:
 	# Projection du vrai stade garage, sans inventer de bureaux, marketing ou SAV.
-	var payroll := 0
-	for emp in PersonnelManager.staff:
-		payroll += int(emp.get("salary", 0))
-	var result := expense_amount(payroll, "Salaires")
+	var result := PersonnelManager.monthly_payroll_cost()
 	result += expense_amount(CompanyManager.monthly_infrastructure_cost(), "Bureaux et infrastructure")
 	result += expense_amount(ExecutiveManager.monthly_workplace_cost(), "Entretien / locaux")
 	result += expense_amount(ExecutiveManager.monthly_benefit_cost(), "Avantages salariés")
