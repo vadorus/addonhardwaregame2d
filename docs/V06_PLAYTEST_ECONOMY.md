@@ -22,7 +22,7 @@ Réglages actuels :
 |---|---:|
 | Accessible | 150 000 € |
 | Standard | 100 000 € |
-| Réaliste | 70 000 € |
+| Réaliste | 95 000 € |
 
 Ces montants sont des paramètres d'équilibrage et pourront encore évoluer, mais ils doivent rester compatibles avec le fantasme « épargne personnelle + prise de risque », pas avec celui d'une startup déjà massivement financée.
 
