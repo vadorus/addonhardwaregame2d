@@ -132,7 +132,11 @@ Les principaux coûts de structure et d'investissement passent par le même syst
 
 La taille des marchés est également ajustée par le profil. La difficulté ne modifie pas arbitrairement la qualité des produits du joueur : elle agit sur le contexte économique dans lequel ces produits doivent survivre.
 
-Le point de départ Standard vise environ **7 à 8 mois de marge structurelle théorique** avant recettes si le joueur laisse tourner l'organisation de départ. Accessible doit donner sensiblement plus de marge ; Réaliste sensiblement moins. L'objectif est d'obliger à arbitrer sans provoquer une faillite automatique avant que le premier CPU puisse être développé et industrialisé.
+Le point de départ doit raconter une histoire crédible : **le joueur quitte son emploi et investit ses économies dans une entreprise lancée depuis son garage**. En V0.6, les capitaux d'équilibrage sont actuellement de 150 000 € en Accessible, 100 000 € en Standard et 70 000 € en Réaliste. Ce ne sont pas des fortunes d'investisseur : ils représentent l'épargne, l'apport et la marge de risque initiale du fondateur.
+
+Au stade garage, l'entreprise ne paie pas artificiellement des bureaux, un service marketing, un SAV ou des avantages de PME. Le petit noyau fondateur vit avec une rémunération de subsistance et le développement interne ne refacture pas les salaires déjà comptés. Les charges complètes apparaissent avec les embauches, les locaux, les ventes et les fonctions réellement ouvertes.
+
+La référence Standard ne vise donc plus un nombre arbitraire de mois de survie structurelle. Elle doit permettre plusieurs trajectoires raisonnables vers un premier CPU industrialisé tout en rendant coûteux les retards, les choix trop ambitieux et les dépenses prématurées. Le playtest V0.6 de référence observe 4 452 € de dépenses au premier mois sur un brief simple, pour 95 548 € de trésorerie restante.
 
 L'équilibrage doit rester mesurable par tests : capital initial, coût d'un même panier de dépenses, taille d'un même marché, vitesse concurrentielle et persistance du profil doivent être comparés automatiquement.
 
