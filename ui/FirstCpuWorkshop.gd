@@ -499,6 +499,9 @@ func _slider_field(title: String, min_value: float, max_value: float, step: floa
 	value_label.add_theme_color_override("font_color", UI.APP_CYAN)
 	row.add_child(value_label)
 	var slider := HSlider.new()
+	# Sur mobile paysage, un glissement vertical commencé sur une jauge doit
+	# pouvoir remonter jusqu'au ScrollContainer au lieu de bloquer la page.
+	slider.mouse_filter = Control.MOUSE_FILTER_PASS
 	slider.min_value = min_value
 	slider.max_value = max_value
 	slider.step = step
