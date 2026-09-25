@@ -949,7 +949,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.5 • NEW PLAYER EXPERIENCE")
+	var version := _eyebrow("V0.6 • ROOM-FIRST PROTOTYPE")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
@@ -1369,6 +1369,8 @@ func _update_nav_state():
 		return
 	if nav_panel != null:
 		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
+	if status_label != null:
+		status_label.visible = not CompanyManager.created or tabs.current_tab != 0
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
