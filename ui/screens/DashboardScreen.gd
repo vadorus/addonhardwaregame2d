@@ -467,7 +467,7 @@ func refresh() -> void:
 		dashboard_metric_b.text = "—"
 		dashboard_metric_c.text = "—"
 		dashboard_cto_label.text = "Je suis prête à constituer l'équipe et à transformer votre première idée en processeur."
-		dashboard_cash_value.text = "500 000 €"
+		dashboard_cash_value.text = "%s €" % UI.money(BalanceManager.starting_capital())
 		dashboard_result_value.text = "—"
 		dashboard_staff_value.text = "—"
 		dashboard_brand_value.text = "—"
