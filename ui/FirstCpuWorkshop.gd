@@ -60,6 +60,7 @@ var _guide_card: PanelContainer
 var _choice_view: VBoxContainer
 var _config_view: VBoxContainer
 var _brief_grid: GridContainer
+var _config_columns: GridContainer
 var _selected_brief: Dictionary = {}
 var _selected_key := ""
 
@@ -192,24 +193,40 @@ func _build() -> void:
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
 
+	_config_columns = GridContainer.new()
+	_config_columns.columns = 2
+	_config_columns.add_theme_constant_override("h_separation", 14)
+	_config_columns.add_theme_constant_override("v_separation", 10)
+	_config_view.add_child(_config_columns)
+
+	var left_column := VBoxContainer.new()
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.add_theme_constant_override("separation", 9)
+	_config_columns.add_child(left_column)
+
+	var right_column := VBoxContainer.new()
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_theme_constant_override("separation", 9)
+	_config_columns.add_child(right_column)
+
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Nom du premier CPU"
 	_name_edit.text = "Nova 1"
 	_name_edit.custom_minimum_size.y = 44
-	_config_view.add_child(_field("Nom du CPU", _name_edit))
+	left_column.add_child(_field("Nom du CPU", _name_edit))
 
 	_preset_select = OptionButton.new()
 	for data in [["Économe","EFFICIENT"],["Équilibré","BALANCED"],["Performance","PERFORMANCE"]]:
 		_preset_select.add_item(str(data[0]))
 		_preset_select.set_item_metadata(_preset_select.item_count - 1, str(data[1]))
 	_preset_select.item_selected.connect(func(_i): _apply_selected_preset())
-	_config_view.add_child(_field("Orientation de l'architecture", _preset_select))
+	left_column.add_child(_field("Orientation de l'architecture", _preset_select))
 
 	var tech_grid := GridContainer.new()
 	tech_grid.columns = 2
 	tech_grid.add_theme_constant_override("h_separation", 14)
 	tech_grid.add_theme_constant_override("v_separation", 8)
-	_config_view.add_child(tech_grid)
+	left_column.add_child(tech_grid)
 
 	var cores_field := _slider_field("Nombre de cœurs", 1.0, 4.0, 1.0, 1.0)
 	_cores = cores_field.slider
@@ -239,11 +256,11 @@ func _build() -> void:
 	_budget.value = 45000
 	_budget.custom_minimum_size.y = 42
 	_budget.value_changed.connect(func(_v): _refresh_preview())
-	_config_view.add_child(_field("Budget mensuel de développement", _budget))
+	left_column.add_child(_field("Budget mensuel de développement", _budget))
 
 	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_config_view.add_child(node_label)
+	left_column.add_child(node_label)
 
 	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
 	var advisor_box := VBoxContainer.new()
@@ -253,46 +270,47 @@ func _build() -> void:
 	_advisor_label = UI.muted_label("", 12)
 	_advisor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	advisor_box.add_child(_advisor_label)
-	_config_view.add_child(advisor_panel)
+	right_column.add_child(advisor_panel)
 
 	var preview_panel := UI.card(UI.APP_CYAN_DARK, 12, 12)
 	_preview_label = UI.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_panel.add_child(_preview_label)
-	_config_view.add_child(preview_panel)
+	right_column.add_child(preview_panel)
 
 	_error_label = UI.label("", 12)
 	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_error_label.add_theme_color_override("font_color", UI.APP_RED)
 	_error_label.visible = false
-	_config_view.add_child(_error_label)
+	right_column.add_child(_error_label)
 
 	var actions := HFlowContainer.new()
 	actions.add_theme_constant_override("h_separation", 8)
 	actions.add_theme_constant_override("v_separation", 8)
-	_config_view.add_child(actions)
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_child(actions)
 
 	var launch := Button.new()
 	launch.text = "Lancer ce CPU"
-	launch.custom_minimum_size = Vector2(190, 48)
+	launch.custom_minimum_size = Vector2(190, 44)
 	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
 	actions.add_child(launch)
 
 	var advanced := Button.new()
 	advanced.text = "Réglages avancés"
-	advanced.custom_minimum_size.y = 48
+	advanced.custom_minimum_size = Vector2(170, 44)
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	actions.add_child(advanced)
 
 	var back := Button.new()
 	back.text = "Changer d'objectif"
-	back.custom_minimum_size.y = 48
+	back.custom_minimum_size = Vector2(170, 44)
 	back.pressed.connect(_show_choices)
 	actions.add_child(back)
 
 	var garage := Button.new()
 	garage.text = "Retour au garage"
-	garage.custom_minimum_size.y = 48
+	garage.custom_minimum_size = Vector2(170, 44)
 	garage.pressed.connect(func(): cancel_requested.emit())
 	actions.add_child(garage)
 
@@ -375,6 +393,8 @@ func set_viewport_width(width: float) -> void:
 		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, max_width)
 	if _brief_grid != null:
 		_brief_grid.columns = 1 if width < 760.0 else 2
+	if _config_columns != null:
+		_config_columns.columns = 1 if width < 1000.0 else 2
 
 func _apply_selected_preset() -> void:
 	if _preset_select == null or _preset_select.item_count == 0:
