@@ -631,6 +631,7 @@ func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
 		"max_units":max_units,
 		"revenue":int(report.get("revenue", 0)),
 		"net_contribution":int(report.get("net_contribution", 0)),
+		"capacity_reservation_cost":int(report.get("capacity_reservation_cost", 0)),
 		"capacity":capacity,
 		"capacity_utilization":utilization,
 		"unserved_demand":maxi(demand_units - capacity, 0),
