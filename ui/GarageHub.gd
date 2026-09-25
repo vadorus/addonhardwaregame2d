@@ -285,7 +285,7 @@ func _zone_actions(zone_name: String) -> Array:
 			]
 		"Banc de test":
 			if _has_active_project():
-				return [{"label":"Voir prototype et validation","tab":3,"context":"","enabled":true}]
+				return [{"label":"Voir prototype et validation","tab":3,"context":"PROJECT_DECISION","enabled":true}]
 			return [{"label":"Aucun prototype pour le moment","tab":3,"context":"","enabled":false}]
 		"Tableau de planification":
 			var actions: Array = [
