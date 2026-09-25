@@ -497,12 +497,9 @@ func staff_average_morale() -> float:
 	return total / float(PersonnelManager.staff.size())
 
 func estimated_structural_monthly_cost() -> int:
-	var payroll := 0
-	for emp in PersonnelManager.staff:
-		payroll += int(emp.get("salary", 0))
 	return (
 		CompanyManager.monthly_infrastructure_cost()
-		+ payroll
+		+ PersonnelManager.monthly_payroll_cost()
 		+ CompanyManager.estimated_policy_monthly_cost()
 		+ monthly_benefit_cost()
 		+ monthly_workplace_cost()
