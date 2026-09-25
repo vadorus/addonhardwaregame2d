@@ -355,6 +355,13 @@ func _refresh_zone_visibility() -> void:
 	for button in _zone_buttons:
 		var zone := _zone_data(str(button.get_meta("zone_name", "")))
 		button.visible = _zone_available(zone)
+		_apply_zone_style(button)
+		if _onboarding_stage == "FIRST_IDEA" and str(button.get_meta("zone_name", "")) == "Établi CPU" and button.visible:
+			var hint := StyleBoxFlat.new()
+			hint.bg_color = Color(0.12, 0.72, 0.80, 0.10)
+			hint.border_color = Color(0.35, 0.90, 0.96, 0.85)
+			hint.set_border_width_all(2)
+			button.add_theme_stylebox_override("normal", hint)
 
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)
