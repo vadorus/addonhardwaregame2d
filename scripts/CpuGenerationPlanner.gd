@@ -51,6 +51,8 @@ static func normalize_saved_proposal(input: Dictionary) -> Dictionary:
 	proposal["potential_models"] = clampi(maxi(int(proposal.get("potential_models", 3)), 3), 3, 6)
 	var market_learning_value = proposal.get("market_learning", {})
 	proposal["market_learning"] = market_learning_value.duplicate(true) if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var sav_lessons_value = proposal.get("sav_lessons", [])
+	proposal["sav_lessons"] = sav_lessons_value.duplicate(true) if typeof(sav_lessons_value) == TYPE_ARRAY else []
 	proposal["recommended"] = bool(proposal.get("recommended", false))
 	return proposal
 
@@ -221,6 +223,8 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	confidence += float(context.get("field_experience", 0.0)) * 0.045
 	var market_learning_value = context.get("market_learning", {})
 	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var sav_lessons_value = context.get("sav_lessons", [])
+	var sav_lessons: Array = sav_lessons_value if typeof(sav_lessons_value) == TYPE_ARRAY else []
 	if bool(market_learning.get("has_data", false)):
 		confidence += (float(market_learning.get("confidence", 50.0)) - 50.0) * 0.08
 	confidence += (management_modifier - 0.8) * 25.0
@@ -244,6 +248,11 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		strengths.append("Retours terrain solides sur les générations précédentes")
 		strengths = strengths.slice(0, 3)
 	var risks := _risks_for(str(profile.key), design, evaluation, context, capability_gap, budget_ratio)
+	if not sav_lessons.is_empty():
+		var first_sav_lesson: Dictionary = sav_lessons[0] if typeof(sav_lessons[0]) == TYPE_DICTIONARY else {}
+		if not first_sav_lesson.is_empty():
+			strengths.push_front("Leçon terrain intégrée : %s" % str(first_sav_lesson.get("issue_label", "retour SAV")))
+			strengths = strengths.slice(0, 3)
 	if bool(market_learning.get("has_data", false)):
 		var market_archetype := str(market_learning.get("recommended_archetype", "BALANCED"))
 		if market_archetype == str(profile.key):
@@ -287,6 +296,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"research_confidence":float(context.get("research_confidence", 50.0)),
 		"field_experience":float(context.get("field_experience", 0.0)),
 		"market_learning":market_learning.duplicate(true),
+		"sav_lessons":sav_lessons.duplicate(true),
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
 		"development_team_size":int(context.get("development_team_size", 0)),
 		"development_confidence":float(context.get("development_confidence", 50.0)),

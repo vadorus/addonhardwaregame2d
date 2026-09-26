@@ -106,6 +106,50 @@ func action_quote(case_id: String) -> Dictionary:
 		"affected_units":affected_units
 	}
 
+func cpu_generation_lessons(limit: int = 3) -> Array:
+	var result: Array = []
+	for case_value in cases:
+		if typeof(case_value) != TYPE_DICTIONARY:
+			continue
+		var case_data: Dictionary = case_value
+		var status := str(case_data.get("status", ""))
+		if status not in ["DIAGNOSED", "RESOLVED", "RECALLED"]:
+			continue
+		var issue_type := str(case_data.get("issue_type", "STABILITY"))
+		var action := str(case_data.get("action", ""))
+		var focus := "RELIABILITY"
+		var lesson := ""
+		match issue_type:
+			"MANUFACTURING":
+				lesson = "Renforcer qualité de fabrication, contrôle des lots et marge de rendement."
+			"THERMAL":
+				focus = "EFFICIENCY"
+				lesson = "Réserver davantage de marge thermique et énergétique avant la prochaine validation."
+			"FIRMWARE":
+				lesson = "Prévoir plus de validation microcode/firmware et de scénarios de compatibilité."
+			_:
+				lesson = "Renforcer stabilité, validation sous charge et marges de fiabilité."
+		if action == "RECALL":
+			lesson += " Le rappel montre que le coût d'une correction tardive peut devenir structurel."
+		elif action == "EXCHANGE":
+			lesson += " L'échange ciblé a limité la portée de la crise."
+		elif action == "CORRECT":
+			lesson += " Le correctif terrain a réduit l'impact sans rappel global."
+		result.append({
+			"case_id":str(case_data.get("id", "")),
+			"product_name":str(case_data.get("product_name", "Produit")),
+			"issue_type":issue_type,
+			"issue_label":issue_label(issue_type),
+			"severity":float(case_data.get("severity", 0.0)),
+			"action":action,
+			"focus":focus,
+			"design_context":str(case_data.get("design_context", "")),
+			"lesson":lesson
+		})
+		if result.size() >= limit:
+			break
+	return result
+
 func cpu_field_experience(issue_type: String = "") -> float:
 	if issue_type != "":
 		return float(field_experience.get(issue_type, 0.0))

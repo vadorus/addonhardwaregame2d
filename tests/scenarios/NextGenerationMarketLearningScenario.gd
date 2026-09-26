@@ -86,6 +86,32 @@ static func run() -> String:
 		_restore(snapshot)
 		return "Safety-oriented market learning does not explain the reliability lesson"
 
+	AfterSalesManager.cases = [{
+		"id":"SAV-CI-LESSON",
+		"product_id":"PROD-CI-LEARNING",
+		"product_name":"CI Learning CPU",
+		"issue_type":"THERMAL",
+		"status":"RESOLVED",
+		"severity":74.0,
+		"action":"CORRECT",
+		"design_context":"Le terrain a révélé une marge thermique trop faible après la revue prototype."
+	}]
+	var sav_plans := ResearchManager.prepare_cpu_generation_proposals(
+		"EMBEDDED", "INTERNAL", "BALANCED", 60000, CPU_DESIGN.default_design()
+	)
+	var sav_recommended := _recommended(sav_plans)
+	var sav_lessons: Array = sav_recommended.get("sav_lessons", [])
+	if sav_lessons.is_empty():
+		_restore(snapshot)
+		return "Resolved SAV dossier did not become a visible next-generation lesson"
+	var thermal_lesson: Dictionary = sav_lessons[0]
+	if str(thermal_lesson.get("issue_type", "")) != "THERMAL" or str(thermal_lesson.get("focus", "")) != "EFFICIENCY":
+		_restore(snapshot)
+		return "Thermal SAV lesson did not preserve its technical focus for the next generation"
+	if str(thermal_lesson.get("lesson", "")).find("marge thermique") < 0:
+		_restore(snapshot)
+		return "Thermal SAV lesson does not explain what should change in the next generation"
+
 	var round_trip := ResearchManager.get_state().duplicate(true)
 	ResearchManager.load_state(round_trip)
 	var restored_plans := ResearchManager.get_cpu_generation_proposals()
@@ -94,6 +120,10 @@ static func run() -> String:
 	if restored_learning.is_empty() or int(restored_learning.get("sample_months", 0)) != 3:
 		_restore(snapshot)
 		return "Market-informed next-generation plans did not survive a research save round-trip"
+	var restored_sav_lessons: Array = restored_recommended.get("sav_lessons", [])
+	if restored_sav_lessons.is_empty() or str(restored_sav_lessons[0].get("case_id", "")) != "SAV-CI-LESSON":
+		_restore(snapshot)
+		return "SAV lessons did not survive the next-generation proposal save round-trip"
 
 	_restore(snapshot)
 	return ""

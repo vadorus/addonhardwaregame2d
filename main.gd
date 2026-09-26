@@ -483,6 +483,8 @@ func _refresh_generation_plan_summary():
 	var risks: Array = proposal.get("risks", [])
 	var market_learning_value = proposal.get("market_learning", {})
 	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var sav_lessons_value = proposal.get("sav_lessons", [])
+	var sav_lessons: Array = sav_lessons_value if typeof(sav_lessons_value) == TYPE_ARRAY else []
 	var market_line := "Retour marché : aucune donnée exploitable sur cette cible."
 	if bool(market_learning.get("has_data", false)):
 		market_line = "Retour marché : %d mois • %s unités • satisfaction %.1f/100 • retours %.1f%% • capacité %.0f%% • demande non servie %.1f%% • confiance %.0f%%\n%s" % [
@@ -495,6 +497,16 @@ func _refresh_generation_plan_summary():
 			float(market_learning.get("confidence", 0.0)),
 			str(market_learning.get("summary", ""))
 		]
+	if sav_lessons.is_empty():
+		market_line += "\nCarnet SAV : aucune leçon critique enregistrée."
+	else:
+		var lesson_lines: Array[String] = []
+		for lesson_value in sav_lessons:
+			if typeof(lesson_value) != TYPE_DICTIONARY:
+				continue
+			var lesson: Dictionary = lesson_value
+			lesson_lines.append("• %s — %s" % [str(lesson.get("issue_label", "Terrain")), str(lesson.get("lesson", ""))])
+		market_line += "\nCarnet SAV :\n" + "\n".join(lesson_lines)
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
 	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœur(s) • %s • %s • %s • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\n%s\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
