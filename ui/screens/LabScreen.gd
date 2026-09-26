@@ -77,6 +77,11 @@ var lab_remediation_summary_label: Label
 var lab_remediation_accept_button: Button
 var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
+var lab_depth_mode := "ESSENTIAL"
+var lab_depth_hint_label: Label
+var lab_depth_buttons: Dictionary = {}
+var lab_detailed_nodes: Array[Control] = []
+var lab_expert_nodes: Array[Control] = []
 
 func _ready() -> void:
 	_build()
@@ -96,6 +101,29 @@ func _build() -> void:
 	var intro := _muted_label("Chaque choix technique change les performances, le coût, la consommation, le risque et le temps de développement.", 13)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_child(intro)
+
+	var depth_card := _card(APP_PANEL_ALT, 10, 10)
+	box.add_child(depth_card)
+	var depth_box := VBoxContainer.new()
+	depth_box.add_theme_constant_override("separation", 7)
+	depth_card.add_child(depth_box)
+	depth_box.add_child(_eyebrow("PROFONDEUR DE CONCEPTION"))
+	var depth_row := HFlowContainer.new()
+	depth_row.add_theme_constant_override("h_separation", 7)
+	depth_box.add_child(depth_row)
+	var depth_group := ButtonGroup.new()
+	for depth_data in [["Essentiel", "ESSENTIAL"], ["Détaillé", "DETAILED"], ["Expert", "EXPERT"]]:
+		var depth_button := Button.new()
+		depth_button.text = str(depth_data[0])
+		depth_button.toggle_mode = true
+		depth_button.button_group = depth_group
+		var depth_key := str(depth_data[1])
+		depth_button.pressed.connect(func(): set_depth_mode(depth_key))
+		depth_row.add_child(depth_button)
+		lab_depth_buttons[depth_key] = depth_button
+	lab_depth_hint_label = _muted_label("", 11)
+	lab_depth_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	depth_box.add_child(lab_depth_hint_label)
 
 	lab_layout_grid = GridContainer.new()
 	lab_layout_grid.columns = 2
@@ -142,6 +170,7 @@ func _build() -> void:
 	rd_supplier = OptionButton.new()
 	rd_supplier.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Fournisseur / partenaire technologique", rd_supplier)
+	_register_depth_node(rd_supplier.get_parent(), "DETAILED")
 
 	rd_negotiation = OptionButton.new()
 	for negotiation_value in SupplierManager.negotiation_keys():
@@ -151,6 +180,7 @@ func _build() -> void:
 	_select_meta(rd_negotiation, "BALANCED")
 	rd_negotiation.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Priorité de négociation", rd_negotiation)
+	_register_depth_node(rd_negotiation.get_parent(), "DETAILED")
 
 	rd_contract_term = OptionButton.new()
 	for contract_term_value in SupplierManager.contract_term_keys():
@@ -160,6 +190,7 @@ func _build() -> void:
 	_select_meta(rd_contract_term, "STANDARD")
 	rd_contract_term.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Durée du contrat", rd_contract_term)
+	_register_depth_node(rd_contract_term.get_parent(), "EXPERT")
 
 	rd_exclusivity = OptionButton.new()
 	for exclusivity_value in SupplierManager.exclusivity_keys():
@@ -169,6 +200,7 @@ func _build() -> void:
 	_select_meta(rd_exclusivity, "NONE")
 	rd_exclusivity.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Exclusivité", rd_exclusivity)
+	_register_depth_node(rd_exclusivity.get_parent(), "EXPERT")
 
 	rd_ip_term = OptionButton.new()
 	for ip_value in SupplierManager.ip_term_keys():
@@ -178,6 +210,7 @@ func _build() -> void:
 	_select_meta(rd_ip_term, "SHARED")
 	rd_ip_term.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Propriété intellectuelle", rd_ip_term)
+	_register_depth_node(rd_ip_term.get_parent(), "EXPERT")
 
 	rd_volume_term = OptionButton.new()
 	for volume_value in SupplierManager.volume_term_keys():
@@ -187,22 +220,29 @@ func _build() -> void:
 	_select_meta(rd_volume_term, "NONE")
 	rd_volume_term.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Engagement commercial", rd_volume_term)
+	_register_depth_node(rd_volume_term.get_parent(), "EXPERT")
 
 	rd_supplier_label = _muted_label("", 11)
 	rd_supplier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(rd_supplier_label)
+	_register_depth_node(rd_supplier_label, "DETAILED")
 
-	configuration_box.add_child(_eyebrow("CONTRATS FOURNISSEURS"))
+	var supplier_contract_heading := _eyebrow("CONTRATS FOURNISSEURS")
+	configuration_box.add_child(supplier_contract_heading)
+	_register_depth_node(supplier_contract_heading, "DETAILED")
 	supplier_contract_select = OptionButton.new()
 	supplier_contract_select.item_selected.connect(func(_index): _emit_action("supplier_contract_selected"))
 	_add_labeled_control(configuration_box, "Contrat actif", supplier_contract_select)
+	_register_depth_node(supplier_contract_select.get_parent(), "DETAILED")
 	supplier_contract_label = _muted_label("Aucun contrat fournisseur actif.", 11)
 	supplier_contract_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(supplier_contract_label)
+	_register_depth_node(supplier_contract_label, "DETAILED")
 	var supplier_contract_actions := HFlowContainer.new()
 	supplier_contract_actions.add_theme_constant_override("h_separation", 8)
 	supplier_contract_actions.add_theme_constant_override("v_separation", 6)
 	configuration_box.add_child(supplier_contract_actions)
+	_register_depth_node(supplier_contract_actions, "DETAILED")
 	supplier_contract_renegotiate_button = Button.new()
 	supplier_contract_renegotiate_button.text = "Renégocier avec les conditions ci-dessus"
 	supplier_contract_renegotiate_button.pressed.connect(func(): _emit_action("renegotiate_supplier_contract"))
@@ -221,18 +261,23 @@ func _build() -> void:
 	rd_budget.value_changed.connect(func(_value): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
 
-	configuration_box.add_child(_eyebrow("RECHERCHE CONTINUE CPU"))
+	var research_heading := _eyebrow("RECHERCHE CONTINUE CPU")
+	configuration_box.add_child(research_heading)
+	_register_depth_node(research_heading, "DETAILED")
 	var research_intro := _muted_label("L’équipe Recherche prépare les générations suivantes pendant que l’équipe Développement transforme les connaissances en produit. Les deux équipes sont désormais indépendantes.", 12)
 	research_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(research_intro)
+	_register_depth_node(research_intro, "DETAILED")
 	research_overview_label = _muted_label("", 12)
 	research_overview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(research_overview_label)
+	_register_depth_node(research_overview_label, "DETAILED")
 	var research_grid := GridContainer.new()
 	research_grid.columns = 2
 	research_grid.add_theme_constant_override("h_separation", 8)
 	research_grid.add_theme_constant_override("v_separation", 6)
 	configuration_box.add_child(research_grid)
+	_register_depth_node(research_grid, "DETAILED")
 	for research_key in ResearchManager.get_cpu_research_domain_keys():
 		research_grid.add_child(_muted_label(ResearchManager.get_cpu_research_label(str(research_key)), 12))
 		var allocation := _spin(0, 30, 1, 0)
@@ -241,38 +286,48 @@ func _build() -> void:
 		research_alloc_controls[str(research_key)] = allocation
 	research_budget = _spin(0, 100000, 1000, 12000)
 	_add_labeled_control(configuration_box, "Budget mensuel recherche fondamentale", research_budget)
+	_register_depth_node(research_budget.get_parent(), "DETAILED")
 	var apply_research := Button.new()
 	apply_research.text = "Appliquer cette répartition de recherche"
 	apply_research.custom_minimum_size.y = 42
 	apply_research.pressed.connect(func(): _emit_action("apply_research_plan"))
 	configuration_box.add_child(apply_research)
+	_register_depth_node(apply_research, "DETAILED")
 
-	configuration_box.add_child(_eyebrow("R&D CONCEPT CPU"))
+	var concept_heading := _eyebrow("R&D CONCEPT CPU")
+	configuration_box.add_child(concept_heading)
+	_register_depth_node(concept_heading, "EXPERT")
 	var concept_intro := _muted_label("Ces programmes ne visent pas forcément un produit immédiat. Ils servent de laboratoire avancé pour créer des technologies transférables aux générations futures.", 12)
 	concept_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(concept_intro)
+	_register_depth_node(concept_intro, "EXPERT")
 	concept_axis = OptionButton.new()
 	for axis_value in ResearchManager.get_cpu_concept_axis_keys():
 		var axis := str(axis_value)
 		concept_axis.add_item(ResearchManager.get_cpu_concept_axis_label(axis))
 		concept_axis.set_item_metadata(concept_axis.item_count - 1, axis)
 	_add_labeled_control(configuration_box, "Axe expérimental", concept_axis)
+	_register_depth_node(concept_axis.get_parent(), "EXPERT")
 	concept_budget = _spin(5000, 150000, 2500, 15000)
 	_add_labeled_control(configuration_box, "Budget mensuel du programme", concept_budget)
+	_register_depth_node(concept_budget.get_parent(), "EXPERT")
 	concept_ambition = OptionButton.new()
 	for data in [["Prudent",1],["Ambitieux",2],["Rupture",3]]:
 		concept_ambition.add_item(str(data[0]))
 		concept_ambition.set_item_metadata(concept_ambition.item_count - 1, int(data[1]))
 	concept_ambition.select(1)
 	_add_labeled_control(configuration_box, "Ambition", concept_ambition)
+	_register_depth_node(concept_ambition.get_parent(), "EXPERT")
 	var concept_start := Button.new()
 	concept_start.text = "Lancer un programme Concept"
 	concept_start.custom_minimum_size.y = 42
 	concept_start.pressed.connect(func(): _emit_action("start_concept"))
 	configuration_box.add_child(concept_start)
+	_register_depth_node(concept_start, "EXPERT")
 	concept_status_label = _muted_label("Aucun programme Concept actif.", 12)
 	concept_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(concept_status_label)
+	_register_depth_node(concept_status_label, "EXPERT")
 
 	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
 	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
@@ -330,10 +385,12 @@ func _build() -> void:
 	rd_cores = _add_lab_slider(configuration_box, "Nombre de cœurs", 1.0, 4.0, 1.0, 1.0, " cœur(s)", 0, "cores")
 	rd_frequency = _add_lab_slider(configuration_box, "Fréquence cible", 0.1, 10.0, 0.1, 0.8, " MHz", 1, "frequency_ghz")
 	rd_cache = _add_lab_slider(configuration_box, "Cache intégré", 0.0, 32.0, 1.0, 0.0, " Ko", 0, "cache_mb")
+	_register_depth_node(rd_cache.get_parent(), "DETAILED")
 
 	rd_node = OptionButton.new()
 	rd_node.item_selected.connect(func(_index): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Procédé de fabrication", rd_node)
+	_register_depth_node(rd_node.get_parent(), "DETAILED")
 
 	rd_tdp = _add_lab_slider(configuration_box, "Enveloppe électrique / thermique", 1.0, 25.0, 1.0, 2.0, " W", 0, "tdp_w")
 
@@ -346,13 +403,17 @@ func _build() -> void:
 	guidance_panel.add_child(lab_team_guidance_label)
 	configuration_box.add_child(guidance_panel)
 
-	configuration_box.add_child(_eyebrow("SOLUTIONS PROPOSÉES PAR L'ÉQUIPE"))
+	var remediation_heading := _eyebrow("SOLUTIONS PROPOSÉES PAR L'ÉQUIPE")
+	configuration_box.add_child(remediation_heading)
+	_register_depth_node(remediation_heading, "DETAILED")
 	var remediation_intro := _muted_label("Si votre objectif dépasse notre zone maîtrisée, l'équipe peut proposer un travail technique supplémentaire plutôt que vous obliger à réduire le CPU.", 11)
 	remediation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	configuration_box.add_child(remediation_intro)
+	_register_depth_node(remediation_intro, "DETAILED")
 	lab_remediation_select = OptionButton.new()
 	lab_remediation_select.item_selected.connect(func(_index): _emit_action("remediation_selected"))
 	_add_labeled_control(configuration_box, "Option technique", lab_remediation_select)
+	_register_depth_node(lab_remediation_select.get_parent(), "DETAILED")
 	var remediation_panel := PanelContainer.new()
 	remediation_panel.add_theme_stylebox_override("panel", _stylebox(APP_PANEL_ALT, 10, 1, APP_LINE, 10))
 	lab_remediation_summary_label = _muted_label("Aucune intervention spéciale nécessaire pour cette configuration.", 12)
@@ -360,11 +421,13 @@ func _build() -> void:
 	lab_remediation_summary_label.custom_minimum_size.y = 78
 	remediation_panel.add_child(lab_remediation_summary_label)
 	configuration_box.add_child(remediation_panel)
+	_register_depth_node(remediation_panel, "DETAILED")
 	lab_remediation_accept_button = Button.new()
 	lab_remediation_accept_button.text = "Intégrer cette solution au projet"
 	lab_remediation_accept_button.custom_minimum_size.y = 42
 	lab_remediation_accept_button.pressed.connect(func(): _emit_action("accept_remediation"))
 	configuration_box.add_child(lab_remediation_accept_button)
+	_register_depth_node(lab_remediation_accept_button, "DETAILED")
 
 	var start := Button.new()
 	start.text = "Lancer ce CPU en développement"
@@ -405,27 +468,35 @@ func _build() -> void:
 	lab_dev_time_value = _add_inline_metric(lab_stats_grid, "Développement", "—")
 	lab_fit_value = _add_inline_metric(lab_stats_grid, "Adéquation cible", "—")
 
-	preview_box.add_child(_eyebrow("5 ARBITRAGES CLÉS"))
+	var tradeoff_heading := _eyebrow("5 ARBITRAGES CLÉS")
+	preview_box.add_child(tradeoff_heading)
+	_register_depth_node(tradeoff_heading, "DETAILED")
 	lab_tradeoff_summary_label = _muted_label("", 12)
 	lab_tradeoff_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_box.add_child(lab_tradeoff_summary_label)
+	_register_depth_node(lab_tradeoff_summary_label, "DETAILED")
 	lab_delta_summary_label = _muted_label("Aucun écart par rapport à la référence.", 12)
 	lab_delta_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_box.add_child(lab_delta_summary_label)
+	_register_depth_node(lab_delta_summary_label, "DETAILED")
 
 	var metrics_box := VBoxContainer.new()
 	metrics_box.add_theme_constant_override("separation", 8)
 	preview_box.add_child(metrics_box)
+	_register_depth_node(metrics_box, "DETAILED")
 	_add_lab_metric(metrics_box, "performance", "Performance")
 	_add_lab_metric(metrics_box, "efficiency", "Efficacité / thermique")
 	_add_lab_metric(metrics_box, "cost_control", "Maîtrise du coût")
 	_add_lab_metric(metrics_box, "reliability", "Fiabilité")
 	_add_lab_metric(metrics_box, "delivery", "Délai / risque")
 
-	preview_box.add_child(_eyebrow("DÉTAILS TECHNIQUES"))
+	var technical_heading := _eyebrow("DÉTAILS TECHNIQUES")
+	preview_box.add_child(technical_heading)
+	_register_depth_node(technical_heading, "EXPERT")
 	lab_technical_detail_label = _muted_label("", 12)
 	lab_technical_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_box.add_child(lab_technical_detail_label)
+	_register_depth_node(lab_technical_detail_label, "EXPERT")
 
 	var warning_panel := PanelContainer.new()
 	warning_panel.add_theme_stylebox_override("panel", _stylebox(APP_AMBER_DARK, 10, 1, APP_AMBER, 11))
@@ -472,6 +543,7 @@ func _build() -> void:
 
 	lab_reference_design = CPU_DESIGN.default_design()
 	lab_reference_name = "Design équilibré"
+	set_depth_mode("ESSENTIAL")
 func refresh_research_content() -> void:
 	if tech_label == null:
 		return
@@ -671,6 +743,41 @@ func refresh_research_content() -> void:
 			"licencié" if bool(patent.get("licensed", false)) else "exclusif"
 		])
 	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
+
+func _register_depth_node(node: Control, depth: String) -> void:
+	if node == null:
+		return
+	if depth == "EXPERT":
+		if node not in lab_expert_nodes:
+			lab_expert_nodes.append(node)
+	elif node not in lab_detailed_nodes:
+		lab_detailed_nodes.append(node)
+
+func set_depth_mode(mode: String) -> void:
+	lab_depth_mode = mode if mode in ["ESSENTIAL", "DETAILED", "EXPERT"] else "ESSENTIAL"
+	var show_detailed := lab_depth_mode in ["DETAILED", "EXPERT"]
+	var show_expert := lab_depth_mode == "EXPERT"
+	for node in lab_detailed_nodes:
+		if is_instance_valid(node):
+			node.visible = show_detailed
+	for node in lab_expert_nodes:
+		if is_instance_valid(node):
+			node.visible = show_expert
+	for key_value in lab_depth_buttons.keys():
+		var key := str(key_value)
+		var button: Button = lab_depth_buttons[key]
+		button.button_pressed = key == lab_depth_mode
+	if lab_depth_hint_label != null:
+		match lab_depth_mode:
+			"DETAILED":
+				lab_depth_hint_label.text = "Ajoute cache, procédé, fournisseurs, recherche continue, solutions techniques et arbitrages complets."
+			"EXPERT":
+				lab_depth_hint_label.text = "Affiche aussi les clauses fournisseur, la R&D Concept et les détails techniques fins."
+			_:
+				lab_depth_hint_label.text = "Commencez par le marché, la priorité, les cœurs, la fréquence et l'enveloppe thermique. La profondeur reste disponible à tout moment."
+
+func get_depth_mode() -> String:
+	return lab_depth_mode
 
 func _add_labeled_control(parent: VBoxContainer, title: String, control: Control):
 	var field := VBoxContainer.new()

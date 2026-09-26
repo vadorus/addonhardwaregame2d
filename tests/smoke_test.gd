@@ -11,6 +11,7 @@ const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackS
 const MEDIA_ECOSYSTEM_SCENARIO := preload("res://tests/scenarios/MediaEcosystemScenario.gd")
 const AFTER_SALES_DOSSIER_SCENARIO := preload("res://tests/scenarios/AfterSalesDossierScenario.gd")
 const PRODUCT_COCKPIT_SCENARIO := preload("res://tests/scenarios/ProductCockpitScenario.gd")
+const LAB_DEPTH_SCENARIO := preload("res://tests/scenarios/LabDepthScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -181,6 +182,10 @@ func _ready() -> void:
 	var product_cockpit_error := PRODUCT_COCKPIT_SCENARIO.run(self)
 	if product_cockpit_error != "":
 		_fail(product_cockpit_error)
+		return
+	var lab_depth_error := LAB_DEPTH_SCENARIO.run(self)
+	if lab_depth_error != "":
+		_fail(lab_depth_error)
 		return
 	var next_gen_market_learning_error := NEXT_GENERATION_MARKET_LEARNING_SCENARIO.run()
 	if next_gen_market_learning_error != "":
