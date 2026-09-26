@@ -36,6 +36,19 @@ static func run() -> String:
 	if ProductManager.products.size() < 3:
 		_restore(snapshot)
 		return "Full journey: first industrialization did not create a CPU range"
+	var first_generation_id := str(ProductManager.products[0].get("generation_id", ""))
+	var first_generation := ProductManager.get_generation(first_generation_id)
+	var shared_capacity := int(first_generation.get("monthly_capacity", 0))
+	var summed_recommended_capacity := 0
+	for family_product in ProductManager.products:
+		if str(family_product.get("generation_id", "")) == first_generation_id:
+			summed_recommended_capacity += int(family_product.get("recommended_capacity", 0))
+	if shared_capacity < 180 or shared_capacity > 700:
+		_restore(snapshot)
+		return "Full journey: first CPU family capacity is not garage-scale (%d units/month)" % shared_capacity
+	if absi(summed_recommended_capacity - shared_capacity) > 2:
+		_restore(snapshot)
+		return "Full journey: SKU capacities no longer represent one shared binned wafer pool (%d vs %d)" % [summed_recommended_capacity, shared_capacity]
 	if int(DivisionManager.get_division("CPU").get("generation_count", 0)) < 1:
 		_restore(snapshot)
 		return "Full journey: CPU division did not record the completed first generation"

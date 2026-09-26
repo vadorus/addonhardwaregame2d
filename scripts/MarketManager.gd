@@ -541,6 +541,11 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	# L'avantage produit et la notoriété peuvent construire la part de marché,
 	# tandis que le prix applique ensuite une vraie élasticité sur les unités.
 	var raw_share: float = clampf(0.012 + (score - competitor_avg) * 0.0025 + awareness * 0.20, 0.0005, 0.28)
+	# Une entreprise jeune ne peut pas transformer trois r?f?rences d'une m?me gamme
+	# en trois parts de march? ind?pendantes. La notori?t? et la r?putation font
+	# monter progressivement ce plafond au fil de la partie.
+	if str(product.get("company", "")) == CompanyManager.company_name:
+		raw_share = minf(raw_share, _player_portfolio_share_cap())
 	var price_multiplier := price_demand_multiplier(product, target)
 	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
@@ -554,6 +559,18 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units
 	}
+
+func _player_portfolio_share_cap() -> float:
+	var awareness := CompanyManager.get_awareness_bonus()
+	var brand_score := CompanyManager.get_brand_score()
+	# En garage, une marque inconnue plafonne autour de 3 % du besoin adress?.
+	# Une entreprise reconnue peut d?passer ce niveau, mais doit le gagner par
+	# la r?putation et la visibilit? plut?t que par le simple nombre de SKU.
+	return clampf(
+		0.026 + awareness * 0.18 + maxf(brand_score - 45.0, 0.0) * 0.0035,
+		0.030,
+		0.35
+	)
 
 func estimate_portfolio_demand(products: Array) -> Dictionary:
 	var result := {}
@@ -570,24 +587,56 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 		if not ids_by_market.has(key):
 			ids_by_market[key] = []
 		ids_by_market[key].append(product_id)
+
 	for market_key_value in ids_by_market.keys():
 		var market_key := str(market_key_value)
 		var ids: Array = ids_by_market[market_key_value]
 		var segment := market_key.get_slice("|", 1)
 		var market_units := maxi(segment_market_units(segment), 1)
 		var requested_units := 0
+		var best_units := 0
+		var best_id := ""
 		for product_id_value in ids:
-			requested_units += int(result[str(product_id_value)].get("units", 0))
-		var brand_score := CompanyManager.get_brand_score()
-		var max_portfolio_share := clampf(0.40 + CompanyManager.get_awareness_bonus() * 0.50 + (brand_score - 40.0) * 0.002, 0.42, 0.74)
-		var portfolio_cap := maxi(1, int(float(market_units) * max_portfolio_share))
-		var scale := minf(1.0, float(portfolio_cap) / maxf(float(requested_units), 1.0))
+			var product_id := str(product_id_value)
+			var requested := int(result[product_id].get("units", 0))
+			requested_units += requested
+			if requested > best_units:
+				best_units = requested
+				best_id = product_id
+
+		# La largeur de gamme aide, mais trois bins ne triplent jamais la client?le.
+		# Au maximum, deux r?f?rences suppl?mentaires apportent ~28 % au potentiel
+		# du meilleur SKU avant application du plafond de marque.
+		var breadth_factor := 1.0 + minf(float(maxi(ids.size() - 1, 0)) * 0.14, 0.35)
+		var family_potential := int(round(float(best_units) * breadth_factor))
+		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap())))
+		var portfolio_units := mini(requested_units, mini(family_potential, share_cap_units))
+		var portfolio_share := float(portfolio_units) / float(market_units)
+
+		var weight_total := 0.0
+		for product_id_value in ids:
+			weight_total += maxf(float(result[str(product_id_value)].get("units", 0)), 1.0)
+		var allocated_total := 0
 		for product_id_value in ids:
 			var product_id := str(product_id_value)
 			var demand: Dictionary = result[product_id]
-			demand["units"] = int(round(float(demand.get("units", 0)) * scale))
-			demand["share"] = float(demand.units) / float(market_units)
-			demand["portfolio_limited"] = scale < 0.999
+			var original_units := int(demand.get("units", 0))
+			var weight := maxf(float(original_units), 1.0)
+			var allocated := int(floor(float(portfolio_units) * weight / maxf(weight_total, 1.0)))
+			demand["units"] = allocated
+			demand["share"] = float(allocated) / float(market_units)
+			demand["portfolio_share"] = portfolio_share
+			demand["portfolio_units"] = portfolio_units
+			demand["cannibalization_factor"] = float(allocated) / maxf(float(original_units), 1.0)
+			demand["portfolio_limited"] = portfolio_units < requested_units
+			allocated_total += allocated
+
+		var remainder := maxi(portfolio_units - allocated_total, 0)
+		if remainder > 0 and best_id != "":
+			var best_demand: Dictionary = result[best_id]
+			best_demand["units"] = int(best_demand.get("units", 0)) + remainder
+			best_demand["share"] = float(best_demand.units) / float(market_units)
+
 	return result
 
 func _evaluate_competitor(product: Dictionary, segment: String) -> float:
