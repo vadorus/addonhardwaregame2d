@@ -85,6 +85,8 @@ var lab_expert_nodes: Array[Control] = []
 
 func _ready() -> void:
 	_build()
+	UI.configure_touch_scroll(self)
+	UI.prepare_touch_scroll_children(self)
 
 func _build() -> void:
 	name = "Laboratoire CPU"

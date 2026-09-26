@@ -50,6 +50,8 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_build()
+	UI.configure_touch_scroll(self)
+	UI.prepare_touch_scroll_children(self)
 	refresh()
 
 func _build() -> void:

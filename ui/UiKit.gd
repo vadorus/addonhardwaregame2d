@@ -19,6 +19,7 @@ static func label(text: String, size: int = 14) -> Label:
 	node.text = text
 	node.add_theme_font_size_override("font_size", size)
 	node.add_theme_color_override("font_color", APP_TEXT)
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
 
 static func muted_label(text: String, size: int = 13) -> Label:
@@ -49,8 +50,26 @@ static func screen_scroll(title: String) -> ScrollContainer:
 	scroll.name = title
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	configure_touch_scroll(scroll)
 	return scroll
+
+static func configure_touch_scroll(scroll: ScrollContainer) -> void:
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.scroll_deadzone = 4
+	scroll.scroll_vertical_custom_step = 96.0
+	scroll.follow_focus = false
+	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+
+static func prepare_touch_scroll_children(root: Node) -> void:
+	for child in root.get_children():
+		if child is ScrollContainer:
+			configure_touch_scroll(child)
+		elif child is BaseButton or child is Range or child is LineEdit or child is TextEdit:
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_PASS
+		elif child is Control:
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		prepare_touch_scroll_children(child)
 
 static func content_box() -> VBoxContainer:
 	var box := VBoxContainer.new()

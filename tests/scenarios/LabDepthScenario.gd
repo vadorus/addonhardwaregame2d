@@ -12,9 +12,15 @@ static func run(host: Node) -> String:
 		lab.queue_free()
 		return "CPU lab did not expose its control map"
 	var controls: Dictionary = controls_value
+	if int(lab.get("scroll_deadzone")) > 4:
+		lab.queue_free()
+		return "CPU lab touch scroll deadzone is too large for mobile"
 	var cores: Control = controls.get("rd_cores") as Control
 	var cache: Control = controls.get("rd_cache") as Control
 	var contract: Control = controls.get("rd_contract_term") as Control
+	if cores.mouse_filter != Control.MOUSE_FILTER_PASS:
+		lab.queue_free()
+		return "CPU lab sliders still block vertical touch scrolling"
 	if cores == null or cache == null or contract == null:
 		lab.queue_free()
 		return "CPU lab depth test is missing expected controls"
