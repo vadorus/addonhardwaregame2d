@@ -36,6 +36,7 @@ var _context_panel: PanelContainer
 var _context_title: Label
 var _context_subtitle: Label
 var _context_actions: VBoxContainer
+var _primary_action: Button
 var _selected_zone := ""
 
 func _ready() -> void:
@@ -97,6 +98,13 @@ func _build_overlay() -> void:
 	_room_subtitle.add_theme_font_size_override("font_size", 11)
 	_room_subtitle.add_theme_color_override("font_color", Color(0.63, 0.73, 0.82))
 	room_box.add_child(_room_subtitle)
+
+	_primary_action = Button.new()
+	_primary_action.custom_minimum_size = Vector2(250, 48)
+	_primary_action.focus_mode = Control.FOCUS_NONE
+	_primary_action.z_index = 15
+	_primary_action.pressed.connect(_run_primary_action)
+	add_child(_primary_action)
 
 	for data in ZONES:
 		var button := Button.new()
@@ -184,7 +192,10 @@ func _layout_zones() -> void:
 
 	if _room_badge != null:
 		_room_badge.position = Vector2(14.0, 14.0)
-		_room_badge.size = Vector2(clampf(size.x * 0.28, 230.0, 330.0), 62.0)
+		_room_badge.size = Vector2(clampf(size.x * 0.34, 250.0, 390.0), 62.0)
+	if _primary_action != null and _primary_action.visible:
+		_primary_action.size = Vector2(clampf(size.x * 0.31, 250.0, 370.0), 48.0)
+		_primary_action.position = Vector2(16.0, size.y - 64.0)
 
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
@@ -362,9 +373,46 @@ func _apply_attention_style(button: Button) -> void:
 	button.add_theme_stylebox_override("normal", hint)
 	button.add_theme_stylebox_override("focus", hint)
 
+func _run_primary_action() -> void:
+	if _primary_action == null or _primary_action.disabled:
+		return
+	zone_requested.emit(int(_primary_action.get_meta("tab", 3)), str(_primary_action.get_meta("context", "Établi CPU")))
+
+func _refresh_primary_action() -> void:
+	if _primary_action == null:
+		return
+	_primary_action.visible = CompanyManager.created
+	_primary_action.disabled = false
+	_primary_action.set_meta("tab", 3)
+	_primary_action.set_meta("context", "Établi CPU")
+	if _has_pending_project_decision():
+		_primary_action.text = "Décision prototype / validation"
+		_primary_action.set_meta("context", "PROJECT_DECISION")
+	elif _has_pending_production_route():
+		_primary_action.text = "Choisir la fabrication"
+		_primary_action.set_meta("tab", 4)
+		_primary_action.set_meta("context", "Production")
+	elif _has_ready_product_to_launch():
+		_primary_action.text = "Préparer le lancement"
+		_primary_action.set_meta("tab", 4)
+		_primary_action.set_meta("context", "PRODUCT_LAUNCH")
+	elif _has_active_project():
+		var project: Dictionary = {}
+		for value in ResearchManager.projects:
+			if str(value.get("status", "")) == "DEVELOPMENT":
+				project = value
+				break
+		var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		_primary_action.text = "%s • %s %.0f%%" % [str(project.get("name", "Projet CPU")), str(GameData.PHASES[phase_index]), float(project.get("phase_progress", 0.0))]
+		_primary_action.disabled = true
+	else:
+		_primary_action.text = "+ Nouveau projet CPU"
+	call_deferred("_layout_zones")
+
 func set_progression(unlocks: Dictionary) -> void:
 	_last_unlocks = unlocks.duplicate(true)
 	_refresh_zone_visibility()
+	_refresh_primary_action()
 
 func set_onboarding_stage(stage: String) -> void:
 	_onboarding_stage = stage
@@ -380,9 +428,18 @@ func set_onboarding_stage(stage: String) -> void:
 				_room_subtitle.text = "Décision requise • Stock & production"
 			elif _has_ready_product_to_launch():
 				_room_subtitle.text = "Décision requise • Lancement CPU"
+			elif _has_active_project():
+				var project: Dictionary = {}
+				for value in ResearchManager.projects:
+					if str(value.get("status", "")) == "DEVELOPMENT":
+						project = value
+						break
+				var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+				_room_subtitle.text = "%s • %s %.0f%%" % [str(project.get("name", "Projet CPU")), str(GameData.PHASES[phase_index]), float(project.get("phase_progress", 0.0))]
 			else:
-				_room_subtitle.text = "Touchez un élément du décor"
+				_room_subtitle.text = "Touchez le décor ou lancez un nouveau projet"
 	_refresh_zone_visibility()
+	_refresh_primary_action()
 	close_context_menu()
 
 func _refresh_zone_visibility() -> void:
@@ -470,6 +527,12 @@ func selected_zone() -> String:
 
 func background_resource_path() -> String:
 	return _art_path_for_tier(_workplace_tier)
+
+func primary_action_text() -> String:
+	return _primary_action.text if _primary_action != null else ""
+
+func primary_action_enabled() -> bool:
+	return _primary_action != null and _primary_action.visible and not _primary_action.disabled
 
 func workplace_visual_tier() -> int:
 	return _workplace_tier

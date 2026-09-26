@@ -69,10 +69,10 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: management dashboard still surrounds the opening garage"
-	if nora_guide == null or not nora_guide.visible or priority_card == null or not priority_card.visible:
+	if nora_guide == null or nora_guide.visible or priority_card == null or priority_card.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.7 room-first entry does not expose Nora and the next CEO decision"
+		return "V0.8 garage-first entry still surrounds the room with permanent management cards"
 	if status_line == null or not status_line.visible:
 		game.queue_free()
 		_restore(snapshot)
@@ -85,10 +85,10 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.6 room-first entry still overlays text buttons on the room"
-	if not bool(garage.call("open_zone_menu", "Établi CPU")):
+	if str(garage.call("primary_action_text")) != "+ Nouveau projet CPU" or not bool(garage.call("primary_action_enabled")):
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.6 room-first entry did not open a contextual workbench menu"
+		return "V0.8 garage-first entry does not expose one clear primary action"
 	if str(garage.get("_onboarding_stage")) != "FIRST_IDEA":
 		game.queue_free()
 		_restore(snapshot)

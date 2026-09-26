@@ -73,6 +73,10 @@ var _cores: HSlider
 var _frequency: HSlider
 var _cache: HSlider
 var _cache_field_root: Control
+var _preset_field_root: Control
+var _technical_grid_root: Control
+var _budget_field_root: Control
+var _node_hint_root: Control
 var _tdp: HSlider
 var _cores_value: Label
 var _frequency_value: Label
@@ -151,7 +155,7 @@ func _build() -> void:
 	var choice_title := UI.label("Quel processeur voulons-nous construire ?", 26)
 	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_title)
-	var choice_intro := UI.muted_label("Commencez par l'intention du produit. Rien ne vous interdit ensuite de personnaliser complètement le design.", 13)
+	var choice_intro := UI.muted_label("Choisissez simplement à qui s'adresse votre premier produit. L'équipe s'occupe du reste tant que vous ne demandez pas plus de détails.", 13)
 	choice_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	choice_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_intro)
@@ -165,13 +169,9 @@ func _build() -> void:
 	for brief_value in BRIEFS:
 		var brief: Dictionary = brief_value
 		var button := Button.new()
-		button.text = "%s\n%s\n\n%s" % [
-			str(brief.get("title", "Projet")),
-			str(brief.get("subtitle", "")),
-			str(brief.get("description", ""))
-		]
+		button.text = "%s\n%s" % [str(brief.get("title", "Projet")), str(brief.get("subtitle", ""))]
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(310, 128)
+		button.custom_minimum_size = Vector2(310, 88)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(select_brief.bind(str(brief.get("id", ""))))
 		_brief_grid.add_child(button)
@@ -190,7 +190,7 @@ func _build() -> void:
 	_brief_title = UI.label("Premier CPU", 23)
 	_brief_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(_brief_title)
-	var config_intro := UI.muted_label("Les réglages restent ouverts : ce qui évolue avec la R&D et l'expérience, c'est surtout ce que l'équipe sait estimer, expliquer et recommander. Les systèmes avancés restent accessibles via Réglages avancés.", 12)
+	var config_intro := UI.muted_label("Donnez un nom au produit puis lancez le projet. Si vous voulez intervenir dans l'architecture, ouvrez Conception avancée.", 12)
 	config_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
@@ -222,13 +222,13 @@ func _build() -> void:
 	right_column.add_child(actions)
 
 	var launch := Button.new()
-	launch.text = "Lancer ce CPU"
+	launch.text = "Lancer le projet"
 	launch.custom_minimum_size = Vector2(190, 44)
 	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
 	actions.add_child(launch)
 
 	var advanced := Button.new()
-	advanced.text = "Réglages avancés"
+	advanced.text = "Conception avancée"
 	advanced.custom_minimum_size = Vector2(170, 44)
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	actions.add_child(advanced)
@@ -257,13 +257,18 @@ func _build() -> void:
 		_preset_select.add_item(str(data[0]))
 		_preset_select.set_item_metadata(_preset_select.item_count - 1, str(data[1]))
 	_preset_select.item_selected.connect(func(_i): _apply_selected_preset())
-	left_column.add_child(_field("Orientation de l'architecture", _preset_select))
+	var preset_field := _field("Orientation de l'architecture", _preset_select)
+	_preset_field_root = preset_field
+	preset_field.visible = false
+	left_column.add_child(preset_field)
 
 	var tech_grid := GridContainer.new()
 	tech_grid.columns = 2
 	tech_grid.add_theme_constant_override("h_separation", 14)
 	tech_grid.add_theme_constant_override("v_separation", 8)
 	left_column.add_child(tech_grid)
+	_technical_grid_root = tech_grid
+	tech_grid.visible = false
 
 	var cores_field := _slider_field("Nombre de cœurs", 1.0, 4.0, 1.0, 1.0)
 	_cores = cores_field.slider
@@ -293,13 +298,19 @@ func _build() -> void:
 	_budget.value = 45000
 	_budget.custom_minimum_size.y = 42
 	_budget.value_changed.connect(func(_v): _refresh_preview())
-	left_column.add_child(_field("Intensité R&D mensuelle (référence)", _budget))
+	var budget_field := _field("Intensité R&D mensuelle (référence)", _budget)
+	_budget_field_root = budget_field
+	budget_field.visible = false
+	left_column.add_child(budget_field)
 	_budget_cost_label = UI.muted_label("", 12)
 	_budget_cost_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_budget_cost_label.visible = false
 	left_column.add_child(_budget_cost_label)
 
 	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
+	_node_hint_root = node_label
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	node_label.visible = false
 	left_column.add_child(node_label)
 
 	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
@@ -390,6 +401,12 @@ func get_brief_count() -> int:
 
 func selected_brief_key() -> String:
 	return _selected_key
+
+func simple_surface_is_reduced() -> bool:
+	return _preset_field_root != null and not _preset_field_root.visible \
+		and _technical_grid_root != null and not _technical_grid_root.visible \
+		and _budget_field_root != null and not _budget_field_root.visible \
+		and _node_hint_root != null and not _node_hint_root.visible
 
 func advisor_text() -> String:
 	return _advisor_label.text if _advisor_label != null else ""

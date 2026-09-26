@@ -92,6 +92,21 @@ Une TV, un GPU, un satellite ou un smartphone diffèrent par leurs données, con
 
 Cela permet d'ajouter de nouveaux secteurs sans réécrire le jeu.
 
+## Principe UX — simple en surface, profond à la demande
+
+Tech Empire doit retrouver la lisibilité immédiate d’un tycoon comme Game Dev Tycoon sans copier son contenu. Le joueur joue d’abord **dans son entreprise**, pas dans une succession de tableaux de bord.
+
+- le garage / QG est la vue principale et permanente ;
+- une seule action importante doit attirer l’attention à la fois ;
+- les décisions arrivent dans le monde : établi, banc de test, stock, Nora, presse, retours clients ;
+- créer un produit doit commencer par quelques choix simples : cible, promesse, nom, lancement du projet ;
+- les paramètres techniques, économiques et organisationnels détaillés restent accessibles volontairement ;
+- aucun écran expert ne doit être nécessaire pour réussir la première boucle ;
+- une interaction doit autant que possible produire une conséquence visible dans l’entreprise plutôt qu’ouvrir une nouvelle page ;
+- les systèmes profonds existants restent la simulation réelle : l’interface n’en montre que ce qui est utile au moment présent.
+
+Règle de contrôle : **si le joueur doit comprendre l’interface avant de comprendre ce qu’il veut faire, l’interface a échoué.**
+
 ## Réalisme modulable
 
 Le jeu doit pouvoir être accessible au départ, tout en permettant une profondeur élevée.
@@ -155,7 +170,7 @@ Les concurrents doivent d'abord disposer d'une vraie logique de stratégie et de
 Le jeu est pensé dès le départ pour :
 
 - **PC / Windows** : interface riche, souris/clavier, davantage d'informations visibles ;
-- **Android** : tactile, interface responsive, navigation par panneaux/onglets ;
+- **Android** : tactile, interface responsive et garage-first ; les panneaux détaillés n’apparaissent que lorsque le joueur demande à approfondir ;
 - éventuellement d'autres plateformes plus tard si l'architecture le permet.
 
 Le projet doit rester un seul codebase Godot avec plusieurs exports.

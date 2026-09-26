@@ -438,7 +438,8 @@ func refresh() -> void:
 	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
 	var room_first := CompanyManager.created
 	if dashboard_nora_guide != null:
-		dashboard_nora_guide.visible = room_first
+		# V0.8 garage-first: Nora intervient dans le monde, pas comme panneau permanent.
+		dashboard_nora_guide.visible = false
 		if dashboard_nora_guide.has_method("set_compact"):
 			dashboard_nora_guide.call("set_compact", room_first)
 		if dashboard_nora_guide.has_method("refresh"):
@@ -448,7 +449,8 @@ func refresh() -> void:
 	if dashboard_garage_header != null:
 		dashboard_garage_header.visible = false
 	if dashboard_priority_card != null:
-		dashboard_priority_card.visible = room_first
+		# Les décisions sont signalées sur les zones du garage et via l’action principale.
+		dashboard_priority_card.visible = false
 	if dashboard_grid != null:
 		dashboard_grid.visible = not room_first
 	if dashboard_stats_grid != null:

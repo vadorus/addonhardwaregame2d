@@ -112,25 +112,26 @@ jobs:
           cp "$HOME/.android/debug.keystore" "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
           mkdir -p build/android
           set -o pipefail
-          godot --headless --path . --export-debug "Android APK" build/android/TechEmpire-v0.7-debug.apk 2>&1 | tee /tmp/android-export.log
+          godot --headless --path . --export-debug "Android APK" build/android/TechEmpire-v0.8-debug.apk 2>&1 | tee /tmp/android-export.log
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/android-export.log; then exit 1; fi
-          test -s build/android/TechEmpire-v0.7-debug.apk
+          test -s build/android/TechEmpire-v0.8-debug.apk
 
       - name: Inspect APK
         shell: bash
         run: |
           set -euo pipefail
           ls -lh build/android
-          file build/android/TechEmpire-v0.7-debug.apk
-          sha256sum build/android/TechEmpire-v0.7-debug.apk | tee build/android/SHA256SUMS.txt
-          unzip -l build/android/TechEmpire-v0.7-debug.apk | grep -E 'AndroidManifest.xml|lib/arm64-v8a/libgodot_android.so'
+          file build/android/TechEmpire-v0.8-debug.apk
+          sha256sum build/android/TechEmpire-v0.8-debug.apk | tee build/android/SHA256SUMS.txt
+          unzip -l build/android/TechEmpire-v0.8-debug.apk | grep -E 'AndroidManifest.xml|lib/arm64-v8a/libgodot_android.so'
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: TechEmpire-Android-v0.7-debug
+          name: TechEmpire-Android-v0.8-debug
           path: |
-            build/android/TechEmpire-v0.7-debug.apk
+            build/android/TechEmpire-v0.8-debug.apk
             build/android/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+

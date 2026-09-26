@@ -38,6 +38,9 @@ static func run(host: Node) -> String:
 		return "First CPU workshop does not use two columns on tablet/desktop layouts"
 
 	workshop.call("select_brief", "INDUSTRIAL")
+	if not bool(workshop.call("simple_surface_is_reduced")):
+		workshop.queue_free()
+		return "V0.8 first CPU flow exposes technical controls before the player asks for advanced design"
 	if int(workshop.call("advisor_detail_level")) != 0:
 		workshop.queue_free()
 		return "First-generation CPU advice exposes expert precision before the company has product experience"
