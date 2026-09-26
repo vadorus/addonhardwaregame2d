@@ -597,20 +597,29 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 		var requested_units := 0
 		var best_units := 0
 		var best_id := ""
+		var conversion_weight := 0.0
+		var weighted_conversion := 0.0
 		for product_id_value in ids:
 			var product_id := str(product_id_value)
-			var requested := int(result[product_id].get("units", 0))
+			var demand: Dictionary = result[product_id]
+			var requested := int(demand.get("units", 0))
 			requested_units += requested
 			if requested > best_units:
 				best_units = requested
 				best_id = product_id
+			# La part de marque est un plafond d'int?r?t. Le prix transforme ensuite
+			# cet int?r?t en achats : augmenter toute la gamme doit r?duire la conversion.
+			var weight := maxf(float(demand.get("raw_share", 0.001)), 0.001)
+			conversion_weight += weight
+			weighted_conversion += weight * float(demand.get("price_demand_multiplier", 1.0)) * float(demand.get("media_demand_multiplier", 1.0))
 
 		# La largeur de gamme aide, mais trois bins ne triplent jamais la client?le.
 		# Au maximum, deux r?f?rences suppl?mentaires apportent ~28 % au potentiel
 		# du meilleur SKU avant application du plafond de marque.
 		var breadth_factor := 1.0 + minf(float(maxi(ids.size() - 1, 0)) * 0.14, 0.35)
 		var family_potential := int(round(float(best_units) * breadth_factor))
-		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap())))
+		var conversion := clampf(weighted_conversion / maxf(conversion_weight, 0.001), 0.05, 1.12)
+		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion)))
 		var portfolio_units := mini(requested_units, mini(family_potential, share_cap_units))
 		var portfolio_share := float(portfolio_units) / float(market_units)
 
@@ -628,6 +637,7 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 			demand["share"] = float(allocated) / float(market_units)
 			demand["portfolio_share"] = portfolio_share
 			demand["portfolio_units"] = portfolio_units
+			demand["portfolio_price_conversion"] = conversion
 			demand["cannibalization_factor"] = float(allocated) / maxf(float(original_units), 1.0)
 			demand["portfolio_limited"] = portfolio_units < requested_units
 			allocated_total += allocated
@@ -1243,7 +1253,21 @@ func forecast_cpu_launch(product: Dictionary, proposed_price: int) -> Dictionary
 	var target := normalize_segment(str(candidate.get("target_segment", default_segment())))
 	if not is_segment_available(target):
 		return {}
-	var demand := estimate_consumer_demand(candidate)
+	var portfolio: Array = []
+	for existing_value in ProductManager.products:
+		var existing: Dictionary = existing_value
+		if str(existing.get("id", "")) == str(candidate.get("id", "")):
+			continue
+		if str(existing.get("status", "")) != "LAUNCHED":
+			continue
+		if str(existing.get("sector", "CPU")) != "CPU":
+			continue
+		if normalize_segment(str(existing.get("target_segment", default_segment()))) != target:
+			continue
+		portfolio.append(existing)
+	portfolio.append(candidate)
+	var portfolio_demand := estimate_portfolio_demand(portfolio)
+	var demand: Dictionary = portfolio_demand.get(str(candidate.get("id", "")), estimate_consumer_demand(candidate))
 	var marketing_score := PersonnelManager.team_score("Marketing", "marketing")
 	var confidence := clampf(34.0 + marketing_score * 0.58, 42.0, 92.0)
 	var uncertainty := clampf(0.34 - confidence * 0.0025, 0.09, 0.24)

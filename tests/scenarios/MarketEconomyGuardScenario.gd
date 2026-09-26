@@ -64,6 +64,32 @@ static func run() -> String:
 		_restore(snapshot)
 		return "Three CPU bins still multiply demand instead of cannibalizing each other (%d vs best SKU %d)" % [family_units, best_single_units]
 
+	var expensive_family: Array = []
+	for family_product_value in family:
+		var expensive_product: Dictionary = family_product_value.duplicate(true)
+		expensive_product["price"] = int(round(float(expensive_product.get("price", 1)) * 1.60))
+		expensive_family.append(expensive_product)
+	var expensive_demand := MarketManager.estimate_portfolio_demand(expensive_family)
+	var expensive_units := 0
+	for expensive_product_value in expensive_family:
+		expensive_units += int(expensive_demand.get(str(expensive_product_value.get("id", "")), {}).get("units", 0))
+	if expensive_units >= int(round(float(family_units) * 0.82)):
+		_restore(snapshot)
+		return "CPU family price elasticity is too weak (%d expensive vs %d normal)" % [expensive_units, family_units]
+
+	# Forecasts must use the same cannibalized portfolio envelope as real sales.
+	for family_product_value in family:
+		family_product_value["status"] = "LAUNCHED"
+	ProductManager.products = family
+	var forecast_total := 0
+	for family_product_value in family:
+		var forecast := MarketManager.forecast_cpu_launch(family_product_value, int(family_product_value.get("price", 1)))
+		forecast_total += int(forecast.get("expected_units", 0))
+	if absi(forecast_total - family_units) > maxi(4, int(round(float(family_units) * 0.05))):
+		_restore(snapshot)
+		return "CPU family launch forecast diverges from portfolio demand (%d forecast vs %d demand)" % [forecast_total, family_units]
+	ProductManager.products = [product]
+
 	var low_commitment := ProductManager.launch_capacity_commitment_cost(product, 250)
 	var high_commitment := ProductManager.launch_capacity_commitment_cost(product, 1000)
 	if low_commitment <= 0 or high_commitment <= low_commitment:

@@ -43,7 +43,7 @@ static func run() -> String:
 	for family_product in ProductManager.products:
 		if str(family_product.get("generation_id", "")) == first_generation_id:
 			summed_recommended_capacity += int(family_product.get("recommended_capacity", 0))
-	if shared_capacity < 180 or shared_capacity > 700:
+	if shared_capacity < 220 or shared_capacity > 800:
 		_restore(snapshot)
 		return "Full journey: first CPU family capacity is not garage-scale (%d units/month)" % shared_capacity
 	if absi(summed_recommended_capacity - shared_capacity) > 2:
