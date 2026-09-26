@@ -77,6 +77,9 @@ static func run(host: Node) -> String:
 	if bool(garage_hub.call("zone_buttons_have_visible_text")):
 		garage_hub.queue_free()
 		return "Room-first garage still paints button labels over the room"
+	if int(garage_hub.call("visible_side_action_count")) != 0:
+		garage_hub.queue_free()
+		return "Garage-first onboarding exposes management shortcuts before the first project"
 	if not bool(garage_hub.call("open_zone_menu", "Établi CPU")) or not bool(garage_hub.call("context_menu_visible")):
 		garage_hub.queue_free()
 		return "Touching the CPU workbench did not open its contextual menu"
@@ -90,5 +93,8 @@ static func run(host: Node) -> String:
 	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
 		garage_hub.queue_free()
 		return "Room-first garage did not expose the three early functional areas after onboarding"
+	if int(garage_hub.call("visible_side_action_count")) != 1:
+		garage_hub.queue_free()
+		return "Garage-first HUD should expose only the unlocked Team shortcut at this stage"
 	garage_hub.queue_free()
 	return ""

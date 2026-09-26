@@ -21,6 +21,7 @@ const APP_RED := UI.APP_RED
 var company_label: Label
 var date_label: Label
 var money_label: Label
+var reputation_label: Label
 var status_label: Label
 var tabs: TabContainer
 var nav_panel: PanelContainer
@@ -136,6 +137,8 @@ func _process(_delta):
 	if CompanyManager.created:
 		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
 		money_label.text = "%s €" % _money(Economy.money)
+		if reputation_label != null:
+			reputation_label.text = "Réputation %.0f" % CompanyManager.get_brand_score()
 
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
@@ -181,76 +184,61 @@ func _build_ui():
 
 	var root_box := VBoxContainer.new()
 	root_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root_box.offset_left = 10.0
-	root_box.offset_top = 10.0
-	root_box.offset_right = -10.0
-	root_box.offset_bottom = -10.0
-	root_box.add_theme_constant_override("separation", 8)
+	root_box.offset_left = 4.0
+	root_box.offset_top = 4.0
+	root_box.offset_right = -4.0
+	root_box.offset_bottom = -4.0
+	root_box.add_theme_constant_override("separation", 4)
 	add_child(root_box)
 
-	var header := _card(APP_SHELL, 13, 12)
+	var header := _card(Color(0.025, 0.055, 0.09, 0.96), 12, 7)
+	header.custom_minimum_size.y = 54
 	root_box.add_child(header)
-	var top := HFlowContainer.new()
-	top.add_theme_constant_override("h_separation", 12)
-	top.add_theme_constant_override("v_separation", 8)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
 	header.add_child(top)
 
-	var mark := PanelContainer.new()
-	mark.custom_minimum_size = Vector2(44, 44)
-	mark.add_theme_stylebox_override("panel", _stylebox(APP_CYAN, 11, 0, APP_CYAN, 0))
-	var mark_label := _label("TE", 17)
-	mark_label.add_theme_color_override("font_color", APP_BG)
-	mark_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mark_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	mark.add_child(mark_label)
-	top.add_child(mark)
-
-	var brand_box := VBoxContainer.new()
-	brand_box.custom_minimum_size.x = 180
+	var brand_box := HBoxContainer.new()
+	brand_box.custom_minimum_size.x = 210
+	brand_box.add_theme_constant_override("separation", 6)
 	top.add_child(brand_box)
+	var mark := Label.new()
+	mark.text = "TE"
+	mark.add_theme_font_size_override("font_size", 20)
+	mark.add_theme_color_override("font_color", APP_CYAN)
+	brand_box.add_child(mark)
 	company_label = _label("Tech Empire", 18)
+	company_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	brand_box.add_child(company_label)
-	var era_label := _muted_label("Vertical slice • CPU • débuts du microprocesseur", 12)
-	brand_box.add_child(era_label)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer.custom_minimum_size.x = 20
 	top.add_child(spacer)
 
-	var date_box := VBoxContainer.new()
-	date_box.custom_minimum_size.x = 125
-	date_box.add_child(_eyebrow("CALENDRIER"))
-	date_label = _label("Jour 1 • Mois 1 • 1971", 14)
-	date_box.add_child(date_label)
-	top.add_child(date_box)
-
-	var money_box := VBoxContainer.new()
-	money_box.custom_minimum_size.x = 120
-	money_box.add_child(_eyebrow("TRÉSORERIE"))
-	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 16)
+	var money_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
+	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 15)
 	money_label.add_theme_color_override("font_color", APP_GREEN)
-	money_box.add_child(money_label)
-	top.add_child(money_box)
+	money_chip.add_child(money_label)
+	top.add_child(money_chip)
 
-	for data in [["Ⅱ",0.0],["x1",1.0],["x2",2.0],["x3",3.0]]:
+	var date_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
+	date_label = _label("Mois 1 • 1971", 14)
+	date_chip.add_child(date_label)
+	top.add_child(date_chip)
+
+	var rep_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
+	reputation_label = _label("Réputation 0", 14)
+	reputation_label.add_theme_color_override("font_color", APP_AMBER)
+	rep_chip.add_child(reputation_label)
+	top.add_child(rep_chip)
+
+	for data in [["Ⅱ",0.0],["▶",1.0],["▶▶",2.0],["▶▶▶",3.0]]:
 		var speed_button := Button.new()
 		speed_button.text = str(data[0])
-		speed_button.custom_minimum_size = Vector2(44, 42)
+		speed_button.custom_minimum_size = Vector2(42, 38)
 		var speed := float(data[1])
 		speed_button.pressed.connect(_request_time_scale.bind(speed))
 		top.add_child(speed_button)
-
-	var save_btn := Button.new()
-	save_btn.text = "Sauver"
-	save_btn.custom_minimum_size.y = 42
-	save_btn.pressed.connect(func(): SaveManager.save_game())
-	top.add_child(save_btn)
-	var load_btn := Button.new()
-	load_btn.text = "Charger"
-	load_btn.custom_minimum_size.y = 42
-	load_btn.pressed.connect(_load_game)
-	top.add_child(load_btn)
 
 	nav_panel = _card(APP_SHELL, 12, 6)
 	root_box.add_child(nav_panel)

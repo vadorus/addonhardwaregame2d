@@ -11,6 +11,12 @@ const WORKPLACE_ART := {
 }
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := ROOM_ART_PATH
+const SIDE_ACTIONS := [
+	{"label":"Équipe","tab":2,"feature":"TEAM"},
+	{"label":"Entreprise","tab":1,"feature":"COMPANY"},
+	{"label":"Produits","tab":4,"feature":"PRODUCTS"},
+	{"label":"Marché","tab":5,"feature":"MARKET"}
+]
 
 # Rectangles normalisés sur le véritable décor paysage 1280x520.
 const ZONES := [
@@ -45,6 +51,7 @@ var _tasks_panel: PanelContainer
 var _tasks_label: Label
 var _feedback_panel: PanelContainer
 var _feedback_label: Label
+var _side_buttons: Array[Button] = []
 var _selected_zone := ""
 
 func _ready() -> void:
@@ -108,6 +115,7 @@ func _build_overlay() -> void:
 	room_box.add_child(_room_subtitle)
 
 	_build_gameplay_overlays()
+	_build_side_actions()
 
 	for data in ZONES:
 		var button := Button.new()
@@ -218,6 +226,35 @@ func _build_gameplay_overlays() -> void:
 	feedback_box.add_child(_feedback_label)
 	_refresh_gameplay_overlays()
 
+func _build_side_actions() -> void:
+	for data in SIDE_ACTIONS:
+		var button := Button.new()
+		button.text = str(data.get("label", "Ouvrir"))
+		button.custom_minimum_size = Vector2(112, 42)
+		button.focus_mode = Control.FOCUS_NONE
+		button.z_index = 15
+		button.set_meta("tab", int(data.get("tab", 0)))
+		button.set_meta("feature", str(data.get("feature", "QG")))
+		button.pressed.connect(_run_side_action.bind(button))
+		add_child(button)
+		_side_buttons.append(button)
+	_refresh_side_actions()
+
+func _run_side_action(button: Button) -> void:
+	zone_requested.emit(int(button.get_meta("tab", 0)), str(button.text))
+
+func _refresh_side_actions() -> void:
+	for button in _side_buttons:
+		var feature := str(button.get_meta("feature", "QG"))
+		button.visible = _onboarding_stage != "FIRST_IDEA" and bool(_last_unlocks.get(feature, false))
+
+func visible_side_action_count() -> int:
+	var count := 0
+	for button in _side_buttons:
+		if button.visible:
+			count += 1
+	return count
+
 func _panel_style(bg: Color, border: Color, radius: int, padding: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg
@@ -273,6 +310,12 @@ func _layout_zones() -> void:
 		var feedback_w := clampf(size.x * 0.32, 300.0, 420.0)
 		_feedback_panel.size = Vector2(feedback_w, 108.0)
 		_feedback_panel.position = Vector2(size.x - feedback_w - 14.0, size.y - 122.0)
+	var side_y := 88.0
+	for button in _side_buttons:
+		if button.visible:
+			button.position = Vector2(14.0, side_y)
+			button.size = Vector2(112.0, 42.0)
+			side_y += 48.0
 
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
@@ -559,6 +602,7 @@ func _refresh_primary_action() -> void:
 func set_progression(unlocks: Dictionary) -> void:
 	_last_unlocks = unlocks.duplicate(true)
 	_refresh_zone_visibility()
+	_refresh_side_actions()
 	_refresh_gameplay_overlays()
 
 func set_onboarding_stage(stage: String) -> void:
@@ -586,6 +630,7 @@ func set_onboarding_stage(stage: String) -> void:
 			else:
 				_room_subtitle.text = "Touchez le décor ou lancez un nouveau projet"
 	_refresh_zone_visibility()
+	_refresh_side_actions()
 	_refresh_gameplay_overlays()
 	close_context_menu()
 
