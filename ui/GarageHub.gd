@@ -37,6 +37,14 @@ var _context_title: Label
 var _context_subtitle: Label
 var _context_actions: VBoxContainer
 var _primary_action: Button
+var _project_panel: PanelContainer
+var _project_title: Label
+var _project_stage: Label
+var _project_progress: ProgressBar
+var _tasks_panel: PanelContainer
+var _tasks_label: Label
+var _feedback_panel: PanelContainer
+var _feedback_label: Label
 var _selected_zone := ""
 
 func _ready() -> void:
@@ -99,12 +107,7 @@ func _build_overlay() -> void:
 	_room_subtitle.add_theme_color_override("font_color", Color(0.63, 0.73, 0.82))
 	room_box.add_child(_room_subtitle)
 
-	_primary_action = Button.new()
-	_primary_action.custom_minimum_size = Vector2(250, 48)
-	_primary_action.focus_mode = Control.FOCUS_NONE
-	_primary_action.z_index = 15
-	_primary_action.pressed.connect(_run_primary_action)
-	add_child(_primary_action)
+	_build_gameplay_overlays()
 
 	for data in ZONES:
 		var button := Button.new()
@@ -150,6 +153,71 @@ func _build_overlay() -> void:
 	close.pressed.connect(close_context_menu)
 	context_box.add_child(close)
 
+func _build_gameplay_overlays() -> void:
+	_project_panel = PanelContainer.new()
+	_project_panel.z_index = 15
+	_project_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.025, 0.055, 0.09, 0.94), Color(0.20, 0.68, 0.92, 0.92), 14, 12))
+	add_child(_project_panel)
+	var project_box := VBoxContainer.new()
+	project_box.add_theme_constant_override("separation", 6)
+	_project_panel.add_child(project_box)
+	var kicker := Label.new()
+	kicker.text = "PROJET EN COURS"
+	kicker.add_theme_font_size_override("font_size", 12)
+	kicker.add_theme_color_override("font_color", Color(0.45, 0.84, 1.0))
+	project_box.add_child(kicker)
+	_project_title = Label.new()
+	_project_title.add_theme_font_size_override("font_size", 20)
+	_project_title.add_theme_color_override("font_color", Color.WHITE)
+	project_box.add_child(_project_title)
+	_project_stage = Label.new()
+	_project_stage.add_theme_font_size_override("font_size", 12)
+	_project_stage.add_theme_color_override("font_color", Color(0.70, 0.79, 0.88))
+	project_box.add_child(_project_stage)
+	_project_progress = ProgressBar.new()
+	_project_progress.show_percentage = true
+	_project_progress.custom_minimum_size.y = 18
+	project_box.add_child(_project_progress)
+	_primary_action = Button.new()
+	_primary_action.custom_minimum_size = Vector2(250, 44)
+	_primary_action.focus_mode = Control.FOCUS_NONE
+	_primary_action.pressed.connect(_run_primary_action)
+	project_box.add_child(_primary_action)
+
+	_tasks_panel = PanelContainer.new()
+	_tasks_panel.z_index = 15
+	_tasks_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.065, 0.92), Color(0.28, 0.38, 0.48, 0.9), 12, 10))
+	add_child(_tasks_panel)
+	var tasks_box := VBoxContainer.new()
+	_tasks_panel.add_child(tasks_box)
+	var tasks_title := Label.new()
+	tasks_title.text = "TÂCHES"
+	tasks_title.add_theme_font_size_override("font_size", 12)
+	tasks_title.add_theme_color_override("font_color", Color(0.45, 0.84, 1.0))
+	tasks_box.add_child(tasks_title)
+	_tasks_label = Label.new()
+	_tasks_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tasks_label.add_theme_font_size_override("font_size", 12)
+	_tasks_label.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98))
+	tasks_box.add_child(_tasks_label)
+	_feedback_panel = PanelContainer.new()
+	_feedback_panel.z_index = 15
+	_feedback_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.06, 0.052, 0.042, 0.92), Color(0.72, 0.55, 0.28, 0.88), 12, 10))
+	add_child(_feedback_panel)
+	var feedback_box := VBoxContainer.new()
+	_feedback_panel.add_child(feedback_box)
+	var feedback_title := Label.new()
+	feedback_title.text = "ACTU & RETOURS"
+	feedback_title.add_theme_font_size_override("font_size", 12)
+	feedback_title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.42))
+	feedback_box.add_child(feedback_title)
+	_feedback_label = Label.new()
+	_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_feedback_label.add_theme_font_size_override("font_size", 12)
+	_feedback_label.add_theme_color_override("font_color", Color(0.94, 0.93, 0.88))
+	feedback_box.add_child(_feedback_label)
+	_refresh_gameplay_overlays()
+
 func _panel_style(bg: Color, border: Color, radius: int, padding: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg
@@ -192,10 +260,19 @@ func _layout_zones() -> void:
 
 	if _room_badge != null:
 		_room_badge.position = Vector2(14.0, 14.0)
-		_room_badge.size = Vector2(clampf(size.x * 0.34, 250.0, 390.0), 62.0)
-	if _primary_action != null and _primary_action.visible:
-		_primary_action.size = Vector2(clampf(size.x * 0.31, 250.0, 370.0), 48.0)
-		_primary_action.position = Vector2(16.0, size.y - 64.0)
+		_room_badge.size = Vector2(clampf(size.x * 0.30, 220.0, 340.0), 62.0)
+	if _project_panel != null:
+		var project_w := clampf(size.x * 0.29, 300.0, 390.0)
+		_project_panel.size = Vector2(project_w, 180.0)
+		_project_panel.position = Vector2(size.x - project_w - 14.0, 14.0)
+	if _tasks_panel != null:
+		var tasks_w := clampf(size.x * 0.25, 250.0, 330.0)
+		_tasks_panel.size = Vector2(tasks_w, 122.0)
+		_tasks_panel.position = Vector2(14.0, size.y - 136.0)
+	if _feedback_panel != null:
+		var feedback_w := clampf(size.x * 0.32, 300.0, 420.0)
+		_feedback_panel.size = Vector2(feedback_w, 108.0)
+		_feedback_panel.position = Vector2(size.x - feedback_w - 14.0, size.y - 122.0)
 
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
@@ -373,6 +450,76 @@ func _apply_attention_style(button: Button) -> void:
 	button.add_theme_stylebox_override("normal", hint)
 	button.add_theme_stylebox_override("focus", hint)
 
+func _refresh_gameplay_overlays() -> void:
+	if _project_title == null or _project_stage == null or _project_progress == null:
+		return
+	var active_project: Dictionary = {}
+	for value in ResearchManager.projects:
+		if str(value.get("status", "")) == "DEVELOPMENT":
+			active_project = value
+			break
+	var active_job: Dictionary = {}
+	for value in ProductionManager.get_active_jobs():
+		active_job = value
+		break
+	var ready_product: Dictionary = {}
+	var launched_product: Dictionary = {}
+	for value in ProductManager.products:
+		if str(value.get("status", "")) == "READY" and ready_product.is_empty():
+			ready_product = value
+		elif str(value.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
+			launched_product = value
+
+	if not active_project.is_empty():
+		var phase_index := clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		var phase_progress := float(active_project.get("phase_progress", 0.0))
+		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		_project_title.text = str(active_project.get("name", "Projet CPU"))
+		_project_stage.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]), phase_progress]
+		_project_progress.value = overall
+	elif not active_job.is_empty():
+		_project_title.text = str(active_job.get("name", "CPU en fabrication"))
+		_project_stage.text = "Industrialisation • %.0f%%" % float(active_job.get("progress", 0.0))
+		_project_progress.value = float(active_job.get("progress", 0.0))
+	elif not ready_product.is_empty():
+		_project_title.text = str(ready_product.get("name", "CPU prêt"))
+		_project_stage.text = "Prêt au lancement"
+		_project_progress.value = 100.0
+	elif not launched_product.is_empty():
+		_project_title.text = str(launched_product.get("name", "CPU lancé"))
+		_project_stage.text = "Sur le marché • %s ventes ce mois" % str(launched_product.get("last_month_sales", 0))
+		_project_progress.value = 100.0
+	else:
+		_project_title.text = "Premier CPU à imaginer"
+		_project_stage.text = "Choisissez une cible et lancez votre projet."
+		_project_progress.value = 0.0
+
+	if _tasks_label != null:
+		if _has_pending_project_decision():
+			_tasks_label.text = "● Traiter la décision prototype\n○ Relancer l'équipe\n○ Préparer la suite"
+		elif _has_pending_production_route():
+			_tasks_label.text = "● Choisir la fabrication\n○ Vérifier la capacité\n○ Préparer le lancement"
+		elif _has_ready_product_to_launch():
+			_tasks_label.text = "● Fixer le lancement\n○ Vérifier le stock\n○ Préparer les premiers retours"
+		elif not active_project.is_empty():
+			_tasks_label.text = "✓ Projet lancé\n○ Laisser l'équipe avancer\n○ Attendre la prochaine décision"
+		elif not launched_product.is_empty():
+			_tasks_label.text = "✓ Produit lancé\n○ Observer ventes et retours\n○ Préparer la génération suivante"
+		else:
+			_tasks_label.text = "○ Choisir une cible CPU\n○ Nommer le produit\n○ Lancer le projet"
+
+	if _feedback_label != null:
+		if not MediaManager.news.is_empty():
+			var news: Dictionary = MediaManager.news[0]
+			var source := str(news.get("source_name", "Presse"))
+			var headline := str(news.get("headline", "Nouvelle couverture médiatique"))
+			_feedback_label.text = "%s\n« %s »" % [source, headline]
+		elif not CompanyManager.alerts.is_empty():
+			_feedback_label.text = str(CompanyManager.alerts[0])
+		else:
+			_feedback_label.text = "Le marché ne vous connaît pas encore. Votre premier produit changera ça."
+	_refresh_primary_action()
+
 func _run_primary_action() -> void:
 	if _primary_action == null or _primary_action.disabled:
 		return
@@ -412,7 +559,7 @@ func _refresh_primary_action() -> void:
 func set_progression(unlocks: Dictionary) -> void:
 	_last_unlocks = unlocks.duplicate(true)
 	_refresh_zone_visibility()
-	_refresh_primary_action()
+	_refresh_gameplay_overlays()
 
 func set_onboarding_stage(stage: String) -> void:
 	_onboarding_stage = stage
@@ -439,7 +586,7 @@ func set_onboarding_stage(stage: String) -> void:
 			else:
 				_room_subtitle.text = "Touchez le décor ou lancez un nouveau projet"
 	_refresh_zone_visibility()
-	_refresh_primary_action()
+	_refresh_gameplay_overlays()
 	close_context_menu()
 
 func _refresh_zone_visibility() -> void:
@@ -521,6 +668,9 @@ func context_action_labels() -> Array[String]:
 		if child is Button:
 			labels.append((child as Button).text)
 	return labels
+
+func gameplay_hud_ready() -> bool:
+	return _project_panel != null and _tasks_panel != null and _feedback_panel != null and _primary_action != null
 
 func selected_zone() -> String:
 	return _selected_zone

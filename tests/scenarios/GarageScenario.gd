@@ -6,6 +6,9 @@ static func run(host: Node) -> String:
 		return "Interactive garage HQ script could not be loaded"
 	var garage_hub: Control = garage_hub_script.new() as Control
 	host.add_child(garage_hub)
+	if not garage_hub.has_method("gameplay_hud_ready") or not bool(garage_hub.call("gameplay_hud_ready")):
+		garage_hub.queue_free()
+		return "Garage-first HUD is missing Project / Tasks / Feedback overlays"
 	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
 		garage_hub.queue_free()
 		return "Interactive garage HQ did not expose the expected five management zones"
