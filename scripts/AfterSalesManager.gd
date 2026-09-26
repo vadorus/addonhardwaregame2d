@@ -52,50 +52,65 @@ func support_team_score() -> float:
 func investigation_cost(case_data: Dictionary) -> int:
 	return int(round(3500.0 + float(case_data.get("severity", 40.0)) * 95.0))
 
+func _case_products(case_data: Dictionary, fallback: Dictionary = {}) -> Array:
+	var result: Array = []
+	var ids_value = case_data.get("affected_product_ids", [])
+	var ids: Array = ids_value if typeof(ids_value) == TYPE_ARRAY else []
+	if ids.is_empty():
+		ids = [str(case_data.get("product_id", ""))]
+	for product_id_value in ids:
+		var target := ProductManager.get_product(str(product_id_value))
+		if not target.is_empty():
+			result.append(target)
+	if result.is_empty() and not fallback.is_empty():
+		result.append(fallback)
+	return result
+
+func _case_cost_basis(case_data: Dictionary, fallback: Dictionary = {}) -> Dictionary:
+	var total_units := 0
+	var unit_cost_value := 0.0
+	for target_value in _case_products(case_data, fallback):
+		var target: Dictionary = target_value
+		var units := maxi(int(target.get("units_sold_total", 0)), 0)
+		var unit_cost := maxi(int(target.get("unit_cost", 1)), 1)
+		total_units += units
+		unit_cost_value += float(units * unit_cost)
+	var average_unit_cost := unit_cost_value / float(maxi(total_units, 1))
+	return {"units":total_units,"cost_value":unit_cost_value,"average_unit_cost":average_unit_cost}
+
 func corrective_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
-	var target := product
-	if target.is_empty():
-		target = ProductManager.get_product(str(case_data.get("product_id", "")))
+	var basis := _case_cost_basis(case_data, product)
 	var severity := float(case_data.get("severity", 40.0))
-	var units_sold := int(target.get("units_sold_total", 0))
-	return int(round(7000.0 + severity * 145.0 + float(units_sold) * float(target.get("unit_cost", 1)) * 0.008))
+	return int(round(7000.0 + severity * 145.0 + float(basis.get("cost_value", 0.0)) * 0.008))
 
 func recall_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
-	var target := product
-	if target.is_empty():
-		target = ProductManager.get_product(str(case_data.get("product_id", "")))
-	var units_sold := int(target.get("units_sold_total", 0))
+	var basis := _case_cost_basis(case_data, product)
 	var severity := float(case_data.get("severity", 40.0))
-	var unit_cost := int(target.get("unit_cost", 1))
-	return maxi(15000, int(round(float(units_sold) * float(unit_cost) * (0.18 + severity / 420.0))))
+	return maxi(15000, int(round(float(basis.get("cost_value", 0.0)) * (0.18 + severity / 420.0))))
 
 func exchange_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
-	var target := product
-	if target.is_empty():
-		target = ProductManager.get_product(str(case_data.get("product_id", "")))
-	var units_sold := int(target.get("units_sold_total", 0))
+	var basis := _case_cost_basis(case_data, product)
+	var total_units := int(basis.get("units", 0))
 	var affected := maxi(
 		int(case_data.get("observed_returns", 0)),
-		int(round(float(units_sold) * float(case_data.get("estimated_affected_rate", 0.02))))
+		int(round(float(total_units) * float(case_data.get("estimated_affected_rate", 0.02))))
 	)
-	return maxi(8000, int(round(float(affected) * float(target.get("unit_cost", 1)) * 0.95 + 3000.0)))
+	return maxi(8000, int(round(float(affected) * float(basis.get("average_unit_cost", 1.0)) * 0.95 + 3000.0)))
 
 func warranty_extension_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
-	var target := product
-	if target.is_empty():
-		target = ProductManager.get_product(str(case_data.get("product_id", "")))
-	var units_sold := int(target.get("units_sold_total", 0))
+	var basis := _case_cost_basis(case_data, product)
 	var severity := float(case_data.get("severity", 40.0))
-	return maxi(5000, int(round(float(units_sold) * float(target.get("unit_cost", 1)) * (0.025 + severity / 1800.0))))
+	return maxi(5000, int(round(float(basis.get("cost_value", 0.0)) * (0.025 + severity / 1800.0))))
 
 func action_quote(case_id: String) -> Dictionary:
 	var case_data := get_case(case_id)
 	if case_data.is_empty():
 		return {}
 	var product := ProductManager.get_product(str(case_data.get("product_id", "")))
+	var basis := _case_cost_basis(case_data, product)
 	var affected_units := maxi(
 		int(case_data.get("observed_returns", 0)),
-		int(round(float(product.get("units_sold_total", 0)) * float(case_data.get("estimated_affected_rate", 0.0))))
+		int(round(float(basis.get("units", 0)) * float(case_data.get("estimated_affected_rate", 0.0))))
 	)
 	return {
 		"investigation_cost":investigation_cost(case_data),
@@ -103,19 +118,28 @@ func action_quote(case_id: String) -> Dictionary:
 		"exchange_cost":exchange_cost(case_data, product),
 		"recall_cost":recall_cost(case_data, product),
 		"warranty_cost":warranty_extension_cost(case_data, product),
-		"affected_units":affected_units
+		"affected_units":affected_units,
+		"affected_products":_case_products(case_data, product).size()
 	}
 
 func cpu_generation_lessons(limit: int = 3) -> Array:
 	var result: Array = []
+	var seen := {}
 	for case_value in cases:
 		if typeof(case_value) != TYPE_DICTIONARY:
 			continue
 		var case_data: Dictionary = case_value
+		if str(case_data.get("sector", "CPU")) != "CPU":
+			continue
 		var status := str(case_data.get("status", ""))
-		if status not in ["DIAGNOSED", "RESOLVED", "RECALLED"]:
+		if status not in ["RESOLVED", "RECALLED"]:
 			continue
 		var issue_type := str(case_data.get("issue_type", "STABILITY"))
+		var generation_id := str(case_data.get("generation_id", ""))
+		var dedupe_key := "%s|%s" % [generation_id, issue_type]
+		if seen.has(dedupe_key):
+			continue
+		seen[dedupe_key] = true
 		var action := str(case_data.get("action", ""))
 		var focus := "RELIABILITY"
 		var lesson := ""
@@ -129,20 +153,26 @@ func cpu_generation_lessons(limit: int = 3) -> Array:
 				lesson = "Prévoir plus de validation microcode/firmware et de scénarios de compatibilité."
 			_:
 				lesson = "Renforcer stabilité, validation sous charge et marges de fiabilité."
+		var confirmed := bool(case_data.get("diagnosis_confirmed", status == "RESOLVED"))
 		if action == "RECALL":
-			lesson += " Le rappel montre que le coût d'une correction tardive peut devenir structurel."
+			if confirmed:
+				lesson += " Le rappel montre que le coût d'une correction tardive peut devenir structurel."
+			else:
+				lesson = "Rappel préventif : cause non confirmée. " + lesson
 		elif action == "EXCHANGE":
 			lesson += " L'échange ciblé a limité la portée de la crise."
 		elif action == "CORRECT":
 			lesson += " Le correctif terrain a réduit l'impact sans rappel global."
 		result.append({
 			"case_id":str(case_data.get("id", "")),
+			"generation_id":generation_id,
 			"product_name":str(case_data.get("product_name", "Produit")),
 			"issue_type":issue_type,
 			"issue_label":issue_label(issue_type),
 			"severity":float(case_data.get("severity", 0.0)),
 			"action":action,
 			"focus":focus,
+			"diagnosis_confirmed":confirmed,
 			"design_context":str(case_data.get("design_context", "")),
 			"lesson":lesson
 		})
@@ -172,10 +202,46 @@ func get_case(case_id: String) -> Dictionary:
 	return {}
 
 func _active_case_for_product(product_id: String) -> Dictionary:
-	for case_data in cases:
-		if str(case_data.get("product_id", "")) == product_id and str(case_data.get("status", "")) not in ["RESOLVED", "RECALLED", "CLOSED"]:
+	for case_value in cases:
+		var case_data: Dictionary = case_value
+		if str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED"]:
+			continue
+		if str(case_data.get("product_id", "")) == product_id:
+			return case_data
+		var affected_value = case_data.get("affected_product_ids", [])
+		if typeof(affected_value) == TYPE_ARRAY and product_id in affected_value:
 			return case_data
 	return {}
+
+func _active_case_for_generation_issue(generation_id: String, issue_type: String) -> Dictionary:
+	if generation_id.is_empty():
+		return {}
+	for case_value in cases:
+		var case_data: Dictionary = case_value
+		if str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED"]:
+			continue
+		if str(case_data.get("generation_id", "")) == generation_id and str(case_data.get("issue_type", "")) == issue_type:
+			return case_data
+	return {}
+
+func _merge_case_observation(case_data: Dictionary, product: Dictionary, units: int, returns: int, return_rate: float) -> void:
+	var product_id := str(product.get("id", ""))
+	var product_name := str(product.get("name", "Produit"))
+	var ids_value = case_data.get("affected_product_ids", [])
+	var ids: Array = ids_value if typeof(ids_value) == TYPE_ARRAY else []
+	var names_value = case_data.get("affected_product_names", [])
+	var names: Array = names_value if typeof(names_value) == TYPE_ARRAY else []
+	if product_id not in ids:
+		ids.append(product_id)
+		names.append(product_name)
+		case_data["history"].push_front("Le même signal touche aussi %s : dossier regroupé au niveau de la génération." % product_name)
+	case_data["affected_product_ids"] = ids
+	case_data["affected_product_names"] = names
+	case_data["observed_units"] = int(case_data.get("observed_units", 0)) + units
+	case_data["observed_returns"] = int(case_data.get("observed_returns", 0)) + returns
+	case_data["last_return_rate"] = maxf(float(case_data.get("last_return_rate", 0.0)), return_rate)
+	case_data["severity"] = clampf(maxf(float(case_data.get("severity", 0.0)), _severity_for(product, return_rate)), 0.0, 100.0)
+	case_data["estimated_affected_rate"] = maxf(float(case_data.get("estimated_affected_rate", 0.0)), return_rate)
 
 func _on_sales_report(report: Dictionary):
 	var product_id := str(report.get("product_id", ""))
@@ -202,7 +268,13 @@ func _on_sales_report(report: Dictionary):
 	var case_pressure := return_rate + defect_rate * 0.80 + maxf(65.0 - reliability, 0.0) * 0.002
 	if returns < 3 or case_pressure < 0.12:
 		return
-	_create_case(product, units, returns, return_rate)
+	var issue_type := _classify_issue(product)
+	var generation_case := _active_case_for_generation_issue(str(product.get("generation_id", "")), issue_type)
+	if not generation_case.is_empty():
+		_merge_case_observation(generation_case, product, units, returns, return_rate)
+		cases_changed.emit()
+		return
+	_create_case(product, units, returns, return_rate, issue_type)
 
 func _gain_passive_field_experience(product: Dictionary, units: int, returns: int):
 	var exposure_gain := clampf(float(units) / 220000.0, 0.02, 1.20)
@@ -217,20 +289,25 @@ func _gain_passive_field_experience(product: Dictionary, units: int, returns: in
 	_add_field_experience("FIRMWARE", exposure_gain * 0.18 + return_gain * 0.20)
 	field_experience_changed.emit()
 
-func _create_case(product: Dictionary, units: int, returns: int, return_rate: float):
-	var issue_type := _classify_issue(product)
+func _create_case(product: Dictionary, units: int, returns: int, return_rate: float, issue_type: String = ""):
+	if issue_type.is_empty():
+		issue_type = _classify_issue(product)
 	var severity := _severity_for(product, return_rate)
 	var confidence := clampf(28.0 + support_team_score() * 0.38 + cpu_field_experience(issue_type) * 0.16 + rng.randf_range(-4.0, 4.0), 20.0, 92.0)
 	var case_data := {
 		"id":"SAV-%03d" % _next_case_id,
 		"product_id":str(product.get("id", "")),
 		"product_name":str(product.get("name", "Produit")),
+		"affected_product_ids":[str(product.get("id", ""))],
+		"affected_product_names":[str(product.get("name", "Produit"))],
 		"generation_id":str(product.get("generation_id", "")),
+		"sector":str(product.get("sector", "CPU")),
 		"issue_type":issue_type,
 		"title":issue_label(issue_type),
 		"status":"OPEN",
 		"severity":severity,
 		"confidence":confidence,
+		"diagnosis_confirmed":false,
 		"investigation_progress":0.0,
 		"months_open":0,
 		"observed_units":units,
@@ -360,7 +437,9 @@ func extend_warranty(case_id: String) -> bool:
 	if not Economy.can_afford(cost, "Extension de garantie — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Extension de garantie — %s" % str(product.get("name", "Produit")))
-	product["warranty_extension_months"] = int(product.get("warranty_extension_months", 0)) + 12
+	for target_value in _case_products(case_data, product):
+		var target: Dictionary = target_value
+		target["warranty_extension_months"] = int(target.get("warranty_extension_months", 0)) + 12
 	case_data["warranty_active"] = true
 	case_data["status"] = "MONITORING"
 	case_data["action"] = "WARRANTY"
@@ -383,7 +462,8 @@ func exchange_affected_units(case_id: String) -> bool:
 	if not Economy.can_afford(cost, "Programme d'échange — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Programme d'échange — %s" % str(product.get("name", "Produit")))
-	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, false)
+	for target_value in _case_products(case_data, product):
+		_apply_fix_to_product(target_value, str(case_data.get("issue_type", "STABILITY")), severity, false)
 	case_data["status"] = "RESOLVED"
 	case_data["action"] = "EXCHANGE"
 	case_data["history"].push_front("Programme d'échange ciblé lancé pour %s €." % cost)
@@ -406,7 +486,8 @@ func apply_corrective_action(case_id: String) -> bool:
 	if not Economy.can_afford(cost, "Correctif SAV — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Correctif SAV — %s" % str(product.get("name", "Produit")))
-	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, false)
+	for target_value in _case_products(case_data, product):
+		_apply_fix_to_product(target_value, str(case_data.get("issue_type", "STABILITY")), severity, false)
 	case_data["status"] = "RESOLVED"
 	case_data["action"] = "CORRECT"
 	case_data["history"].push_front("Correctif déployé pour %s €." % cost)
@@ -429,8 +510,10 @@ func recall_product(case_id: String) -> bool:
 	if not Economy.can_afford(cost, "Rappel produit — %s" % str(product.get("name", "Produit"))):
 		return false
 	Economy.add_expense(cost, "Rappel produit — %s" % str(product.get("name", "Produit")))
-	_apply_fix_to_product(product, str(case_data.get("issue_type", "STABILITY")), severity, true)
-	product["production_capacity"] = maxi(1, int(float(product.get("production_capacity", 1)) * 0.72))
+	for target_value in _case_products(case_data, product):
+		var target: Dictionary = target_value
+		_apply_fix_to_product(target, str(case_data.get("issue_type", "STABILITY")), severity, true)
+		target["production_capacity"] = maxi(1, int(float(target.get("production_capacity", 1)) * 0.72))
 	case_data["status"] = "RECALLED"
 	case_data["action"] = "RECALL"
 	case_data["history"].push_front("Rappel volontaire lancé pour %s €." % cost)

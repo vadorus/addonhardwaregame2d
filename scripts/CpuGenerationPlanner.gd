@@ -101,6 +101,7 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 				design.cores = int(base.cores) + 1
 	_apply_segment(design, str(context.get("segment", "EMBEDDED")), archetype)
 	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability, architecture_capability, layout_score)
+	_apply_sav_lesson_to_design(design, archetype, context)
 	return CPU_DESIGN.normalize(design)
 
 static func _apply_segment(design: Dictionary, segment: String, archetype: String) -> void:
@@ -178,6 +179,25 @@ static func _apply_focus(design: Dictionary, focus: String, archetype: String, c
 				elif float(design.cache_mb) > 0.0:
 					design.cache_mb = float(design.cache_mb) * 1.20
 
+static func _apply_sav_lesson_to_design(design: Dictionary, archetype: String, context: Dictionary) -> void:
+	var lessons_value = context.get("sav_lessons", [])
+	var lessons: Array = lessons_value if typeof(lessons_value) == TYPE_ARRAY else []
+	if lessons.is_empty() or typeof(lessons[0]) != TYPE_DICTIONARY:
+		return
+	var lesson: Dictionary = lessons[0]
+	var focus := str(lesson.get("focus", "RELIABILITY"))
+	# A lesson changes the next proposal instead of being a decorative banner.
+	# Conservative plans reserve real design margin; BOLD may consciously ignore it.
+	if archetype == "BOLD":
+		return
+	if focus == "EFFICIENCY":
+		var frequency_factor := 0.97 if archetype == "SAFE" else 0.99
+		var tdp_factor := 0.92 if archetype == "SAFE" else 0.96
+		design.frequency_ghz = float(design.frequency_ghz) * frequency_factor
+		design.tdp_w = maxi(1, int(round(float(design.tdp_w) * tdp_factor)))
+	else:
+		var reliability_frequency_factor := 0.96 if archetype == "SAFE" else 0.985
+		design.frequency_ghz = float(design.frequency_ghz) * reliability_frequency_factor
 static func _next_advanced_node(node_nm: int, manufacturing_score: float, miniaturization_score: float) -> int:
 	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
 	var index := nodes.find(node_nm)
@@ -232,6 +252,29 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	confidence += float(profile.confidence_delta)
 	confidence = clampf(confidence, 28.0, 96.0)
 
+	var sav_lesson_applied := false
+	var sav_lesson_conflict := false
+	var sav_risk_delta := 0.0
+	var sav_confidence_delta := 0.0
+	var sav_design_note := ""
+	if not sav_lessons.is_empty() and typeof(sav_lessons[0]) == TYPE_DICTIONARY:
+		var first_lesson: Dictionary = sav_lessons[0]
+		var lesson_severity := clampf(float(first_lesson.get("severity", 50.0)), 20.0, 100.0)
+		var lesson_scale := clampf(lesson_severity / 70.0, 0.55, 1.35)
+		if str(profile.key) == "BOLD":
+			sav_lesson_conflict = true
+			sav_risk_delta = 7.0 * lesson_scale
+			sav_confidence_delta = -3.0 * lesson_scale
+			sav_design_note = "Ce plan accepte de ne pas réserver la marge demandée par le dernier incident terrain."
+		else:
+			sav_lesson_applied = true
+			var safe_factor := 1.0 if str(profile.key) == "SAFE" else 0.62
+			sav_risk_delta = -5.0 * lesson_scale * safe_factor
+			sav_confidence_delta = 3.5 * lesson_scale * safe_factor
+			sav_design_note = "La proposition réserve une marge de conception issue du retour SAV précédent."
+		risk = clampf(risk + sav_risk_delta, 5.0, 95.0)
+		confidence = clampf(confidence + sav_confidence_delta, 28.0, 96.0)
+
 	var competitive_months := float(profile.life_base) + float(evaluation.innovation) * 0.10
 	competitive_months += float(evaluation.reliability) * 0.06 + float(context.get("technology_score", 0.0)) * 0.10
 	competitive_months += capability * 0.04 - risk * 0.04
@@ -251,8 +294,13 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	if not sav_lessons.is_empty():
 		var first_sav_lesson: Dictionary = sav_lessons[0] if typeof(sav_lessons[0]) == TYPE_DICTIONARY else {}
 		if not first_sav_lesson.is_empty():
-			strengths.push_front("Leçon terrain intégrée : %s" % str(first_sav_lesson.get("issue_label", "retour SAV")))
-			strengths = strengths.slice(0, 3)
+			var lesson_label := str(first_sav_lesson.get("issue_label", "retour SAV"))
+			if sav_lesson_applied:
+				strengths.push_front("Leçon terrain appliquée : %s — marge supplémentaire réservée" % lesson_label)
+				strengths = strengths.slice(0, 3)
+			elif sav_lesson_conflict:
+				risks.push_front("Risque de répéter %s : ce plan ne réserve pas la marge apprise sur le terrain" % lesson_label)
+				risks = risks.slice(0, 3)
 	if bool(market_learning.get("has_data", false)):
 		var market_archetype := str(market_learning.get("recommended_archetype", "BALANCED"))
 		if market_archetype == str(profile.key):
@@ -297,6 +345,11 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"field_experience":float(context.get("field_experience", 0.0)),
 		"market_learning":market_learning.duplicate(true),
 		"sav_lessons":sav_lessons.duplicate(true),
+		"sav_lesson_applied":sav_lesson_applied,
+		"sav_lesson_conflict":sav_lesson_conflict,
+		"sav_risk_delta":sav_risk_delta,
+		"sav_confidence_delta":sav_confidence_delta,
+		"sav_design_note":sav_design_note,
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
 		"development_team_size":int(context.get("development_team_size", 0)),
 		"development_confidence":float(context.get("development_confidence", 50.0)),
@@ -389,6 +442,16 @@ static func _mark_recommendation(proposals: Array, context: Dictionary, capabili
 			recommended_key = "SAFE"
 		elif market_key == "BOLD" and capability >= 58.0 and (treasury <= 0 or treasury >= int(bold.program_cost * 0.65)):
 			recommended_key = "BOLD"
+
+	var sav_lessons_value = context.get("sav_lessons", [])
+	var sav_lessons: Array = sav_lessons_value if typeof(sav_lessons_value) == TYPE_ARRAY else []
+	if not sav_lessons.is_empty() and typeof(sav_lessons[0]) == TYPE_DICTIONARY:
+		var lesson: Dictionary = sav_lessons[0]
+		var lesson_severity := float(lesson.get("severity", 0.0))
+		# A severe field lesson cannot be ignored silently by Camille.
+		# It tempers an aggressive recommendation, without forbidding the player from choosing BOLD.
+		if recommended_key == "BOLD" and lesson_severity >= 60.0:
+			recommended_key = "SAFE" if lesson_severity >= 82.0 else "BALANCED"
 
 	for proposal_value in proposals:
 		var proposal: Dictionary = proposal_value

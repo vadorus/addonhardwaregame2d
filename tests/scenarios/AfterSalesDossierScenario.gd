@@ -100,6 +100,50 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "Targeted exchange did not close the SAV dossier cleanly"
 
+	# One physical generation defect must create one dossier shared by all SKU.
+	AfterSalesManager.reset()
+	var family: Array = []
+	for index in range(3):
+		var sibling := product.duplicate(true)
+		sibling["id"] = "PROD-CI-SAV-%d" % index
+		sibling["name"] = "CI Risk CPU %d" % index
+		sibling["generation_id"] = "CPU-GEN-CI-SAV"
+		sibling["units_sold_total"] = 900 + index * 100
+		sibling["last_month_returns"] = 40
+		family.append(sibling)
+	ProductManager.products = family
+	for sibling_value in family:
+		var sibling: Dictionary = sibling_value
+		AfterSalesManager._on_sales_report({"product_id":str(sibling.get("id", "")),"units":200})
+	var grouped_cases := AfterSalesManager.get_open_cases()
+	if grouped_cases.size() != 1:
+		panel.queue_free()
+		_restore(snapshot)
+		return "Three SKU from one faulty CPU generation created duplicate SAV dossiers"
+	var grouped_case: Dictionary = grouped_cases[0]
+	var affected_value = grouped_case.get("affected_product_ids", [])
+	var affected: Array = affected_value if typeof(affected_value) == TYPE_ARRAY else []
+	if affected.size() != 3:
+		panel.queue_free()
+		_restore(snapshot)
+		return "Grouped SAV dossier did not retain all affected SKU"
+	var grouped_quote := AfterSalesManager.action_quote(str(grouped_case.get("id", "")))
+	if int(grouped_quote.get("affected_products", 0)) != 3:
+		panel.queue_free()
+		_restore(snapshot)
+		return "Grouped SAV action quote ignored part of the affected CPU family"
+	grouped_case["status"] = "DIAGNOSED"
+	grouped_case["diagnosis_confirmed"] = true
+	if not AfterSalesManager.apply_corrective_action(str(grouped_case.get("id", ""))):
+		panel.queue_free()
+		_restore(snapshot)
+		return "Grouped SAV dossier could not apply one correction to the CPU family"
+	for sibling_value in family:
+		var sibling: Dictionary = sibling_value
+		if int(sibling.get("field_fix_count", 0)) < 1:
+			panel.queue_free()
+			_restore(snapshot)
+			return "Grouped SAV correction did not reach every affected SKU"
 	panel.queue_free()
 	_restore(snapshot)
 	return ""

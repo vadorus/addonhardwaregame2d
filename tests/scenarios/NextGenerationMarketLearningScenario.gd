@@ -111,6 +111,25 @@ static func run() -> String:
 	if str(thermal_lesson.get("lesson", "")).find("marge thermique") < 0:
 		_restore(snapshot)
 		return "Thermal SAV lesson does not explain what should change in the next generation"
+	var safe_plan := _plan(sav_plans, "SAFE")
+	var bold_plan := _plan(sav_plans, "BOLD")
+	if safe_plan.is_empty() or bold_plan.is_empty():
+		_restore(snapshot)
+		return "SAV learning scenario lost SAFE or BOLD generation plans"
+	if not bool(safe_plan.get("sav_lesson_applied", false)) or float(safe_plan.get("sav_risk_delta", 0.0)) >= 0.0:
+		_restore(snapshot)
+		return "Compatible next-generation plan did not mechanically apply the thermal lesson"
+	if not bool(bold_plan.get("sav_lesson_conflict", false)) or float(bold_plan.get("sav_risk_delta", 0.0)) <= 0.0:
+		_restore(snapshot)
+		return "Aggressive next-generation plan did not carry extra risk for ignoring the thermal lesson"
+	var bold_risks: Array = bold_plan.get("risks", [])
+	var explains_repeat_risk := false
+	for risk_value in bold_risks:
+		if str(risk_value).find("répéter") >= 0:
+			explains_repeat_risk = true
+	if not explains_repeat_risk:
+		_restore(snapshot)
+		return "BOLD plan does not explain the risk of repeating the previous field failure"
 
 	var round_trip := ResearchManager.get_state().duplicate(true)
 	ResearchManager.load_state(round_trip)
@@ -162,6 +181,12 @@ static func _feedback(units: int, capacity: int, unserved: int, satisfaction: fl
 		"verdict":verdict
 	}
 
+static func _plan(plans: Array, archetype: String) -> Dictionary:
+	for plan_value in plans:
+		var plan: Dictionary = plan_value
+		if str(plan.get("archetype", "")) == archetype:
+			return plan
+	return {}
 static func _recommended(plans: Array) -> Dictionary:
 	for plan_value in plans:
 		var plan: Dictionary = plan_value
