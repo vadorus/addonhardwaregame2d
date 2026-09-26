@@ -993,7 +993,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.6 • ROOM-FIRST PROTOTYPE")
+	var version := _eyebrow("V0.7 - PRODUCT LIVE LOOP")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
