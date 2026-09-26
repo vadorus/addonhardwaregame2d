@@ -8,6 +8,7 @@ const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourn
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
+const MEDIA_ECOSYSTEM_SCENARIO := preload("res://tests/scenarios/MediaEcosystemScenario.gd")
 const AFTER_SALES_DOSSIER_SCENARIO := preload("res://tests/scenarios/AfterSalesDossierScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
@@ -167,6 +168,10 @@ func _ready() -> void:
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
 		_fail(launch_feedback_error)
+		return
+	var media_ecosystem_error := MEDIA_ECOSYSTEM_SCENARIO.run()
+	if media_ecosystem_error != "":
+		_fail(media_ecosystem_error)
 		return
 	var after_sales_dossier_error := AFTER_SALES_DOSSIER_SCENARIO.run(self)
 	if after_sales_dossier_error != "":

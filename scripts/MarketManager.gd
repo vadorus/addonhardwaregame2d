@@ -547,14 +547,15 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	if str(product.get("company", "")) == CompanyManager.company_name:
 		raw_share = minf(raw_share, _player_portfolio_share_cap())
 	var price_multiplier := price_demand_multiplier(product, target)
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier)))
+	var media_multiplier := MediaManager.product_visibility_modifier(str(product.get("id", "")))
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
 	return {
 		"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,
 		"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,
-		"raw_share":raw_share,"price_demand_multiplier":price_multiplier,
+		"raw_share":raw_share,"price_demand_multiplier":price_multiplier,"media_demand_multiplier":media_multiplier,
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units
