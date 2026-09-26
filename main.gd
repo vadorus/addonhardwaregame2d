@@ -2035,6 +2035,27 @@ func _on_products_action(action: String, payload: Dictionary):
 				status_label.text = "Logiciel de contrôle publié ou mis à jour pour les modèles compatibles de cette génération."
 			else:
 				status_label.text = "Logiciel impossible à publier : produit non lancé ou trésorerie insuffisante."
+		"open_lab":
+			_show_tab(3)
+			status_label.text = "Cockpit produit : laboratoire de conception ouvert."
+		"investigate_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête SAV."
+		"monitor_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Dossier SAV placé sous surveillance." if case_id != "" and AfterSalesManager.monitor_case(case_id) else "Aucun dossier SAV disponible."
+		"correct_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Correctif SAV appliqué à la génération concernée." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et finançable."
+		"exchange_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Programme d'échange lancé pour les modèles concernés." if case_id != "" and AfterSalesManager.exchange_affected_units(case_id) else "L'échange nécessite un diagnostic et une trésorerie suffisante."
+		"warranty_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Garantie étendue sur les modèles concernés." if case_id != "" and AfterSalesManager.extend_warranty(case_id) else "Extension de garantie impossible."
+		"recall_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Rappel lancé sur la génération concernée." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible."
 		_:
 			return
 	_refresh_all()
