@@ -50,6 +50,8 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_build()
+	UI.configure_touch_scroll(self)
+	UI.prepare_touch_scroll_children(self)
 	refresh()
 
 func _build() -> void:
@@ -140,6 +142,9 @@ func _build() -> void:
 	dashboard_priority_defer.visible = false
 	dashboard_priority_defer.pressed.connect(_dashboard_priority_defer_pressed)
 	priority_actions.add_child(dashboard_priority_defer)
+	# V0.7 room-first: Nora + the next CEO decision sit above the room,
+	# like a lightweight HUD rather than a hidden management dashboard.
+	box.move_child(dashboard_priority_card, 2)
 
 	dashboard_grid = GridContainer.new()
 	dashboard_grid.columns = 2
@@ -218,7 +223,7 @@ func _build() -> void:
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(46, 46)
 	avatar.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_AMBER_DARK, 12, 0, UI.APP_AMBER_DARK, 0))
-	var avatar_label := UI.label("CD", 15)
+	var avatar_label := UI.label("N", 15)
 	avatar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	avatar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	avatar_label.add_theme_color_override("font_color", UI.APP_AMBER)
@@ -433,13 +438,17 @@ func refresh() -> void:
 	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
 	var room_first := CompanyManager.created
 	if dashboard_nora_guide != null:
-		dashboard_nora_guide.visible = false
+		dashboard_nora_guide.visible = room_first
+		if dashboard_nora_guide.has_method("set_compact"):
+			dashboard_nora_guide.call("set_compact", room_first)
+		if dashboard_nora_guide.has_method("refresh"):
+			dashboard_nora_guide.call("refresh")
 	if dashboard_heading != null:
 		dashboard_heading.visible = not room_first
 	if dashboard_garage_header != null:
 		dashboard_garage_header.visible = false
 	if dashboard_priority_card != null:
-		dashboard_priority_card.visible = not room_first
+		dashboard_priority_card.visible = room_first
 	if dashboard_grid != null:
 		dashboard_grid.visible = not room_first
 	if dashboard_stats_grid != null:

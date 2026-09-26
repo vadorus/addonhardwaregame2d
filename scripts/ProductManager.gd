@@ -68,7 +68,7 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		generation_index,
 		_base_unit_cost(project),
 		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
-		maxi(300, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.22)),
+		maxi(220, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.028)),
 		float(division.get("maturity", 0.0)),
 		industrialization
 	)
@@ -107,6 +107,7 @@ func _create_single_product(project: Dictionary) -> void:
 		"customization_freedom":float(sourcing.get("customization", 100.0)),"ip_ownership":float(sourcing.get("ip_ownership", 100.0)),
 		"application_profile":str(project.get("application_profile", "GENERAL")),
 		"cpu_design":project.get("cpu_design", {}).duplicate(true),"design_estimate":project.get("design_estimate", {}).duplicate(true),
+		"decision_history":project.get("decision_history", []).duplicate(true),
 		"metrics":metrics,"unit_cost":unit_cost,"price":suggested_price,
 		"production_capacity":maxi(100, int(float(sector_data.market_units) * 0.22)),"status":"READY",
 		"months_on_market":0,"units_sold_total":0,"last_month_sales":0,"last_month_score":0.0,
@@ -481,12 +482,29 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			product.months_on_market = 0
 			product.last_month_age_penalty = 0.0
 			product.market_lifecycle = "Nouveau"
+			_refresh_cpu_launch_forecasts(str(product.get("generation_id", "")))
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
 			MarketManager.activate_reserved_contracts(str(product.id))
 			product_launched.emit(product)
 			products_changed.emit()
 			return true
 	return false
+
+func _refresh_cpu_launch_forecasts(generation_id: String) -> void:
+	if generation_id.is_empty():
+		return
+	for candidate_value in products:
+		var candidate: Dictionary = candidate_value
+		if str(candidate.get("sector", "")) != "CPU" or str(candidate.get("status", "")) != "LAUNCHED":
+			continue
+		if str(candidate.get("generation_id", "")) != generation_id:
+			continue
+		var launch_plan_value = candidate.get("launch_plan", {})
+		if typeof(launch_plan_value) != TYPE_DICTIONARY:
+			continue
+		var launch_plan: Dictionary = launch_plan_value
+		launch_plan["forecast"] = MarketManager.forecast_cpu_launch(candidate, int(candidate.get("price", 1))).duplicate(true)
+		candidate["launch_plan"] = launch_plan
 
 func process_month():
 	var launched: Array = []

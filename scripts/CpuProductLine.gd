@@ -69,6 +69,8 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 		"foundry_confidentiality":float(industrialization.get("foundry_confidentiality", 0.0)),
 		"foundry_reliability":float(industrialization.get("foundry_reliability", 0.0)),
 		"foundry_capacity":foundry_capacity,
+		"monthly_capacity":effective_monthly_capacity,
+		"max_monthly_capacity":int(round(float(effective_monthly_capacity) * 1.35)),
 		"binning_strategy":str(industrialization.get("binning_strategy", "BALANCED")),
 		"die_quality_mean":float(industrialization.get("die_quality_mean", industrialization.get("silicon_quality_mean", industrialization.get("quality_score", 60.0)))),
 		"die_variation":float(industrialization.get("die_variation", industrialization.get("silicon_variation", 10.0))),
@@ -136,7 +138,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var target_margin := BalanceManager.gross_margin_target(str(project.get("segment", "EMBEDDED")))
 	var margin_guard_price := float(unit_cost) / maxf(1.0 - target_margin, 0.20)
 	var suggested_price := maxi(unit_cost + 5, _round_price(maxf(price_from_position, maxf(price_from_margin, margin_guard_price))))
-	var recommended_capacity := maxi(100, int(round(float(total_monthly_capacity) * bin_share)))
+	var recommended_capacity := maxi(25, int(round(float(total_monthly_capacity) * bin_share)))
 	var max_capacity := maxi(recommended_capacity, int(round(float(recommended_capacity) * 1.35)))
 	var suffix := str(tier.suffix)
 	var base_name := str(project.get("name", "Nova CPU"))
@@ -151,6 +153,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"generation_index":maxi(generation_index, 1),
 		"generation_name":base_name,
 		"generation_plan_id":str(project.get("generation_plan", {}).get("id", "")),
+		"decision_history":project.get("decision_history", []).duplicate(true),
 		"name":product_name,
 		"sector":"CPU",
 		"target_segment":_target_segment(str(project.get("segment", "MAINSTREAM")), tier_key),

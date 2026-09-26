@@ -15,6 +15,7 @@ var product_capacity: SpinBox
 var launch_intel_label: Label
 var post_launch_group: VBoxContainer
 var post_launch_label: Label
+var product_pulse_panel: Control
 var promotion_select: OptionButton
 var revision_select: OptionButton
 var firmware_select: OptionButton
@@ -72,6 +73,9 @@ func _build() -> void:
 	var intro := UI.muted_label("Un CPU lancé continue d'évoluer : prix et promotion sont commerciaux, le stepping modifie uniquement les nouvelles unités, tandis que firmware et logiciel peuvent toucher le parc compatible.", 12)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	post_launch_group.add_child(intro)
+	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")
+	product_pulse_panel = pulse_script.new() as Control
+	post_launch_group.add_child(product_pulse_panel)
 	post_launch_label = UI.rich_label()
 	post_launch_group.add_child(post_launch_label)
 
@@ -137,6 +141,8 @@ func set_viewport_width(width: float) -> void:
 		launch_grid.columns = columns
 	if lifecycle_grid != null:
 		lifecycle_grid.columns = columns
+	if product_pulse_panel != null and product_pulse_panel.has_method("set_viewport_width"):
+		product_pulse_panel.call("set_viewport_width", width)
 
 func refresh() -> void:
 	_refresh_product_list()
@@ -194,6 +200,8 @@ func _refresh_product_details() -> void:
 	if product.is_empty():
 		return
 	post_launch_group.visible = str(product.get("status", "")) == "LAUNCHED"
+	if product_pulse_panel != null and product_pulse_panel.has_method("refresh_product"):
+		product_pulse_panel.call("refresh_product", product)
 	var metrics: Dictionary = product.get("metrics", {})
 	var metric_lines: Array[String] = []
 	for metric in GameData.METRICS:

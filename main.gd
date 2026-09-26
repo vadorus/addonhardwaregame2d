@@ -32,6 +32,7 @@ var first_cpu_workshop: Control
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
+var month_ticker_timer: Timer
 var game_over_layer: Control
 var game_over_panel: PanelContainer
 var game_over_label: Label
@@ -39,6 +40,10 @@ var research_event_layer: Control
 var research_event_panel: PanelContainer
 var research_event_label: Label
 var active_research_event_id := ""
+var launch_layer: Control
+var launch_moment_panel: Control
+var launch_moment_timer: Timer
+var _launch_resume_scale := 1.0
 
 var company_screen: Control
 var dashboard_screen: Control
@@ -264,6 +269,14 @@ func _build_ui():
 	status_label.custom_minimum_size.y = 24
 	status_label.add_theme_color_override("font_color", APP_CYAN)
 	root_box.add_child(status_label)
+	month_ticker_timer = Timer.new()
+	month_ticker_timer.one_shot = true
+	month_ticker_timer.wait_time = 3.0
+	month_ticker_timer.timeout.connect(func():
+		if status_label != null and status_label.text.begins_with("Bilan "):
+			status_label.text = ""
+	)
+	add_child(month_ticker_timer)
 
 	tabs = TabContainer.new()
 	tabs.tabs_visible = false
@@ -284,6 +297,7 @@ func _build_ui():
 	_build_game_over_layer()
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
+	_build_launch_moment_layer()
 
 func _create_dashboard_tab():
 	var dashboard_script: Script = load("res://ui/screens/DashboardScreen.gd")
@@ -469,6 +483,8 @@ func _refresh_generation_plan_summary():
 	var risks: Array = proposal.get("risks", [])
 	var market_learning_value = proposal.get("market_learning", {})
 	var market_learning: Dictionary = market_learning_value if typeof(market_learning_value) == TYPE_DICTIONARY else {}
+	var sav_lessons_value = proposal.get("sav_lessons", [])
+	var sav_lessons: Array = sav_lessons_value if typeof(sav_lessons_value) == TYPE_ARRAY else []
 	var market_line := "Retour marché : aucune donnée exploitable sur cette cible."
 	if bool(market_learning.get("has_data", false)):
 		market_line = "Retour marché : %d mois • %s unités • satisfaction %.1f/100 • retours %.1f%% • capacité %.0f%% • demande non servie %.1f%% • confiance %.0f%%\n%s" % [
@@ -481,6 +497,16 @@ func _refresh_generation_plan_summary():
 			float(market_learning.get("confidence", 0.0)),
 			str(market_learning.get("summary", ""))
 		]
+	if sav_lessons.is_empty():
+		market_line += "\nCarnet SAV : aucune leçon critique enregistrée."
+	else:
+		var lesson_lines: Array[String] = []
+		for lesson_value in sav_lessons:
+			if typeof(lesson_value) != TYPE_DICTIONARY:
+				continue
+			var lesson: Dictionary = lesson_value
+			lesson_lines.append("• %s — %s" % [str(lesson.get("issue_label", "Terrain")), str(lesson.get("lesson", ""))])
+		market_line += "\nCarnet SAV :\n" + "\n".join(lesson_lines)
 	var recommendation_prefix := "★ RECOMMANDÉ PAR CAMILLE\n" if bool(proposal.get("recommended", false)) else ""
 	cpu_generation_summary_label.text = "%sPLAN %s — %s G%d\n%s\n\n%d cœur(s) • %s • %s • %s • %d W\n~%d mois • %s € • compétitif ~%.1f ans • %d modèles\nRisque %.0f/100 • confiance plan %.0f/100 • confiance R&D %.0f/100 • confiance dev %.0f/100 • terrain %.0f/100 • cible %.0f/100\n%s\nGains estimés : performance %s • efficacité %s • fiabilité %s\nForces : %s\nRisques : %s\n\n%s" % [
 		recommendation_prefix, str(proposal.get("tag", "PLAN")), str(proposal.get("title", "Architecture")), int(proposal.get("generation_index", 1)),
@@ -923,6 +949,12 @@ func _on_market_action(action: String, payload: Dictionary):
 		"correct_case":
 			var case_id := str(payload.get("case_id", ""))
 			status_label.text = "Correctif SAV appliqué." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et la trésorerie doit permettre le correctif."
+		"exchange_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Programme d'échange lancé pour les unités touchées." if case_id != "" and AfterSalesManager.exchange_affected_units(case_id) else "L'échange nécessite un diagnostic établi et une trésorerie suffisante."
+		"warranty_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Garantie étendue de 12 mois. Le dossier reste sous surveillance." if case_id != "" and AfterSalesManager.extend_warranty(case_id) else "Extension de garantie impossible : vérifiez le dossier et la trésorerie."
 		"recall_case":
 			var case_id := str(payload.get("case_id", ""))
 			status_label.text = "Rappel produit lancé." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible : dossier absent ou trésorerie insuffisante."
@@ -961,7 +993,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.6 • ROOM-FIRST PROTOTYPE")
+	var version := _eyebrow("V0.7 - PRODUCT LIVE LOOP")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
@@ -1143,6 +1175,49 @@ func _build_month_layer():
 	var box:=VBoxContainer.new(); box.add_theme_constant_override("separation",12); month_panel.add_child(box)
 	box.add_child(_section("Rapport mensuel")); month_report_label=_rich_label(); box.add_child(month_report_label)
 	var cont:=Button.new(); cont.text="Continuer"; cont.custom_minimum_size.y=44; cont.pressed.connect(_close_month_report); box.add_child(cont)
+
+func _build_launch_moment_layer() -> void:
+	launch_layer = ColorRect.new()
+	launch_layer.color = Color(0.015, 0.025, 0.04, 0.95)
+	launch_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	launch_layer.visible = false
+	add_child(launch_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	launch_layer.add_child(center)
+	var launch_script: Script = load("res://ui/components/LaunchMomentPanel.gd")
+	launch_moment_panel = launch_script.new() as Control
+	launch_moment_panel.connect("continue_requested", Callable(self, "_close_launch_moment"))
+	center.add_child(launch_moment_panel)
+	launch_moment_timer = Timer.new()
+	launch_moment_timer.one_shot = true
+	launch_moment_timer.wait_time = 4.0
+	launch_moment_timer.timeout.connect(_close_launch_moment)
+	add_child(launch_moment_timer)
+
+func _show_launch_moment(product: Dictionary, launch_cost: int) -> void:
+	if launch_layer == null or launch_moment_panel == null:
+		return
+	_launch_resume_scale = TimeManager.time_scale if TimeManager.time_scale > 0.0 else 1.0
+	TimeManager.time_scale = 0.0
+	launch_moment_panel.call("show_product", product, launch_cost)
+	if launch_moment_panel.has_method("set_viewport_width"):
+		launch_moment_panel.call("set_viewport_width", size.x)
+	launch_layer.visible = true
+	launch_moment_timer.start()
+	MediaManager.publish_business_event(
+		"%s arrive sur le marché" % str(product.get("name", "Nouveau produit")),
+		"Les premières commandes sont ouvertes. Le marché va maintenant confronter la promesse du produit aux ventes, benchmarks et retours terrain."
+	)
+
+func _close_launch_moment() -> void:
+	if launch_layer == null or not launch_layer.visible:
+		return
+	launch_layer.visible = false
+	if launch_moment_timer != null:
+		launch_moment_timer.stop()
+	if not SimulationManager.is_game_over and _blocking_company_decision().is_empty():
+		TimeManager.time_scale = maxf(_launch_resume_scale, 1.0)
 
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
@@ -1388,7 +1463,9 @@ func _update_nav_state():
 	if nav_panel != null:
 		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
 	if status_label != null:
-		status_label.visible = not CompanyManager.created or tabs.current_tab != 0
+		# V0.7: the room-first QG keeps one thin status line so Nora/blocking
+		# decisions and non-blocking monthly tickers remain visible.
+		status_label.visible = true
 	for i in range(nav_buttons.size()):
 		var button := nav_buttons[i]
 		var visible := true
@@ -1405,6 +1482,10 @@ func _update_responsive_layout():
 		dashboard_screen.call("set_viewport_width", size.x)
 	if products_screen != null and products_screen.has_method("set_viewport_width"):
 		products_screen.call("set_viewport_width", size.x)
+	if market_screen != null and market_screen.has_method("set_viewport_width"):
+		market_screen.call("set_viewport_width", size.x)
+	if launch_moment_panel != null and launch_moment_panel.has_method("set_viewport_width"):
+		launch_moment_panel.call("set_viewport_width", size.x)
 	var compact := size.x < 900.0
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:
@@ -1647,11 +1728,26 @@ func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
 
 func _on_month_closed(report: Dictionary):
-	TimeManager.time_scale=0.0
-	var inc_lines:=_breakdown(report.income_breakdown)
-	var exp_lines:=_breakdown(report.expense_breakdown)
-	month_report_label.text="Mois %d / %d\n\nRevenus : %s €\n%s\n\nDépenses : %s €\n%s\n\nRésultat : %s €\nTrésorerie : %s €" % [int(report.month),int(report.year),_money(int(report.income)),inc_lines,_money(int(report.expenses)),exp_lines,_money(int(report.result)),_money(int(report.money))]
-	month_layer.visible=true
+	# V0.7: a month is information, not a decision. Never pause just to show
+	# accounting. Preserve x1/x2/x3 unless a real blocking decision appeared.
+	month_layer.visible = false
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		_show_tab(0)
+		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
+	else:
+		var result := int(report.get("result", 0))
+		var result_prefix := "+" if result >= 0 else ""
+		status_label.text = "Bilan M%d/%d • %s%s € • trésorerie %s €" % [
+			int(report.get("month", TimeManager.month)),
+			int(report.get("year", TimeManager.year)),
+			result_prefix,
+			_money(result),
+			_money(int(report.get("money", Economy.money)))
+		]
+		if month_ticker_timer != null:
+			month_ticker_timer.start()
 	_refresh_all()
 
 func _breakdown(data: Dictionary) -> String:
@@ -1707,7 +1803,7 @@ func _close_month_report():
 		status_label.text = str(blocker.get("message", "Une décision importante attend votre choix."))
 		_refresh_all()
 		return
-	TimeManager.time_scale=1.0
+	# Legacy close path: keep the speed selected by the player.
 
 func _on_game_over(reason: String, report: Dictionary):
 	TimeManager.time_scale = 0.0
@@ -1728,14 +1824,15 @@ func _restart_from_game_over():
 	status_label.text = ""
 
 func _refresh_top():
-	company_label.text=CompanyManager.company_name if CompanyManager.created else "Tech Empire"
-	money_label.text="%s €" % _money(Economy.money)
+	company_label.text = CompanyManager.company_name if CompanyManager.created else "Tech Empire"
+	var runway := BalanceManager.starting_runway_months()
+	if CompanyManager.created:
+		runway = float(ExecutiveManager.financial_advice().get("runway_months", runway))
+	money_label.text = "%s € • %.0f mois" % [_money(Economy.money), runway]
 	var cash_color := APP_GREEN
-	if Economy.money <= 0:
+	if Economy.money <= 0 or runway < 3.0:
 		cash_color = APP_RED
-	elif Economy.money < 75000:
-		cash_color = APP_RED
-	elif Economy.money < 175000:
+	elif runway < 12.0:
 		cash_color = APP_AMBER
 	money_label.add_theme_color_override("font_color", cash_color)
 
@@ -1910,8 +2007,7 @@ func _on_products_action(action: String, payload: Dictionary):
 			var launch_cost := ProductManager.launch_capacity_commitment_cost(launch_product_data, launch_capacity) if not launch_product_data.is_empty() else 0
 			if ProductManager.launch_product(launch_product_id, int(payload.get("price", 0)), launch_capacity):
 				status_label.text = "Produit lancé : %s € engagés pour la capacité. Le prochain mois comparera prévision et ventes réelles." % _money(launch_cost)
-				if _blocking_company_decision().is_empty() and not month_layer.visible:
-					TimeManager.time_scale = 1.0
+				_show_launch_moment(ProductManager.get_product(launch_product_id), launch_cost)
 			else:
 				status_label.text = "Lancement impossible : produit indisponible ou trésorerie insuffisante pour engager la capacité demandée (~%s €)." % _money(launch_cost)
 		"update_price":
@@ -1939,6 +2035,27 @@ func _on_products_action(action: String, payload: Dictionary):
 				status_label.text = "Logiciel de contrôle publié ou mis à jour pour les modèles compatibles de cette génération."
 			else:
 				status_label.text = "Logiciel impossible à publier : produit non lancé ou trésorerie insuffisante."
+		"open_lab":
+			_show_tab(3)
+			status_label.text = "Cockpit produit : laboratoire de conception ouvert."
+		"investigate_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête SAV."
+		"monitor_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Dossier SAV placé sous surveillance." if case_id != "" and AfterSalesManager.monitor_case(case_id) else "Aucun dossier SAV disponible."
+		"correct_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Correctif SAV appliqué à la génération concernée." if case_id != "" and AfterSalesManager.apply_corrective_action(case_id) else "Le dossier doit être diagnostiqué et finançable."
+		"exchange_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Programme d'échange lancé pour les modèles concernés." if case_id != "" and AfterSalesManager.exchange_affected_units(case_id) else "L'échange nécessite un diagnostic et une trésorerie suffisante."
+		"warranty_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Garantie étendue sur les modèles concernés." if case_id != "" and AfterSalesManager.extend_warranty(case_id) else "Extension de garantie impossible."
+		"recall_case":
+			var case_id := str(payload.get("case_id", ""))
+			status_label.text = "Rappel lancé sur la génération concernée." if case_id != "" and AfterSalesManager.recall_product(case_id) else "Rappel impossible."
 		_:
 			return
 	_refresh_all()

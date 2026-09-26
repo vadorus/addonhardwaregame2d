@@ -87,6 +87,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	_build()
+	UI.prepare_touch_scroll_children(self)
 
 func _build() -> void:
 	var margin := MarginContainer.new()
@@ -100,7 +101,7 @@ func _build() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	UI.configure_touch_scroll(scroll)
 	margin.add_child(scroll)
 
 	var center := CenterContainer.new()

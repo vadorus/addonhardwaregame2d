@@ -32,6 +32,12 @@ func _ready() -> void:
 	after_sales_panel.connect("action_requested", _relay_action)
 	box.add_child(after_sales_panel)
 
+func set_viewport_width(width: float) -> void:
+	if overview_panel != null and overview_panel.has_method("set_viewport_width"):
+		overview_panel.call("set_viewport_width", width)
+	if after_sales_panel != null and after_sales_panel.has_method("set_viewport_width"):
+		after_sales_panel.call("set_viewport_width", width)
+
 func refresh() -> void:
 	if overview_panel != null:
 		overview_panel.call("refresh")

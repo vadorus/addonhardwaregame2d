@@ -81,6 +81,22 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "CPU launch plan did not preserve the selected price and capacity"
 
+	var launch_moment_script: Script = load("res://ui/components/LaunchMomentPanel.gd")
+	var launch_moment: Control = launch_moment_script.new() as Control
+	host.add_child(launch_moment)
+	launch_moment.call("show_product", product, ProductManager.launch_capacity_commitment_cost(product, 10))
+	var launch_title: Label = launch_moment.get("title_label")
+	var launch_forecast: Label = launch_moment.get("forecast_label")
+	if launch_title == null or launch_title.text.find("CI Feedback CPU") < 0:
+		launch_moment.queue_free()
+		_restore(snapshot)
+		return "V0.7 launch moment did not make the product the hero"
+	if launch_forecast == null or launch_forecast.text.find("Scénario central") < 0:
+		launch_moment.queue_free()
+		_restore(snapshot)
+		return "V0.7 launch moment did not expose the launch forecast"
+	launch_moment.queue_free()
+
 	ProductManager.process_month()
 	var feedback := ProductManager.get_market_feedback("PROD-CI-FEEDBACK")
 	if feedback.is_empty():
@@ -127,6 +143,22 @@ static func run(host: Node) -> String:
 		lifecycle_panel.queue_free()
 		_restore(snapshot)
 		return "Product lifecycle UI did not expose the market feedback lesson"
+	var lifecycle_pulse: Control = lifecycle_panel.get("product_pulse_panel")
+	if lifecycle_pulse == null:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product lifecycle UI did not create the V0.7 product pulse"
+	var pulse_sales: Label = lifecycle_pulse.get("sales_value")
+	var pulse_demand: Label = lifecycle_pulse.get("demand_value")
+	var pulse_signal: Label = lifecycle_pulse.get("signal_label")
+	if pulse_sales == null or pulse_sales.text.find("10") < 0 or pulse_demand == null or pulse_demand.text.find("100%") < 0:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product pulse did not expose actual sales and saturated capacity"
+	if pulse_signal == null or pulse_signal.text.find("capacité") < 0:
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Product pulse did not turn the first month into a readable market lesson"
 
 	var market_script: Script = load("res://ui/components/MarketOverviewPanel.gd")
 	var market_panel: Control = market_script.new() as Control
@@ -138,6 +170,19 @@ static func run(host: Node) -> String:
 		lifecycle_panel.queue_free()
 		_restore(snapshot)
 		return "Market screen did not compare the launch plan with actual results"
+	var market_pulse: Control = market_panel.get("product_pulse_panel")
+	if market_pulse == null:
+		market_panel.queue_free()
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Market screen did not reuse the V0.7 product pulse"
+	var market_returns: Label = market_pulse.get("returns_value")
+	var market_contribution: Label = market_pulse.get("contribution_value")
+	if market_returns == null or market_contribution == null or market_contribution.text.find("€") < 0:
+		market_panel.queue_free()
+		lifecycle_panel.queue_free()
+		_restore(snapshot)
+		return "Market product pulse is missing returns or contribution"
 
 	var round_trip := ProductManager.get_state().duplicate(true)
 	ProductManager.reset()

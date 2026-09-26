@@ -5,6 +5,7 @@ const UI := preload("res://ui/UiKit.gd")
 
 var market_product_select: OptionButton
 var market_label: Label
+var product_pulse_panel: Control
 var market_competitor_select: OptionButton
 var market_comparison_label: Label
 
@@ -18,6 +19,9 @@ func _build() -> void:
 	market_product_select = OptionButton.new()
 	market_product_select.item_selected.connect(func(_i): refresh())
 	add_child(market_product_select)
+	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")
+	product_pulse_panel = pulse_script.new() as Control
+	add_child(product_pulse_panel)
 	market_label = UI.rich_label()
 	add_child(market_label)
 
@@ -34,8 +38,21 @@ func _build() -> void:
 
 func refresh() -> void:
 	_refresh_product_options()
+	_refresh_product_pulse()
 	_refresh_overview()
 	_refresh_comparison()
+
+func set_viewport_width(width: float) -> void:
+	if product_pulse_panel != null and product_pulse_panel.has_method("set_viewport_width"):
+		product_pulse_panel.call("set_viewport_width", width)
+
+func _refresh_product_pulse() -> void:
+	if product_pulse_panel == null or not product_pulse_panel.has_method("refresh_product"):
+		return
+	if market_product_select.item_count == 0:
+		product_pulse_panel.call("refresh_product", {})
+		return
+	product_pulse_panel.call("refresh_product", ProductManager.get_product(UI.option_meta(market_product_select)))
 
 func _refresh_product_options() -> void:
 	var current := UI.option_meta(market_product_select) if market_product_select.item_count > 0 else ""

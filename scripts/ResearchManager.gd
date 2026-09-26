@@ -641,6 +641,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	# En attendant les bâtiments détaillés, les savoir-faire fabrication/intégration représentent l'équipement disponible.
 	var equipment_score := clampf(25.0 + manufacturing_score * 1.55 + integration_score * 0.85, 20.0, 100.0)
 	var market_learning := CPU_MARKET_LEARNING.summarize(ProductManager.products, market_segment)
+	var sav_lessons := AfterSalesManager.cpu_generation_lessons(3)
 	cpu_generation_context = {
 		"segment":market_segment,
 		"approach":approach,
@@ -665,6 +666,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"research_confidence":research_confidence_score,
 		"field_experience":field_experience_score,
 		"market_learning":market_learning.duplicate(true),
+		"sav_lessons":sav_lessons.duplicate(true),
 		"development_capacity_factor":projected_capacity_factor,
 		"development_team_size":get_development_team_size(),
 		"development_confidence":development_confidence(),

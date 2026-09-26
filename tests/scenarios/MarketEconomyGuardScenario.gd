@@ -34,6 +34,62 @@ static func run() -> String:
 		_restore(snapshot)
 		return "A CPU priced at 5x market reference still keeps implausible demand (%d vs %d normal)" % [premium_units, normal_units]
 
+	# A three-bin CPU family must share one market envelope instead of tripling demand.
+	var essential := product.duplicate(true)
+	essential["id"] = "PROD-CI-ESSENTIAL"
+	essential["sku_tier"] = "ESSENTIAL"
+	essential["price"] = int(round(float(reference) * 0.72))
+	var signature := product.duplicate(true)
+	signature["id"] = "PROD-CI-SIGNATURE"
+	signature["sku_tier"] = "SIGNATURE"
+	var apex := product.duplicate(true)
+	apex["id"] = "PROD-CI-APEX"
+	apex["sku_tier"] = "APEX"
+	apex["price"] = int(round(float(reference) * 1.45))
+	apex["metrics"] = metrics.duplicate(true)
+	apex["metrics"]["performance"] = 78.0
+	var family := [essential, signature, apex]
+	var family_demand := MarketManager.estimate_portfolio_demand(family)
+	var family_units := 0
+	var best_single_units := 0
+	for family_product in family:
+		var family_id := str(family_product.get("id", ""))
+		family_units += int(family_demand.get(family_id, {}).get("units", 0))
+		best_single_units = maxi(best_single_units, int(MarketManager.estimate_consumer_demand(family_product).get("units", 0)))
+	var family_share := float(family_units) / float(maxi(MarketManager.segment_market_units("EMBEDDED"), 1))
+	if family_share > 0.031:
+		_restore(snapshot)
+		return "Unknown three-SKU CPU family escapes entrant market cap (%.2f%%)" % (family_share * 100.0)
+	if family_units > int(round(float(best_single_units) * 1.35)):
+		_restore(snapshot)
+		return "Three CPU bins still multiply demand instead of cannibalizing each other (%d vs best SKU %d)" % [family_units, best_single_units]
+
+	var expensive_family: Array = []
+	for family_product_value in family:
+		var expensive_product: Dictionary = family_product_value.duplicate(true)
+		expensive_product["price"] = int(round(float(expensive_product.get("price", 1)) * 1.60))
+		expensive_family.append(expensive_product)
+	var expensive_demand := MarketManager.estimate_portfolio_demand(expensive_family)
+	var expensive_units := 0
+	for expensive_product_value in expensive_family:
+		expensive_units += int(expensive_demand.get(str(expensive_product_value.get("id", "")), {}).get("units", 0))
+	if expensive_units >= int(round(float(family_units) * 0.82)):
+		_restore(snapshot)
+		return "CPU family price elasticity is too weak (%d expensive vs %d normal)" % [expensive_units, family_units]
+
+	# Forecasts must use the same cannibalized portfolio envelope as real sales.
+	for family_product_value in family:
+		family_product_value["status"] = "LAUNCHED"
+	ProductManager.products = family
+	var forecast_total := 0
+	for family_product_value in family:
+		var forecast := MarketManager.forecast_cpu_launch(family_product_value, int(family_product_value.get("price", 1)))
+		forecast_total += int(forecast.get("expected_units", 0))
+	if absi(forecast_total - family_units) > maxi(4, int(round(float(family_units) * 0.05))):
+		_restore(snapshot)
+		return "CPU family launch forecast diverges from portfolio demand (%d forecast vs %d demand)" % [forecast_total, family_units]
+	ProductManager.products = [product]
+
 	var low_commitment := ProductManager.launch_capacity_commitment_cost(product, 250)
 	var high_commitment := ProductManager.launch_capacity_commitment_cost(product, 1000)
 	if low_commitment <= 0 or high_commitment <= low_commitment:

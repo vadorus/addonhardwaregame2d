@@ -62,10 +62,21 @@ static func run(host: Node) -> String:
 	var heading: Control = dashboard.get("dashboard_heading")
 	var management_grid: GridContainer = dashboard.get("dashboard_grid")
 	var garage: Control = dashboard.get("dashboard_garage")
+	var nora_guide: Control = dashboard.get("dashboard_nora_guide")
+	var priority_card: Control = dashboard.get("dashboard_priority_card")
+	var status_line: Label = game.get("status_label")
 	if heading == null or heading.visible or management_grid == null or management_grid.visible:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: management dashboard still surrounds the opening garage"
+	if nora_guide == null or not nora_guide.visible or priority_card == null or not priority_card.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.7 room-first entry does not expose Nora and the next CEO decision"
+	if status_line == null or not status_line.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.7 room-first entry hides the thin status line"
 	if garage == null or int(garage.call("visible_zone_count")) != 1:
 		game.queue_free()
 		_restore(snapshot)
@@ -124,6 +135,28 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: simulation did not start when the first CPU entered development"
+
+	# V0.7: a normal month-end is a ticker, not a forced modal/pause.
+	TimeManager.time_scale = 2.0
+	game.call("_on_month_closed", {
+		"month":1,
+		"year":1971,
+		"income":0,
+		"expenses":4200,
+		"result":-4200,
+		"money":Economy.money,
+		"income_breakdown":{},
+		"expense_breakdown":{"Tests":4200}
+	})
+	var month_layer: Control = game.get("month_layer")
+	if TimeManager.time_scale != 2.0 or month_layer == null or month_layer.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.7 month-end interrupted the selected speed or reopened the monthly modal"
+	if not status_line.text.begins_with("Bilan "):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.7 month-end did not expose the non-blocking ticker"
 
 	if nav_panel.visible:
 		game.queue_free()

@@ -8,6 +8,10 @@ const FIRST_CPU_JOURNEY_SCENARIO := preload("res://tests/scenarios/FirstCpuJourn
 const FIRST_CPU_RUNWAY_SCENARIO := preload("res://tests/scenarios/FirstCpuRunwayScenario.gd")
 const GARAGE_ECONOMY_MATRIX_SCENARIO := preload("res://tests/scenarios/GarageEconomyMatrixScenario.gd")
 const LAUNCH_FEEDBACK_SCENARIO := preload("res://tests/scenarios/LaunchFeedbackScenario.gd")
+const MEDIA_ECOSYSTEM_SCENARIO := preload("res://tests/scenarios/MediaEcosystemScenario.gd")
+const AFTER_SALES_DOSSIER_SCENARIO := preload("res://tests/scenarios/AfterSalesDossierScenario.gd")
+const PRODUCT_COCKPIT_SCENARIO := preload("res://tests/scenarios/ProductCockpitScenario.gd")
+const LAB_DEPTH_SCENARIO := preload("res://tests/scenarios/LabDepthScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -166,6 +170,22 @@ func _ready() -> void:
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
 		_fail(launch_feedback_error)
+		return
+	var media_ecosystem_error := MEDIA_ECOSYSTEM_SCENARIO.run()
+	if media_ecosystem_error != "":
+		_fail(media_ecosystem_error)
+		return
+	var after_sales_dossier_error := AFTER_SALES_DOSSIER_SCENARIO.run(self)
+	if after_sales_dossier_error != "":
+		_fail(after_sales_dossier_error)
+		return
+	var product_cockpit_error := PRODUCT_COCKPIT_SCENARIO.run(self)
+	if product_cockpit_error != "":
+		_fail(product_cockpit_error)
+		return
+	var lab_depth_error := LAB_DEPTH_SCENARIO.run(self)
+	if lab_depth_error != "":
+		_fail(lab_depth_error)
 		return
 	var next_gen_market_learning_error := NEXT_GENERATION_MARKET_LEARNING_SCENARIO.run()
 	if next_gen_market_learning_error != "":
@@ -985,9 +1005,9 @@ func _ready() -> void:
 		if gross_margin + 0.015 < BalanceManager.gross_margin_target(str(family_model.get("target_segment", "EMBEDDED"))):
 			_fail("Suggested CPU price fell below the market-specific gross margin guard")
 			return
-	var target_family_capacity := maxi(300, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.22))
-	if family_recommended_capacity > target_family_capacity + 6:
-		_fail("CPU launch family capacity exceeded the actual target market sizing")
+	var target_family_capacity := maxi(220, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.028))
+	if absi(family_recommended_capacity - target_family_capacity) > 6:
+		_fail("CPU launch family capacity no longer matches the shared garage-scale market sizing")
 		return
 	for family_market_model in [essential_model, signature_model, apex_model]:
 		if str(family_market_model.get("target_segment", "")) != "EMBEDDED":

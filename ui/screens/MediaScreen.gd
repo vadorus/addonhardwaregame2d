@@ -10,6 +10,8 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_build()
+	UI.configure_touch_scroll(self)
+	UI.prepare_touch_scroll_children(self)
 
 func _build() -> void:
 	var box := UI.content_box()
@@ -29,7 +31,10 @@ func refresh() -> void:
 	var lines: Array[String] = []
 	for news_value in MediaManager.news.slice(0, 20):
 		var news: Dictionary = news_value
-		lines.append("[%02d/%d] %s — %s\n%s" % [
-			int(news.month), int(news.year), str(news.category), str(news.headline), str(news.body)
+		var source := str(news.get("source_name", ""))
+		var channel := MediaManager.channel_label(str(news.get("channel", ""))) if news.has("channel") else str(news.get("category", "Actualite"))
+		var source_line := channel if source.is_empty() else "%s ? %s" % [channel, source]
+		lines.append("[%02d/%d] %s\n%s\n%s" % [
+			int(news.month), int(news.year), source_line, str(news.headline), str(news.body)
 		])
 	media_label.text = "\n\n".join(lines) if not lines.is_empty() else "Aucune actualité."

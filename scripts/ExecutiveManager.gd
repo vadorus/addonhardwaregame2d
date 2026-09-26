@@ -108,7 +108,9 @@ func sync_interface_unlocks() -> Array:
 	var has_market_history := false
 	var has_public_product_feedback := false
 	for news_item in MediaManager.news:
-		if str(news_item.get("category", "")) == "Test produit":
+		var legacy_review := str(news_item.get("category", "")) == "Test produit"
+		var sourced_product_review := not str(news_item.get("product_id", "")).is_empty() and not str(news_item.get("source_name", "")).is_empty()
+		if legacy_review or sourced_product_review:
 			has_public_product_feedback = true
 			break
 	for product in ProductManager.products:
