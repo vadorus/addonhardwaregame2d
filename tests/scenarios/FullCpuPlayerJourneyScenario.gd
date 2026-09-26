@@ -53,18 +53,20 @@ static func run() -> String:
 		_restore(snapshot)
 		return "Full journey: CPU division did not record the completed first generation"
 
-	var launched := _choose_launch_product()
+	var launch_result := _launch_generation_range(first_generation_id)
+	if str(launch_result.get("error", "")) != "":
+		_restore(snapshot)
+		return "Full journey: " + str(launch_result.error)
+	var launched: Dictionary = launch_result.get("signature", {})
 	if launched.is_empty():
 		_restore(snapshot)
-		return "Full journey: no launchable CPU model was created"
-	var launch_price := maxi(int(launched.get("price", 1)), int(launched.get("unit_cost", 1)) + 10)
-	var launch_capacity := maxi(1, int(launched.get("recommended_capacity", launched.get("production_capacity", 100))))
-	if not ProductManager.launch_product(str(launched.get("id", "")), launch_price, launch_capacity):
+		return "Full journey: launched CPU range has no observable model"
+	if int(launch_result.get("count", 0)) < 3:
 		_restore(snapshot)
-		return "Full journey: could not launch a model from the first CPU range"
+		return "Full journey: complete first CPU family was not launched together"
 
 	for _month in range(3):
-		SimulationManager.process_month_end()
+		_advance_calendar_month()
 		if SimulationManager.is_game_over or Economy.money <= 0:
 			_restore(snapshot)
 			return "Full journey: company failed financially during the first three commercial months"
@@ -73,6 +75,54 @@ static func run() -> String:
 	if feedback_history.size() < 3:
 		_restore(snapshot)
 		return "Full journey: three commercial months did not create three market feedback entries"
+	var media_signal := MediaManager.product_media_signal(str(launched.get("id", "")))
+	if int(media_signal.get("mentions", 0)) < 2:
+		_restore(snapshot)
+		return "Full journey: launch did not generate benchmark and specialist media coverage"
+	for item_value in MediaManager.news:
+		var item: Dictionary = item_value
+		if str(item.get("product_id", "")) == str(launched.get("id", "")) and str(item.get("channel", "")) in ["VIDEO_CREATOR", "STREAMER"] and TimeManager.year < 2006:
+			_restore(snapshot)
+			return "Full journey: modern creator coverage appeared before its historical era"
+
+	var sav_case := _first_case_for_generation(first_generation_id)
+	if sav_case.is_empty():
+		# Force a deterministic bad production batch so the end-to-end test exercises the SAV branch.
+		for family_product_value in ProductManager.products:
+			var family_product: Dictionary = family_product_value
+			if str(family_product.get("generation_id", "")) == first_generation_id and str(family_product.get("status", "")) == "LAUNCHED":
+				family_product["defect_rate"] = maxf(float(family_product.get("defect_rate", 0.02)), 0.085)
+				family_product["manufacturing_quality"] = minf(float(family_product.get("manufacturing_quality", 60.0)), 54.0)
+		_advance_calendar_month()
+		sav_case = _first_case_for_generation(first_generation_id)
+	if sav_case.is_empty():
+		_restore(snapshot)
+		return "Full journey: a real field-quality incident did not create a SAV dossier"
+	var affected_value = sav_case.get("affected_product_ids", [])
+	var affected: Array = affected_value if typeof(affected_value) == TYPE_ARRAY else []
+	if affected.size() < 2:
+		_restore(snapshot)
+		return "Full journey: family-wide issue was not grouped into one SAV generation dossier"
+	if not AfterSalesManager.start_investigation(str(sav_case.get("id", ""))):
+		_restore(snapshot)
+		return "Full journey: SAV investigation could not be started"
+	for _sav_month in range(12):
+		if str(sav_case.get("status", "")) == "DIAGNOSED":
+			break
+		_advance_calendar_month()
+		if SimulationManager.is_game_over:
+			_restore(snapshot)
+			return "Full journey: company failed before the SAV diagnosis completed"
+	if str(sav_case.get("status", "")) != "DIAGNOSED":
+		_restore(snapshot)
+		return "Full journey: SAV investigation never reached a diagnosis"
+	if not AfterSalesManager.apply_corrective_action(str(sav_case.get("id", ""))):
+		_restore(snapshot)
+		return "Full journey: diagnosed SAV case could not be corrected"
+	var field_lessons := AfterSalesManager.cpu_generation_lessons(3)
+	if field_lessons.is_empty():
+		_restore(snapshot)
+		return "Full journey: resolved SAV dossier did not become a next-generation lesson"
 
 	var next_plans := ResearchManager.prepare_cpu_generation_proposals(
 		str(launched.get("target_segment", MarketManager.default_segment())),
@@ -92,6 +142,20 @@ static func run() -> String:
 	if not bool(learning.get("has_data", false)):
 		_restore(snapshot)
 		return "Full journey: second-generation plan ignored the real first-generation market feedback"
+	var inherited_lessons_value = next_plan.get("sav_lessons", [])
+	var inherited_lessons: Array = inherited_lessons_value if typeof(inherited_lessons_value) == TYPE_ARRAY else []
+	if inherited_lessons.is_empty():
+		_restore(snapshot)
+		return "Full journey: second-generation meeting forgot the resolved SAV lesson"
+	var lesson_applied := false
+	var lesson_conflicted := false
+	for plan_value in next_plans:
+		var plan: Dictionary = plan_value
+		lesson_applied = lesson_applied or bool(plan.get("sav_lesson_applied", false))
+		lesson_conflicted = lesson_conflicted or bool(plan.get("sav_lesson_conflict", false))
+	if not lesson_applied or not lesson_conflicted:
+		_restore(snapshot)
+		return "Full journey: field lesson does not alter safe/balanced and bold generation choices"
 
 	if not ResearchManager.start_project(
 		"CI Generation 2",
@@ -133,11 +197,18 @@ static func run() -> String:
 	_restore(snapshot)
 	return ""
 
+static func _advance_calendar_month() -> void:
+	var start_month := TimeManager.month
+	var start_year := TimeManager.year
+	var guard := 0
+	while TimeManager.month == start_month and TimeManager.year == start_year and guard < 31:
+		TimeManager._next_day()
+		guard += 1
 static func _advance_project_to_industrialization(project_id: String, max_months: int) -> String:
 	for _month in range(max_months):
 		if not ProductionManager.get_active_jobs().is_empty():
 			return ""
-		SimulationManager.process_month_end()
+		_advance_calendar_month()
 		if SimulationManager.is_game_over or Economy.money <= 0:
 			return "bankruptcy before industrialization"
 		var pending := ResearchManager.get_project_decision(project_id)
@@ -169,7 +240,7 @@ static func _configure_and_finish_industrialization(job: Dictionary, max_months:
 	for _month in range(max_months):
 		if str(job.get("status", "")) == "COMPLETED":
 			return ""
-		SimulationManager.process_month_end()
+		_advance_calendar_month()
 		if SimulationManager.is_game_over or Economy.money <= 0:
 			return "bankruptcy before industrialization completed (start cash %d, job month %d, progress %.1f, base monthly %d, setup %d, cash %d)" % [
 				starting_cash,
@@ -183,17 +254,29 @@ static func _configure_and_finish_industrialization(job: Dictionary, max_months:
 		max_months, starting_cash, float(job.get("progress", 0.0)), int(job.get("monthly_cost", 0))
 	]
 
-static func _choose_launch_product() -> Dictionary:
-	for product_value in ProductManager.products:
-		var product: Dictionary = product_value
-		if str(product.get("status", "")) == "READY" and str(product.get("sku_tier", "")) == "SIGNATURE":
-			return product
-	for product_value in ProductManager.products:
-		var product: Dictionary = product_value
-		if str(product.get("status", "")) == "READY":
-			return product
+static func _first_case_for_generation(generation_id: String) -> Dictionary:
+	for case_value in AfterSalesManager.cases:
+		var case_data: Dictionary = case_value
+		if str(case_data.get("generation_id", "")) == generation_id and str(case_data.get("status", "")) not in ["CLOSED"]:
+			return case_data
 	return {}
-
+static func _launch_generation_range(generation_id: String) -> Dictionary:
+	var count := 0
+	var signature: Dictionary = {}
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("generation_id", "")) != generation_id or str(product.get("status", "")) != "READY":
+			continue
+		var launch_price := maxi(int(product.get("price", 1)), int(product.get("unit_cost", 1)) + 10)
+		var launch_capacity := maxi(1, int(product.get("recommended_capacity", product.get("production_capacity", 100))))
+		if not ProductManager.launch_product(str(product.get("id", "")), launch_price, launch_capacity):
+			return {"error":"could not launch complete CPU family", "count":count, "signature":signature}
+		count += 1
+		if str(product.get("sku_tier", "")) == "SIGNATURE":
+			signature = product
+		elif signature.is_empty():
+			signature = product
+	return {"error":"", "count":count, "signature":signature}
 static func _recommended(plans: Array) -> Dictionary:
 	for plan_value in plans:
 		var plan: Dictionary = plan_value
