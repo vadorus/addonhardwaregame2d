@@ -119,8 +119,8 @@ func _build() -> void:
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(center)
 
-	_panel = LOOK.card(Color("fbfdff"), 20, 20)
-	var panel_style := UI.stylebox(Color("fbfdff"), 20, 2, Color("38b7ff"), 20)
+	_panel = LOOK.card(Color("fffaf1"), 20, 20)
+	var panel_style := UI.stylebox(Color("fffaf1"), 20, 2, Color("e39a45"), 20)
 	panel_style.shadow_color = Color(0.015, 0.05, 0.10, 0.4)
 	panel_style.shadow_size = 12
 	_panel.add_theme_stylebox_override("panel", panel_style)
@@ -135,19 +135,19 @@ func _build() -> void:
 	var header_row := HBoxContainer.new()
 	header_row.add_theme_constant_override("separation", 12)
 	header.add_child(header_row)
-	header_row.add_child(LOOK.badge("chip", Color("159ded"), 48))
+	header_row.add_child(LOOK.badge("chip", Color("d9822b"), 48))
 	var header_copy := VBoxContainer.new()
 	header_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_copy.add_theme_constant_override("separation", 2)
 	header_row.add_child(header_copy)
 	header_copy.add_child(LOOK.label("Atelier CPU", 25, Color.WHITE))
-	_year_label = LOOK.label("", 12, Color("dcefff"))
+	_year_label = LOOK.label("", 12, Color("f6e3c6"))
 	header_copy.add_child(_year_label)
 	_step_label = LOOK.label("1  Objectif     ›     2  Projet", 14, Color.WHITE)
 	header_row.add_child(_step_label)
 	shell.add_child(header)
 
-	_guide_card = LOOK.card(Color("edf6ff"), 12, 10)
+	_guide_card = LOOK.card(Color("faf0e0"), 12, 10)
 	var guide_card := _guide_card
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 10)
@@ -389,7 +389,7 @@ func _build() -> void:
 	advisor_box.add_child(_advisor_label)
 	right_column.add_child(advisor_panel)
 
-	var preview_panel := LOOK.card(Color("edf6ff"), 12, 12)
+	var preview_panel := LOOK.card(Color("faf0e0"), 12, 12)
 	_preview_label = LOOK.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_panel.add_child(_preview_label)

@@ -46,3 +46,12 @@ Aucune rÃ¨gle de gameplay, d'Ã©conomie ou de simulation n'a Ã©tÃ© modifiÃ©e.
 - DÃ©cor diffÃ©rent par palier de locaux : les 4 paliers utilisent toujours la mÃªme image (`garage_stage0..3.webp` existent dans le dÃ©pÃ´t mais ne sont pas branchÃ©es sur le nouveau dÃ©cor).
 - Â« Conception avancÃ©e Â» reste proposÃ©e dÃ¨s le premier geste (choix conservÃ© : le test d'Astra l'exige).
 - Six mois de jeu sans dÃ©cision aprÃ¨s le lancement du premier projet : Nora le dit maintenant, mais il manque de petits Ã©vÃ©nements.
+
+## Passe « chaleur » (même soir)
+
+- Palette froide (blancs bleutés, bleus) remplacée par une palette chaude partout : fonds crème, texte brun, bandeaux bois, accents ambre. Vert d'action, rouges d'alerte et couleurs des repères conservés.
+- Cartes du garage en papier crème légèrement translucide, bordure beige, ombre chaude ; frise d'étapes masquée sur écran bas pour libérer le décor.
+- Nora a son visage (pastille « N ») dans sa carte.
+- Rail de gauche : mêmes noms que la navigation (Entreprise, Équipe, Produits, Marché).
+- Comparaison : `docs/reviews/V081_avant_apres.png`.
+

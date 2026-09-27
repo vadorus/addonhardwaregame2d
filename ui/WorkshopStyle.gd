@@ -2,10 +2,10 @@ extends RefCounted
 ## Native controls matching the illustrated garage; no interaction baked into art.
 const UI := preload("res://ui/UiKit.gd")
 const BADGE := preload("res://ui/GarageBadge.gd")
-const INK := Color("172b49")
-const MUTED := Color("596c84")
-const BLUE := Color("167bc5")
-const LINE := Color("d5e3ef")
+const INK := Color("2e2418")
+const MUTED := Color("7a6a58")
+const BLUE := Color("a85a22")
+const LINE := Color("e5d4ba")
 const GREEN := Color("10a34c")
 
 static func label(text: String, size: int = 14, color: Color = INK) -> Label:
@@ -25,15 +25,15 @@ static func card(color: Color = Color.WHITE, radius: int = 14, padding: int = 14
 	return node
 
 static func button_style(button: Button, primary: bool = false) -> void:
-	var base := GREEN if primary else Color("f1f7fd")
+	var base := GREEN if primary else Color("f8efe2")
 	var ink := Color.WHITE if primary else BLUE
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var fill := base
 		if state == "hover": fill = base.darkened(0.06)
 		if state == "pressed": fill = base.darkened(0.14)
-		if state == "disabled": fill = Color("e9eef4")
+		if state == "disabled": fill = Color("eee5d7")
 		button.add_theme_stylebox_override(state, UI.stylebox(fill, 12, 1, GREEN.darkened(0.15) if primary else LINE, 12))
-	button.add_theme_stylebox_override("focus", UI.stylebox(Color(0, 0, 0, 0), 12, 3, Color("38b7ff"), 12))
+	button.add_theme_stylebox_override("focus", UI.stylebox(Color(0, 0, 0, 0), 12, 3, Color("e39a45"), 12))
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		button.add_theme_color_override(state, ink)
 	button.add_theme_color_override("font_disabled_color", MUTED)
@@ -49,9 +49,9 @@ static func badge(kind: String, tint: Color, size: float = 48.0) -> Control:
 	return node
 
 static func input_style(input: LineEdit) -> void:
-	input.add_theme_stylebox_override("normal", UI.stylebox(Color("f6f9fd"), 10, 1, LINE, 12))
+	input.add_theme_stylebox_override("normal", UI.stylebox(Color("fbf4e8"), 10, 1, LINE, 12))
 	input.add_theme_stylebox_override("focus", UI.stylebox(Color.WHITE, 10, 2, BLUE, 12))
 	input.add_theme_color_override("font_color", INK)
 	input.add_theme_color_override("caret_color", BLUE)
 	input.add_theme_color_override("font_placeholder_color", MUTED)
-	input.add_theme_color_override("selection_color", Color("b9def7"))
+	input.add_theme_color_override("selection_color", Color("f3d7ae"))

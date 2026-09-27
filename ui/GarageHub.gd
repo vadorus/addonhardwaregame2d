@@ -5,9 +5,9 @@ signal zone_requested(tab_index: int, zone_name: String)
 const ROOM_ART_PATH := "res://assets/ui/garage_reference_v09.png"
 const BADGE := preload("res://ui/GarageBadge.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
-const INK := Color("20334f")
-const MUTED := Color("62728a")
-const BLUE := Color("159ef1")
+const INK := Color("2e2418")
+const MUTED := Color("7a6a58")
+const BLUE := Color("d9822b")
 const WORKPLACE_ART := {
 	0:ROOM_ART_PATH,
 	1:ROOM_ART_PATH,
@@ -17,8 +17,9 @@ const WORKPLACE_ART := {
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
 const SIDE_ACTIONS := [
-	{"label":"Améliorations","tab":1,"feature":"COMPANY","icon":"screen"},
-	{"label":"Recrutement","tab":2,"feature":"TEAM","icon":"people"},
+	# Mêmes noms que la barre de navigation : un seul vocabulaire pour les mêmes écrans.
+	{"label":"Entreprise","tab":1,"feature":"COMPANY","icon":"screen"},
+	{"label":"Équipe","tab":2,"feature":"TEAM","icon":"people"},
 	{"label":"Produits","tab":4,"feature":"PRODUCTS","icon":"box"},
 	{"label":"Marché","tab":5,"feature":"MARKET","icon":"chart"}
 ]
@@ -28,7 +29,7 @@ const ZONES := [
 	{"name":"Établi CPU","subtitle":"Conception processeur","tab":3,"feature":"LAB","icon":"chip","color":Color("17ba70"),"rect":Rect2(0.24,0.28,0.06,0.10)},
 	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","icon":"flask","color":Color("af51de"),"rect":Rect2(0.60,0.54,0.06,0.10)},
 	{"name":"Tableau de planification","subtitle":"R&D, pistes et équipe","tab":3,"feature":"LAB","icon":"chart","color":Color("e4a225"),"rect":Rect2(0.61,0.33,0.06,0.10)},
-	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","icon":"screen","color":Color("159ef1"),"rect":Rect2(0.39,0.51,0.06,0.10)},
+	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","icon":"screen","color":Color("3a8fd6"),"rect":Rect2(0.39,0.51,0.06,0.10)},
 	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","icon":"box","color":Color("ed9440"),"rect":Rect2(0.84,0.60,0.06,0.10)}
 ]
 
@@ -76,6 +77,7 @@ const CATEGORY_ZONE := {
 ## Source des décisions PDG ; remplaçable par les tests.
 var decision_source: Callable = Callable()
 var _focus: Dictionary = {}
+var _phase_row: HBoxContainer
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(0, 560)
@@ -121,7 +123,7 @@ func _build_background() -> void:
 
 func _build_overlay() -> void:
 	_room_badge = PanelContainer.new()
-	_room_badge.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.05, 0.08, 0.82), Color(0.18, 0.42, 0.52, 0.75), 12, 10))
+	_room_badge.add_theme_stylebox_override("panel", _panel_style(Color(0.17, 0.11, 0.07, 0.80), Color(0.72, 0.52, 0.30, 0.75), 12, 10))
 	_room_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_room_badge)
 
@@ -131,12 +133,12 @@ func _build_overlay() -> void:
 	_room_title = Label.new()
 	_room_title.text = "Garage aménagé"
 	_room_title.add_theme_font_size_override("font_size", 16)
-	_room_title.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+	_room_title.add_theme_color_override("font_color", Color(1.0, 0.96, 0.89))
 	room_box.add_child(_room_title)
 	_room_subtitle = Label.new()
 	_room_subtitle.text = "Touchez un élément du décor"
-	_room_subtitle.add_theme_font_size_override("font_size", 11)
-	_room_subtitle.add_theme_color_override("font_color", Color(0.63, 0.73, 0.82))
+	_room_subtitle.add_theme_font_size_override("font_size", 12)
+	_room_subtitle.add_theme_color_override("font_color", Color(0.90, 0.80, 0.66))
 	room_box.add_child(_room_subtitle)
 
 	_build_gameplay_overlays()
@@ -183,7 +185,7 @@ func _build_overlay() -> void:
 	_context_panel = PanelContainer.new()
 	_context_panel.visible = false
 	_context_panel.z_index = 20
-	_context_panel.add_theme_stylebox_override("panel", _panel_style(Color("fbfdff"), BLUE, 14, 14))
+	_context_panel.add_theme_stylebox_override("panel", _panel_style(Color("fffaf1"), BLUE, 14, 14))
 	add_child(_context_panel)
 
 	var context_box := VBoxContainer.new()
@@ -192,7 +194,7 @@ func _build_overlay() -> void:
 	_context_title = Label.new()
 	_context_title.add_theme_font_size_override("font_size", 19)
 	_context_title.add_theme_color_override("font_color", Color.WHITE)
-	_context_title.add_theme_stylebox_override("normal", _panel_style(Color("2166a3"), BLUE, 8, 8))
+	_context_title.add_theme_stylebox_override("normal", _panel_style(Color("7a4a2a"), BLUE, 8, 8))
 	context_box.add_child(_context_title)
 	_context_subtitle = Label.new()
 	_context_subtitle.add_theme_font_size_override("font_size", 12)
@@ -242,6 +244,7 @@ func _build_gameplay_overlays() -> void:
 	var phases := HBoxContainer.new()
 	phases.add_theme_constant_override("separation", 4)
 	project_box.add_child(phases)
+	_phase_row = phases
 	for phase in [["Concept", "chip"], ["Prototype", "screen"], ["Tests", "flask"], ["Lancement", "box"]]:
 		var cell := VBoxContainer.new()
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -264,7 +267,7 @@ func _build_gameplay_overlays() -> void:
 	_project_progress.custom_minimum_size.y = 18
 	_project_progress.add_theme_color_override("font_color", INK)
 	_project_progress.add_theme_color_override("font_outline_color", Color.TRANSPARENT)
-	_project_progress.add_theme_stylebox_override("background", _panel_style(Color("e5edf5"), Color("c9d6e5"), 9, 0))
+	_project_progress.add_theme_stylebox_override("background", _panel_style(Color("efe3d0"), Color("dcc8a8"), 9, 0))
 	_project_progress.add_theme_stylebox_override("fill", _panel_style(BLUE, BLUE, 9, 0))
 	project_box.add_child(_project_progress)
 	_primary_action = Button.new()
@@ -285,7 +288,22 @@ func _build_gameplay_overlays() -> void:
 	var tasks_box := VBoxContainer.new()
 	_tasks_panel.add_child(tasks_box)
 	# V0.8.1 : Nora remplace la liste de tâches figée — une seule prochaine étape, toujours vraie.
-	_card_heading(tasks_box, "Nora • prochaine étape")
+	var nora_heading := _card_heading(tasks_box, "Nora • prochaine étape")
+	var nora_bar := nora_heading.get_parent()
+	nora_bar.remove_child(nora_heading)
+	var nora_row := HBoxContainer.new()
+	nora_row.add_theme_constant_override("separation", 8)
+	nora_bar.add_child(nora_row)
+	var avatar := Label.new()
+	avatar.text = "N"
+	avatar.custom_minimum_size = Vector2(26, 26)
+	avatar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	avatar.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	avatar.add_theme_font_size_override("font_size", 15)
+	avatar.add_theme_color_override("font_color", Color("5a3218"))
+	avatar.add_theme_stylebox_override("normal", _panel_style(Color("f6d7a8"), Color("fff3dd"), 13, 0))
+	nora_row.add_child(avatar)
+	nora_row.add_child(nora_heading)
 	_tasks_label = Label.new()
 	_tasks_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tasks_label.add_theme_font_size_override("font_size", 14)
@@ -311,16 +329,17 @@ func _build_gameplay_overlays() -> void:
 	_refresh_gameplay_overlays()
 
 func _paper_style() -> StyleBoxFlat:
-	var style := _panel_style(Color("f9fcff"), Color("39b4f5"), 16, 12)
+	# Papier crème légèrement translucide : le décor chaleureux reste perceptible sous les cartes.
+	var style := _panel_style(Color(1.0, 0.98, 0.945, 0.93), Color("d8b88a"), 16, 11)
 	style.set_border_width_all(2)
-	style.shadow_color = Color(0.03, 0.08, 0.16, 0.28)
+	style.shadow_color = Color(0.22, 0.12, 0.04, 0.30)
 	style.shadow_size = 6
 	style.shadow_offset = Vector2(0, 3)
 	return style
 
 func _card_heading(parent: VBoxContainer, text: String) -> Label:
 	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", _panel_style(Color("22659d"), Color("22659d"), 7, 7))
+	bar.add_theme_stylebox_override("panel", _panel_style(Color("7a4a2a"), Color("7a4a2a"), 7, 7))
 	parent.add_child(bar)
 	var label := Label.new()
 	label.text = text
@@ -333,7 +352,7 @@ func _refresh_phase_strip(stage: int) -> void:
 	for index in range(_phase_badges.size()):
 		var active := index == stage
 		var done := index < stage
-		_phase_badges[index].set("tint", Color("17ba70") if done else (BLUE if active else Color("b7c3d2")))
+		_phase_badges[index].set("tint", Color("17ba70") if done else (BLUE if active else Color("cdbfa9")))
 		_phase_badges[index].queue_redraw()
 		_phase_labels[index].add_theme_color_override("font_color", INK if active else MUTED)
 
@@ -343,8 +362,8 @@ func _build_side_actions() -> void:
 		button.set_meta("label", str(data.get("label", "Ouvrir")))
 		button.custom_minimum_size = Vector2(92, 40)
 		button.add_theme_font_size_override("font_size", 12)
-		button.add_theme_stylebox_override("normal", _panel_style(Color("1f3755"), Color("6a98c5"), 12, 8))
-		button.add_theme_stylebox_override("disabled", _panel_style(Color("26364b"), Color("5b708c"), 12, 8))
+		button.add_theme_stylebox_override("normal", _panel_style(Color("4a3424"), Color("a07a52"), 12, 8))
+		button.add_theme_stylebox_override("disabled", _panel_style(Color("3e3024"), Color("7d6750"), 12, 8))
 		button.focus_mode = Control.FOCUS_NONE
 		button.z_index = 15
 		button.set_meta("tab", int(data.get("tab", 0)))
@@ -391,7 +410,7 @@ func _refresh_side_actions() -> void:
 			amber.set_border_width_all(3)
 			button.add_theme_stylebox_override("normal", amber)
 		else:
-			button.add_theme_stylebox_override("normal", _panel_style(Color("1f3755"), Color("6a98c5"), 12, 8))
+			button.add_theme_stylebox_override("normal", _panel_style(Color("4a3424"), Color("a07a52"), 12, 8))
 		button.modulate = Color(0.70, 0.77, 0.87, 1) if button.disabled else Color.WHITE
 		button.tooltip_text = "%s — disponible avec la progression de l'entreprise" % str(button.get_meta("label", "")) if button.disabled else str(button.get_meta("label", ""))
 
@@ -460,6 +479,11 @@ func _layout_zones() -> void:
 		_room_badge.position = Vector2(14.0, 14.0)
 		_room_badge.size = Vector2(clampf(size.x * 0.22, 220.0, 290.0), 50.0)
 	if _project_panel != null:
+		# Écran bas (téléphone, petite fenêtre) : on retire la frise d'étapes pour libérer le décor.
+		if _phase_row != null:
+			var want_phases := size.y >= 560.0
+			if _phase_row.visible != want_phases:
+				_phase_row.visible = want_phases
 		var project_w := clampf(size.x * 0.29, 300.0, 370.0)
 		_project_panel.size = Vector2(project_w, 0.0)
 		_project_panel.position = Vector2(size.x - project_w - 14.0, 14.0)

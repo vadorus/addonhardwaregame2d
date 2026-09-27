@@ -233,7 +233,7 @@ func _build_ui():
 	add_child(root_box)
 	game_root = root_box
 
-	var header := _card(Color("1d304a"), 12, 8)
+	var header := _card(Color("3b2b1e"), 12, 8)
 	header.custom_minimum_size.y = 68
 	root_box.add_child(header)
 	var top := HBoxContainer.new()
@@ -251,12 +251,12 @@ func _build_ui():
 	tech_word.add_theme_color_override("font_color", Color.WHITE)
 	wordmark.add_child(tech_word)
 	var empire := _label("EMPIRE", 26)
-	empire.add_theme_color_override("font_color", Color("32b8f4"))
+	empire.add_theme_color_override("font_color", Color("f2a541"))
 	wordmark.add_child(empire)
 	header_brand_box = brand_box
 	header_wordmark = [tech_word, empire]
 	company_label = _label("Tech Empire", 11)
-	company_label.add_theme_color_override("font_color", Color("b2c7df"))
+	company_label.add_theme_color_override("font_color", Color("dcc7a6"))
 	company_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	brand_box.add_child(company_label)
 
@@ -264,33 +264,33 @@ func _build_ui():
 	spacer.custom_minimum_size.x = 8
 	top.add_child(spacer)
 
-	var money_chip := _card(Color("14243a"), 10, 9)
+	var money_chip := _card(Color("2b1f15"), 10, 9)
 	money_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var cash_box := VBoxContainer.new()
 	cash_box.add_theme_constant_override("separation", 1)
 	money_chip.add_child(cash_box)
 	var cash_caption := _muted_label("TRÉSORERIE", 10)
-	cash_caption.add_theme_color_override("font_color", Color("b2c7df"))
+	cash_caption.add_theme_color_override("font_color", Color("dcc7a6"))
 	cash_box.add_child(cash_caption)
 	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 17)
 	money_label.add_theme_color_override("font_color", Color("5ce0a4"))
 	cash_box.add_child(money_label)
 	top.add_child(money_chip)
 
-	var date_chip := _card(Color("14243a"), 10, 9)
+	var date_chip := _card(Color("2b1f15"), 10, 9)
 	date_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var calendar_box := VBoxContainer.new()
 	calendar_box.add_theme_constant_override("separation", 1)
 	date_chip.add_child(calendar_box)
 	var calendar_caption := _muted_label("CALENDRIER", 10)
-	calendar_caption.add_theme_color_override("font_color", Color("b2c7df"))
+	calendar_caption.add_theme_color_override("font_color", Color("dcc7a6"))
 	calendar_box.add_child(calendar_caption)
 	date_label = _label("Mois 1 • 1971", 15)
 	date_label.add_theme_color_override("font_color", Color.WHITE)
 	calendar_box.add_child(date_label)
 	top.add_child(date_chip)
 
-	var rep_chip := _card(Color("14243a"), 10, 9)
+	var rep_chip := _card(Color("2b1f15"), 10, 9)
 	rep_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reputation_label = _label("Réputation 0", 14)
 	reputation_label.add_theme_color_override("font_color", Color("ffbd5a"))
@@ -303,7 +303,7 @@ func _build_ui():
 		speed_button.custom_minimum_size = Vector2(44, 46)
 		var speed := float(data[1])
 		speed_button.toggle_mode = true
-		speed_button.add_theme_stylebox_override("pressed", UI.stylebox(Color("159ef1"), 10, 1, Color("57ccff"), 8))
+		speed_button.add_theme_stylebox_override("pressed", UI.stylebox(Color("d9822b"), 10, 1, Color("f0b060"), 8))
 		speed_button.set_meta("speed", speed)
 		speed_buttons.append(speed_button)
 		speed_button.pressed.connect(_request_time_scale.bind(speed))
@@ -1488,7 +1488,7 @@ func _create_app_theme() -> Theme:
 	app_theme.set_color("font_color", "LineEdit", APP_TEXT)
 	app_theme.set_color("font_placeholder_color", "LineEdit", APP_MUTED)
 	app_theme.set_color("caret_color", "LineEdit", APP_CYAN)
-	app_theme.set_color("selection_color", "LineEdit", Color("b9def7"))
+	app_theme.set_color("selection_color", "LineEdit", Color("f3d7ae"))
 	app_theme.set_stylebox("normal", "OptionButton", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
 	app_theme.set_stylebox("hover", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
 	app_theme.set_stylebox("pressed", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
