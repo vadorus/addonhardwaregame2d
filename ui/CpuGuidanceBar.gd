@@ -38,7 +38,7 @@ func _draw() -> void:
 	draw_rect(Rect2(recommended_x0, y, maxf(recommended_x1 - recommended_x0, 1.0), track_height), Color(0.22, 0.67, 0.43, 0.78), true)
 
 	var marker_x := _value_to_x(current_value)
-	draw_line(Vector2(marker_x, 0.0), Vector2(marker_x, size.y), Color(0.94, 0.97, 1.0, 1.0), 2.0)
+	draw_line(Vector2(marker_x, 0.0), Vector2(marker_x, size.y), Color("172b49"), 2.0)
 
 func _value_to_x(value: float) -> float:
 	var ratio := inverse_lerp(min_value, max_value, clampf(value, min_value, max_value))

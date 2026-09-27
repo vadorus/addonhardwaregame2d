@@ -2,6 +2,7 @@ extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const UI := preload("res://ui/UiKit.gd")
+const LOOK := preload("res://ui/WorkshopStyle.gd")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
 
 const APP_BG := UI.APP_BG
@@ -120,6 +121,7 @@ var cpu_metric_bars: Dictionary = {}
 var cpu_metric_labels: Dictionary = {}
 
 var nav_buttons: Array[Button] = []
+var speed_buttons: Array[Button] = []
 var _refresh_all_pending := false
 
 func _ready():
@@ -134,6 +136,8 @@ func _ready():
 	call_deferred("_update_responsive_layout")
 
 func _process(_delta):
+	for button in speed_buttons:
+		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
 	if CompanyManager.created:
 		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
 		money_label.text = "%s €" % _money(Economy.money)
@@ -191,52 +195,77 @@ func _build_ui():
 	root_box.add_theme_constant_override("separation", 4)
 	add_child(root_box)
 
-	var header := _card(Color(0.025, 0.055, 0.09, 0.96), 12, 7)
-	header.custom_minimum_size.y = 54
+	var header := _card(Color("1d304a"), 12, 8)
+	header.custom_minimum_size.y = 68
 	root_box.add_child(header)
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	header.add_child(top)
 
-	var brand_box := HBoxContainer.new()
-	brand_box.custom_minimum_size.x = 210
-	brand_box.add_theme_constant_override("separation", 6)
+	var brand_box := VBoxContainer.new()
+	brand_box.custom_minimum_size.x = 235
+	brand_box.add_theme_constant_override("separation", 0)
 	top.add_child(brand_box)
-	var mark := Label.new()
-	mark.text = "TE"
-	mark.add_theme_font_size_override("font_size", 20)
-	mark.add_theme_color_override("font_color", APP_CYAN)
-	brand_box.add_child(mark)
-	company_label = _label("Tech Empire", 18)
+	var wordmark := HBoxContainer.new()
+	wordmark.add_theme_constant_override("separation", 5)
+	brand_box.add_child(wordmark)
+	var tech_word := _label("TECH", 26)
+	tech_word.add_theme_color_override("font_color", Color.WHITE)
+	wordmark.add_child(tech_word)
+	var empire := _label("EMPIRE", 26)
+	empire.add_theme_color_override("font_color", Color("32b8f4"))
+	wordmark.add_child(empire)
+	company_label = _label("Tech Empire", 11)
+	company_label.add_theme_color_override("font_color", Color("b2c7df"))
 	company_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	brand_box.add_child(company_label)
 
 	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.custom_minimum_size.x = 8
 	top.add_child(spacer)
 
-	var money_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
-	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 15)
-	money_label.add_theme_color_override("font_color", APP_GREEN)
-	money_chip.add_child(money_label)
+	var money_chip := _card(Color("14243a"), 10, 9)
+	money_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var cash_box := VBoxContainer.new()
+	cash_box.add_theme_constant_override("separation", 1)
+	money_chip.add_child(cash_box)
+	var cash_caption := _muted_label("TRÉSORERIE", 10)
+	cash_caption.add_theme_color_override("font_color", Color("b2c7df"))
+	cash_box.add_child(cash_caption)
+	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 17)
+	money_label.add_theme_color_override("font_color", Color("5ce0a4"))
+	cash_box.add_child(money_label)
 	top.add_child(money_chip)
 
-	var date_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
-	date_label = _label("Mois 1 • 1971", 14)
-	date_chip.add_child(date_label)
+	var date_chip := _card(Color("14243a"), 10, 9)
+	date_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var calendar_box := VBoxContainer.new()
+	calendar_box.add_theme_constant_override("separation", 1)
+	date_chip.add_child(calendar_box)
+	var calendar_caption := _muted_label("CALENDRIER", 10)
+	calendar_caption.add_theme_color_override("font_color", Color("b2c7df"))
+	calendar_box.add_child(calendar_caption)
+	date_label = _label("Mois 1 • 1971", 15)
+	date_label.add_theme_color_override("font_color", Color.WHITE)
+	calendar_box.add_child(date_label)
 	top.add_child(date_chip)
 
-	var rep_chip := _card(Color(0.035, 0.075, 0.105, 0.94), 9, 7)
+	var rep_chip := _card(Color("14243a"), 10, 9)
+	rep_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reputation_label = _label("Réputation 0", 14)
-	reputation_label.add_theme_color_override("font_color", APP_AMBER)
+	reputation_label.add_theme_color_override("font_color", Color("ffbd5a"))
 	rep_chip.add_child(reputation_label)
 	top.add_child(rep_chip)
 
 	for data in [["Ⅱ",0.0],["▶",1.0],["▶▶",2.0],["▶▶▶",3.0]]:
 		var speed_button := Button.new()
 		speed_button.text = str(data[0])
-		speed_button.custom_minimum_size = Vector2(42, 38)
+		speed_button.custom_minimum_size = Vector2(44, 46)
 		var speed := float(data[1])
+		speed_button.toggle_mode = true
+		speed_button.add_theme_stylebox_override("pressed", UI.stylebox(Color("159ef1"), 10, 1, Color("57ccff"), 8))
+		speed_button.set_meta("speed", speed)
+		speed_buttons.append(speed_button)
 		speed_button.pressed.connect(_request_time_scale.bind(speed))
 		top.add_child(speed_button)
 
@@ -281,11 +310,17 @@ func _build_ui():
 	_create_media_tab()
 	_update_nav_state()
 	_build_setup_layer()
+	# Hide the gameplay subtree while onboarding is open, including raised garage HUD panels.
+	setup_layer.visibility_changed.connect(func(): root_box.visible = not setup_layer.visible)
+	root_box.visible = not setup_layer.visible
 	_build_month_layer()
 	_build_game_over_layer()
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
 	_build_launch_moment_layer()
+	# Modal screens must draw above the raised room markers and HUD.
+	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, launch_layer]:
+		overlay.z_index = 100
 
 func _create_dashboard_tab():
 	var dashboard_script: Script = load("res://ui/screens/DashboardScreen.gd")
@@ -994,6 +1029,7 @@ func _build_setup_layer():
 
 	var new_game := Button.new()
 	new_game.text = "Nouvelle entreprise"
+	LOOK.button_style(new_game, true)
 	new_game.custom_minimum_size.y = 54
 	new_game.pressed.connect(_show_creation_screen)
 	setup_title_box.add_child(new_game)
@@ -1049,6 +1085,7 @@ func _build_setup_layer():
 
 	var start := Button.new()
 	start.text = "Entrer dans le garage"
+	LOOK.button_style(start, true)
 	start.custom_minimum_size.y = 52
 	start.pressed.connect(_start_new_game)
 	setup_creation_box.add_child(start)
@@ -1338,10 +1375,7 @@ func _eyebrow(text: String) -> Label:
 	return label
 
 func _section(text: String) -> Label:
-	var label := _label(text, 19)
-	label.custom_minimum_size.y = 34
-	label.add_theme_color_override("font_color", APP_CYAN)
-	return label
+	return UI.section(text)
 
 func _rich_label() -> Label:
 	var label := _label("", 14)
@@ -1394,17 +1428,33 @@ func _create_app_theme() -> Theme:
 	app_theme.set_stylebox("normal", "Button", _stylebox(APP_PANEL_ALT, 9, 1, APP_LINE, 10))
 	app_theme.set_stylebox("hover", "Button", _stylebox(APP_CYAN_DARK, 9, 1, APP_CYAN, 10))
 	app_theme.set_stylebox("pressed", "Button", _stylebox(APP_CYAN, 9, 1, APP_CYAN, 10))
-	app_theme.set_stylebox("focus", "Button", _stylebox(APP_CYAN_DARK, 9, 1, APP_CYAN, 10))
+	app_theme.set_stylebox("focus", "Button", _stylebox(Color(0, 0, 0, 0), 9, 2, APP_CYAN, 10))
 	app_theme.set_stylebox("disabled", "Button", _stylebox(APP_SHELL, 9, 1, APP_LINE, 10))
 	app_theme.set_stylebox("panel", "PanelContainer", _stylebox(APP_PANEL, 12, 1, APP_LINE, 12))
 	app_theme.set_stylebox("normal", "LineEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
 	app_theme.set_stylebox("focus", "LineEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_CYAN, 9))
 	app_theme.set_color("font_color", "LineEdit", APP_TEXT)
 	app_theme.set_color("font_placeholder_color", "LineEdit", APP_MUTED)
+	app_theme.set_color("caret_color", "LineEdit", APP_CYAN)
+	app_theme.set_color("selection_color", "LineEdit", Color("b9def7"))
 	app_theme.set_stylebox("normal", "OptionButton", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
 	app_theme.set_stylebox("hover", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
 	app_theme.set_stylebox("pressed", "OptionButton", _stylebox(APP_CYAN_DARK, 8, 1, APP_CYAN, 9))
 	app_theme.set_color("font_color", "OptionButton", APP_TEXT)
+	app_theme.set_color("font_hover_color", "OptionButton", APP_TEXT)
+	app_theme.set_color("font_pressed_color", "OptionButton", APP_TEXT)
+	app_theme.set_color("font_disabled_color", "OptionButton", APP_MUTED)
+	app_theme.set_stylebox("focus", "OptionButton", _stylebox(Color(0, 0, 0, 0), 8, 2, APP_CYAN, 9))
+	app_theme.set_stylebox("disabled", "OptionButton", _stylebox(APP_BG, 8, 1, APP_LINE, 9))
+	app_theme.set_stylebox("panel", "PopupMenu", _stylebox(APP_SHELL, 10, 1, APP_LINE, 10))
+	app_theme.set_stylebox("hover", "PopupMenu", _stylebox(APP_CYAN_DARK, 6, 0, APP_LINE, 6))
+	app_theme.set_color("font_color", "PopupMenu", APP_TEXT)
+	app_theme.set_color("font_hover_color", "PopupMenu", APP_CYAN)
+	app_theme.set_color("font_disabled_color", "PopupMenu", APP_MUTED)
+	app_theme.set_stylebox("panel", "PopupPanel", _stylebox(APP_SHELL, 10, 1, APP_LINE, 10))
+	app_theme.set_stylebox("normal", "TextEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
+	app_theme.set_color("font_color", "TextEdit", APP_TEXT)
+	app_theme.set_color("default_color", "RichTextLabel", APP_TEXT)
 	app_theme.set_stylebox("background", "ProgressBar", _stylebox(APP_PANEL_ALT, 99, 0, APP_PANEL_ALT, 0))
 	app_theme.set_stylebox("fill", "ProgressBar", _stylebox(APP_CYAN, 99, 0, APP_CYAN, 0))
 	app_theme.set_color("font_color", "ProgressBar", APP_TEXT)
@@ -1698,7 +1748,7 @@ func _start_new_game():
 	game_over_layer.visible = false
 	if tabs != null:
 		tabs.current_tab = 0
-	status_label.text = "Nora est votre bras droit : son panneau de guide reste visible au QG et vous indique la prochaine décision utile."
+	status_label.text = "Nora : touchez l'établi ou « Nouveau projet CPU » pour commencer."
 	_refresh_all()
 
 func _load_game():
@@ -1817,11 +1867,11 @@ func _refresh_top():
 	if CompanyManager.created:
 		runway = float(ExecutiveManager.financial_advice().get("runway_months", runway))
 	money_label.text = "%s € • %.0f mois" % [_money(Economy.money), runway]
-	var cash_color := APP_GREEN
+	var cash_color := Color("5ce0a4")
 	if Economy.money <= 0 or runway < 3.0:
-		cash_color = APP_RED
+		cash_color = Color("ff7b7b")
 	elif runway < 12.0:
-		cash_color = APP_AMBER
+		cash_color = Color("ffbd5a")
 	money_label.add_theme_color_override("font_color", cash_color)
 
 func _request_refresh_all():

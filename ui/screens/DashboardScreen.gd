@@ -53,6 +53,15 @@ func _ready() -> void:
 	UI.configure_touch_scroll(self)
 	UI.prepare_touch_scroll_children(self)
 	refresh()
+	resized.connect(_fit_room_to_screen)
+	call_deferred("_fit_room_to_screen")
+
+func _fit_room_to_screen() -> void:
+	if dashboard_garage == null or not CompanyManager.created or size.y <= 0.0:
+		return
+	# Keep the HUD inside the available screen, including on wide landscape phones.
+	dashboard_garage.custom_minimum_size.y = maxf(360.0, size.y)
+	scroll_vertical = 0
 
 func _build() -> void:
 	var box := UI.content_box()
@@ -431,8 +440,10 @@ func set_viewport_width(width: float) -> void:
 			dashboard_garage.call("set_viewport_width", width)
 		else:
 			dashboard_garage.custom_minimum_size.y = 300.0 if compact else 360.0
+	call_deferred("_fit_room_to_screen")
 
 func refresh() -> void:
+	call_deferred("_fit_room_to_screen")
 	if dashboard_label == null:
 		return
 	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()

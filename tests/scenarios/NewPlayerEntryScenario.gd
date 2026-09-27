@@ -16,6 +16,11 @@ static func run(host: Node) -> String:
 	var setup_layer: Control = game.get("setup_layer")
 	var title_box: VBoxContainer = game.get("setup_title_box")
 	var creation_box: VBoxContainer = game.get("setup_creation_box")
+	var opening_dashboard: Control = game.get("dashboard_screen")
+	if opening_dashboard == null or opening_dashboard.is_visible_in_tree():
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.8 entry: gameplay panels are visible behind the title screen"
 	if setup_layer == null or not setup_layer.visible:
 		game.queue_free()
 		_restore(snapshot)
@@ -26,6 +31,10 @@ static func run(host: Node) -> String:
 		return "V0.5 entry: title screen did not start in the simple title state"
 
 	game.call("_show_creation_screen")
+	if opening_dashboard.is_visible_in_tree():
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.8 entry: gameplay panels are visible behind company creation"
 	if title_box.visible or not creation_box.visible:
 		game.queue_free()
 		_restore(snapshot)
@@ -38,6 +47,10 @@ static func run(host: Node) -> String:
 		return "V0.5 entry: company name field is missing"
 	setup_name.text = "CI Garage Start"
 	game.call("_start_new_game")
+	if not opening_dashboard.is_visible_in_tree():
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.8 entry: entering the garage leaves gameplay hidden"
 
 	if not CompanyManager.created or setup_layer.visible:
 		game.queue_free()

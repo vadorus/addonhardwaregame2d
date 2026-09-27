@@ -1,18 +1,20 @@
 extends RefCounted
 
-const APP_BG := Color(0.027, 0.043, 0.071, 1.0)
-const APP_SHELL := Color(0.047, 0.071, 0.114, 1.0)
-const APP_PANEL := Color(0.071, 0.106, 0.161, 1.0)
-const APP_PANEL_ALT := Color(0.094, 0.141, 0.212, 1.0)
-const APP_TEXT := Color(0.933, 0.965, 1.0, 1.0)
-const APP_MUTED := Color(0.565, 0.635, 0.718, 1.0)
-const APP_LINE := Color(0.149, 0.212, 0.290, 1.0)
-const APP_CYAN := Color(0.306, 0.843, 0.910, 1.0)
-const APP_CYAN_DARK := Color(0.071, 0.200, 0.239, 1.0)
-const APP_AMBER := Color(1.000, 0.741, 0.353, 1.0)
-const APP_AMBER_DARK := Color(0.224, 0.165, 0.086, 1.0)
-const APP_GREEN := Color(0.361, 0.878, 0.643, 1.0)
-const APP_RED := Color(1.000, 0.482, 0.482, 1.0)
+# Shared light surfaces for every management screen, including dynamic content.
+# Semantic colors remain distinct and readable on white.
+const APP_BG := Color("eaf1f8")
+const APP_SHELL := Color("fbfdff")
+const APP_PANEL := Color("ffffff")
+const APP_PANEL_ALT := Color("f1f7fd")
+const APP_TEXT := Color("172b49")
+const APP_MUTED := Color("596c84")
+const APP_LINE := Color("d5e3ef")
+const APP_CYAN := Color("167bc5")
+const APP_CYAN_DARK := Color("e6f3ff")
+const APP_AMBER := Color("93600c")
+const APP_AMBER_DARK := Color("fff7e9")
+const APP_GREEN := Color("087c3b")
+const APP_RED := Color("b72732")
 
 static func label(text: String, size: int = 14) -> Label:
 	var node := Label.new()
@@ -35,7 +37,9 @@ static func eyebrow(text: String) -> Label:
 static func section(text: String) -> Label:
 	var node := label(text, 19)
 	node.custom_minimum_size.y = 34
-	node.add_theme_color_override("font_color", APP_CYAN)
+	node.add_theme_color_override("font_color", Color.WHITE)
+	node.add_theme_stylebox_override("normal", stylebox(APP_CYAN, 9, 0, APP_CYAN, 9))
+	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return node
 
 static func rich_label(text: String = "") -> Label:

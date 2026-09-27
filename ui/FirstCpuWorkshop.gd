@@ -5,6 +5,7 @@ signal advanced_requested(spec: Dictionary)
 signal cancel_requested
 
 const UI := preload("res://ui/UiKit.gd")
+const LOOK := preload("res://ui/WorkshopStyle.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_ADVICE := preload("res://scripts/CpuAdvice.gd")
 
@@ -85,9 +86,13 @@ var _tdp_value: Label
 var _advisor_label: Label
 var _preview_label: Label
 var _error_label: Label
+var _step_label: Label
+var _year_label: Label
+var _scroll: ScrollContainer
+var _launch_button: Button
 
 func _ready() -> void:
-	color = Color(0.01, 0.018, 0.03, 0.96)
+	color = Color(0.025, 0.055, 0.10, 0.74)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	_build()
@@ -103,6 +108,7 @@ func _build() -> void:
 	add_child(margin)
 
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	UI.configure_touch_scroll(scroll)
@@ -113,37 +119,53 @@ func _build() -> void:
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(center)
 
-	_panel = UI.card(UI.APP_SHELL, 18, 22)
+	_panel = LOOK.card(Color("fbfdff"), 20, 20)
+	var panel_style := UI.stylebox(Color("fbfdff"), 20, 2, Color("38b7ff"), 20)
+	panel_style.shadow_color = Color(0.015, 0.05, 0.10, 0.4)
+	panel_style.shadow_size = 12
+	_panel.add_theme_stylebox_override("panel", panel_style)
 	_panel.custom_minimum_size = Vector2(760, 0)
 	center.add_child(_panel)
 
 	var shell := VBoxContainer.new()
-	shell.add_theme_constant_override("separation", 14)
+	shell.add_theme_constant_override("separation", 12)
 	_panel.add_child(shell)
 
-	var brand := UI.eyebrow("ATELIER CPU • 1971")
-	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	shell.add_child(brand)
+	var header := LOOK.card(LOOK.BLUE, 12, 12)
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 12)
+	header.add_child(header_row)
+	header_row.add_child(LOOK.badge("chip", Color("159ded"), 48))
+	var header_copy := VBoxContainer.new()
+	header_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_copy.add_theme_constant_override("separation", 2)
+	header_row.add_child(header_copy)
+	header_copy.add_child(LOOK.label("Atelier CPU", 25, Color.WHITE))
+	_year_label = LOOK.label("", 12, Color("dcefff"))
+	header_copy.add_child(_year_label)
+	_step_label = LOOK.label("1  Objectif     ›     2  Projet", 14, Color.WHITE)
+	header_row.add_child(_step_label)
+	shell.add_child(header)
 
-	_guide_card = UI.card(UI.APP_CYAN_DARK, 12, 10)
+	_guide_card = LOOK.card(Color("edf6ff"), 12, 10)
 	var guide_card := _guide_card
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 10)
 	guide_card.add_child(guide_row)
 	var guide_avatar := PanelContainer.new()
 	guide_avatar.custom_minimum_size = Vector2(44, 44)
-	guide_avatar.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_CYAN, 99, 0, UI.APP_CYAN, 0))
-	var guide_initial := UI.label("N", 18)
+	guide_avatar.add_theme_stylebox_override("panel", UI.stylebox(LOOK.BLUE, 99, 0, LOOK.BLUE, 0))
+	var guide_initial := LOOK.label("N", 18)
 	guide_initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	guide_initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	guide_initial.add_theme_color_override("font_color", UI.APP_BG)
+	guide_initial.add_theme_color_override("font_color", Color.WHITE)
 	guide_avatar.add_child(guide_initial)
 	guide_row.add_child(guide_avatar)
 	var guide_copy := VBoxContainer.new()
 	guide_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	guide_row.add_child(guide_copy)
-	guide_copy.add_child(UI.label("Nora Bernard — votre bras droit", 15))
-	var guide_text := UI.muted_label("Je reste avec vous pendant cette première décision. Choisissez d'abord l'objectif du produit ; l'équipe traduira ensuite ce choix en architecture.", 12)
+	guide_copy.add_child(LOOK.label("Nora Bernard — votre bras droit", 15))
+	var guide_text := LOOK.muted_label("Choisissez à qui s'adresse votre premier CPU. L'équipe vous aidera ensuite à préparer le projet.", 13)
 	guide_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	guide_copy.add_child(guide_text)
 	shell.add_child(guide_card)
@@ -152,10 +174,10 @@ func _build() -> void:
 	_choice_view.add_theme_constant_override("separation", 12)
 	shell.add_child(_choice_view)
 
-	var choice_title := UI.label("Quel processeur voulons-nous construire ?", 26)
+	var choice_title := LOOK.label("Quel processeur allons-nous créer ?", 24)
 	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_title)
-	var choice_intro := UI.muted_label("Choisissez simplement à qui s'adresse votre premier produit. L'équipe s'occupe du reste tant que vous ne demandez pas plus de détails.", 13)
+	var choice_intro := LOOK.muted_label("Quatre objectifs possibles. Vous pourrez ajuster votre choix avant de lancer le développement.", 13)
 	choice_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	choice_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_view.add_child(choice_intro)
@@ -169,15 +191,40 @@ func _build() -> void:
 	for brief_value in BRIEFS:
 		var brief: Dictionary = brief_value
 		var button := Button.new()
-		button.text = "%s\n%s" % [str(brief.get("title", "Projet")), str(brief.get("subtitle", ""))]
-		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(310, 88)
+		button.name = "Brief" + str(brief.id)
+		button.tooltip_text = str(brief.description)
+		LOOK.button_style(button)
+		button.custom_minimum_size = Vector2(0, 112)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(select_brief.bind(str(brief.get("id", ""))))
 		_brief_grid.add_child(button)
+		var inset := MarginContainer.new()
+		inset.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		for edge in ["left", "right", "top", "bottom"]:
+			inset.add_theme_constant_override("margin_" + edge, 12)
+		button.add_child(inset)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		inset.add_child(row)
+		var accents := {"CALCULATOR": Color("16a66a"), "EMBEDDED": LOOK.BLUE, "INDUSTRIAL": Color("8b65d3"), "PIONEER": Color("d28b26")}
+		var symbols := {"CALCULATOR": "chip", "EMBEDDED": "screen", "INDUSTRIAL": "box", "PIONEER": "chart"}
+		row.add_child(LOOK.badge(str(symbols[brief.id]), accents[brief.id], 48))
+		var copy := VBoxContainer.new()
+		copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		copy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		copy.add_theme_constant_override("separation", 5)
+		row.add_child(copy)
+		var title := LOOK.label(str(brief.title), 18)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		copy.add_child(title)
+		var subtitle := LOOK.muted_label(str(brief.subtitle), 13)
+		subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		copy.add_child(subtitle)
+		row.add_child(LOOK.label("›", 24, LOOK.BLUE))
 
 	var return_button := Button.new()
 	return_button.text = "Retour au garage"
+	LOOK.button_style(return_button)
 	return_button.custom_minimum_size.y = 44
 	return_button.pressed.connect(func(): cancel_requested.emit())
 	_choice_view.add_child(return_button)
@@ -187,10 +234,11 @@ func _build() -> void:
 	_config_view.visible = false
 	shell.add_child(_config_view)
 
-	_brief_title = UI.label("Premier CPU", 23)
+	_brief_title = LOOK.label("Premier CPU", 22)
+	_brief_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_brief_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(_brief_title)
-	var config_intro := UI.muted_label("Donnez un nom au produit puis lancez le projet. Si vous voulez intervenir dans l'architecture, ouvrez Conception avancée.", 12)
+	var config_intro := LOOK.muted_label("Nommez votre CPU, consultez l'avis de l'équipe, puis lancez le projet.", 13)
 	config_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
@@ -211,7 +259,7 @@ func _build() -> void:
 	right_column.add_theme_constant_override("separation", 9)
 	_config_columns.add_child(right_column)
 
-	var action_hint := UI.muted_label("Quand le compromis vous convient, lancez le projet. Vous pourrez encore apprendre et corriger pendant le développement.", 12)
+	var action_hint := LOOK.muted_label("Les estimations évolueront avec l'expérience de l'équipe. Vous pourrez corriger pendant le développement.", 12)
 	action_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right_column.add_child(action_hint)
 
@@ -219,28 +267,34 @@ func _build() -> void:
 	actions.add_theme_constant_override("h_separation", 8)
 	actions.add_theme_constant_override("v_separation", 8)
 	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_column.add_child(actions)
+	_config_view.add_child(actions)
 
 	var launch := Button.new()
+	_launch_button = launch
+	launch.name = "LaunchProject"
 	launch.text = "Lancer le projet"
+	LOOK.button_style(launch, true)
 	launch.custom_minimum_size = Vector2(190, 44)
 	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
 	actions.add_child(launch)
 
 	var advanced := Button.new()
 	advanced.text = "Conception avancée"
+	LOOK.button_style(advanced)
 	advanced.custom_minimum_size = Vector2(170, 44)
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	actions.add_child(advanced)
 
 	var back := Button.new()
 	back.text = "Changer d'objectif"
+	LOOK.button_style(back)
 	back.custom_minimum_size = Vector2(170, 44)
 	back.pressed.connect(_show_choices)
 	actions.add_child(back)
 
 	var garage := Button.new()
 	garage.text = "Retour au garage"
+	LOOK.button_style(garage)
 	garage.custom_minimum_size = Vector2(170, 44)
 	garage.pressed.connect(func(): cancel_requested.emit())
 	actions.add_child(garage)
@@ -250,6 +304,18 @@ func _build() -> void:
 	_name_edit.placeholder_text = "Nom du premier CPU"
 	_name_edit.text = "Nova 1"
 	_name_edit.custom_minimum_size.y = 44
+	LOOK.input_style(_name_edit)
+	var product_badge := HBoxContainer.new()
+	product_badge.add_child(LOOK.badge("chip", LOOK.BLUE, 64))
+	var product_copy := VBoxContainer.new()
+	product_copy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	product_copy.add_child(LOOK.eyebrow("VOTRE PREMIER PROCESSEUR"))
+	product_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var product_tagline := LOOK.label("Une idée devient un produit", 17)
+	product_tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	product_copy.add_child(product_tagline)
+	product_badge.add_child(product_copy)
+	left_column.add_child(product_badge)
 	left_column.add_child(_field("Nom du CPU", _name_edit))
 
 	_preset_select = OptionButton.new()
@@ -302,43 +368,44 @@ func _build() -> void:
 	_budget_field_root = budget_field
 	budget_field.visible = false
 	left_column.add_child(budget_field)
-	_budget_cost_label = UI.muted_label("", 12)
+	_budget_cost_label = LOOK.muted_label("", 12)
 	_budget_cost_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_budget_cost_label.visible = false
 	left_column.add_child(_budget_cost_label)
 
-	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
+	var node_label := LOOK.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
 	_node_hint_root = node_label
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	node_label.visible = false
 	left_column.add_child(node_label)
 
-	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
+	var advisor_panel := LOOK.card(Color("fff7e9"), 12, 12)
 	var advisor_box := VBoxContainer.new()
 	advisor_box.add_theme_constant_override("separation", 4)
 	advisor_panel.add_child(advisor_box)
-	advisor_box.add_child(UI.eyebrow("AVIS DE L'ÉQUIPE"))
-	_advisor_label = UI.muted_label("", 12)
+	advisor_box.add_child(LOOK.eyebrow("AVIS DE L'ÉQUIPE"))
+	_advisor_label = LOOK.muted_label("", 13)
 	_advisor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	advisor_box.add_child(_advisor_label)
 	right_column.add_child(advisor_panel)
 
-	var preview_panel := UI.card(UI.APP_CYAN_DARK, 12, 12)
-	_preview_label = UI.muted_label("", 13)
+	var preview_panel := LOOK.card(Color("edf6ff"), 12, 12)
+	_preview_label = LOOK.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_panel.add_child(_preview_label)
-	right_column.add_child(preview_panel)
+	left_column.add_child(preview_panel)
 
-	_error_label = UI.label("", 12)
+	_error_label = LOOK.label("", 13)
 	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_error_label.add_theme_color_override("font_color", UI.APP_RED)
+	_error_label.add_theme_color_override("font_color", Color("b72732"))
 	_error_label.visible = false
-	right_column.add_child(_error_label)
+	_config_view.add_child(_error_label)
 
 
 	set_viewport_width(1280.0)
 
 func open() -> void:
+	_year_label.text = "Premier produit • %d" % TimeManager.year
 	if _error_label != null:
 		_error_label.visible = false
 	_show_choices()
@@ -354,6 +421,8 @@ func select_brief(key: String) -> void:
 			continue
 		_selected_brief = brief.duplicate(true)
 		_selected_key = key
+		_step_label.text = "✓  Objectif     ›     2  Projet"
+		_scroll.scroll_vertical = 0
 		_choice_view.visible = false
 		_config_view.visible = true
 		if _guide_card != null:
@@ -366,6 +435,8 @@ func select_brief(key: String) -> void:
 		return
 
 func _show_choices() -> void:
+	_step_label.text = "1  Objectif     ›     2  Projet"
+	_scroll.scroll_vertical = 0
 	_selected_brief = {}
 	_selected_key = ""
 	_choice_view.visible = true
@@ -569,11 +640,11 @@ func _slider_field(title: String, min_value: float, max_value: float, step: floa
 	root.add_theme_constant_override("separation", 4)
 	var row := HBoxContainer.new()
 	root.add_child(row)
-	var label := UI.muted_label(title, 12)
+	var label := LOOK.muted_label(title, 12)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
-	var value_label := UI.label("", 12)
-	value_label.add_theme_color_override("font_color", UI.APP_CYAN)
+	var value_label := LOOK.label("", 12)
+	value_label.add_theme_color_override("font_color", LOOK.BLUE)
 	row.add_child(value_label)
 	var slider := HSlider.new()
 	# Sur mobile paysage, un glissement vertical commencé sur une jauge doit
@@ -595,7 +666,7 @@ func _slider_field(title: String, min_value: float, max_value: float, step: floa
 func _field(title: String, control: Control) -> VBoxContainer:
 	var field := VBoxContainer.new()
 	field.add_theme_constant_override("separation", 4)
-	field.add_child(UI.muted_label(title, 12))
+	field.add_child(LOOK.muted_label(title, 13))
 	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	field.add_child(control)
 	return field
