@@ -1,7 +1,8 @@
 extends Node
 
 func _ready() -> void:
-	for dimensions in [Vector2i(1616, 720), Vector2i(1280, 720)]:
+	# PC 16:9, Pixel 20:9, téléphone 16:9 et tablette 4:3 avec interface agrandie (x1.2), ultra-large 21:9.
+	for dimensions in [Vector2i(1616, 720), Vector2i(1280, 720), Vector2i(1067, 600), Vector2i(1333, 600), Vector2i(1067, 800), Vector2i(1706, 720)]:
 		var viewport := SubViewport.new()
 		viewport.size = dimensions
 		add_child(viewport)
@@ -36,6 +37,49 @@ func _ready() -> void:
 			push_error("Task card retains an oversized wrapped-text height")
 			get_tree().quit(1)
 			return
+		# V0.8.1 : le rail de gauche ne recouvre jamais la carte de Nora, les repères restent visibles.
+		for side in garage.get("_side_buttons"):
+			var side_button := side as Control
+			if side_button.visible and (side_button.get_rect().intersects(tasks.get_rect()) or not bounds.encloses(side_button.get_rect())):
+				push_error("Garage navigation rail overlaps Nora's card or leaves the screen at %s" % dimensions)
+				get_tree().quit(1)
+				return
+		for zone in garage.get("_zone_buttons"):
+			var marker := zone as Control
+			if not marker.visible:
+				continue
+			if not bounds.encloses(marker.get_rect()):
+				push_error("Garage marker is cut by the screen edge at %s" % dimensions)
+				get_tree().quit(1)
+				return
+			for card in [project, feedback, tasks]:
+				if marker.get_rect().intersects((card as Control).get_rect()):
+					push_error("Garage marker hidden under a HUD card at %s" % dimensions)
+					get_tree().quit(1)
+					return
+		# Garage complet (toutes les zones débloquées) : mêmes garanties pour les cinq repères.
+		garage.call("set_progression", {"QG":true, "LAB":true, "COMPANY":true, "TEAM":true, "PRODUCTS":true, "MARKET":true, "PRESS":true})
+		garage.call("set_onboarding_stage", "NORMAL")
+		for frame in range(6):
+			await get_tree().process_frame
+		if int(garage.call("visible_zone_count")) != 5:
+			push_error("Unlocked garage should show five markers")
+			get_tree().quit(1)
+			return
+		for zone in garage.get("_zone_buttons"):
+			var full_marker := zone as Control
+			if not bounds.encloses(full_marker.get_rect()):
+				push_error("Unlocked garage marker cut by the screen edge at %s" % dimensions)
+				get_tree().quit(1)
+				return
+			for card in [project, feedback, tasks]:
+				if full_marker.get_rect().intersects((card as Control).get_rect()):
+					push_error("Unlocked garage marker %s hidden under a HUD card at %s" % [full_marker.get_meta("zone_name", "?"), dimensions])
+					get_tree().quit(1)
+					return
+		garage.call("set_onboarding_stage", "FIRST_IDEA")
+		for frame in range(4):
+			await get_tree().process_frame
 		garage.call("open_zone_menu", "Établi CPU")
 		for frame in range(8):
 			await get_tree().process_frame

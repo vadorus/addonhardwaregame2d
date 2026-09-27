@@ -124,25 +124,62 @@ var nav_buttons: Array[Button] = []
 var speed_buttons: Array[Button] = []
 var _refresh_all_pending := false
 
+# V0.8.1 — plateforme PC / Android : sauvegarde, menu, échelle d'interface, zones sûres.
+const SETTINGS_PATH := "user://settings.cfg"
+const UI_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2, 1.35, 1.5]
+const MIN_LOGICAL_SIZE := Vector2(960.0, 540.0)
+var game_root: VBoxContainer
+var menu_layer: ColorRect
+var menu_scale_label: Label
+var menu_save_label: Label
+var menu_fullscreen_button: Button
+var menu_previous_speed := 1.0
+var ui_scale := 1.0
+var last_autosave_text := ""
+var _back_pressed_once_at := -10.0
+var header_brand_box: VBoxContainer
+var header_wordmark: Array = []
+var header_compact := false
+var setup_continue_button: Button
+
 func _ready():
+	_apply_saved_ui_scale()
 	theme = _create_app_theme()
 	_build_ui()
+	_build_menu_layer()
 	_connect_signals()
 	resized.connect(_update_responsive_layout)
+	resized.connect(_apply_safe_area)
 	_refresh_all()
 	setup_layer.visible = not CompanyManager.created
 	if setup_layer.visible:
 		_show_title_screen()
 	call_deferred("_update_responsive_layout")
+	call_deferred("_apply_safe_area")
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_PAUSED:
+			# Fermeture PC ou appli Android passée en arrière-plan : ne jamais perdre la partie.
+			_autosave("fermeture")
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			_handle_back_request()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_handle_back_request()
 
 func _process(_delta):
 	for button in speed_buttons:
 		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
 	if CompanyManager.created:
-		date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		money_label.text = "%s €" % _money(Economy.money)
+		if header_compact:
+			date_label.text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+		else:
+			date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
 		if reputation_label != null:
-			reputation_label.text = "Réputation %.0f" % CompanyManager.get_brand_score()
+			reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
 
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
@@ -194,6 +231,7 @@ func _build_ui():
 	root_box.offset_bottom = -4.0
 	root_box.add_theme_constant_override("separation", 4)
 	add_child(root_box)
+	game_root = root_box
 
 	var header := _card(Color("1d304a"), 12, 8)
 	header.custom_minimum_size.y = 68
@@ -215,6 +253,8 @@ func _build_ui():
 	var empire := _label("EMPIRE", 26)
 	empire.add_theme_color_override("font_color", Color("32b8f4"))
 	wordmark.add_child(empire)
+	header_brand_box = brand_box
+	header_wordmark = [tech_word, empire]
 	company_label = _label("Tech Empire", 11)
 	company_label.add_theme_color_override("font_color", Color("b2c7df"))
 	company_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -268,6 +308,15 @@ func _build_ui():
 		speed_buttons.append(speed_button)
 		speed_button.pressed.connect(_request_time_scale.bind(speed))
 		top.add_child(speed_button)
+
+	# Menu système : sauvegarde, taille d'interface, plein écran, quitter.
+	var menu_button := Button.new()
+	menu_button.text = "☰"
+	menu_button.tooltip_text = "Menu (Échap)"
+	menu_button.custom_minimum_size = Vector2(46, 46)
+	menu_button.add_theme_font_size_override("font_size", 20)
+	menu_button.pressed.connect(open_system_menu)
+	top.add_child(menu_button)
 
 	nav_panel = _card(APP_SHELL, 12, 6)
 	root_box.add_child(nav_panel)
@@ -1039,6 +1088,7 @@ func _build_setup_layer():
 	continue_game.custom_minimum_size.y = 48
 	continue_game.disabled = not FileAccess.file_exists(SaveManager.SAVE_PATH) and not FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH)
 	continue_game.pressed.connect(_load_game)
+	setup_continue_button = continue_game
 	setup_title_box.add_child(continue_game)
 
 	setup_creation_box = VBoxContainer.new()
@@ -1097,6 +1147,8 @@ func _build_setup_layer():
 	setup_creation_box.add_child(back)
 
 func _show_title_screen() -> void:
+	if setup_continue_button != null:
+		setup_continue_button.disabled = not _has_save_file()
 	if setup_title_box != null:
 		setup_title_box.visible = true
 	if setup_creation_box != null:
@@ -1516,6 +1568,13 @@ func _update_nav_state():
 		button.add_theme_stylebox_override("normal", _stylebox(APP_CYAN_DARK if selected else Color(0, 0, 0, 0), 9, 0, APP_LINE, 9))
 
 func _update_responsive_layout():
+	header_compact = size.x < 1220.0
+	if header_brand_box != null:
+		header_brand_box.custom_minimum_size.x = 150.0 if header_compact else 235.0
+		for word in header_wordmark:
+			(word as Label).add_theme_font_size_override("font_size", 20 if header_compact else 26)
+	if menu_layer != null and menu_layer.visible:
+		_refresh_menu_labels()
 	if dashboard_screen != null and dashboard_screen.has_method("set_viewport_width"):
 		dashboard_screen.call("set_viewport_width", size.x)
 	if products_screen != null and products_screen.has_method("set_viewport_width"):
@@ -1787,6 +1846,8 @@ func _on_month_closed(report: Dictionary):
 		if month_ticker_timer != null:
 			month_ticker_timer.start()
 	_refresh_all()
+	# V0.8.1 : sauvegarde automatique à chaque clôture de mois (PC et Android).
+	_autosave("mensuelle")
 
 func _breakdown(data: Dictionary) -> String:
 	if data.is_empty(): return "  —"
@@ -2105,3 +2166,262 @@ func _refresh_market():
 func _select_meta(option: OptionButton, wanted: String):
 	for i in range(option.item_count):
 		if str(option.get_item_metadata(i))==wanted: option.select(i); return
+
+
+# ---------------------------------------------------------------------------
+# V0.8.1 — Plateforme PC / Android
+# ---------------------------------------------------------------------------
+
+func _is_mobile() -> bool:
+	return OS.has_feature("mobile")
+
+func _apply_saved_ui_scale() -> void:
+	if not (get_viewport() is Window):
+		return # instance de test dans un SubViewport : ne pas toucher à la fenêtre réelle
+	var config := ConfigFile.new()
+	var has_file := config.load(SETTINGS_PATH) == OK
+	if has_file and config.has_section_key("ui", "scale"):
+		set_ui_scale(float(config.get_value("ui", "scale", 1.0)), false)
+	elif _is_mobile():
+		# Sur téléphone, le texte à l'échelle PC est trop petit : on part un cran au-dessus.
+		set_ui_scale(1.15, false)
+	else:
+		ui_scale = get_window().content_scale_factor
+
+func _max_ui_scale() -> float:
+	var window_size := Vector2(get_window().size)
+	if window_size.x <= 0.0 or window_size.y <= 0.0:
+		return 1.5
+	var stretch := minf(window_size.x / 1280.0, window_size.y / 720.0)
+	if stretch <= 0.0:
+		return 1.5
+	var logical := window_size / stretch
+	return clampf(minf(logical.x / MIN_LOGICAL_SIZE.x, logical.y / MIN_LOGICAL_SIZE.y), 0.9, 1.5)
+
+func set_ui_scale(value: float, persist: bool = true) -> void:
+	ui_scale = clampf(value, 0.9, _max_ui_scale())
+	if get_viewport() is Window:
+		get_window().content_scale_factor = ui_scale
+	if persist:
+		var config := ConfigFile.new()
+		config.load(SETTINGS_PATH)
+		config.set_value("ui", "scale", ui_scale)
+		config.save(SETTINGS_PATH)
+	call_deferred("_update_responsive_layout")
+	call_deferred("_apply_safe_area")
+
+func _apply_safe_area() -> void:
+	if game_root == null:
+		return
+	var margins := Vector4(0, 0, 0, 0) # gauche, haut, droite, bas
+	if _is_mobile():
+		var screen := Vector2(DisplayServer.screen_get_size())
+		var safe := DisplayServer.get_display_safe_area()
+		var window_size := Vector2(get_window().size)
+		if screen.x > 0.0 and window_size.x > 0.0 and safe.size.x > 0:
+			var to_logical := get_viewport_rect().size.x / window_size.x
+			margins = Vector4(
+				float(safe.position.x) * to_logical,
+				float(safe.position.y) * to_logical,
+				maxf(0.0, screen.x - float(safe.end.x)) * to_logical,
+				maxf(0.0, screen.y - float(safe.end.y)) * to_logical
+			)
+	game_root.offset_left = 4.0 + margins.x
+	game_root.offset_top = 4.0 + margins.y
+	game_root.offset_right = -4.0 - margins.z
+	game_root.offset_bottom = -4.0 - margins.w
+
+func safe_area_margins() -> Vector4:
+	if game_root == null:
+		return Vector4.ZERO
+	return Vector4(game_root.offset_left - 4.0, game_root.offset_top - 4.0, -game_root.offset_right - 4.0, -game_root.offset_bottom - 4.0)
+
+func _autosave(reason: String) -> bool:
+	if not CompanyManager.created or SimulationManager.is_game_over:
+		return false
+	var ok := bool(SaveManager.save_game(true))
+	if ok:
+		last_autosave_text = "%s (%s %d)" % [reason, _month_name(TimeManager.month), TimeManager.year]
+	return ok
+
+func _month_name(month: int) -> String:
+	var names := ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+	return str(names[clampi(month, 1, 12) - 1])
+
+func _has_save_file() -> bool:
+	return FileAccess.file_exists(SaveManager.SAVE_PATH) or FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH)
+
+# --- Menu système -----------------------------------------------------------
+
+func _build_menu_layer() -> void:
+	menu_layer = ColorRect.new()
+	menu_layer.color = Color(0.02, 0.04, 0.07, 0.62)
+	menu_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	menu_layer.visible = false
+	menu_layer.z_index = 110
+	add_child(menu_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	menu_layer.add_child(center)
+	var panel := LOOK.card(Color.WHITE, 18, 20)
+	panel.custom_minimum_size = Vector2(380, 0)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	var title := LOOK.label("Menu", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	menu_save_label = LOOK.muted_label("", 13)
+	menu_save_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	menu_save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(menu_save_label)
+	box.add_child(_menu_button("Reprendre", close_system_menu, true))
+	box.add_child(_menu_button("Sauvegarder maintenant", _menu_save_now))
+	box.add_child(_menu_button("Charger la dernière sauvegarde", _menu_load))
+	var scale_row := HBoxContainer.new()
+	scale_row.add_theme_constant_override("separation", 8)
+	box.add_child(scale_row)
+	var scale_caption := LOOK.label("Taille de l'interface", 14)
+	scale_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scale_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	scale_row.add_child(scale_caption)
+	var minus := _menu_button("−", _menu_change_scale.bind(-1))
+	minus.custom_minimum_size = Vector2(52, 46)
+	scale_row.add_child(minus)
+	menu_scale_label = LOOK.label("100 %", 15)
+	menu_scale_label.custom_minimum_size.x = 64
+	menu_scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_scale_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	scale_row.add_child(menu_scale_label)
+	var plus := _menu_button("+", _menu_change_scale.bind(1))
+	plus.custom_minimum_size = Vector2(52, 46)
+	scale_row.add_child(plus)
+	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
+	menu_fullscreen_button.visible = not _is_mobile()
+	box.add_child(menu_fullscreen_button)
+	box.add_child(_menu_button("Sauvegarder et quitter", _menu_quit))
+
+func _menu_button(text: String, action: Callable, primary: bool = false) -> Button:
+	var button := Button.new()
+	button.text = text
+	LOOK.button_style(button, primary)
+	button.pressed.connect(action)
+	return button
+
+func open_system_menu() -> void:
+	if menu_layer == null or menu_layer.visible:
+		return
+	menu_previous_speed = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	_refresh_menu_labels()
+	menu_layer.visible = true
+
+func close_system_menu() -> void:
+	if menu_layer == null or not menu_layer.visible:
+		return
+	menu_layer.visible = false
+	if menu_previous_speed > 0.0 and is_zero_approx(TimeManager.time_scale) and _blocking_company_decision().is_empty():
+		TimeManager.time_scale = menu_previous_speed
+
+func system_menu_visible() -> bool:
+	return menu_layer != null and menu_layer.visible
+
+func _refresh_menu_labels() -> void:
+	if menu_scale_label != null:
+		menu_scale_label.text = "%d %%" % int(round(ui_scale * 100.0))
+	if menu_save_label != null:
+		if last_autosave_text != "":
+			menu_save_label.text = "Dernière sauvegarde : %s.\nSauvegarde automatique chaque mois et à la fermeture." % last_autosave_text
+		elif _has_save_file():
+			menu_save_label.text = "Une sauvegarde existe.\nSauvegarde automatique chaque mois et à la fermeture."
+		else:
+			menu_save_label.text = "Aucune sauvegarde pour l'instant.\nSauvegarde automatique chaque mois et à la fermeture."
+	if menu_fullscreen_button != null:
+		var fullscreen := DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+		menu_fullscreen_button.text = "Quitter le plein écran" if fullscreen else "Plein écran"
+
+func _menu_save_now() -> void:
+	if not CompanyManager.created:
+		status_label.text = "Aucune partie à sauvegarder."
+		return
+	if _autosave("manuelle"):
+		status_label.text = "✓ Partie sauvegardée."
+	else:
+		status_label.text = "⚠ La sauvegarde a échoué."
+	_refresh_menu_labels()
+
+func _menu_load() -> void:
+	if not _has_save_file():
+		status_label.text = "Aucune sauvegarde à charger."
+		_refresh_menu_labels()
+		return
+	menu_layer.visible = false
+	_load_game()
+	TimeManager.time_scale = 0.0
+	status_label.text = "Partie chargée. Relancez le temps quand vous êtes prêt."
+
+func _menu_change_scale(direction: int) -> void:
+	var index := 0
+	var best := INF
+	for i in range(UI_SCALE_STEPS.size()):
+		var gap := absf(float(UI_SCALE_STEPS[i]) - ui_scale)
+		if gap < best:
+			best = gap
+			index = i
+	index = clampi(index + direction, 0, UI_SCALE_STEPS.size() - 1)
+	set_ui_scale(float(UI_SCALE_STEPS[index]))
+	_refresh_menu_labels()
+
+func _menu_toggle_fullscreen() -> void:
+	if DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	call_deferred("_refresh_menu_labels")
+
+func _menu_quit() -> void:
+	_autosave("fermeture")
+	get_tree().quit()
+
+# --- Bouton Retour Android / Échap PC --------------------------------------
+
+func _handle_back_request() -> void:
+	if system_menu_visible():
+		close_system_menu()
+		return
+	if first_cpu_workshop != null and first_cpu_workshop.visible:
+		_close_first_cpu_workshop()
+		return
+	# Les écrans de décision (lancement, événement de recherche, bilan, faillite) exigent un choix.
+	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer]:
+		if blocking != null and blocking.visible:
+			return
+	if setup_layer != null and setup_layer.visible:
+		if setup_creation_box != null and setup_creation_box.visible:
+			_show_title_screen()
+		elif _is_mobile():
+			_confirm_quit_on_back()
+		return
+	var garage: Control = dashboard_screen.get("dashboard_garage") if dashboard_screen != null else null
+	if garage != null and bool(garage.call("context_menu_visible")):
+		garage.call("close_context_menu")
+		return
+	if tabs != null and tabs.current_tab != 0:
+		_show_tab(0)
+		return
+	if _is_mobile():
+		_confirm_quit_on_back()
+	else:
+		open_system_menu()
+
+func _confirm_quit_on_back() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _back_pressed_once_at < 2.5:
+		_autosave("fermeture")
+		get_tree().quit()
+		return
+	_back_pressed_once_at = now
+	_autosave("retour")
+	if status_label != null:
+		status_label.text = "Partie sauvegardée. Appuyez encore sur Retour pour quitter."

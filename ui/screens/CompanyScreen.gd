@@ -294,8 +294,13 @@ func refresh() -> void:
 		return
 	var reputation := CompanyManager.reputation
 	var lines: Array[String] = ["Image de l'entreprise :"]
+	var reputation_labels := {
+		"innovation":"Innovation", "reliability":"Fiabilité", "value":"Rapport qualité-prix",
+		"support":"Service client", "sustainability":"Responsabilité", "prestige":"Prestige",
+		"professional":"Clientèle professionnelle"
+	}
 	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
-		lines.append("• %s : %.1f/100" % [key.capitalize(), float(reputation[key])])
+		lines.append("• %s : %.0f/100" % [str(reputation_labels.get(key, key)), float(reputation.get(key, 0.0))])
 	lines.append("\nÉquilibrage économique : %s" % BalanceManager.profile_label())
 	lines.append("Marge structurelle théorique au départ : %.1f mois • marché x%.2f • pression concurrentielle x%.2f" % [
 		BalanceManager.starting_runway_months(), BalanceManager.market_demand_factor(), BalanceManager.competitor_pressure_factor()

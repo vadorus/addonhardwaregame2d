@@ -63,6 +63,20 @@ var _side_buttons: Array[Button] = []
 var _selected_zone := ""
 var _context_action_data: Array = []
 
+# V0.8.1 — chaque décision du PDG est signalée dans le décor, pas seulement le projet CPU.
+const CATEGORY_ZONE := {
+	"PROTOTYPE":"Banc de test", "VALIDATION":"Banc de test", "DÉVELOPPEMENT":"Banc de test",
+	"PROJET":"Banc de test", "DÉMARRAGE":"Établi CPU", "TECHNIQUE":"Tableau de planification",
+	"LANCEMENT":"Stock & production", "FONDERIE":"Stock & production", "FOURNISSEUR":"Stock & production",
+	"PRODUCTION":"Stock & production", "SAV":"Stock & production", "CONTRAT":"Stock & production",
+	"MARCHÉ":"Stock & production",
+	"RH":"Bureau du fondateur", "LOCAUX":"Bureau du fondateur", "ARBITRAGE":"Bureau du fondateur",
+	"FINANCE":"Bureau du fondateur", "GUIDE":"Bureau du fondateur"
+}
+## Source des décisions PDG ; remplaçable par les tests.
+var decision_source: Callable = Callable()
+var _focus: Dictionary = {}
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(0, 560)
 	clip_contents = true
@@ -148,6 +162,22 @@ func _build_overlay() -> void:
 		marker.tint = data.get("color", BLUE)
 		marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		button.add_child(marker)
+		# Pastille « ! » : bien visible quelle que soit la couleur du repère.
+		var alert := Label.new()
+		alert.text = "!"
+		alert.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		alert.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		alert.add_theme_font_size_override("font_size", 17)
+		alert.add_theme_color_override("font_color", Color.WHITE)
+		var alert_style := _panel_style(Color("e5372c"), Color.WHITE, 13, 0)
+		alert_style.set_border_width_all(2)
+		alert.add_theme_stylebox_override("normal", alert_style)
+		alert.position = Vector2(38, -4)
+		alert.size = Vector2(26, 26)
+		alert.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		alert.visible = false
+		button.add_child(alert)
+		button.set_meta("alert_node", alert)
 		_zone_buttons.append(button)
 
 	_context_panel = PanelContainer.new()
@@ -254,12 +284,15 @@ func _build_gameplay_overlays() -> void:
 	add_child(_tasks_panel)
 	var tasks_box := VBoxContainer.new()
 	_tasks_panel.add_child(tasks_box)
-	_card_heading(tasks_box, "Tâches")
+	# V0.8.1 : Nora remplace la liste de tâches figée — une seule prochaine étape, toujours vraie.
+	_card_heading(tasks_box, "Nora • prochaine étape")
 	_tasks_label = Label.new()
 	_tasks_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tasks_label.add_theme_font_size_override("font_size", 13)
-	_tasks_label.add_theme_constant_override("line_spacing", 5)
+	_tasks_label.add_theme_font_size_override("font_size", 14)
+	_tasks_label.add_theme_constant_override("line_spacing", 3)
 	_tasks_label.add_theme_color_override("font_color", INK)
+	_tasks_label.max_lines_visible = 4
+	_tasks_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tasks_box.add_child(_tasks_label)
 	_feedback_panel = PanelContainer.new()
 	_feedback_panel.z_index = 15
@@ -308,7 +341,7 @@ func _build_side_actions() -> void:
 	for data in SIDE_ACTIONS:
 		var button := Button.new()
 		button.set_meta("label", str(data.get("label", "Ouvrir")))
-		button.custom_minimum_size = Vector2(92, 64)
+		button.custom_minimum_size = Vector2(92, 40)
 		button.add_theme_font_size_override("font_size", 12)
 		button.add_theme_stylebox_override("normal", _panel_style(Color("1f3755"), Color("6a98c5"), 12, 8))
 		button.add_theme_stylebox_override("disabled", _panel_style(Color("26364b"), Color("5b708c"), 12, 8))
@@ -330,9 +363,14 @@ func _build_side_actions() -> void:
 		label.position = Vector2(0, 40)
 		label.size = Vector2(92, 20)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 11)
+		# Le thème global est clair (texte foncé) : sur ce bouton sombre, le libellé doit rester blanc.
+		label.add_theme_color_override("font_color", Color.WHITE)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(label)
+		button.set_meta("icon_node", icon)
+		button.set_meta("label_node", label)
 		_side_buttons.append(button)
 	_refresh_side_actions()
 
@@ -341,10 +379,19 @@ func _run_side_action(button: Button) -> void:
 		zone_requested.emit(int(button.get_meta("tab", 0)), str(button.get_meta("label", "")))
 
 func _refresh_side_actions() -> void:
+	_update_focus()
+	var needs_rail := not _focus.is_empty() and not bool(_focus.get("zone_visible", true))
 	for button in _side_buttons:
 		var feature := str(button.get_meta("feature", "QG"))
 		button.visible = true
 		button.disabled = _onboarding_stage == "FIRST_IDEA" or not bool(_last_unlocks.get(feature, false))
+		var attention := needs_rail and not button.disabled and int(button.get_meta("tab", -1)) == int(_focus.get("tab", -2))
+		if attention:
+			var amber := _panel_style(Color("7a4a06"), Color("ff9f1a"), 12, 8)
+			amber.set_border_width_all(3)
+			button.add_theme_stylebox_override("normal", amber)
+		else:
+			button.add_theme_stylebox_override("normal", _panel_style(Color("1f3755"), Color("6a98c5"), 12, 8))
 		button.modulate = Color(0.70, 0.77, 0.87, 1) if button.disabled else Color.WHITE
 		button.tooltip_text = "%s — disponible avec la progression de l'entreprise" % str(button.get_meta("label", "")) if button.disabled else str(button.get_meta("label", ""))
 
@@ -424,21 +471,86 @@ func _layout_zones() -> void:
 		var feedback_w := clampf(size.x * 0.29, 300.0, 370.0)
 		_feedback_panel.size = Vector2(feedback_w, 0.0)
 		_feedback_panel.position = Vector2(size.x - feedback_w - 14.0, size.y - _feedback_panel.size.y - 14.0)
-	var side_y := 78.0
+	# Rail de navigation : s'adapte à la hauteur disponible au-dessus de la carte de Nora
+	# (téléphones 16:9 avec interface agrandie, fenêtres PC basses).
+	var visible_side: Array[Button] = []
 	for button in _side_buttons:
 		if button.visible:
-			button.position = Vector2(14.0, side_y)
-			button.size = Vector2(92.0, 64.0)
-			side_y += 70.0
+			visible_side.append(button)
+	if not visible_side.is_empty():
+		var rail_top := 78.0
+		var rail_bottom := size.y - 14.0
+		if _tasks_panel != null:
+			rail_bottom = _tasks_panel.position.y - 8.0
+		var count := visible_side.size()
+		var gap := 6.0
+		var columns := 1
+		var button_h := floorf((rail_bottom - rail_top - gap * float(count - 1)) / float(count))
+		if button_h < 44.0:
+			columns = 2
+			var rows := int(ceil(float(count) / 2.0))
+			button_h = floorf((rail_bottom - rail_top - gap * float(rows - 1)) / float(rows))
+		button_h = clampf(button_h, 40.0, 64.0)
+		var show_icon := button_h >= 58.0
+		for i in range(count):
+			var button := visible_side[i]
+			var col := i % columns
+			var row := floori(float(i) / float(columns))
+			button.size = Vector2(92.0, button_h)
+			button.position = Vector2(14.0 + float(col) * 98.0, rail_top + float(row) * (button_h + gap))
+			var icon: Control = button.get_meta("icon_node", null)
+			var label: Label = button.get_meta("label_node", null)
+			if icon != null:
+				icon.visible = show_icon
+			if label != null:
+				label.position = Vector2(0, 40) if show_icon else Vector2.ZERO
+				label.size = Vector2(92, 20) if show_icon else Vector2(92, button_h)
+				label.add_theme_font_size_override("font_size", 11 if show_icon else 13)
 
+	# Repères : suivent le décor, mais restent à l'écran (tablette 4:3 = décor recadré sur les côtés)
+	# et ne se cachent jamais sous une carte du HUD (téléphones 16:9, fenêtres basses).
+	var hud_rects: Array[Rect2] = []
+	for panel in [_room_badge, _project_panel, _tasks_panel, _feedback_panel]:
+		if panel != null and panel.visible:
+			hud_rects.append(Rect2(panel.position, panel.size).grow(4.0))
+	for side_button in visible_side:
+		hud_rects.append(Rect2(side_button.position, side_button.size).grow(4.0))
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
 		var target := art_rect.position + r.get_center() * art_rect.size
 		button.size = Vector2(58, 58)
-		button.position = target - button.size * 0.5
+		button.position = _free_marker_position(target - button.size * 0.5, button.size, hud_rects)
 
 	if _context_panel != null and _context_panel.visible:
 		_layout_context_panel(art_rect)
+
+## Position libre la plus proche de l'emplacement voulu : dans l'écran et hors des cartes du HUD.
+func _free_marker_position(wanted: Vector2, marker_size: Vector2, huds: Array[Rect2]) -> Vector2:
+	var max_pos := Vector2(maxf(8.0, size.x - marker_size.x - 8.0), maxf(8.0, size.y - marker_size.y - 8.0))
+	var start := wanted.clamp(Vector2(8.0, 8.0), max_pos)
+	var candidates: Array[Vector2] = [start]
+	for hud in huds:
+		candidates.append(Vector2(hud.position.x - marker_size.x, start.y))
+		candidates.append(Vector2(hud.end.x, start.y))
+		candidates.append(Vector2(start.x, hud.position.y - marker_size.y))
+		candidates.append(Vector2(start.x, hud.end.y))
+	var best := start
+	var best_distance := INF
+	for candidate_value in candidates:
+		var candidate: Vector2 = candidate_value.clamp(Vector2(8.0, 8.0), max_pos)
+		var rect := Rect2(candidate, marker_size)
+		var blocked := false
+		for hud in huds:
+			if rect.intersects(hud):
+				blocked = true
+				break
+		if blocked:
+			continue
+		var distance := candidate.distance_squared_to(wanted)
+		if distance < best_distance:
+			best_distance = distance
+			best = candidate
+	return best
 
 func _layout_context_panel(_art_rect: Rect2) -> void:
 	if size.x >= 1000.0:
@@ -537,6 +649,13 @@ func _run_context_action(action: Dictionary) -> void:
 	zone_requested.emit(int(action.get("tab", 0)), str(action.get("context", "")))
 
 func _zone_actions(zone_name: String) -> Array:
+	var actions: Array = _base_zone_actions(zone_name)
+	# Une décision PDG signalée sur cette zone apparaît en tête du menu contextuel.
+	if str(_focus.get("kind", "")) == "ceo" and str(_focus.get("zone", "")) == zone_name:
+		actions.push_front({"label":"⚠ %s" % _short(str(_focus.get("title", "Décision")), 36), "tab":int(_focus.get("tab", 1)), "context":"", "enabled":true})
+	return actions
+
+func _base_zone_actions(zone_name: String) -> Array:
 	match zone_name:
 		"Établi CPU":
 			if ResearchManager.projects.is_empty():
@@ -619,17 +738,113 @@ func _has_pending_production_route() -> bool:
 func _has_ready_product_to_launch() -> bool:
 	return ProductManager.has_ready_product_to_launch()
 
+# --- V0.8.1 : décision prioritaire (projet bloquant, puis décision PDG la plus grave) ----
+
+func _ceo_decisions() -> Array:
+	if decision_source.is_valid():
+		return decision_source.call()
+	if not CompanyManager.created:
+		return []
+	return ExecutiveManager.get_ceo_decisions()
+
+func _short(text: String, max_chars: int) -> String:
+	return text if text.length() <= max_chars else text.substr(0, max_chars - 1).strip_edges() + "…"
+
+func _compute_focus() -> Dictionary:
+	if _has_pending_project_decision():
+		return {"kind":"project", "zone":"Banc de test", "label":"Décision prototype / validation", "tab":3, "context":"PROJECT_DECISION", "title":"Le prototype attend votre décision", "category":"PROTOTYPE"}
+	if _has_pending_production_route():
+		return {"kind":"project", "zone":"Stock & production", "label":"Choisir la fabrication", "tab":4, "context":"Production", "title":"L'industrialisation attend votre choix de fabrication", "category":"PRODUCTION"}
+	if _has_ready_product_to_launch():
+		return {"kind":"project", "zone":"Stock & production", "label":"Préparer le lancement", "tab":4, "context":"PRODUCT_LAUNCH", "title":"Votre CPU est prêt à être lancé", "category":"LANCEMENT"}
+	var best: Dictionary = {}
+	for value in _ceo_decisions():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var decision: Dictionary = value
+		if str(decision.get("id", "")).begins_with("PROJECT:"):
+			continue
+		if best.is_empty() or float(decision.get("severity", 0.0)) > float(best.get("severity", 0.0)):
+			best = decision
+	if best.is_empty():
+		return {}
+	var category := str(best.get("category", "DIRECTION"))
+	var title := str(best.get("title", "Décision à prendre"))
+	return {
+		"kind":"ceo",
+		"zone":str(CATEGORY_ZONE.get(category, "Bureau du fondateur")),
+		"label":_short("Traiter : %s" % title, 34),
+		"tab":int(best.get("target_tab", 1)),
+		"context":"",
+		"title":title,
+		"category":category,
+		"advice":str(best.get("recommendation", "")),
+		"id":str(best.get("id", ""))
+	}
+
+func _update_focus() -> void:
+	_focus = _compute_focus()
+	if not _focus.is_empty():
+		_focus["zone_visible"] = _zone_available(_zone_data(str(_focus.get("zone", ""))))
+
+func focus_decision() -> Dictionary:
+	_update_focus()
+	return _focus.duplicate()
+
+func _side_label_for_tab(tab: int) -> String:
+	for button in _side_buttons:
+		if int(button.get_meta("tab", -1)) == tab and not button.disabled:
+			return str(button.get_meta("label", ""))
+	return ""
+
+func _focus_where() -> String:
+	if bool(_focus.get("zone_visible", false)):
+		return "le repère « %s » (pastille rouge)" % str(_focus.get("zone", ""))
+	var side := _side_label_for_tab(int(_focus.get("tab", -1)))
+	if side != "":
+		return "le bouton « %s » à gauche" % side
+	return "le bouton vert"
+
+func _nora_message() -> String:
+	if not CompanyManager.created and decision_source.is_null():
+		return "Créez votre entreprise pour commencer."
+	if _onboarding_stage == "FIRST_IDEA":
+		return "Bienvenue au garage ! Touchez l'établi (repère vert) pour imaginer notre premier processeur."
+	if not _focus.is_empty():
+		var message := "%s : passez par %s." % [str(_focus.get("title", "")), _focus_where()]
+		var advice := str(_focus.get("advice", ""))
+		if str(_focus.get("kind", "")) == "ceo" and advice != "" and message.length() + advice.length() < 140:
+			message += " " + advice
+		return message
+	for value in ResearchManager.projects:
+		if str(value.get("status", "")) == "DEVELOPMENT":
+			var phase_index := clampi(int(value.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+			return "L'équipe avance sur %s (%s). Accélérez le temps ▶▶ : je vous préviens dès qu'une décision arrive." % [str(value.get("name", "le projet")), str(GameData.PHASES[phase_index]).to_lower()]
+	for job_value in ProductionManager.get_active_jobs():
+		return "La fabrication de %s avance (%.0f %%). Je vous préviens quand il sera prêt à lancer." % [str(job_value.get("name", "votre CPU")), float(job_value.get("progress", 0.0))]
+	for product_value in ProductManager.products:
+		if str(product_value.get("status", "")) == "LAUNCHED":
+			return "%s se vend : %s unités ce mois. Quand vous voulez, lancez la génération suivante depuis l'établi." % [str(product_value.get("name", "Votre CPU")), str(product_value.get("last_month_sales", 0))]
+	return "Touchez un élément du décor pour gérer l'entreprise."
+
+func nora_message() -> String:
+	return _tasks_label.text if _tasks_label != null else ""
+
 func _apply_attention_style(button: Button) -> void:
 	var hint := StyleBoxFlat.new()
-	hint.bg_color = Color(0.95, 0.70, 0.25, 0.16)
-	hint.border_color = Color(1.0, 0.77, 0.35, 0.95)
-	hint.set_border_width_all(3)
+	hint.bg_color = Color(1.0, 0.72, 0.2, 0.30)
+	hint.border_color = Color("ff9f1a")
+	hint.set_border_width_all(4)
+	hint.set_corner_radius_all(30)
+	hint.shadow_color = Color(1.0, 0.62, 0.1, 0.55)
+	hint.shadow_size = 10
 	button.add_theme_stylebox_override("normal", hint)
 	button.add_theme_stylebox_override("focus", hint)
 
 func _refresh_gameplay_overlays() -> void:
 	if _project_title == null or _project_stage == null or _project_progress == null:
 		return
+	_update_focus()
 	var active_project: Dictionary = {}
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":
@@ -654,13 +869,14 @@ func _refresh_gameplay_overlays() -> void:
 		var phase_progress := float(active_project.get("phase_progress", 0.0))
 		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
 		_project_title.text = str(active_project.get("name", "Projet CPU"))
-		_project_stage.text = "%s • %.0f%%" % [str(GameData.PHASES[phase_index]), phase_progress]
+		# Un seul pourcentage à l'écran : la barre (avancement global). La ligne dit l'étape.
+		_project_stage.text = "Étape %d/%d : %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
 		_project_progress.value = overall
 	elif not active_job.is_empty():
 		_project_kicker.text = "Industrialisation"
 		_refresh_phase_strip(3)
 		_project_title.text = str(active_job.get("name", "CPU en fabrication"))
-		_project_stage.text = "Industrialisation • %.0f%%" % float(active_job.get("progress", 0.0))
+		_project_stage.text = "Industrialisation en cours"
 		_project_progress.value = float(active_job.get("progress", 0.0))
 	elif not ready_product.is_empty():
 		_project_kicker.text = "Prêt au lancement"
@@ -682,18 +898,7 @@ func _refresh_gameplay_overlays() -> void:
 		_project_progress.value = 0.0
 
 	if _tasks_label != null:
-		if _has_pending_project_decision():
-			_tasks_label.text = "● Traiter la décision prototype\n○ Relancer l'équipe\n○ Préparer la suite"
-		elif _has_pending_production_route():
-			_tasks_label.text = "● Choisir la fabrication\n○ Vérifier la capacité\n○ Préparer le lancement"
-		elif _has_ready_product_to_launch():
-			_tasks_label.text = "● Fixer le lancement\n○ Vérifier le stock\n○ Préparer les premiers retours"
-		elif not active_project.is_empty():
-			_tasks_label.text = "✓ Projet lancé\n○ Laisser l'équipe avancer\n○ Attendre la prochaine décision"
-		elif not launched_product.is_empty():
-			_tasks_label.text = "✓ Produit lancé\n○ Observer ventes et retours\n○ Préparer la génération suivante"
-		else:
-			_tasks_label.text = "○ Choisir une cible CPU\n○ Nommer le produit\n○ Lancer le projet"
+		_tasks_label.text = _nora_message()
 
 	if _feedback_label != null:
 		if not MediaManager.news.is_empty():
@@ -720,25 +925,14 @@ func _refresh_primary_action() -> void:
 	_primary_action.disabled = false
 	_primary_action.set_meta("tab", 3)
 	_primary_action.set_meta("context", "Établi CPU")
-	if _has_pending_project_decision():
-		_primary_action.text = "Décision prototype / validation"
-		_primary_action.set_meta("context", "PROJECT_DECISION")
-	elif _has_pending_production_route():
-		_primary_action.text = "Choisir la fabrication"
-		_primary_action.set_meta("tab", 4)
-		_primary_action.set_meta("context", "Production")
-	elif _has_ready_product_to_launch():
-		_primary_action.text = "Préparer le lancement"
-		_primary_action.set_meta("tab", 4)
-		_primary_action.set_meta("context", "PRODUCT_LAUNCH")
+	if not _focus.is_empty():
+		# Projet bloquant ou décision PDG la plus grave : le bouton vert y mène directement.
+		_primary_action.text = str(_focus.get("label", "Traiter la décision"))
+		_primary_action.set_meta("tab", int(_focus.get("tab", 3)))
+		_primary_action.set_meta("context", str(_focus.get("context", "")))
 	elif _has_active_project():
-		var project: Dictionary = {}
-		for value in ResearchManager.projects:
-			if str(value.get("status", "")) == "DEVELOPMENT":
-				project = value
-				break
-		var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
-		_primary_action.text = "%s • %s %.0f%%" % [str(project.get("name", "Projet CPU")), str(GameData.PHASES[phase_index]), float(project.get("phase_progress", 0.0))]
+		# Rien à décider : on ne montre pas un faux bouton grisé qui répète la carte.
+		_primary_action.text = "L'équipe travaille…"
 		_primary_action.disabled = true
 	else:
 		_primary_action.text = "+ Nouveau projet CPU"
@@ -759,12 +953,9 @@ func set_onboarding_stage(stage: String) -> void:
 			_room_subtitle.text = "Touchez l'établi pour commencer"
 		else:
 			_room_title.text = str(ExecutiveManager.workplace_data().get("name", "Garage aménagé"))
-			if _has_pending_project_decision():
-				_room_subtitle.text = "Décision requise • Banc de test"
-			elif _has_pending_production_route():
-				_room_subtitle.text = "Décision requise • Stock & production"
-			elif _has_ready_product_to_launch():
-				_room_subtitle.text = "Décision requise • Lancement CPU"
+			_update_focus()
+			if not _focus.is_empty():
+				_room_subtitle.text = "Décision requise • %s" % str(_focus.get("zone", ""))
 			elif _has_active_project():
 				var project: Dictionary = {}
 				for value in ResearchManager.projects:
@@ -781,16 +972,25 @@ func set_onboarding_stage(stage: String) -> void:
 	_refresh_selected_context()
 
 func _refresh_zone_visibility() -> void:
+	_update_focus()
+	var focus_zone := str(_focus.get("zone", ""))
 	for button in _zone_buttons:
 		var zone := _zone_data(str(button.get_meta("zone_name", "")))
 		button.visible = _zone_available(zone)
 		_apply_zone_style(button)
-		if _onboarding_stage == "FIRST_IDEA" and str(button.get_meta("zone_name", "")) == "Établi CPU" and button.visible:
+		var zone_name := str(button.get_meta("zone_name", ""))
+		var alert: Control = button.get_meta("alert_node", null)
+		var attention := button.visible and zone_name == focus_zone and zone_name != _selected_zone
+		if alert != null:
+			alert.visible = attention
+		button.z_index = 16 if attention else 0
+		if _onboarding_stage == "FIRST_IDEA" and zone_name == "Établi CPU" and button.visible:
 			button.tooltip_text = "Touchez l'établi pour imaginer votre premier CPU"
-		elif str(button.get_meta("zone_name", "")) == "Banc de test" and _has_pending_project_decision() and button.visible:
+		elif attention:
 			_apply_attention_style(button)
-		elif str(button.get_meta("zone_name", "")) == "Stock & production" and (_has_pending_production_route() or _has_ready_product_to_launch()) and button.visible:
-			_apply_attention_style(button)
+			button.tooltip_text = "Décision requise — %s" % str(_focus.get("title", ""))
+		else:
+			button.tooltip_text = "%s — %s" % [zone_name, str(zone.get("subtitle", ""))]
 
 func set_workplace(data: Dictionary) -> void:
 	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)

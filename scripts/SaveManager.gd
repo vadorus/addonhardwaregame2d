@@ -8,10 +8,12 @@ const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SAVE_VERSION := 29
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 
-func save_game():
+func save_game(quiet: bool = false) -> bool:
+	# quiet = sauvegarde automatique : pas de message de succès (évite d'écraser la ligne de statut).
 	if not CompanyManager.created:
-		save_completed.emit(false, "Aucune partie à sauvegarder.")
-		return
+		if not quiet:
+			save_completed.emit(false, "Aucune partie à sauvegarder.")
+		return false
 	var state := {
 		"version":SAVE_VERSION,
 		"time":TimeManager.get_state(),
@@ -33,8 +35,10 @@ func save_game():
 	}
 	if not _write_atomic(JSON.stringify(state)):
 		save_completed.emit(false, "Impossible d'écrire la sauvegarde de façon sûre.")
-		return
-	save_completed.emit(true, "Partie sauvegardée.")
+		return false
+	if not quiet:
+		save_completed.emit(true, "Partie sauvegardée.")
+	return true
 
 func load_game() -> bool:
 	var state := _read_save_state(SAVE_PATH)
@@ -96,8 +100,8 @@ func _write_atomic(json_text: String) -> bool:
 		DirAccess.remove_absolute(temp_abs)
 		return false
 
-	if FileAccess.file_exists(BACKUP_SAVE_PATH):
-		DirAccess.remove_absolute(backup_abs)
+	# La sauvegarde précédente est conservée en .bak : c'est elle que load_game() récupère
+	# si la sauvegarde principale est un jour corrompue (coupure, appli tuée par Android…).
 	return true
 
 func _read_save_state(path: String) -> Dictionary:
