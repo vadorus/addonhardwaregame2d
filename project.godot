@@ -44,6 +44,7 @@ AfterSalesManager="*res://scripts/AfterSalesManager.gd"
 SimulationManager="*res://scripts/SimulationManager.gd"
 TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
+SoundManager="*res://scripts/SoundManager.gd"
 
 [display]
 

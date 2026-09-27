@@ -23,6 +23,7 @@ const SUPPLIER_SCENARIO := preload("res://tests/scenarios/SupplierScenario.gd")
 const COMPANY_POLICY_SCENARIO := preload("res://tests/scenarios/CompanyPolicyScenario.gd")
 const GARAGE_DECISION_SCENARIO := preload("res://tests/scenarios/GarageDecisionScenario.gd")
 const PLATFORM_SCENARIO := preload("res://tests/scenarios/PlatformScenario.gd")
+const SENSATION_SCENARIO := preload("res://tests/scenarios/SensationScenario.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
@@ -1605,6 +1606,10 @@ func _ready() -> void:
 	var platform_error := PLATFORM_SCENARIO.run(self)
 	if platform_error != "":
 		_fail(platform_error)
+		return
+	var sensation_error := SENSATION_SCENARIO.run(self)
+	if sensation_error != "":
+		_fail(sensation_error)
 		return
 
 	print("[CI] Smoke test passed")

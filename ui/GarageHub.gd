@@ -1,6 +1,10 @@
 extends Control
 
 signal zone_requested(tab_index: int, zone_name: String)
+## Émis quand une nouvelle décision prioritaire apparaît (notification + son côté main).
+signal decision_raised(title: String, tab: int)
+
+const JUICE := preload("res://ui/Juice.gd")
 
 const ROOM_ART_PATH := "res://assets/ui/garage_reference_v09.png"
 const BADGE := preload("res://ui/GarageBadge.gd")
@@ -77,6 +81,7 @@ const CATEGORY_ZONE := {
 ## Source des décisions PDG ; remplaçable par les tests.
 var decision_source: Callable = Callable()
 var _focus: Dictionary = {}
+var _last_focus_key := ""
 var _phase_row: HBoxContainer
 
 func _ready() -> void:
@@ -628,6 +633,9 @@ func open_zone_menu(zone_name: String) -> bool:
 	_context_panel.visible = true
 	_refresh_zone_visibility()
 	call_deferred("_layout_zones")
+	(func(): JUICE.pop_in(_context_panel, 0.16)).call_deferred()
+	if get_node_or_null("/root/SoundManager") != null:
+		SoundManager.play("open")
 	return true
 
 func close_context_menu() -> void:
@@ -810,6 +818,11 @@ func _update_focus() -> void:
 	_focus = _compute_focus()
 	if not _focus.is_empty():
 		_focus["zone_visible"] = _zone_available(_zone_data(str(_focus.get("zone", ""))))
+	var key := "" if _focus.is_empty() else "%s|%s" % [str(_focus.get("id", _focus.get("category", ""))), str(_focus.get("label", ""))]
+	if key != _last_focus_key:
+		_last_focus_key = key
+		if key != "":
+			decision_raised.emit(str(_focus.get("title", "Décision")), int(_focus.get("tab", 0)))
 
 func focus_decision() -> Dictionary:
 	_update_focus()
@@ -1007,6 +1020,12 @@ func _refresh_zone_visibility() -> void:
 		var attention := button.visible and zone_name == focus_zone and zone_name != _selected_zone
 		if alert != null:
 			alert.visible = attention
+			var pulse: Tween = alert.get_meta("pulse") if alert.has_meta("pulse") else null
+			if attention and (pulse == null or not pulse.is_valid()):
+				alert.set_meta("pulse", JUICE.pulse_forever(alert, 0.2, 0.8))
+			elif not attention and pulse != null:
+				JUICE.stop_pulse(alert, pulse)
+				alert.remove_meta("pulse")
 		button.z_index = 16 if attention else 0
 		if _onboarding_stage == "FIRST_IDEA" and zone_name == "Établi CPU" and button.visible:
 			button.tooltip_text = "Touchez l'établi pour imaginer votre premier CPU"

@@ -1,6 +1,8 @@
 extends Node
 
 signal news_changed
+## Émis une fois par produit quand la presse publie ses tests (écran de révélation des notes).
+signal reviews_published(product_name, reviews)
 
 const OUTLETS := [
 	{"id":"CIRCUIT_LAB","name":"Circuit Lab","channel":"BENCHMARK","start_year":1971,"focus":"PERFORMANCE","reach":0.72},
@@ -44,12 +46,14 @@ func available_outlets(year: int = TimeManager.year) -> Array:
 
 func publish_product_review(product: Dictionary, segment_scores: Dictionary, benchmark_rank: int, benchmark_total: int):
 	var selected := _select_review_outlets(product)
+	var published: Array = []
 	for outlet_value in selected:
 		var outlet: Dictionary = outlet_value
 		var review_score := _outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total)
 		var sentiment := clampf((review_score - 56.0) / 34.0, -1.0, 1.0)
 		var tone := _tone_for_score(review_score)
 		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total)
+		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score, "headline":str(text.headline)})
 		add_news(
 			channel_label(str(outlet.channel)),
 			str(text.headline),
@@ -60,6 +64,8 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach)
 			}
 		)
+	if not published.is_empty():
+		reviews_published.emit(str(product.get("name", "Produit")), published)
 
 func _select_review_outlets(product: Dictionary) -> Array:
 	var available := available_outlets()

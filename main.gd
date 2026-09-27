@@ -142,12 +142,36 @@ var header_wordmark: Array = []
 var header_compact := false
 var setup_continue_button: Button
 
+# Étape 1 « Sensation » : notifications, révélation des notes, trésorerie animée, sons.
+const JUICE := preload("res://ui/Juice.gd")
+var notification_feed: Control
+var review_layer: ColorRect
+var review_panel: Control
+var _pending_reviews: Array = []
+var _money_shown := 0.0
+var _money_shown_ready := false
+var _money_tween: Tween
+var _runway_warned := false
+var _last_news_key := ""
+var _review_resume_scale := 0.0
+var _last_news_toast_ms := -100000
+var menu_volume_label: Label
+
 func _ready():
+	get_tree().node_added.connect(_on_node_added)
 	_apply_saved_ui_scale()
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
+	_build_notification_feed()
+	_build_review_layer()
 	_connect_signals()
+	MediaManager.reviews_published.connect(_on_reviews_published)
+	MediaManager.news_changed.connect(_on_news_changed)
+	tabs.tab_changed.connect(func(_index): JUICE.fade_in(tabs.get_current_tab_control(), 0.18))
+	var garage: Control = dashboard_screen.get("dashboard_garage") if dashboard_screen != null else null
+	if garage != null and garage.has_signal("decision_raised"):
+		garage.connect("decision_raised", _on_decision_raised)
 	resized.connect(_update_responsive_layout)
 	resized.connect(_apply_safe_area)
 	_refresh_all()
@@ -1175,6 +1199,8 @@ func _show_first_cpu_workshop() -> void:
 		return
 	TimeManager.time_scale = 0.0
 	first_cpu_workshop.call("open")
+	SoundManager.play("open")
+	JUICE.fade_in(first_cpu_workshop, 0.2)
 	status_label.text = "Nora : choisissez d'abord ce que ce premier processeur doit accomplir."
 
 func _close_first_cpu_workshop() -> void:
@@ -1282,6 +1308,9 @@ func _show_launch_moment(product: Dictionary, launch_cost: int) -> void:
 		launch_moment_panel.call("set_viewport_width", size.x)
 	launch_layer.visible = true
 	launch_moment_timer.start()
+	SoundManager.play("launch")
+	JUICE.fade_in(launch_layer, 0.25)
+	(func(): JUICE.pop_in(launch_moment_panel, 0.3)).call_deferred()
 	MediaManager.publish_business_event(
 		"%s arrive sur le marché" % str(product.get("name", "Nouveau produit")),
 		"Les premières commandes sont ouvertes. Le marché va maintenant confronter la promesse du produit aux ventes, benchmarks et retours terrain."
@@ -1295,6 +1324,7 @@ func _close_launch_moment() -> void:
 		launch_moment_timer.stop()
 	if not SimulationManager.is_game_over and _blocking_company_decision().is_empty():
 		TimeManager.time_scale = maxf(_launch_resume_scale, 1.0)
+	_show_pending_reviews()
 
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
@@ -1845,6 +1875,14 @@ func _on_month_closed(report: Dictionary):
 		]
 		if month_ticker_timer != null:
 			month_ticker_timer.start()
+		# Bilan mensuel : la ligne de statut suffit ; une carte seulement quand la trésorerie devient tendue.
+		var runway_left := float(ExecutiveManager.financial_advice().get("runway_months", 99.0))
+		if runway_left < 6.0 and not _runway_warned:
+			_runway_warned = true
+			notify("Trésorerie tendue : moins de 6 mois d'avance. Nora conseille de vérifier les dépenses.", "alert", 1)
+		elif runway_left >= 9.0:
+			_runway_warned = false
+		SoundManager.play("cash" if result > 0 else "month")
 	_refresh_all()
 	# V0.8.1 : sauvegarde automatique à chaque clôture de mois (PC et Android).
 	_autosave("mensuelle")
@@ -1927,7 +1965,15 @@ func _refresh_top():
 	var runway := BalanceManager.starting_runway_months()
 	if CompanyManager.created:
 		runway = float(ExecutiveManager.financial_advice().get("runway_months", runway))
-	money_label.text = "%s € • %.0f mois" % [_money(Economy.money), runway]
+	# Étape 1 « Sensation » : la trésorerie défile jusqu'à sa nouvelle valeur.
+	var target_money := float(Economy.money)
+	var from_money := _money_shown if _money_shown_ready else target_money
+	_money_shown = target_money
+	_money_shown_ready = true
+	var runway_months := runway
+	if _money_tween != null and _money_tween.is_valid():
+		_money_tween.kill()
+	_money_tween = JUICE.count_label(money_label, from_money, target_money, func(value: float) -> String: return "%s € • %.0f mois" % [_money(int(round(value))), runway_months], 0.55)
 	var cash_color := Color("5ce0a4")
 	if Economy.money <= 0 or runway < 3.0:
 		cash_color = Color("ff7b7b")
@@ -1974,6 +2020,8 @@ func _refresh_navigation_progression():
 		for feature_value in newly_unlocked:
 			labels.append(str(ExecutiveManager.interface_feature_info(str(feature_value)).get("label", feature_value)))
 		status_label.text = "Nora : nouvelle fonction disponible — %s." % ", ".join(labels)
+		notify("Nouvelle fonction disponible : %s" % ", ".join(labels), "unlock")
+		SoundManager.play("unlock")
 
 func _apply_research_plan():
 	var allocations := {}
@@ -2297,6 +2345,24 @@ func _build_menu_layer() -> void:
 	var plus := _menu_button("+", _menu_change_scale.bind(1))
 	plus.custom_minimum_size = Vector2(52, 46)
 	scale_row.add_child(plus)
+	var volume_row := HBoxContainer.new()
+	volume_row.add_theme_constant_override("separation", 8)
+	box.add_child(volume_row)
+	var volume_caption := LOOK.label("Volume des sons", 14)
+	volume_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	volume_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	volume_row.add_child(volume_caption)
+	var quieter := _menu_button("−", _menu_change_volume.bind(-1))
+	quieter.custom_minimum_size = Vector2(52, 46)
+	volume_row.add_child(quieter)
+	menu_volume_label = LOOK.label("80 %", 15)
+	menu_volume_label.custom_minimum_size.x = 64
+	menu_volume_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_volume_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	volume_row.add_child(menu_volume_label)
+	var louder := _menu_button("+", _menu_change_volume.bind(1))
+	louder.custom_minimum_size = Vector2(52, 46)
+	volume_row.add_child(louder)
 	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
 	menu_fullscreen_button.visible = not _is_mobile()
 	box.add_child(menu_fullscreen_button)
@@ -2306,6 +2372,7 @@ func _menu_button(text: String, action: Callable, primary: bool = false) -> Butt
 	var button := Button.new()
 	button.text = text
 	LOOK.button_style(button, primary)
+	button.custom_minimum_size.y = 42 # le menu doit tenir sur un téléphone 16:9 à 120 %
 	button.pressed.connect(action)
 	return button
 
@@ -2316,6 +2383,8 @@ func open_system_menu() -> void:
 	TimeManager.time_scale = 0.0
 	_refresh_menu_labels()
 	menu_layer.visible = true
+	SoundManager.play("open")
+	JUICE.fade_in(menu_layer, 0.15)
 
 func close_system_menu() -> void:
 	if menu_layer == null or not menu_layer.visible:
@@ -2328,6 +2397,8 @@ func system_menu_visible() -> bool:
 	return menu_layer != null and menu_layer.visible
 
 func _refresh_menu_labels() -> void:
+	if menu_volume_label != null:
+		menu_volume_label.text = "Muet" if SoundManager.muted else "%d %%" % int(round(SoundManager.sfx_volume * 100.0))
 	if menu_scale_label != null:
 		menu_scale_label.text = "%d %%" % int(round(ui_scale * 100.0))
 	if menu_save_label != null:
@@ -2373,6 +2444,17 @@ func _menu_change_scale(direction: int) -> void:
 	set_ui_scale(float(UI_SCALE_STEPS[index]))
 	_refresh_menu_labels()
 
+func _menu_change_volume(direction: int) -> void:
+	var steps := [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+	var index := 0
+	for i in range(steps.size()):
+		if absf(float(steps[i]) - SoundManager.sfx_volume) < absf(float(steps[index]) - SoundManager.sfx_volume):
+			index = i
+	index = clampi(index + direction, 0, steps.size() - 1)
+	SoundManager.set_volume(float(steps[index]))
+	SoundManager.play("notify")
+	_refresh_menu_labels()
+
 func _menu_toggle_fullscreen() -> void:
 	if DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
@@ -2394,7 +2476,7 @@ func _handle_back_request() -> void:
 		_close_first_cpu_workshop()
 		return
 	# Les écrans de décision (lancement, événement de recherche, bilan, faillite) exigent un choix.
-	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer]:
+	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer, review_layer]:
 		if blocking != null and blocking.visible:
 			return
 	if setup_layer != null and setup_layer.visible:
@@ -2425,3 +2507,105 @@ func _confirm_quit_on_back() -> void:
 	_autosave("retour")
 	if status_label != null:
 		status_label.text = "Partie sauvegardée. Appuyez encore sur Retour pour quitter."
+
+
+# ---------------------------------------------------------------------------
+# Étape 1 « Sensation » : sons, notifications, révélation des notes de presse
+# ---------------------------------------------------------------------------
+
+func _on_node_added(node: Node) -> void:
+	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
+	if node is BaseButton and not node.has_meta("silent"):
+		var button := node as BaseButton
+		if not button.pressed.is_connected(_play_click):
+			button.pressed.connect(_play_click)
+
+func _play_click() -> void:
+	SoundManager.play("click")
+
+func _build_notification_feed() -> void:
+	var feed_script: Script = load("res://ui/NotificationFeed.gd")
+	notification_feed = feed_script.new() as Control
+	notification_feed.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	notification_feed.offset_left = -180.0
+	notification_feed.offset_right = 180.0
+	notification_feed.offset_top = 104.0
+	notification_feed.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	notification_feed.connect("navigate_requested", func(tab_index: int): _show_tab(tab_index))
+	add_child(notification_feed)
+
+## Petite carte en haut de l'écran. kind : info, good, alert, press, unlock. tab >= 0 : un toucher ouvre l'écran.
+func notify(text: String, kind: String = "info", tab: int = -1) -> void:
+	if notification_feed == null or not CompanyManager.created:
+		return
+	notification_feed.call("push", text, kind, tab)
+
+func _on_news_changed() -> void:
+	if MediaManager.news.is_empty() or not CompanyManager.created:
+		return
+	var item: Dictionary = MediaManager.news[0]
+	if item.has("review_score"):
+		return # les tests de presse passent par l'écran de révélation
+	var key := "%s|%s|%s" % [str(item.get("headline", "")), str(item.get("month", "")), str(item.get("year", ""))]
+	if key == _last_news_key:
+		return
+	_last_news_key = key
+	# En vitesse ×3, plusieurs actualités tombent d'affilée : une carte au plus toutes les 3 s.
+	var now := Time.get_ticks_msec()
+	if now - _last_news_toast_ms < 3000:
+		return
+	_last_news_toast_ms = now
+	notify("Presse — %s" % str(item.get("headline", "")), "press", 6)
+	SoundManager.play("notify")
+
+func _on_decision_raised(title: String, tab: int) -> void:
+	notify("Décision requise : %s" % title, "alert", tab)
+	SoundManager.play("decision")
+
+func _build_review_layer() -> void:
+	review_layer = ColorRect.new()
+	review_layer.color = Color(0.10, 0.06, 0.02, 0.80)
+	review_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	review_layer.visible = false
+	review_layer.z_index = 100
+	add_child(review_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	review_layer.add_child(center)
+	var panel_script: Script = load("res://ui/components/ReviewRevealPanel.gd")
+	review_panel = panel_script.new() as Control
+	review_panel.connect("continue_requested", _close_review_reveal)
+	center.add_child(review_panel)
+
+func _on_reviews_published(product_name: String, reviews: Array) -> void:
+	_pending_reviews.append({"name":product_name, "reviews":reviews})
+	# Une gamme publie ses tests modèle par modèle dans la même clôture de mois :
+	# on attend la fin de la vague pour n'afficher qu'un seul écran.
+	call_deferred("_show_pending_reviews")
+
+func _show_pending_reviews() -> void:
+	if _pending_reviews.is_empty() or review_layer == null or review_layer.visible:
+		return
+	# Ne jamais empiler deux grands moments : on attend la fin du lancement ou d'un choix bloquant.
+	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer]:
+		if other != null and other.visible:
+			return
+	var next: Dictionary = _pending_reviews.pop_front()
+	var other_models := _pending_reviews.size()
+	_pending_reviews.clear()
+	_review_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	review_layer.visible = true
+	JUICE.fade_in(review_layer, 0.25)
+	review_panel.call("show_reviews", str(next.get("name", "")), next.get("reviews", []), other_models)
+
+func review_reveal_visible() -> bool:
+	return review_layer != null and review_layer.visible
+
+func _close_review_reveal() -> void:
+	if review_layer == null or not review_layer.visible:
+		return
+	review_layer.visible = false
+	if _review_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
+		TimeManager.time_scale = _review_resume_scale
+	_show_pending_reviews()
