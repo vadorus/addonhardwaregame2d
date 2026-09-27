@@ -2185,8 +2185,14 @@ func _on_products_action(action: String, payload: Dictionary):
 			if ProductManager.launch_product(launch_product_id, int(payload.get("price", 0)), launch_capacity):
 				status_label.text = "Produit lancé : %s € engagés pour la capacité. Le prochain mois comparera prévision et ventes réelles." % _money(launch_cost)
 				_show_launch_moment(ProductManager.get_product(launch_product_id), launch_cost)
+				_select_next_ready_product()
+			elif str(launch_product_data.get("status", "")) != "READY":
+				status_label.text = "%s est déjà lancé ou indisponible : choisissez un modèle « prêt » dans la liste." % str(launch_product_data.get("name", "Ce modèle"))
+				_select_next_ready_product()
 			else:
-				status_label.text = "Lancement impossible : produit indisponible ou trésorerie insuffisante pour engager la capacité demandée (~%s €)." % _money(launch_cost)
+				status_label.text = "Lancement impossible : trésorerie insuffisante pour engager la capacité demandée (~%s €). Réduisez la capacité." % _money(launch_cost)
+		"launch_range":
+			_launch_range(str(payload.get("generation_id", "")))
 		"update_price":
 			if ProductManager.update_product_price(str(payload.get("product_id", "")), int(payload.get("price", 0))):
 				status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."
@@ -2802,3 +2808,44 @@ func _load_from_slot_picker(slot: int) -> void:
 	_load_game_slot(slot)
 	TimeManager.time_scale = 0.0
 	status_label.text = "Partie chargée. Relancez le temps quand vous êtes prêt."
+
+# --- Lancement de gamme (correctif du bug « Lancement impossible » sur une gamme) ---------
+
+func _select_next_ready_product() -> void:
+	# Après le rafraîchissement général, la liste reviendrait sur le modèle déjà lancé :
+	# on repointe le prochain modèle prêt pour que le joueur continue sans se tromper.
+	(func():
+		var panel: Object = products_screen.get("lifecycle_panel") if products_screen != null else null
+		if panel != null and panel.has_method("select_first_ready"):
+			panel.call("select_first_ready")
+	).call_deferred()
+
+func _launch_range(generation_id: String) -> void:
+	var launched: Array = []
+	var total_cost := 0
+	var failed := 0
+	var ready: Array = []
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "READY" and (generation_id == "" or str(product.get("generation_id", "")) == generation_id):
+			ready.append(product)
+	for product in ready:
+		var price := maxi(int(product.get("price", 1)), int(product.get("unit_cost", 1)) + 10)
+		var capacity := maxi(1, int(product.get("recommended_capacity", product.get("production_capacity", 100))))
+		var cost := ProductManager.launch_capacity_commitment_cost(product, capacity)
+		if ProductManager.launch_product(str(product.get("id", "")), price, capacity):
+			launched.append(product)
+			total_cost += cost
+		else:
+			failed += 1
+	if launched.is_empty():
+		status_label.text = "Aucun modèle n'a pu être lancé : trésorerie insuffisante pour la capacité conseillée." if failed > 0 else "Aucun modèle prêt à lancer."
+		SoundManager.play("error")
+		return
+	var headline: Dictionary = launched[0]
+	for product in launched:
+		if str(product.get("sku_tier", "")) == "SIGNATURE":
+			headline = product
+	status_label.text = "Gamme lancée : %d modèle(s), %s € engagés pour la capacité.%s" % [launched.size(), _money(total_cost), " %d modèle(s) non lancé(s) faute de trésorerie." % failed if failed > 0 else ""]
+	_show_launch_moment(ProductManager.get_product(str(headline.get("id", ""))), total_cost)
+	_refresh_all()

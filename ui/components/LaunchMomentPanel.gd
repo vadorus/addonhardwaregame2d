@@ -68,7 +68,7 @@ func show_product(product: Dictionary, launch_cost: int = 0) -> void:
 	var target_label := MarketManager.segment_label(target_key)
 	var price := int(product.get("price", 0))
 	var capacity := int(product.get("production_capacity", 0))
-	promise_label.text = "[b]Cible :[/b] %s\n[b]Prix :[/b] %s €   •   [b]Capacité :[/b] %s unités/mois\n[b]Engagement industriel :[/b] %s €" % [
+	promise_label.text = "Cible : %s\nPrix : %s €   •   Capacité : %s unités/mois\nEngagement industriel : %s €" % [
 		target_label,
 		UI.money(price),
 		UI.money(capacity),
@@ -81,7 +81,7 @@ func show_product(product: Dictionary, launch_cost: int = 0) -> void:
 	if forecast.is_empty():
 		forecast_label.text = "La première mesure réelle arrivera à la fin du mois commercial."
 	else:
-		forecast_label.text = "Demande estimée : [b]%s à %s[/b] unités/mois\nScénario central : [b]%s[/b] unités\nConfiance : une estimation, pas une promesse." % [
+		forecast_label.text = "Demande estimée : %s à %s unités/mois\nScénario central : %s unités\nConfiance : une estimation, pas une promesse." % [
 			UI.money(int(forecast.get("min_units", 0))),
 			UI.money(int(forecast.get("max_units", 0))),
 			UI.money(int(forecast.get("expected_units", 0)))

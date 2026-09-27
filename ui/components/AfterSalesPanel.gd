@@ -136,7 +136,7 @@ func _refresh_selected_case() -> void:
 		str(case_data.get("product_name", "Produit")),
 		AfterSalesManager.issue_label(str(case_data.get("issue_type", "")))
 	]
-	case_signal_label.text = "[b]Gravité :[/b] %.0f/100   •   [b]Confiance :[/b] %.0f%%\n[b]Retours observés :[/b] %d / %d (%.2f%%)   •   [b]Population estimée concernée :[/b] ~%s unités" % [
+	case_signal_label.text = "Gravité : %.0f/100   •   Confiance : %.0f%%\nRetours observés : %d / %d (%.2f%%)   •   Population estimée concernée : ~%s unités" % [
 		severity,
 		confidence,
 		int(case_data.get("observed_returns", 0)),
@@ -149,7 +149,7 @@ func _refresh_selected_case() -> void:
 
 	var hypothesis := AfterSalesManager.case_hypothesis(case_data)
 	var design_context := str(case_data.get("design_context", ""))
-	case_cause_label.text = "%s\n\n[b]Lien avec la conception :[/b] %s" % [hypothesis, design_context]
+	case_cause_label.text = "%s\n\nLien avec la conception : %s" % [hypothesis, design_context]
 
 	var history: Array = case_data.get("history", [])
 	case_history_label.text = str(history[0]) if not history.is_empty() else "Le dossier vient d'être ouvert."

@@ -169,6 +169,10 @@ func focus_product_launch() -> void:
 	refresh()
 	_select_mode("SELL")
 	if lifecycle_panel != null:
+		# Arrivée par « Préparer le lancement » : on pointe le premier modèle réellement prêt,
+		# pas le dernier consulté (qui peut être déjà lancé).
+		if lifecycle_panel.has_method("select_first_ready"):
+			lifecycle_panel.call("select_first_ready")
 		call_deferred("_focus_product_launch_deferred")
 
 func _focus_product_launch_deferred() -> void:

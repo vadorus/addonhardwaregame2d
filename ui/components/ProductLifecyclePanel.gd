@@ -7,6 +7,8 @@ const UI := preload("res://ui/UiKit.gd")
 
 var products_label: Label
 var product_select: OptionButton
+var launch_button: Button
+var launch_range_button: Button
 var launch_grid: GridContainer
 var lifecycle_grid: GridContainer
 var product_details_label: Label
@@ -65,6 +67,12 @@ func _build() -> void:
 	launch.text = "Lancer sur le marché"
 	launch.pressed.connect(_emit_launch)
 	add_child(launch)
+	launch_button = launch
+	# Une gamme = plusieurs modèles prêts : un seul geste pour tout lancer aux réglages conseillés.
+	launch_range_button = Button.new()
+	launch_range_button.text = "Lancer toute la gamme (prix et capacité conseillés)"
+	launch_range_button.pressed.connect(_emit_launch_range)
+	add_child(launch_range_button)
 
 	post_launch_group = VBoxContainer.new()
 	post_launch_group.add_theme_constant_override("separation", 10)
@@ -200,6 +208,7 @@ func _refresh_product_details() -> void:
 	if product.is_empty():
 		return
 	post_launch_group.visible = str(product.get("status", "")) == "LAUNCHED"
+	_refresh_launch_buttons(product)
 	if product_pulse_panel != null and product_pulse_panel.has_method("refresh_product"):
 		product_pulse_panel.call("refresh_product", product)
 	var metrics: Dictionary = product.get("metrics", {})
@@ -389,6 +398,47 @@ func _emit_launch() -> void:
 	if product_select.item_count == 0:
 		return
 	action_requested.emit("launch_product", {"product_id":UI.option_meta(product_select),"price":int(product_price.value),"capacity":int(product_capacity.value)})
+
+func _emit_launch_range() -> void:
+	var product := ProductManager.get_product(UI.option_meta(product_select)) if product_select.item_count > 0 else {}
+	var generation_id := str(product.get("generation_id", ""))
+	if generation_id == "":
+		for candidate in ProductManager.products:
+			if str(candidate.get("status", "")) == "READY":
+				generation_id = str(candidate.get("generation_id", ""))
+				break
+	action_requested.emit("launch_range", {"generation_id":generation_id})
+
+func _ready_products_in(generation_id: String) -> int:
+	var count := 0
+	for candidate in ProductManager.products:
+		if str(candidate.get("status", "")) == "READY" and (generation_id == "" or str(candidate.get("generation_id", "")) == generation_id):
+			count += 1
+	return count
+
+## Le bouton ne propose de lancer que ce qui est réellement prêt (un modèle déjà lancé ne se relance pas).
+func _refresh_launch_buttons(product: Dictionary) -> void:
+	var is_ready := str(product.get("status", "")) == "READY"
+	if launch_button != null:
+		launch_button.disabled = not is_ready
+		launch_button.text = "Lancer %s sur le marché" % str(product.get("name", "ce modèle")) if is_ready else "%s est déjà lancé — choisissez un modèle prêt dans la liste" % str(product.get("name", "Ce modèle"))
+	if launch_range_button != null:
+		var ready_left := _ready_products_in("")
+		launch_range_button.visible = ready_left >= 2 or (ready_left >= 1 and not is_ready)
+		launch_range_button.text = "Lancer les %d modèles prêts (prix et capacité conseillés)" % ready_left if ready_left > 1 else "Lancer le modèle prêt restant (prix et capacité conseillés)"
+
+## Sélectionne le premier modèle prêt à lancer (appelé quand on arrive par « Préparer le lancement »).
+func select_first_ready() -> bool:
+	for i in range(product_select.item_count):
+		var candidate := ProductManager.get_product(str(product_select.get_item_metadata(i)))
+		if str(candidate.get("status", "")) == "READY":
+			product_select.select(i)
+			_refresh_product_details()
+			return true
+	return false
+
+func selected_product_id() -> String:
+	return UI.option_meta(product_select) if product_select.item_count > 0 else ""
 
 func _emit_update_price() -> void:
 	if product_select.item_count == 0:
