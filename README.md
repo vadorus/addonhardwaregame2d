@@ -4,7 +4,11 @@
 
 ## Statut
 
-**Projet actif — prototype V0.6 « room-first » sous Godot 4.7.2.**
+**Projet actif — prototype V0.8.1 « garage first » sous Godot 4.7.2, versions PC (Windows) et Android.**
+
+> **Obtenir la version PC et la version Android :** voir [`docs/BUILD_PC_ANDROID.md`](docs/BUILD_PC_ANDROID.md), ou lancer `powershell -ExecutionPolicy Bypass -File tools\build_all.ps1` (tests + `build/windows/TechEmpire.exe` + APK Android ; option `-Install` pour l'envoyer sur le téléphone).
+>
+> Nouveautés 0.8.1 : sauvegarde automatique + 3 emplacements, menu ☰ (taille d'interface, volumes, plein écran), bouton Retour Android, zones sûres, décisions du PDG signalées dans le garage, Nora comme guide, ambiance chaleureuse, sons, musique par décennie, notifications et révélation des notes de presse. Détail : `docs/reviews/V081_CLAUDE_PLATFORM_FIXES.md`.
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 

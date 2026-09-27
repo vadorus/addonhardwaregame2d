@@ -1098,7 +1098,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.8 - GARAGE FIRST")
+	var version := _eyebrow("V0.8.1 - GARAGE FIRST")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
@@ -1206,7 +1206,8 @@ func _show_creation_screen() -> void:
 		setup_title_box.visible = false
 	if setup_creation_box != null:
 		setup_creation_box.visible = true
-	if setup_name != null:
+	if setup_name != null and not _is_mobile():
+		# Sur téléphone, le focus automatique ouvrirait le clavier par-dessus le bouton « Entrer dans le garage ».
 		setup_name.grab_focus()
 
 func _build_first_cpu_workshop_layer() -> void:
