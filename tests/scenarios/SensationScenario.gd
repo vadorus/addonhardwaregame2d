@@ -15,6 +15,14 @@ static func run(host: Node) -> String:
 		return "Setting volume to 0 does not mute the game"
 	SoundManager.set_volume(previous_volume, false)
 
+	# Musique : une ambiance par décennie, en boucle.
+	if SoundManager.era_for_year(1975) != "1970s" or SoundManager.era_for_year(1986) != "1980s" or SoundManager.era_for_year(1999) != "1990s":
+		return "Music era mapping by year is wrong"
+	for era in ["1970s", "1980s", "1990s"]:
+		var track: AudioStreamWAV = SoundManager.build_music(era, 1)
+		if track == null or track.data.size() < 20000 or track.loop_mode != AudioStreamWAV.LOOP_FORWARD:
+			return "Music loop for %s is empty or does not loop" % era
+
 	# Notifications : empilées, plafonnées, texte conservé.
 	var feed: Control = (load("res://ui/NotificationFeed.gd") as Script).new() as Control
 	host.add_child(feed)

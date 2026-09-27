@@ -24,6 +24,26 @@ static func run(host: Node) -> String:
 		return "Second save did not keep the previous save as a backup"
 	_clear_saves()
 
+	# Emplacements manuels : écriture, résumé lisible, rechargement, « Continuer » = le plus récent.
+	SimulationManager.reset_all("CI Slot Company", "CPU", "STANDARD")
+	if not bool(SaveManager.save_to_slot(2, true)):
+		return "Saving into manual slot 2 failed"
+	var info: Dictionary = SaveManager.slot_info(2)
+	if not bool(info.get("exists", false)) or str(info.get("company", "")) != "CI Slot Company":
+		_clear_saves()
+		return "Slot 2 summary does not show the saved company: %s" % info
+	if bool(SaveManager.slot_info(1).get("exists", false)):
+		_clear_saves()
+		return "Empty slot 1 is reported as used"
+	if SaveManager.most_recent_slot() != 2:
+		_clear_saves()
+		return "Continue should pick the most recent slot (2)"
+	SimulationManager.reset_all("Other Company", "CPU", "STANDARD")
+	if not bool(SaveManager.load_from_slot(2)) or CompanyManager.company_name != "CI Slot Company":
+		_clear_saves()
+		return "Loading slot 2 did not restore the saved company"
+	_clear_saves()
+
 	# Le vrai jeu doit sauvegarder tout seul à la clôture d'un mois.
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(1280, 720)
@@ -57,6 +77,5 @@ static func run(host: Node) -> String:
 	return ""
 
 static func _clear_saves() -> void:
-	for path in [SaveManager.SAVE_PATH, SaveManager.BACKUP_SAVE_PATH, SaveManager.TEMP_SAVE_PATH]:
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	for slot in range(SaveManager.SLOT_COUNT + 1):
+		SaveManager.delete_slot(slot)

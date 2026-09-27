@@ -2,20 +2,43 @@ extends Node
 
 signal save_completed(ok, message)
 
+# Emplacement 0 = sauvegarde automatique (même fichier qu'avant : les anciennes parties restent lisibles).
 const SAVE_PATH := "user://tech_empire_save.json"
 const TEMP_SAVE_PATH := "user://tech_empire_save.json.tmp"
 const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
+const SLOT_COUNT := 3 # emplacements manuels 1..3
 const SAVE_VERSION := 29
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 
+# --- Chemins ----------------------------------------------------------------
+
+func slot_path(slot: int) -> String:
+	return SAVE_PATH if slot <= 0 else "user://tech_empire_slot_%d.json" % slot
+
+func _slot_temp(slot: int) -> String:
+	return TEMP_SAVE_PATH if slot <= 0 else slot_path(slot) + ".tmp"
+
+func _slot_backup(slot: int) -> String:
+	return BACKUP_SAVE_PATH if slot <= 0 else slot_path(slot) + ".bak"
+
+# --- Sauvegarde -------------------------------------------------------------
+
 func save_game(quiet: bool = false) -> bool:
 	# quiet = sauvegarde automatique : pas de message de succès (évite d'écraser la ligne de statut).
+	return save_to_slot(0, quiet)
+
+func save_to_slot(slot: int, quiet: bool = false) -> bool:
 	if not CompanyManager.created:
 		if not quiet:
 			save_completed.emit(false, "Aucune partie à sauvegarder.")
 		return false
+	slot = clampi(slot, 0, SLOT_COUNT)
 	var state := {
 		"version":SAVE_VERSION,
+		"meta":{
+			"company":CompanyManager.company_name, "month":TimeManager.month, "year":TimeManager.year,
+			"money":Economy.money, "saved_at":int(Time.get_unix_time_from_system())
+		},
 		"time":TimeManager.get_state(),
 		"balance":BalanceManager.get_state(),
 		"economy":Economy.get_state(),
@@ -33,17 +56,23 @@ func save_game(quiet: bool = false) -> bool:
 		"market":MarketManager.get_state(),
 		"media":MediaManager.get_state()
 	}
-	if not _write_atomic(JSON.stringify(state)):
+	if not _write_atomic(JSON.stringify(state), slot_path(slot), _slot_temp(slot), _slot_backup(slot)):
 		save_completed.emit(false, "Impossible d'écrire la sauvegarde de façon sûre.")
 		return false
 	if not quiet:
-		save_completed.emit(true, "Partie sauvegardée.")
+		save_completed.emit(true, "Partie sauvegardée." if slot == 0 else "Partie sauvegardée dans l'emplacement %d." % slot)
 	return true
 
+# --- Chargement -------------------------------------------------------------
+
 func load_game() -> bool:
-	var state := _read_save_state(SAVE_PATH)
-	if state.is_empty() and FileAccess.file_exists(BACKUP_SAVE_PATH):
-		state = _read_save_state(BACKUP_SAVE_PATH)
+	return load_from_slot(0)
+
+func load_from_slot(slot: int) -> bool:
+	slot = clampi(slot, 0, SLOT_COUNT)
+	var state := _read_save_state(slot_path(slot))
+	if state.is_empty() and FileAccess.file_exists(_slot_backup(slot)):
+		state = _read_save_state(_slot_backup(slot))
 		if not state.is_empty():
 			save_completed.emit(true, "Sauvegarde principale invalide : copie de secours récupérée.")
 	if state.is_empty():
@@ -75,32 +104,79 @@ func load_game() -> bool:
 	save_completed.emit(true, "Partie chargée.")
 	return true
 
-func _write_atomic(json_text: String) -> bool:
-	var temp_file := FileAccess.open(TEMP_SAVE_PATH, FileAccess.WRITE)
+# --- Informations d'emplacement (écran de choix) -----------------------------
+
+func slot_info(slot: int) -> Dictionary:
+	var path := slot_path(slot)
+	if not FileAccess.file_exists(path):
+		path = _slot_backup(slot)
+		if not FileAccess.file_exists(path):
+			return {"exists":false, "slot":slot}
+	var state := _read_save_state(path)
+	if state.is_empty():
+		return {"exists":false, "slot":slot}
+	var meta: Dictionary = state.get("meta", {})
+	var company: Dictionary = state.get("company", {})
+	var time_state: Dictionary = state.get("time", {})
+	return {
+		"exists":true, "slot":slot,
+		"company":str(meta.get("company", company.get("company_name", "Entreprise"))),
+		"month":int(meta.get("month", time_state.get("month", 1))),
+		"year":int(meta.get("year", time_state.get("year", 1971))),
+		"money":int(meta.get("money", 0)),
+		"saved_at":int(meta.get("saved_at", FileAccess.get_modified_time(path)))
+	}
+
+func has_any_save() -> bool:
+	for slot in range(SLOT_COUNT + 1):
+		if bool(slot_info(slot).get("exists", false)):
+			return true
+	return false
+
+## Emplacement le plus récent (-1 si aucune sauvegarde) : c'est ce que « Continuer » charge.
+func most_recent_slot() -> int:
+	var best := -1
+	var best_time := -1
+	for slot in range(SLOT_COUNT + 1):
+		var info := slot_info(slot)
+		if bool(info.get("exists", false)) and int(info.get("saved_at", 0)) > best_time:
+			best_time = int(info.get("saved_at", 0))
+			best = slot
+	return best
+
+func delete_slot(slot: int) -> void:
+	for path in [slot_path(slot), _slot_backup(slot), _slot_temp(slot)]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+# --- Écriture atomique --------------------------------------------------------
+
+func _write_atomic(json_text: String, target: String = SAVE_PATH, temp: String = TEMP_SAVE_PATH, backup: String = BACKUP_SAVE_PATH) -> bool:
+	var temp_file := FileAccess.open(temp, FileAccess.WRITE)
 	if temp_file == null:
 		return false
 	temp_file.store_string(json_text)
 	temp_file.flush()
 	temp_file.close()
 
-	var target_abs := ProjectSettings.globalize_path(SAVE_PATH)
-	var temp_abs := ProjectSettings.globalize_path(TEMP_SAVE_PATH)
-	var backup_abs := ProjectSettings.globalize_path(BACKUP_SAVE_PATH)
+	var target_abs := ProjectSettings.globalize_path(target)
+	var temp_abs := ProjectSettings.globalize_path(temp)
+	var backup_abs := ProjectSettings.globalize_path(backup)
 
-	if FileAccess.file_exists(BACKUP_SAVE_PATH):
+	if FileAccess.file_exists(backup):
 		DirAccess.remove_absolute(backup_abs)
-	if FileAccess.file_exists(SAVE_PATH):
+	if FileAccess.file_exists(target):
 		if DirAccess.rename_absolute(target_abs, backup_abs) != OK:
 			DirAccess.remove_absolute(temp_abs)
 			return false
 
 	if DirAccess.rename_absolute(temp_abs, target_abs) != OK:
-		if FileAccess.file_exists(BACKUP_SAVE_PATH):
+		if FileAccess.file_exists(backup):
 			DirAccess.rename_absolute(backup_abs, target_abs)
 		DirAccess.remove_absolute(temp_abs)
 		return false
 
-	# La sauvegarde précédente est conservée en .bak : c'est elle que load_game() récupère
+	# La sauvegarde précédente est conservée en .bak : c'est elle qui est récupérée
 	# si la sauvegarde principale est un jour corrompue (coupure, appli tuée par Android…).
 	return true
 

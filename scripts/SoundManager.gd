@@ -11,12 +11,23 @@ var muted := false
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
 
+# Musique d'ambiance : une boucle douce générée par décennie (construite en arrière-plan).
+const MUSIC_RATE := 16000
+var music_volume := 0.45
+var _music_player: AudioStreamPlayer
+var _music_cache: Dictionary = {}
+var _current_era := ""
+var _music_task := -1
+var _building_era := ""
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for i in range(POOL_SIZE):
 		var player := AudioStreamPlayer.new()
 		add_child(player)
 		_players.append(player)
+	_music_player = AudioStreamPlayer.new()
+	add_child(_music_player)
 	_build_sounds()
 	_load_settings()
 
@@ -62,8 +73,11 @@ func set_volume(value: float, persist: bool = true) -> void:
 
 func _load_settings() -> void:
 	var config := ConfigFile.new()
-	if config.load(SETTINGS_PATH) == OK and config.has_section_key("audio", "sfx"):
-		set_volume(float(config.get_value("audio", "sfx", 0.8)), false)
+	if config.load(SETTINGS_PATH) == OK:
+		if config.has_section_key("audio", "sfx"):
+			set_volume(float(config.get_value("audio", "sfx", 0.8)), false)
+		if config.has_section_key("audio", "music"):
+			set_music_volume(float(config.get_value("audio", "music", 0.45)), false)
 
 func _free_player() -> AudioStreamPlayer:
 	for player in _players:
@@ -93,4 +107,138 @@ func _melody(notes: Array, volume: float, brightness: float = 0.35) -> AudioStre
 	stream.mix_rate = MIX_RATE
 	stream.stereo = false
 	stream.data = data
+	return stream
+
+# ---------------------------------------------------------------------------
+# Musique d'ambiance par décennie
+# ---------------------------------------------------------------------------
+
+## Accords (C, Am, F, G) : fondamentale puis tierce et quinte (Hz, octave 3).
+const PROGRESSION := [
+	[130.81, 164.81, 196.00],
+	[110.00, 130.81, 164.81],
+	[87.31, 110.00, 130.81],
+	[98.00, 123.47, 146.83]
+]
+const ERA_STYLE := {
+	# tempo (bpm), timbre de l'arpège, volumes nappe / basse / arpège, décroissance de l'arpège (s)
+	"1970s":{"tempo":80.0, "arp":"piano", "pad":0.10, "bass":0.20, "lead":0.16, "decay":0.35},
+	"1980s":{"tempo":96.0, "arp":"synth", "pad":0.08, "bass":0.22, "lead":0.12, "decay":0.16},
+	"1990s":{"tempo":88.0, "arp":"bell", "pad":0.11, "bass":0.18, "lead":0.13, "decay":0.50}
+}
+
+func era_for_year(year: int) -> String:
+	if year < 1980:
+		return "1970s"
+	if year < 1990:
+		return "1980s"
+	return "1990s"
+
+func current_music_era() -> String:
+	return _current_era
+
+func play_music_for_year(year: int) -> void:
+	var era := era_for_year(year)
+	if era == _current_era and (_music_player.playing or _music_task != -1):
+		return
+	_current_era = era
+	if _music_cache.has(era):
+		_start_music(_music_cache[era])
+		return
+	if _music_task != -1:
+		return # une construction est en cours ; _on_music_built relancera la bonne époque
+	_building_era = era
+	_music_task = WorkerThreadPool.add_task(_build_music_task.bind(era))
+
+func stop_music() -> void:
+	_current_era = ""
+	if _music_player != null:
+		_music_player.stop()
+
+func set_music_volume(value: float, persist: bool = true) -> void:
+	music_volume = clampf(value, 0.0, 1.0)
+	if _music_player != null:
+		_music_player.volume_db = linear_to_db(maxf(music_volume, 0.001))
+		_music_player.stream_paused = music_volume <= 0.0
+	if persist:
+		var config := ConfigFile.new()
+		config.load(SETTINGS_PATH)
+		config.set_value("audio", "music", music_volume)
+		config.save(SETTINGS_PATH)
+
+func _build_music_task(era: String) -> void:
+	var stream := build_music(era, 8)
+	call_deferred("_on_music_built", era, stream)
+
+func _on_music_built(era: String, stream: AudioStreamWAV) -> void:
+	if _music_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_music_task)
+	_music_task = -1
+	_music_cache[era] = stream
+	if era == _current_era:
+		_start_music(stream)
+	elif _current_era != "":
+		var wanted := _current_era
+		_current_era = ""
+		play_music_for_year({"1970s":1975, "1980s":1985}.get(wanted, 1995))
+
+func _start_music(stream: AudioStreamWAV) -> void:
+	_music_player.stream = stream
+	_music_player.volume_db = linear_to_db(0.001)
+	_music_player.play()
+	_music_player.stream_paused = music_volume <= 0.0
+	# Fondu d'entrée doux.
+	var tween := create_tween()
+	tween.tween_property(_music_player, "volume_db", linear_to_db(maxf(music_volume, 0.001)), 2.5)
+
+## Construit une boucle de `bars` mesures (4 temps) : nappe + basse + arpège, sans clic au bouclage.
+func build_music(era: String, bars: int) -> AudioStreamWAV:
+	var style: Dictionary = ERA_STYLE.get(era, ERA_STYLE["1970s"])
+	var beat := 60.0 / float(style.tempo)
+	var bar_len := beat * 4.0
+	var eighth := beat * 0.5
+	var total := int(bar_len * bars * MUSIC_RATE)
+	var data := PackedByteArray()
+	data.resize(total * 2)
+	var pattern := [0, 1, 2, 1, 0, 2, 1, 2]
+	var pad_vol := float(style.pad)
+	var bass_vol := float(style.bass)
+	var lead_vol := float(style.lead)
+	var decay := float(style.decay)
+	var timbre := str(style.arp)
+	for i in range(total):
+		var t := float(i) / MUSIC_RATE
+		var bar := int(t / bar_len)
+		var in_bar := t - bar * bar_len
+		var chord: Array = PROGRESSION[bar % PROGRESSION.size()]
+		# Nappe : l'accord tenu, avec fondu aux changements d'accord (pas de clic).
+		var edge := minf(1.0, minf(in_bar / 0.12, (bar_len - in_bar) / 0.12))
+		var pad := (sin(TAU * chord[0] * t) + sin(TAU * chord[1] * t) + sin(TAU * chord[2] * t)) * pad_vol * edge / 3.0
+		# Basse : fondamentale grave sur les temps 1 et 3.
+		var in_half := fmod(in_bar, beat * 2.0)
+		var bass := sin(TAU * chord[0] * 0.5 * t) * bass_vol * minf(1.0, in_half / 0.01) * exp(-in_half / 0.6)
+		# Arpège : croches sur les notes de l'accord, deux octaves au-dessus.
+		var step := int(in_bar / eighth)
+		var in_step := in_bar - step * eighth
+		var freq: float = chord[pattern[step % pattern.size()]] * 4.0
+		var env := minf(1.0, in_step / 0.006) * exp(-in_step / decay)
+		var lead := 0.0
+		match timbre:
+			"synth":
+				lead = sin(TAU * freq * t) + sin(TAU * freq * 3.0 * t) / 3.0 + sin(TAU * freq * 5.0 * t) / 6.0
+			"bell":
+				lead = sin(TAU * freq * t) + 0.45 * sin(TAU * freq * 4.0 * t) * exp(-in_step / 0.12)
+			_:
+				lead = sin(TAU * freq * t) + 0.3 * sin(TAU * freq * 2.0 * t)
+		lead *= env * lead_vol
+		var value := clampf(pad + bass + lead, -1.0, 1.0)
+		data.encode_s16(i * 2, int(value * 30000.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = MUSIC_RATE
+	stream.stereo = false
+	stream.data = data
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = total
 	return stream

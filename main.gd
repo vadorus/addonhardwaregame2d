@@ -156,6 +156,12 @@ var _last_news_key := ""
 var _review_resume_scale := 0.0
 var _last_news_toast_ms := -100000
 var menu_volume_label: Label
+var menu_music_label: Label
+var setup_load_button: Button
+var slot_layer: ColorRect
+var slot_title_label: Label
+var slot_list: VBoxContainer
+var slot_mode := "load"
 
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
@@ -163,9 +169,12 @@ func _ready():
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
+	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()
 	_connect_signals()
+	TimeManager.month_changed.connect(_on_month_changed_music)
+	_start_music_for_current_year()
 	MediaManager.reviews_published.connect(_on_reviews_published)
 	MediaManager.news_changed.connect(_on_news_changed)
 	tabs.tab_changed.connect(func(_index): JUICE.fade_in(tabs.get_current_tab_control(), 0.18))
@@ -1065,7 +1074,7 @@ func _create_media_tab():
 
 func _build_setup_layer():
 	setup_layer = ColorRect.new()
-	setup_layer.color = Color(0.018, 0.026, 0.040, 0.985)
+	setup_layer.color = Color(0.10, 0.065, 0.04, 0.985) # fond d'accueil brun chaud, pas noir bleuté
 	setup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(setup_layer)
 
@@ -1110,10 +1119,16 @@ func _build_setup_layer():
 	var continue_game := Button.new()
 	continue_game.text = "Continuer"
 	continue_game.custom_minimum_size.y = 48
-	continue_game.disabled = not FileAccess.file_exists(SaveManager.SAVE_PATH) and not FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH)
+	continue_game.disabled = not SaveManager.has_any_save()
 	continue_game.pressed.connect(_load_game)
 	setup_continue_button = continue_game
 	setup_title_box.add_child(continue_game)
+	var load_game_button := Button.new()
+	load_game_button.text = "Charger une partie"
+	load_game_button.custom_minimum_size.y = 44
+	load_game_button.pressed.connect(open_slot_picker.bind("load"))
+	setup_title_box.add_child(load_game_button)
+	setup_load_button = load_game_button
 
 	setup_creation_box = VBoxContainer.new()
 	setup_creation_box.add_theme_constant_override("separation", 12)
@@ -1173,6 +1188,14 @@ func _build_setup_layer():
 func _show_title_screen() -> void:
 	if setup_continue_button != null:
 		setup_continue_button.disabled = not _has_save_file()
+		var recent := SaveManager.most_recent_slot()
+		if recent >= 0:
+			var info := SaveManager.slot_info(recent)
+			setup_continue_button.text = "Continuer — %s, %s %d" % [str(info.get("company", "")), _month_name(int(info.get("month", 1))), int(info.get("year", 1971))]
+		else:
+			setup_continue_button.text = "Continuer"
+	if setup_load_button != null:
+		setup_load_button.disabled = not _has_save_file()
 	if setup_title_box != null:
 		setup_title_box.visible = true
 	if setup_creation_box != null:
@@ -1839,9 +1862,14 @@ func _start_new_game():
 		tabs.current_tab = 0
 	status_label.text = "Nora : touchez l'établi ou « Nouveau projet CPU » pour commencer."
 	_refresh_all()
+	_start_music_for_current_year()
 
 func _load_game():
-	if SaveManager.load_game():
+	# « Continuer » : la sauvegarde la plus récente, automatique ou manuelle.
+	_load_game_slot(maxi(0, SaveManager.most_recent_slot()))
+
+func _load_game_slot(slot: int) -> void:
+	if SaveManager.load_from_slot(slot):
 		setup_layer.visible=false
 		SimulationManager.is_game_over = Economy.money <= 0
 		game_over_layer.visible=false
@@ -1850,6 +1878,7 @@ func _load_game():
 			_on_game_over("Faillite : la trésorerie est épuisée.", {"money": Economy.money})
 		_refresh_all()
 		_show_next_pending_research_event()
+		_start_music_for_current_year()
 
 func _on_save_message(ok: bool, message: String):
 	status_label.text=("✓ " if ok else "⚠ ")+message
@@ -2297,7 +2326,7 @@ func _month_name(month: int) -> String:
 	return str(names[clampi(month, 1, 12) - 1])
 
 func _has_save_file() -> bool:
-	return FileAccess.file_exists(SaveManager.SAVE_PATH) or FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH)
+	return SaveManager.has_any_save()
 
 # --- Menu système -----------------------------------------------------------
 
@@ -2311,11 +2340,11 @@ func _build_menu_layer() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_layer.add_child(center)
-	var panel := LOOK.card(Color.WHITE, 18, 20)
+	var panel := LOOK.card(Color("fffaf1"), 18, 20)
 	panel.custom_minimum_size = Vector2(380, 0)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 	var title := LOOK.label("Menu", 22)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2325,8 +2354,8 @@ func _build_menu_layer() -> void:
 	menu_save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(menu_save_label)
 	box.add_child(_menu_button("Reprendre", close_system_menu, true))
-	box.add_child(_menu_button("Sauvegarder maintenant", _menu_save_now))
-	box.add_child(_menu_button("Charger la dernière sauvegarde", _menu_load))
+	box.add_child(_menu_button("Sauvegarder dans un emplacement", open_slot_picker.bind("save")))
+	box.add_child(_menu_button("Charger une partie", open_slot_picker.bind("load")))
 	var scale_row := HBoxContainer.new()
 	scale_row.add_theme_constant_override("separation", 8)
 	box.add_child(scale_row)
@@ -2363,6 +2392,24 @@ func _build_menu_layer() -> void:
 	var louder := _menu_button("+", _menu_change_volume.bind(1))
 	louder.custom_minimum_size = Vector2(52, 46)
 	volume_row.add_child(louder)
+	var music_row := HBoxContainer.new()
+	music_row.add_theme_constant_override("separation", 8)
+	box.add_child(music_row)
+	var music_caption := LOOK.label("Musique", 14)
+	music_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	music_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	music_row.add_child(music_caption)
+	var music_down := _menu_button("−", _menu_change_music.bind(-1))
+	music_down.custom_minimum_size = Vector2(52, 46)
+	music_row.add_child(music_down)
+	menu_music_label = LOOK.label("45 %", 15)
+	menu_music_label.custom_minimum_size.x = 64
+	menu_music_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_music_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	music_row.add_child(menu_music_label)
+	var music_up := _menu_button("+", _menu_change_music.bind(1))
+	music_up.custom_minimum_size = Vector2(52, 46)
+	music_row.add_child(music_up)
 	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
 	menu_fullscreen_button.visible = not _is_mobile()
 	box.add_child(menu_fullscreen_button)
@@ -2399,6 +2446,8 @@ func system_menu_visible() -> bool:
 func _refresh_menu_labels() -> void:
 	if menu_volume_label != null:
 		menu_volume_label.text = "Muet" if SoundManager.muted else "%d %%" % int(round(SoundManager.sfx_volume * 100.0))
+	if menu_music_label != null:
+		menu_music_label.text = "Coupée" if SoundManager.music_volume <= 0.0 else "%d %%" % int(round(SoundManager.music_volume * 100.0))
 	if menu_scale_label != null:
 		menu_scale_label.text = "%d %%" % int(round(ui_scale * 100.0))
 	if menu_save_label != null:
@@ -2469,6 +2518,9 @@ func _menu_quit() -> void:
 # --- Bouton Retour Android / Échap PC --------------------------------------
 
 func _handle_back_request() -> void:
+	if slot_picker_visible():
+		close_slot_picker()
+		return
 	if system_menu_visible():
 		close_system_menu()
 		return
@@ -2609,3 +2661,143 @@ func _close_review_reveal() -> void:
 	if _review_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
 		TimeManager.time_scale = _review_resume_scale
 	_show_pending_reviews()
+
+# --- Musique -----------------------------------------------------------------
+
+func _on_month_changed_music(_month: int, _year: int) -> void:
+	_start_music_for_current_year()
+
+func _start_music_for_current_year() -> void:
+	# Pas de musique en mode sans affichage (tests, CI) : la génération tournerait pour rien.
+	if DisplayServer.get_name() == "headless" or not (get_viewport() is Window):
+		return
+	SoundManager.play_music_for_year(TimeManager.year)
+
+func _menu_change_music(direction: int) -> void:
+	var steps := [0.0, 0.15, 0.3, 0.45, 0.6, 0.8]
+	var index := 0
+	for i in range(steps.size()):
+		if absf(float(steps[i]) - SoundManager.music_volume) < absf(float(steps[index]) - SoundManager.music_volume):
+			index = i
+	index = clampi(index + direction, 0, steps.size() - 1)
+	SoundManager.set_music_volume(float(steps[index]))
+	_refresh_menu_labels()
+
+# --- Emplacements de sauvegarde ------------------------------------------------
+
+func _build_slot_layer() -> void:
+	slot_layer = ColorRect.new()
+	slot_layer.color = Color(0.10, 0.06, 0.02, 0.62)
+	slot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slot_layer.visible = false
+	slot_layer.z_index = 115
+	add_child(slot_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slot_layer.add_child(center)
+	var panel := LOOK.card(Color("fffaf1"), 18, 20)
+	panel.custom_minimum_size = Vector2(480, 0)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	slot_title_label = LOOK.label("", 22)
+	slot_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(slot_title_label)
+	slot_list = VBoxContainer.new()
+	slot_list.add_theme_constant_override("separation", 8)
+	box.add_child(slot_list)
+	box.add_child(_menu_button("Retour", close_slot_picker))
+
+## mode : "save" ou "load".
+func open_slot_picker(mode: String) -> void:
+	if slot_layer == null:
+		return
+	slot_mode = mode
+	slot_title_label.text = "Sauvegarder la partie" if mode == "save" else "Charger une partie"
+	_refresh_slot_list()
+	slot_layer.visible = true
+	SoundManager.play("open")
+	JUICE.fade_in(slot_layer, 0.15)
+
+func close_slot_picker() -> void:
+	if slot_layer != null:
+		slot_layer.visible = false
+
+func slot_picker_visible() -> bool:
+	return slot_layer != null and slot_layer.visible
+
+func slot_picker_rows() -> Array[String]:
+	var rows: Array[String] = []
+	if slot_list == null:
+		return rows
+	for row in slot_list.get_children():
+		rows.append(str(row.get_meta("summary", "")))
+	return rows
+
+func _refresh_slot_list() -> void:
+	for child in slot_list.get_children():
+		slot_list.remove_child(child)
+		child.queue_free()
+	for slot in range(SaveManager.SLOT_COUNT + 1):
+		var info := SaveManager.slot_info(slot)
+		var exists := bool(info.get("exists", false))
+		var row := PanelContainer.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("f8efe2")
+		style.border_color = Color("e5d4ba")
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(12)
+		for side in ["left", "right", "top", "bottom"]:
+			style.set("content_margin_" + side, 10)
+		row.add_theme_stylebox_override("panel", style)
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 10)
+		row.add_child(line)
+		var text_box := VBoxContainer.new()
+		text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(text_box)
+		var title := "Sauvegarde automatique" if slot == 0 else "Emplacement %d" % slot
+		text_box.add_child(LOOK.label(title, 15))
+		var detail := "Vide"
+		if exists:
+			detail = "%s — %s %d — %s €" % [str(info.get("company", "")), _month_name(int(info.get("month", 1))), int(info.get("year", 1971)), _money(int(info.get("money", 0)))]
+		text_box.add_child(LOOK.muted_label(detail, 13))
+		row.set_meta("summary", "%s|%s" % [title, detail])
+		var action := Button.new()
+		action.custom_minimum_size = Vector2(130, 44)
+		if slot_mode == "save":
+			LOOK.button_style(action, slot != 0)
+			action.custom_minimum_size = Vector2(130, 44)
+			if slot == 0:
+				action.text = "Automatique"
+				action.disabled = true
+			else:
+				action.text = "Écraser" if exists else "Sauvegarder ici"
+				action.pressed.connect(_save_into_slot.bind(slot))
+		else:
+			LOOK.button_style(action, exists)
+			action.custom_minimum_size = Vector2(130, 44)
+			action.text = "Charger" if exists else "Vide"
+			action.disabled = not exists
+			action.pressed.connect(_load_from_slot_picker.bind(slot))
+		line.add_child(action)
+		slot_list.add_child(row)
+
+func _save_into_slot(slot: int) -> void:
+	if SaveManager.save_to_slot(slot, true):
+		status_label.text = "✓ Partie sauvegardée dans l'emplacement %d." % slot
+		SoundManager.play("cash")
+	else:
+		status_label.text = "⚠ La sauvegarde a échoué."
+		SoundManager.play("error")
+	_refresh_slot_list()
+	_refresh_menu_labels()
+
+func _load_from_slot_picker(slot: int) -> void:
+	close_slot_picker()
+	if menu_layer != null:
+		menu_layer.visible = false
+	_load_game_slot(slot)
+	TimeManager.time_scale = 0.0
+	status_label.text = "Partie chargée. Relancez le temps quand vous êtes prêt."
