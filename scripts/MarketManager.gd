@@ -1775,6 +1775,27 @@ func maybe_generate_b2b(product: Dictionary):
 	opportunity_created.emit(contract)
 	market_changed.emit()
 
+## Signer une offre B2B précise (conversation avec le client au garage).
+func accept_contract(contract_id: String) -> bool:
+	for contract in contracts:
+		if str(contract.get("id", "")) == contract_id and str(contract.get("status", "")) == "PENDING":
+			contract["status"] = "ACTIVE"
+			CompanyManager.change_reputation({"professional":2.0,"prestige":0.5})
+			CompanyManager.add_alert("Contrat signé avec %s pour %s." % [str(contract.get("customer", "")), str(contract.get("product_name", ""))])
+			market_changed.emit()
+			return true
+	return false
+
+## Refuser poliment une offre B2B : le client repart, sans pénalité.
+func decline_contract(contract_id: String) -> bool:
+	for contract in contracts:
+		if str(contract.get("id", "")) == contract_id and str(contract.get("status", "")) == "PENDING":
+			contract["status"] = "DECLINED"
+			CompanyManager.add_alert("Offre de %s déclinée." % str(contract.get("customer", "")))
+			market_changed.emit()
+			return true
+	return false
+
 func accept_first_pending_contract() -> bool:
 	for contract in contracts:
 		if str(contract.get("status", "")) == "PENDING":

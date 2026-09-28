@@ -176,6 +176,7 @@ func _ready():
 	_build_notification_feed()
 	_build_review_layer()
 	_build_ceo_layer()
+	_build_dialogue_layer()
 	_connect_signals()
 	TimeManager.month_changed.connect(_on_month_changed_music)
 	_start_music_for_current_year()
@@ -1433,15 +1434,13 @@ func _build_research_event_layer():
 	box.add_child(archive)
 
 func _on_research_event(event: Dictionary):
-	if research_event_layer == null:
+	# Une découverte R&D n'est plus un écran de texte : la chercheuse vient vous l'annoncer.
+	if dialogue_visible():
 		return
-	active_research_event_id = str(event.get("id", ""))
-	research_event_label.text = "%s\n\n%s\n\nApprofondir donne à cette équipe un élan de recherche pendant 3 mois et augmente immédiatement son expérience. Archiver conserve simplement le savoir acquis." % [str(event.get("title", "Nouvelle piste")), str(event.get("text", ""))]
-	TimeManager.time_scale = 0.0
-	research_event_layer.visible = true
+	open_dialogue("RND:%s" % str(event.get("id", "")))
 
 func _show_next_pending_research_event():
-	if research_event_layer == null or research_event_layer.visible:
+	if dialogue_visible():
 		return
 	var pending := ResearchManager.get_pending_research_events()
 	if not pending.is_empty():
@@ -2560,6 +2559,9 @@ func _handle_back_request() -> void:
 	if first_cpu_workshop != null and first_cpu_workshop.visible:
 		_close_first_cpu_workshop()
 		return
+	if dialogue_visible():
+		close_dialogue()
+		return
 	if ceo_decision_visible():
 		ceo_panel.call("choose", "LATER")
 		return
@@ -2684,7 +2686,7 @@ func _show_pending_reviews() -> void:
 	if _pending_reviews.is_empty() or review_layer == null or review_layer.visible:
 		return
 	# Ne jamais empiler deux grands moments : on attend la fin du lancement ou d'un choix bloquant.
-	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer]:
+	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer, dialogue_layer]:
 		if other != null and other.visible:
 			return
 	var next: Dictionary = _pending_reviews.pop_front()
@@ -2746,6 +2748,9 @@ func open_ceo_decision(decision_id: String) -> bool:
 			break
 	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
 		return false
+	# Les dossiers RH et les visites de clients se règlent en parlant à la personne.
+	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:")) and open_dialogue(decision_id):
+		return true
 	if not ceo_layer.visible:
 		_ceo_resume_scale = TimeManager.time_scale
 	TimeManager.time_scale = 0.0
@@ -2758,6 +2763,86 @@ func open_ceo_decision(decision_id: String) -> bool:
 	SoundManager.play("decision")
 	status_label.text = "Temps en pause : %s." % str(found.get("title", "décision"))
 	return true
+
+# --- Conversations avec les personnages (équipe, clients, R&D) ---------------------
+
+const INTERACTIONS := preload("res://scripts/Interactions.gd")
+var dialogue_layer: ColorRect
+var dialogue_panel: Control
+var _dialogue_resume_scale := 0.0
+
+func _build_dialogue_layer() -> void:
+	dialogue_layer = ColorRect.new()
+	dialogue_layer.color = Color(0.10, 0.06, 0.02, 0.55)
+	dialogue_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dialogue_layer.visible = false
+	dialogue_layer.z_index = 106
+	add_child(dialogue_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dialogue_layer.add_child(center)
+	dialogue_panel = (load("res://ui/components/DialoguePanel.gd") as Script).new() as Control
+	dialogue_panel.connect("choice_made", _on_dialogue_choice)
+	center.add_child(dialogue_panel)
+	var garage: Control = dashboard_screen.get("dashboard_garage") if dashboard_screen != null else null
+	if garage != null:
+		var crew: Control = garage.call("crew")
+		if crew != null:
+			crew.connect("member_opened", _on_crew_member_opened)
+
+func dialogue_visible() -> bool:
+	return dialogue_layer != null and dialogue_layer.visible
+
+## Ouvre une conversation (« HR:… », « RND:… », « CLIENT:… »). false si elle n'existe plus.
+func open_dialogue(key: String) -> bool:
+	if dialogue_layer == null:
+		return false
+	var data: Dictionary = INTERACTIONS.dialogue(key)
+	if data.is_empty():
+		return false
+	if not dialogue_layer.visible:
+		_dialogue_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	dialogue_panel.call("fit_to", get_viewport_rect().size)
+	dialogue_panel.call("show_dialogue", data)
+	dialogue_layer.visible = true
+	JUICE.fade_in(dialogue_layer, 0.2)
+	SoundManager.play("notify")
+	return true
+
+func close_dialogue() -> void:
+	if not dialogue_visible():
+		return
+	dialogue_layer.visible = false
+	if _dialogue_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
+		TimeManager.time_scale = _dialogue_resume_scale
+	_refresh_all()
+	call_deferred("_show_pending_reviews")
+
+func _on_dialogue_choice(key: String, choice_id: String) -> void:
+	var result: Dictionary = INTERACTIONS.choose(key, choice_id)
+	if bool(result.get("later", false)):
+		close_dialogue()
+		status_label.text = "Vous en reparlerez plus tard : la personne garde son « ! » au garage."
+		return
+	if not bool(result.get("ok", false)):
+		status_label.text = "⚠ " + str(result.get("message", "Impossible pour l'instant."))
+		SoundManager.play("error")
+		return
+	close_dialogue()
+	var message := str(result.get("message", ""))
+	if message != "":
+		status_label.text = "✓ " + message
+		notify(message, "good")
+	SoundManager.play("success")
+	if key.begins_with("RND:"):
+		# Une autre découverte R&D attend ? La suivante vient vous voir.
+		call_deferred("_show_next_pending_research_event")
+
+func _on_crew_member_opened(member_id: String) -> void:
+	var key: String = INTERACTIONS.pending_for(member_id)
+	if key != "":
+		open_dialogue(key)
 
 func _refit_ceo_panel() -> void:
 	if ceo_decision_visible():

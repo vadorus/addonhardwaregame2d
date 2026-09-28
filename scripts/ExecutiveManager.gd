@@ -626,7 +626,7 @@ func get_ceo_decisions() -> Array:
 			"severity":float(issue.get("severity", 50.0)),
 			"title":str(issue.get("title", "Décision RH")),
 			"text":str(issue.get("text", "")),
-			"recommendation":"Choisissez une réponse dans le comité de direction.",
+			"recommendation":"Allez lui parler : touchez le personnage avec un « ! » dans le garage.",
 			"target_tab":1,
 			"can_defer":false
 		})
@@ -694,6 +694,22 @@ func get_ceo_decisions() -> Array:
 			"recommendation":"Ouvrez Marché et comparez la prévision au réel. %s" % str(feedback.get("lesson", "")),
 			"target_tab":5,
 			"can_defer":true
+		})
+
+	# Un client est venu au garage avec une offre : il attend votre réponse (conversation).
+	for contract_value in MarketManager.contracts:
+		var contract: Dictionary = contract_value
+		if str(contract.get("status", "")) != "PENDING":
+			continue
+		decisions.append({
+			"id":"CLIENT:%s" % str(contract.get("id", "")),
+			"category":"CLIENT",
+			"severity":58.0,
+			"title":"%s vous attend" % str(contract.get("customer", "Un client")),
+			"text":"%d %s par mois pendant %d mois." % [int(contract.get("units_per_month", 0)), str(contract.get("product_name", "CPU")), int(contract.get("remaining_months", 12))],
+			"recommendation":"Écoutez son offre : signer fait monter votre réputation auprès des pros.",
+			"target_tab":5,
+			"can_defer":false
 		})
 
 	for tender_value in MarketManager.open_tenders():

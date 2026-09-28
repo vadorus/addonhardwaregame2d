@@ -12,6 +12,7 @@ var department := ""
 var pose := "SIT"        # SIT (de dos, au poste) ou STAND (debout, de face)
 var facing := -1.0       # -1 : travaille vers la gauche, 1 : vers la droite
 var working := false
+var alert := false       # « ! » au-dessus de la tête : une conversation attend
 var scale_px := 90.0     # hauteur du personnage en pixels
 var hair := Color("3b2a1e")
 var shirt := Color("c8743a")
@@ -30,14 +31,23 @@ func setup(data: Dictionary) -> void:
 	department = str(data.get("department", ""))
 	pose = str(data.get("pose", "SIT"))
 	facing = float(data.get("facing", -1.0))
-	var pick := absi(hash(member_id if member_id != "" else display_name))
+	var colors := palette_for(member_id if member_id != "" else display_name)
+	hair = data.get("hair", colors.hair)
+	shirt = data.get("shirt", colors.shirt)
+	skin = colors.skin
+	queue_redraw()
+
+## Mêmes couleurs partout (garage, portrait de dialogue) pour une même personne.
+static func palette_for(key: String) -> Dictionary:
+	if key == "NORA":
+		return {"hair":Color("5a3a2a"), "shirt":Color("3f7f8c"), "skin":Color("e7b48f")}
+	var pick := absi(hash(key))
 	var hairs := [Color("3b2a1e"), Color("1f1a17"), Color("7a4a26"), Color("c9a064"), Color("5a3a2a"), Color("8c8c8c")]
 	var shirts := [Color("c8743a"), Color("3f7f8c"), Color("6a8f3a"), Color("8a4a7a"), Color("b8483a"), Color("4a6aa8")]
 	var skins := [Color("f1c9a5"), Color("e7b48f"), Color("c68a62"), Color("8d5a3b")]
-	hair = data.get("hair", hairs[pick % hairs.size()])
-	shirt = data.get("shirt", shirts[(pick / 7) % shirts.size()])
-	skin = skins[(pick / 13) % skins.size()]
-	queue_redraw()
+	if key.begins_with("CLIENT"):
+		shirts = [Color("2f3a4a"), Color("3a3a3a"), Color("4a3a2f")]
+	return {"hair":hairs[pick % hairs.size()], "shirt":shirts[(pick / 7) % shirts.size()], "skin":skins[(pick / 13) % skins.size()]}
 
 func set_scale_px(value: float) -> void:
 	scale_px = value
@@ -69,6 +79,15 @@ func _draw() -> void:
 		_draw_standing(base, s)
 	else:
 		_draw_seated(base, s)
+	if alert:
+		# « ! » qui rebondit au-dessus de la tête : cette personne veut vous parler.
+		var head_local := head_position() - position
+		var bounce := absf(sin(_t * 3.0)) * s * 0.08
+		var center := head_local + Vector2(0, -s * 0.30 - bounce)
+		draw_circle(center, s * 0.13, Color("e5372c"))
+		draw_arc(center, s * 0.13, 0, TAU, 24, Color.WHITE, 2.0, true)
+		draw_line(center + Vector2(0, -s * 0.07), center + Vector2(0, s * 0.02), Color.WHITE, s * 0.035)
+		draw_circle(center + Vector2(0, s * 0.065), s * 0.02, Color.WHITE)
 
 func _draw_seated(base: Vector2, s: float) -> void:
 	var breathe := sin(_t * 1.6) * s * 0.008

@@ -21,6 +21,8 @@ const SEATS := [
 	{"at":Vector2(0.760, 0.690), "facing":-1.0, "pose":"SIT", "place":"stock"},
 ]
 const NORA_SPOT := {"at":Vector2(0.690, 0.560), "facing":-1.0, "pose":"STAND"}
+const VISITOR_SPOT := Vector2(0.790, 0.640)   # devant la porte du fond
+const INTERACTIONS := preload("res://scripts/Interactions.gd")
 const POINT_KINDS := [["Perf", Color("d9822b")], ["Énergie", Color("2f9e6a")], ["Fiabilité", Color("7a57c2")]]
 
 var art_rect := Rect2()
@@ -74,8 +76,34 @@ func refresh() -> void:
 		_last_staff_key = key
 		_rebuild_members()
 	var active := _has_active_work()
+	# Qui veut vous parler ? (« ! » au-dessus de la tête) ; un client en visite attend à la porte.
+	var talkers := {}
+	var visitor_key := ""
+	for item_value in INTERACTIONS.pending():
+		var speaker := str((item_value as Dictionary).get("speaker", ""))
+		talkers[speaker] = true
+		if speaker.begins_with("CLIENT:") and visitor_key == "":
+			visitor_key = speaker
+	_sync_visitor(visitor_key)
 	for member in _members:
 		(member as Control).set("working", active and str(member.get("pose")) == "SIT")
+		(member as Control).set("alert", talkers.has(str(member.get("member_id"))))
+
+func _sync_visitor(visitor_key: String) -> void:
+	var current: Control = null
+	for member in _members:
+		if str(member.get("member_id")).begins_with("CLIENT:"):
+			current = member
+	if current != null and str(current.get("member_id")) != visitor_key:
+		_members.erase(current)
+		current.queue_free()
+		current = null
+	if current == null and visitor_key != "":
+		_add_member({"id":visitor_key, "name":visitor_key.substr(7), "role":"Client en visite", "department":"Client",
+			"pose":"STAND", "facing":-1.0, "at":VISITOR_SPOT})
+		_place_members()
+		if is_visible_in_tree():
+			SoundManager.play("notify")
 
 func member_count() -> int:
 	return _members.size()
@@ -191,6 +219,12 @@ func _place_bubble() -> void:
 	_bubble.position = pos
 
 func _on_member_tapped(member: Control) -> void:
+	if bool(member.get("alert")):
+		# Cette personne a quelque chose à vous dire : la conversation s'ouvre.
+		_bubble.visible = false
+		_card.visible = false
+		member_opened.emit(str(member.get("member_id")))
+		return
 	say(member, line_for(member), 7.0)
 	_show_card(member)
 	member_opened.emit(str(member.get("member_id")))
@@ -220,6 +254,10 @@ func _show_card(member: Control) -> void:
 ## Ce que dit un personnage : toujours tiré de l'état réel de la partie.
 func line_for(member: Control) -> String:
 	var id := str(member.get("member_id"))
+	if id.begins_with("CLIENT:"):
+		return "Bonjour ! J'aurais une commande à vous proposer, vous avez une minute ?"
+	if bool(member.get("alert")):
+		return "Vous auriez une minute ? J'ai besoin de vous parler."
 	if id == "NORA":
 		var focus: Dictionary = get_parent().call("focus_decision") if get_parent() != null and get_parent().has_method("focus_decision") else {}
 		if not focus.is_empty():

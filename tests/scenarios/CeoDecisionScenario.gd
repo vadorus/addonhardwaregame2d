@@ -11,6 +11,16 @@ static func _find(decision_id: String) -> Dictionary:
 			return value
 	return {}
 
+static func _crew_member(crew: Control, member_id: String) -> Control:
+	for member in crew.get("_members"):
+		if str((member as Control).get("member_id")) == member_id:
+			return member
+	return null
+
+static func _crew_alert(crew: Control, member_id: String) -> bool:
+	var member := _crew_member(crew, member_id)
+	return member != null and bool(member.get("alert"))
+
 static func run(host: Node) -> String:
 	SimulationManager.reset_all("CI Decisions PDG", "CPU", "STANDARD")
 	Economy.money = 400000
@@ -84,19 +94,51 @@ static func _run_in_game(game: Control) -> String:
 	if Economy.money >= money_before:
 		return "CEO decision: maintenance was free"
 
-	# Un dossier RH se règle aussi depuis la carte.
-	ExecutiveManager._add_hr_issue("MORALE", "Test moral", "", "Un salarié décroche.", 60.0)
+	# Un dossier RH devient une conversation avec la personne concernée.
+	var staff_id := str((PersonnelManager.staff[0] as Dictionary).get("id", ""))
+	ExecutiveManager._add_hr_issue("MORALE", "Test moral", staff_id, "Un salarié décroche.", 60.0)
 	var hr_id := "HR:%s" % str(ExecutiveManager.hr_issues[0].get("id", ""))
-	if not bool(game.call("open_ceo_decision", hr_id)):
-		return "CEO decision: HR card did not open"
-	if not bool(panel.call("choose", "HR_DISCUSS")) or not _find(hr_id).is_empty():
-		return "CEO decision: HR issue not resolved from the card"
+	game.call("_refresh_all")
+	if not bool(crew.call("member_count")) or not _crew_alert(crew, staff_id):
+		return "Dialogue: the unhappy employee has no « ! » in the garage"
+	if not bool(game.call("open_ceo_decision", hr_id)) or not bool(game.call("dialogue_visible")):
+		return "Dialogue: the HR decision should open a conversation with the employee"
+	if TimeManager.time_scale != 0.0:
+		return "Dialogue: time keeps running during a conversation"
+	game.call("_on_dialogue_choice", hr_id, "DISCUSS")
+	if bool(game.call("dialogue_visible")) or not _find(hr_id).is_empty():
+		return "Dialogue: HR issue not resolved by the conversation"
+
+	# Découverte R&D : la chercheuse vient l'annoncer.
+	ResearchManager._create_research_event("RELIABILITY", 25.0)
+	if not bool(game.call("dialogue_visible")):
+		return "Dialogue: an R&D discovery should open a conversation"
+	var rnd_key := str((game.get("dialogue_panel").get("dialogue") as Dictionary).get("key", ""))
+	game.call("_on_dialogue_choice", rnd_key, "PURSUE")
+	if not ResearchManager.get_pending_research_events().is_empty():
+		return "Dialogue: R&D discovery not resolved"
+
+	# Un client passe au garage avec une offre.
+	var contract := {"id":"B2B-777", "product_id":"PROD-X", "product_name":"tv9", "customer":"Nova Laboratories",
+		"units_per_month":40, "unit_price":120, "remaining_months":6, "months_total":6, "status":"PENDING", "sized_to_capacity":true}
+	MarketManager.contracts.append(contract)
+	game.call("_refresh_all")
+	if not _crew_alert(crew, "CLIENT:Nova Laboratories"):
+		return "Dialogue: the visiting client does not appear at the garage door"
+	crew.call("_on_member_tapped", _crew_member(crew, "CLIENT:Nova Laboratories"))
+	if not bool(game.call("dialogue_visible")):
+		return "Dialogue: tapping the client should open the conversation"
+	game.call("_on_dialogue_choice", "CLIENT:B2B-777", "SIGN")
+	if str(contract.get("status", "")) != "ACTIVE":
+		return "Dialogue: signing with the client did not activate the contract"
+	MarketManager.contracts.erase(contract)
+	game.call("_refresh_all")
 
 	# « Voir le dossier complet » emmène à l'onglet en gardant la pause.
-	ExecutiveManager._add_hr_issue("MORALE", "Test moral 2", "", "Un salarié décroche.", 60.0)
-	var hr_id2 := "HR:%s" % str(ExecutiveManager.hr_issues[0].get("id", ""))
+	ExecutiveManager.workplace["condition"] = 30.0
+	ExecutiveManager.workplace["upgrade_reminder_at"] = -1
 	TimeManager.time_scale = 3.0
-	game.call("open_ceo_decision", hr_id2)
+	game.call("open_ceo_decision", "WORKPLACE:1")
 	panel.call("choose", "DETAIL")
 	if tabs.current_tab != 1 or TimeManager.time_scale != 0.0:
 		return "CEO decision: detail should open Entreprise with time paused (tab %d, speed %.1f)" % [tabs.current_tab, TimeManager.time_scale]
@@ -119,7 +161,6 @@ static func _run_in_game(game: Control) -> String:
 	if tabs.current_tab == 5 and str(market.call("current_section")) != "SAV":
 		return "Market: SAV context should open the SAV sub-page"
 	game.call("_show_tab", 0)
-	ExecutiveManager.resolve_hr_issue(hr_id2.substr(3), "DISCUSS")
 
 	# Une partie chargée repart en pause, même sauvegardée en ×3.
 	# (l'emplacement 3 d'un joueur qui lance les tests sur son PC est préservé)
