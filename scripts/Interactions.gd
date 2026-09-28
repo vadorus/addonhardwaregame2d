@@ -18,10 +18,40 @@ static func pending() -> Array:
 		var contract: Dictionary = contract_value
 		if str(contract.get("status", "")) == "PENDING":
 			result.append({"key":"CLIENT:%s" % str(contract.get("id", "")), "speaker":"CLIENT:%s" % str(contract.get("customer", ""))})
+	if not hiring_need().is_empty():
+		result.append({"key":"HIRE:DEV", "speaker":"NORA"})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
 	return result
+
+## Nora pousse à grandir : le CPU en cours demande plus de développeurs que l'équipe n'en a,
+## et la trésorerie permet d'embaucher (équilibrage 28/09 : l'équipe restait à 3 pendant 15 ans).
+static func hiring_need() -> Dictionary:
+	var project: Dictionary = {}
+	for project_value in ResearchManager.projects:
+		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
+			project = project_value
+			break
+	if project.is_empty():
+		return {}
+	if ExecutiveManager.months_operated < int(ExecutiveManager.workplace.get("hiring_reminder_at", -1)):
+		return {}
+	var estimator: Script = load("res://scripts/DevelopmentEstimator.gd")
+	var complexity := float(project.get("complexity", 30.0))
+	var required: float = estimator.call("required_developers", complexity)
+	var devs := ResearchManager.get_development_team_size()
+	if float(devs) >= required - 0.5:
+		return {}
+	var monthly_staff := 0
+	for employee_value in PersonnelManager.staff:
+		monthly_staff += int((employee_value as Dictionary).get("salary", 3000))
+	if Economy.money < monthly_staff * 12 + 40000:
+		return {}
+	var now: float = estimator.call("staffing_factor", devs, complexity)
+	var plus_one: float = estimator.call("staffing_factor", devs + 1, complexity)
+	return {"project":str(project.get("name", "le CPU")), "required":int(ceil(required)), "devs":devs,
+		"gain_pct":int(round((plus_one / maxf(now, 0.01) - 1.0) * 100.0))}
 
 ## Produit tout juste lancé, pas encore testé, dont personne n'a encore parlé à la presse.
 static func press_interview_product() -> Dictionary:
@@ -131,6 +161,18 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"BONUS", "label":"Je débloque une prime (%s €)." % _money(cost), "hint":"Effet plus fort sur le moral", "enabled":Economy.can_afford(cost)},
 				{"id":"LATER", "label":"Pas maintenant.", "hint":"Le problème reste ouvert"},
 			]}
+	elif key == "HIRE:DEV":
+		var need := hiring_need()
+		if need.is_empty():
+			return {}
+		return {"key":key, "person":_person("NORA"), "mood":"NEUTRAL", "kicker":"GRANDIR",
+			"text":"Pour %s, il faudrait environ %d développeurs. On n'est que %d : le projet traîne. Avec une recrue de plus, on avancerait %d %% plus vite. On embauche ?" % [str(need.project), int(need.required), int(need.devs), int(need.gain_pct)],
+			"note":"Chaque recrue : salaire d'environ 3 000 à 4 000 €/mois + prime d'embauche (2 mois). Attention à la place dans les locaux.",
+			"choices":[
+				{"id":"HIRE1", "label":"Recrute un développeur.", "hint":"Le projet accélère dès le mois prochain", "primary":true},
+				{"id":"HIRE2", "label":"Recrute-en deux.", "hint":"Encore plus vite, deux salaires de plus"},
+				{"id":"LATER", "label":"On reste comme ça pour l'instant.", "hint":"Nora n'en reparle pas avant 6 mois"},
+			]}
 	elif key.begins_with("PRESS:"):
 		var product := ProductManager.get_product(sid)
 		if product.is_empty() or product.has("press_pitch") or int(product.get("months_on_market", 0)) != 0:
@@ -165,6 +207,16 @@ static func dialogue(key: String) -> Dictionary:
 ## Applique une réponse. Renvoie {ok, message}.
 static func choose(key: String, choice_id: String) -> Dictionary:
 	var sid := key.substr(key.find(":") + 1)
+	if key == "HIRE:DEV":
+		if choice_id == "LATER":
+			ExecutiveManager.workplace["hiring_reminder_at"] = ExecutiveManager.months_operated + 6
+			return {"ok":true, "message":"", "later":true}
+		var hired := 0
+		for _i in range(2 if choice_id == "HIRE2" else 1):
+			PersonnelManager.generate_candidate("Développement")
+			if PersonnelManager.hire_candidate():
+				hired += 1
+		return {"ok":hired > 0, "message":("%d développeur(s) rejoignent l'équipe !" % hired) if hired > 0 else "Trésorerie insuffisante pour recruter."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
 	if key.begins_with("RND:"):

@@ -67,3 +67,22 @@ Aucune règle de gameplay, d'économie ou de simulation n'a été modifiée.
 | Un dossier SAV déjà en enquête ou sous surveillance restait « décision requise » indéfiniment. | Il ne revient que si la surveillance seule laisse la confiance se dégrader (sans garantie étendue). |
 
 Test : `tests/scenarios/CeoDecisionScenario.gd` (dans le smoke test). Vérifié sur le Pixel 10 avec la vraie sauvegarde.
+
+## 28/09 après-midi — équilibrage « grandir » (parties automatiques de 15 ans)
+
+Mesures avant correctif (joueur automatique, 1971 → 1986) :
+
+| | Sans embauche | En embauchant 1 dev/an |
+| --- | --- | --- |
+| Trésorerie 1986 | 18,0 M€ | 10,5 M€ (salaires) |
+| Durée d'un CPU | 10-11 mois | 10 mois avec 15 devs |
+| Ventes du CPU de 1972 en 1986 | ~120/mois | ~120/mois |
+
+Embaucher ne servait à rien et les vieux produits se vendaient éternellement.
+
+Correctifs :
+- `DevelopmentEstimator.staffing_factor` : un CPU complexe demande une vraie équipe (2 devs jusqu'à complexité 45, puis +1 tous les 6 points). Début de partie inchangé ; dans les années 80, à 2 devs un CPU prend ~20 mois, à 5 devs ~10.
+- `MarketManager.obsolescence_factor` : après 3 ans, les ventes d'un CPU déclinent jusqu'à ~5 % à 8 ans ; plus de contrats B2B sur un CPU en fin de vie.
+- Nora vient proposer d'embaucher quand le projet en cours manque de développeurs et que la trésorerie le permet (conversation « On embauche ? », rappel dans 6 mois si refus).
+
+Après correctif : le CPU de 1972 ne se vend plus en 1979 ; le joueur qui suit Nora passe à 6 salariés et garde des cycles de 10-11 mois. **Reste à traiter** : la trésorerie s'accumule encore (13-15 M€ en 1986) — il manque des investissements qui rapportent (marketing, usine, nouveaux marchés) et le début de partie est très rentable (≈1 M€/an dès 1974 à 3 personnes).

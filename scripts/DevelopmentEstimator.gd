@@ -14,7 +14,20 @@ static func monthly_progress(
 	progress *= approach_speed * sourcing_speed * supplier_execution * management
 	var complexity_factor := lerpf(0.86, 1.28, clampf(complexity / 100.0, 0.0, 1.0))
 	progress /= complexity_factor
+	progress *= staffing_factor(ResearchManager.get_development_team_size(), complexity)
 	return maxf(progress, 0.01)
+
+## Équilibrage (28/09) : avant, embaucher 13 développeurs ne faisait gagner qu'un mois sur
+## un CPU. Désormais un CPU complexe demande une vraie équipe : les CPU de 1971 se font à 2,
+## ceux des années 80 en demandent 5 à 7 ; au-delà, l'équipe va plus vite (plafonné).
+static func required_developers(complexity: float) -> float:
+	# Les deux fondateurs suffisent pour les CPU du garage (complexité ≤ 45) : le début
+	# de partie ne change pas. Ensuite ~1 développeur de plus tous les 6 points.
+	return 2.0 + maxf(complexity - 45.0, 0.0) / 6.0
+
+static func staffing_factor(developers: int, complexity: float) -> float:
+	var ratio := clampf(float(maxi(developers, 0)) / required_developers(complexity), 0.30, 1.50)
+	return pow(ratio, 0.85)
 
 static func estimated_months_from_progress(progress_per_month: float, phase_count: int = 6) -> int:
 	var phases := maxi(phase_count, 1)

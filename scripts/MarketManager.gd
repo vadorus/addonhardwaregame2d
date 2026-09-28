@@ -512,6 +512,14 @@ func product_age_penalty(product: Dictionary) -> float:
 			monthly_penalty = 0.44
 	return minf(float(age_months - 12) * monthly_penalty, 24.0)
 
+## Équilibrage (28/09) : un CPU de 1972 se vendait encore 120 fois par mois en 1986.
+## Après 3 ans, la clientèle passe aux nouvelles générations : ventes divisées par ~20 à 8 ans.
+func obsolescence_factor(product: Dictionary) -> float:
+	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 36:
+		return 1.0
+	return maxf(0.05, 1.0 - float(age_months - 36) / 60.0)
+
 func product_lifecycle_label(product: Dictionary) -> String:
 	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
 	if age_months <= 6:
@@ -548,7 +556,7 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		raw_share = minf(raw_share, _player_portfolio_share_cap())
 	var price_multiplier := price_demand_multiplier(product, target)
 	var media_multiplier := MediaManager.product_visibility_modifier(str(product.get("id", "")))
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier)))
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * obsolescence_factor(product))))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -1727,6 +1735,9 @@ func activate_reserved_contracts(product_id: String):
 
 func maybe_generate_b2b(product: Dictionary):
 	if str(product.get("status", "")) != "LAUNCHED":
+		return
+	# Personne ne signe un contrat de 2 ans sur un CPU en fin de vie.
+	if obsolescence_factor(product) < 0.6:
 		return
 	for contract in contracts:
 		if str(contract.get("product_id", "")) == str(product.get("id", "")) and str(contract.get("status", "")) == "PENDING":
