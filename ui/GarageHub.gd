@@ -65,6 +65,8 @@ var _tasks_label: Label
 var _feedback_panel: PanelContainer
 var _feedback_label: Label
 var _side_buttons: Array[Button] = []
+## V0.9 : rail de gauche remplacé par la barre d'icônes du bas (main.gd). Gardé pour un retour arrière.
+var rail_enabled := false
 var _selected_zone := ""
 var _context_action_data: Array = []
 
@@ -416,7 +418,8 @@ func _refresh_side_actions() -> void:
 	var needs_rail := not _focus.is_empty() and not bool(_focus.get("zone_visible", true))
 	for button in _side_buttons:
 		var feature := str(button.get_meta("feature", "QG"))
-		button.visible = true
+		# V0.9 : la navigation passe par la barre d'icônes du bas ; le rail de gauche reste désactivé.
+		button.visible = rail_enabled
 		button.disabled = _onboarding_stage == "FIRST_IDEA" or not bool(_last_unlocks.get(feature, false))
 		var attention := needs_rail and not button.disabled and int(button.get_meta("tab", -1)) == int(_focus.get("tab", -2))
 		if attention:
@@ -709,6 +712,7 @@ func _base_zone_actions(zone_name: String) -> Array:
 					{"label":"Conception avancée","tab":3,"context":"Réglages avancés","enabled":true}
 				]
 			return [
+				{"label":"Nouveau processeur","tab":3,"context":"NOUVEAU_CPU","enabled":true},
 				{"label":"Continuer le projet CPU","tab":3,"context":"","enabled":true},
 				{"label":"Conception & R&D avancées","tab":3,"context":"Réglages avancés","enabled":true}
 			]
@@ -989,6 +993,9 @@ func _refresh_primary_action() -> void:
 		_primary_action.disabled = true
 	else:
 		_primary_action.text = "+ Nouveau projet CPU"
+		# V0.9 : après le premier CPU, le bouton ouvre la conception en étapes.
+		if not ResearchManager.projects.is_empty():
+			_primary_action.set_meta("context", "NOUVEAU_CPU")
 	call_deferred("_layout_zones")
 
 func set_progression(unlocks: Dictionary) -> void:

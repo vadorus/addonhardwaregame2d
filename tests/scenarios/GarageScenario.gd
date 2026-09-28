@@ -97,8 +97,8 @@ static func run(host: Node) -> String:
 	if not garage_hub.has_method("visible_zone_count") or int(garage_hub.call("visible_zone_count")) != 3:
 		garage_hub.queue_free()
 		return "Room-first garage did not expose the three early functional areas after onboarding"
-	if int(garage_hub.call("available_side_action_count")) != 1:
+	if int(garage_hub.call("available_side_action_count")) != 0:
 		garage_hub.queue_free()
-		return "Garage-first HUD should expose only the unlocked Team shortcut at this stage"
+		return "V0.9: the garage's old left rail must stay hidden, navigation is the bottom dock"
 	garage_hub.queue_free()
 	return ""

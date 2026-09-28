@@ -183,6 +183,21 @@ func next_interface_unlock_hint() -> Dictionary:
 				return {"feature":feature,"text":"Obtenez vos premiers retours publics pour ouvrir la presse."}
 	return {}
 
+## V0.9 : explication propre à une fonction (barre du bas), pas seulement la prochaine à débloquer.
+func interface_unlock_hint_for(feature: String) -> String:
+	match feature:
+		"TEAM":
+			return "Lancez votre premier projet CPU pour ouvrir la gestion de l'équipe."
+		"COMPANY":
+			return "Faites tourner l'entreprise un premier mois pour ouvrir budgets, RH et locaux."
+		"PRODUCTS":
+			return "Terminez le développement d'un CPU pour ouvrir l'industrialisation et les produits."
+		"MARKET":
+			return "Commercialisez un CPU pour ouvrir l'analyse du marché."
+		"PRESS":
+			return "Obtenez vos premiers retours publics pour ouvrir la presse."
+	return "Continuez la progression de l'entreprise."
+
 func get_right_hand() -> Dictionary:
 	return right_hand.duplicate(true)
 

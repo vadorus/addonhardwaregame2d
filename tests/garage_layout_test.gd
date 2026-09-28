@@ -15,10 +15,25 @@ func _ready() -> void:
 		var dashboard: Control = game.get("dashboard_screen")
 		var garage: Control = dashboard.get("dashboard_garage")
 		var bounds := Rect2(Vector2.ZERO, garage.size)
-		if int(garage.call("visible_side_action_count")) != 4 or int(garage.call("available_side_action_count")) != 0:
-			push_error("Garage navigation rail must be visible but gated before the first project")
+		if int(garage.call("visible_side_action_count")) != 0:
+			push_error("V0.9: the old left rail must stay hidden (navigation is the bottom dock)")
 			get_tree().quit(1)
 			return
+		var dock: Control = game.get("bottom_dock")
+		if dock == null or not dock.is_visible_in_tree() or (dock.call("labels") as Array).size() != 7:
+			push_error("V0.9: the bottom dock must show all seven destinations in the garage")
+			get_tree().quit(1)
+			return
+		if dock.call("unlocked_labels") != ["QG", "Labo"]:
+			push_error("V0.9: only QG and Labo are open before the first project, got %s" % str(dock.call("unlocked_labels")))
+			get_tree().quit(1)
+			return
+		var dock_rect := dock.get_global_rect()
+		if dock_rect.end.y > float(dimensions.y) + 0.5 or dock_rect.end.x > float(dimensions.x) + 0.5 or dock_rect.intersects(garage.get_global_rect()):
+			push_error("V0.9: bottom dock leaves the screen or covers the garage at %s" % dimensions)
+			get_tree().quit(1)
+			return
+		print("[UI] ", dimensions, " dock ", dock_rect, " garage ", garage.get_global_rect())
 		for field in ["_project_panel", "_tasks_panel", "_feedback_panel"]:
 			var panel: Control = garage.get(field)
 			print("[UI] ", dimensions, " ", field, " ", panel.get_rect(), " min=", panel.get_combined_minimum_size())

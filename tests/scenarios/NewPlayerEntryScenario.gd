@@ -60,7 +60,12 @@ static func run(host: Node) -> String:
 	if nav_panel == null or nav_panel.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: management navigation is visible before the first CPU project"
+		return "V0.9 entry: the old top navigation must stay hidden (bottom dock replaces it)"
+	var dock: Control = game.get("bottom_dock")
+	if dock == null or not dock.visible or dock.call("unlocked_labels") != ["QG", "Labo"]:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.9 entry: the bottom dock must be visible with only QG and Labo open"
 	var tabs: TabContainer = game.get("tabs")
 	if tabs == null or tabs.current_tab != 0:
 		game.queue_free()
@@ -171,24 +176,31 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "V0.7 month-end did not expose the non-blocking ticker"
 
-	if nav_panel.visible:
+	if nav_panel.visible or not dock.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.6 room-first entry shows management tabs while the player is still in the room"
+		return "V0.9: in the room the bottom dock is the only navigation"
 	if heading.visible or management_grid.visible:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.6 room-first entry restored the old dashboard around the room"
 	game.call("_show_tab", 3)
-	if not nav_panel.visible:
+	if nav_panel.visible or not dock.visible or tabs.current_tab != 3:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.6 detailed screens do not restore navigation back to the room"
+		return "V0.9 detailed screens keep the same bottom dock"
 	game.call("_show_tab", 0)
-	if nav_panel.visible:
+	if nav_panel.visible or not dock.visible or tabs.current_tab != 0:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.6 navigation did not disappear again after returning to the room"
+		return "V0.9 dock did not bring the player back to the room"
+	# Toucher un onglet verrouillé explique quand il s'ouvre, sans changer d'écran.
+	if not ExecutiveManager.is_interface_feature_unlocked("PRESS"):
+		dock.call("button_for", "Presse").emit_signal("pressed")
+		if tabs.current_tab != 0 or not status_line.text.begins_with("Nora : pas encore."):
+			game.queue_free()
+			_restore(snapshot)
+			return "V0.9 locked dock button must explain itself and stay in place"
 	if int(garage.call("visible_zone_count")) < 3:
 		game.queue_free()
 		_restore(snapshot)

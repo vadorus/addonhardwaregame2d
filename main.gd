@@ -123,6 +123,11 @@ var cpu_metric_labels: Dictionary = {}
 var nav_buttons: Array[Button] = []
 var speed_buttons: Array[Button] = []
 var _refresh_all_pending := false
+# V0.9 — navigation unique : barre d'icônes fixe en bas, bandeau du haut réduit sur téléphone.
+var bottom_dock: Control
+var header_panel: PanelContainer
+var header_captions: Array[Label] = []
+var cpu_stepper: Control
 
 # V0.8.1 — plateforme PC / Android : sauvegarde, menu, échelle d'interface, zones sûres.
 const SETTINGS_PATH := "user://settings.cfg"
@@ -274,6 +279,7 @@ func _build_ui():
 	var header := _card(Color("3b2b1e"), 12, 8)
 	header.custom_minimum_size.y = 68
 	root_box.add_child(header)
+	header_panel = header
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	header.add_child(top)
@@ -305,11 +311,13 @@ func _build_ui():
 	var money_chip := _card(Color("2b1f15"), 10, 9)
 	money_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var cash_box := VBoxContainer.new()
+	cash_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	cash_box.add_theme_constant_override("separation", 1)
 	money_chip.add_child(cash_box)
 	var cash_caption := _muted_label("TRÉSORERIE", 10)
 	cash_caption.add_theme_color_override("font_color", Color("dcc7a6"))
 	cash_box.add_child(cash_caption)
+	header_captions.append(cash_caption)
 	money_label = _label("%s €" % _money(BalanceManager.starting_capital()), 17)
 	money_label.add_theme_color_override("font_color", Color("5ce0a4"))
 	cash_box.add_child(money_label)
@@ -318,11 +326,13 @@ func _build_ui():
 	var date_chip := _card(Color("2b1f15"), 10, 9)
 	date_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var calendar_box := VBoxContainer.new()
+	calendar_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	calendar_box.add_theme_constant_override("separation", 1)
 	date_chip.add_child(calendar_box)
 	var calendar_caption := _muted_label("CALENDRIER", 10)
 	calendar_caption.add_theme_color_override("font_color", Color("dcc7a6"))
 	calendar_box.add_child(calendar_caption)
+	header_captions.append(calendar_caption)
 	date_label = _label("Mois 1 • 1971", 15)
 	date_label.add_theme_color_override("font_color", Color.WHITE)
 	calendar_box.add_child(date_label)
@@ -395,6 +405,12 @@ func _build_ui():
 	_create_products_tab()
 	_create_market_tab()
 	_create_media_tab()
+	# V0.9 : une seule navigation, en bas, identique dans le garage et dans les onglets.
+	bottom_dock = (load("res://ui/components/BottomDock.gd") as Script).new() as Control
+	bottom_dock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom_dock.connect("tab_requested", _on_dock_tab)
+	bottom_dock.connect("locked_pressed", _on_dock_locked)
+	root_box.add_child(bottom_dock)
 	_update_nav_state()
 	_build_setup_layer()
 	# Hide the gameplay subtree while onboarding is open, including raised garage HUD panels.
@@ -427,6 +443,9 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 	if CompanyManager.created and ResearchManager.projects.is_empty() and tab_index == 3 and context == "Établi CPU":
 		_show_first_cpu_workshop()
 		return
+	if CompanyManager.created and context == "NOUVEAU_CPU":
+		open_cpu_stepper()
+		return
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
 	# Écrans découpés en sous-pages : on ouvre directement la bonne.
@@ -443,8 +462,7 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		status_label.text = "Nora : le CPU est prêt. Choisissez un prix et une capacité que la trésorerie peut réellement soutenir."
 		products_screen.call_deferred("focus_product_launch")
 		return
-	if context != "" and tabs != null and tabs.current_tab == tab_index and before != tab_index:
-		status_label.text = "Nora : %s ouvert. Prenez la décision utile, puis revenez au QG." % context
+	# V0.9 : plus de message « X ouvert » : il restait affiché une fois revenu au garage.
 
 func _create_company_tab():
 	var company_script: Script = load("res://ui/screens/CompanyScreen.gd")
@@ -485,6 +503,8 @@ func _bind_lab_screen_controls():
 
 func _on_lab_action(action: String, payload: Variant = null):
 	match action:
+		"open_stepper":
+			open_cpu_stepper()
 		"research_tree_message":
 			if str(payload) != "":
 				status_label.text = str(payload)
@@ -1234,6 +1254,48 @@ func _build_first_cpu_workshop_layer() -> void:
 	first_cpu_workshop.connect("advanced_requested", _open_advanced_first_cpu)
 	first_cpu_workshop.connect("cancel_requested", _close_first_cpu_workshop)
 	add_child(first_cpu_workshop)
+	# V0.9 : conception en étapes pour les CPU suivants.
+	cpu_stepper = (load("res://ui/components/CpuDesignStepper.gd") as Script).new() as Control
+	cpu_stepper.connect("launch_requested", _launch_cpu_from_stepper)
+	cpu_stepper.connect("advanced_requested", _open_advanced_from_stepper)
+	cpu_stepper.connect("cancel_requested", _close_cpu_stepper)
+	cpu_stepper.z_index = 100
+	add_child(cpu_stepper)
+
+func open_cpu_stepper() -> void:
+	if cpu_stepper == null:
+		return
+	TimeManager.time_scale = 0.0
+	cpu_stepper.call("open")
+	SoundManager.play("open")
+	JUICE.fade_in(cpu_stepper, 0.2)
+
+func _close_cpu_stepper() -> void:
+	if cpu_stepper != null:
+		cpu_stepper.call("close")
+	SoundManager.play("close")
+
+func _open_advanced_from_stepper(spec: Dictionary) -> void:
+	_apply_first_cpu_spec_to_lab(spec)
+	_close_cpu_stepper()
+	_show_tab(3)
+	status_label.text = "Mode avancé : votre conception est reprise, tous les réglages sont modifiables."
+
+func _launch_cpu_from_stepper(spec: Dictionary) -> void:
+	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
+	var ok := ResearchManager.start_project(str(spec.get("name", "Nova CPU")), "CPU",
+		str(spec.get("segment", MarketManager.default_segment())), "INTERNAL", str(spec.get("focus", "BALANCED")),
+		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")))
+	if not ok:
+		SoundManager.play("error")
+		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
+		return
+	cpu_stepper.call("close")
+	SoundManager.play("launch")
+	TimeManager.time_scale = 1.0
+	status_label.text = "%s entre en développement." % str(spec.get("name", "Nova CPU"))
+	_refresh_all()
+	_show_tab(0)
 
 func _show_first_cpu_workshop() -> void:
 	if first_cpu_workshop == null:
@@ -1617,17 +1679,35 @@ func _show_tab(index: int):
 	if CompanyManager.created and safe_index < NAV_FEATURES.size():
 		var feature := str(NAV_FEATURES[safe_index])
 		if not ExecutiveManager.is_interface_feature_unlocked(feature):
-			var hint := ExecutiveManager.next_interface_unlock_hint()
-			status_label.text = "Nora : cette fonction viendra plus tard. %s" % str(hint.get("text", "Continuez la progression de l'entreprise."))
+			status_label.text = "Nora : cette fonction viendra plus tard. %s" % ExecutiveManager.interface_unlock_hint_for(feature)
 			return
+	if tabs.current_tab != safe_index and status_label != null and (status_label.text.begins_with("Nora : cette fonction") or status_label.text.begins_with("Nora : pas encore")):
+		status_label.text = ""
 	tabs.current_tab = safe_index
 	_update_nav_state()
+
+func _on_dock_tab(index: int) -> void:
+	SoundManager.play("click")
+	# Premier CPU pas encore lancé : le Labo ouvre l'atelier guidé, comme l'établi du garage.
+	if index == 3 and CompanyManager.created and ResearchManager.projects.is_empty():
+		_show_first_cpu_workshop()
+		return
+	_show_tab(index)
+
+func _on_dock_locked(feature: String) -> void:
+	SoundManager.play("error")
+	status_label.text = "Nora : pas encore. %s" % ExecutiveManager.interface_unlock_hint_for(feature)
+	JUICE.fade_in(status_label, 0.2)
 
 func _update_nav_state():
 	if tabs == null:
 		return
 	if nav_panel != null:
-		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
+		# V0.9 : l'ancienne barre du haut est remplacée par la barre d'icônes du bas.
+		nav_panel.visible = false
+	if bottom_dock != null:
+		bottom_dock.visible = CompanyManager.created
+		bottom_dock.call("refresh", tabs.current_tab, ExecutiveManager.get_interface_unlocks() if CompanyManager.created else {})
 	call_deferred("_place_notification_feed")
 	if status_label != null:
 		# V0.7: the room-first QG keeps one thin status line so Nora/blocking
@@ -1652,6 +1732,19 @@ func _update_responsive_layout():
 			(word as Label).add_theme_font_size_override("font_size", 20 if header_compact else 26)
 	if menu_layer != null and menu_layer.visible:
 		_refresh_menu_labels()
+	# V0.9 : écran bas (téléphone en paysage) = bandeau d'une ligne et barre du bas resserrée.
+	var short_screen := size.y < 620.0 or _is_mobile()
+	if header_panel != null:
+		header_panel.custom_minimum_size.y = 50.0 if short_screen else 68.0
+	for caption in header_captions:
+		caption.visible = not short_screen
+	for speed_button in speed_buttons:
+		speed_button.custom_minimum_size = Vector2(40, 36) if short_screen else Vector2(44, 46)
+	if status_label != null:
+		status_label.custom_minimum_size.y = 18.0 if short_screen else 24.0
+	if bottom_dock != null:
+		# Sur téléphone on garde de grosses cibles tactiles : la barre ne se resserre que sur PC bas.
+		bottom_dock.call("set_compact", size.y < 620.0 and not _is_mobile())
 	if dashboard_screen != null and dashboard_screen.has_method("set_viewport_width"):
 		dashboard_screen.call("set_viewport_width", size.x)
 	if products_screen != null and products_screen.has_method("set_viewport_width"):
@@ -2565,6 +2658,13 @@ func _handle_back_request() -> void:
 		return
 	if first_cpu_workshop != null and first_cpu_workshop.visible:
 		_close_first_cpu_workshop()
+		return
+	if cpu_stepper != null and cpu_stepper.visible:
+		# Retour du téléphone : étape précédente, puis fermeture.
+		if int(cpu_stepper.get("step")) > 0:
+			cpu_stepper.call("go_to_step", int(cpu_stepper.get("step")) - 1)
+		else:
+			_close_cpu_stepper()
 		return
 	if dialogue_visible():
 		close_dialogue()

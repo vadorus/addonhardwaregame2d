@@ -509,6 +509,20 @@ func _build() -> void:
 	pager = pager_script.new() as Control
 	box.add_child(pager)
 	var new_page: VBoxContainer = pager.call("add_page", "NEW", "Nouveau CPU")
+	# V0.9 : entrée principale = conception en étapes ; le formulaire complet reste dessous (mode expert).
+	var stepper_button := Button.new()
+	stepper_button.text = "✚  Concevoir un nouveau processeur, étape par étape"
+	stepper_button.custom_minimum_size.y = 56
+	stepper_button.add_theme_font_size_override("font_size", 17)
+	stepper_button.add_theme_color_override("font_color", Color.WHITE)
+	stepper_button.add_theme_stylebox_override("normal", UI.stylebox(Color("138a4a"), 14, 0, Color("138a4a"), 12))
+	stepper_button.add_theme_stylebox_override("hover", UI.stylebox(Color("0f7a40"), 14, 0, Color("0f7a40"), 12))
+	stepper_button.add_theme_stylebox_override("pressed", UI.stylebox(Color("0b6634"), 14, 0, Color("0b6634"), 12))
+	stepper_button.pressed.connect(func(): action_requested.emit("open_stepper", null))
+	new_page.add_child(stepper_button)
+	var expert_hint := _muted_label("Ou réglez tout vous-même dans le formulaire complet ci-dessous (partenaires, contrats, plans de génération).", 12)
+	expert_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	new_page.add_child(expert_hint)
 	for node in [depth_card, lab_layout_grid]:
 		box.remove_child(node)
 		new_page.add_child(node)

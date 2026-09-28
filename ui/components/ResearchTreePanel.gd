@@ -18,14 +18,120 @@ var _detail_button: Button
 var _selected_id := ""
 var _selected: Dictionary = {}
 var max_nodes := 7
+var _tiles: GridContainer
+
+func set_viewport_width(width: float) -> void:
+	var wanted := 7 if width >= 1250.0 else (5 if width >= 950.0 else 3)
+	if _tiles != null:
+		_tiles.columns = 3 if width >= 1000.0 else 2
+	if wanted != max_nodes:
+		max_nodes = wanted
+		refresh()
+
+func refresh() -> void:
+	if _lanes_box == null:
+		return
+	for child in _tiles.get_children():
+		_tiles.remove_child(child)
+		child.queue_free()
+	var lanes := TREE.lanes(max_nodes)
+	var fallback: Dictionary = {}
+	for lane_value in lanes:
+		var lane: Dictionary = lane_value
+		_tiles.add_child(_lane_tile(lane))
+		for node_value in lane.nodes:
+			var node: Dictionary = node_value
+			if str(node.id) == _selected_id:
+				_selected = node
+			if fallback.is_empty() and str(node.state) == "NEXT":
+				fallback = node
+	if _selected_id == "" or str(_selected.get("id", "")) != _selected_id:
+		_selected = fallback
+		_selected_id = str(fallback.get("id", ""))
+	_show_detail()
+	UI.prepare_touch_scroll_children(self)
+
+## Tuile : nom de la branche, niveau, prochain objectif, jauge, frise de pastilles.
+func _lane_tile(lane: Dictionary) -> Control:
+	var next: Dictionary = lane.get("next", {})
+	var level := int(lane.hidden_before)
+	for node_value in lane.nodes:
+		if str((node_value as Dictionary).state) == "DONE":
+			level += 1
+	var selected := false
+	for node_value in lane.nodes:
+		if str((node_value as Dictionary).id) == _selected_id:
+			selected = true
+	var tile := Button.new()
+	tile.focus_mode = Control.FOCUS_NONE
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile.custom_minimum_size = Vector2(0, 118)
+	var edge := Color("d9822b") if selected else UI.APP_LINE
+	for style_name in ["normal", "hover", "pressed", "focus"]:
+		tile.add_theme_stylebox_override(style_name, UI.stylebox(Color("fbe8cc") if selected else UI.APP_PANEL, 14, 3 if selected else 1, edge, 10))
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 12; box.offset_top = 8; box.offset_right = -12; box.offset_bottom = -8
+	box.add_theme_constant_override("separation", 4)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(box)
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(head)
+	var title := UI.label(str(lane.title), 16)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	var chip := UI.label("Niv. %d" % level, 13)
+	chip.add_theme_color_override("font_color", Color("a85a22"))
+	head.add_child(chip)
+	var next_label := UI.muted_label(("Prochain : %s" % str(next.title)) if not next.is_empty() else "Branche terminée", 13)
+	next_label.clip_text = true
+	box.add_child(next_label)
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 10
+	bar.max_value = 100
+	var target := maxf(float(next.get("target", 100.0)), 1.0)
+	bar.value = 100.0 if next.is_empty() else clampf(float(lane.value) / target * 100.0, 3.0, 100.0)
+	var fill := UI.APP_GREEN if next.is_empty() else Color("d9822b")
+	bar.add_theme_stylebox_override("fill", UI.stylebox(fill, 5, 0, fill, 0))
+	bar.add_theme_stylebox_override("background", UI.stylebox(Color("ead9c0"), 5, 0, UI.APP_LINE, 0))
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(bar)
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 5)
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(foot)
+	var value_label := UI.muted_label("%.0f / %.0f" % [float(lane.value), target] if not next.is_empty() else "%.0f" % float(lane.value), 12)
+	value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(value_label)
+	for node_value in lane.nodes:
+		var state := str((node_value as Dictionary).state)
+		var dot := ColorRect.new()
+		dot.custom_minimum_size = Vector2(10, 10)
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dot.color = UI.APP_GREEN if state == "DONE" else (Color("d9822b") if state == "NEXT" else Color("d9c7ab"))
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		foot.add_child(dot)
+	var pick_id := str(next.get("id", "")) if not next.is_empty() else (str((lane.nodes[lane.nodes.size() - 1] as Dictionary).id) if not (lane.nodes as Array).is_empty() else "")
+	tile.pressed.connect(func():
+		SoundManager.play("click")
+		select_node(pick_id))
+	return tile
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
-	var legend := UI.muted_label("● acquis   ● prochain objectif   ● à venir — touchez une pastille pour voir ce qu'elle débloque.", 12)
+	# V0.9 : une tuile par branche (façon PC Tycoon 2), la frise de pastilles reste dans la tuile.
+	var legend := UI.muted_label("Touchez une tuile pour voir ce qu'elle débloque et la faire progresser.", 12)
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(legend)
+	_tiles = GridContainer.new()
+	_tiles.columns = 3
+	_tiles.add_theme_constant_override("h_separation", 10)
+	_tiles.add_theme_constant_override("v_separation", 10)
+	add_child(_tiles)
 	_lanes_box = VBoxContainer.new()
-	_lanes_box.add_theme_constant_override("separation", 10)
+	_lanes_box.visible = false
 	add_child(_lanes_box)
 
 	var detail := UI.card(UI.APP_CYAN_DARK, 12, 12)
@@ -50,35 +156,6 @@ func _ready() -> void:
 	detail_box.add_child(_detail_button)
 	add_child(detail)
 	refresh()
-
-func set_viewport_width(width: float) -> void:
-	var wanted := 7 if width >= 1250.0 else (5 if width >= 950.0 else 3)
-	if wanted != max_nodes:
-		max_nodes = wanted
-		refresh()
-
-func refresh() -> void:
-	if _lanes_box == null:
-		return
-	for child in _lanes_box.get_children():
-		_lanes_box.remove_child(child)
-		child.queue_free()
-	var lanes := TREE.lanes(max_nodes)
-	var fallback: Dictionary = {}
-	for lane_value in lanes:
-		var lane: Dictionary = lane_value
-		_lanes_box.add_child(_lane_row(lane))
-		for node_value in lane.nodes:
-			var node: Dictionary = node_value
-			if str(node.id) == _selected_id:
-				_selected = node
-			if fallback.is_empty() and str(node.state) == "NEXT":
-				fallback = node
-	if _selected_id == "" or str(_selected.get("id", "")) != _selected_id:
-		_selected = fallback
-		_selected_id = str(fallback.get("id", ""))
-	_show_detail()
-	UI.prepare_touch_scroll_children(self)
 
 func select_node(node_id: String) -> void:
 	_selected_id = node_id
