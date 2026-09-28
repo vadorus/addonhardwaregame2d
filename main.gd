@@ -484,6 +484,10 @@ func _bind_lab_screen_controls():
 
 func _on_lab_action(action: String, payload: Variant = null):
 	match action:
+		"research_tree_message":
+			if str(payload) != "":
+				status_label.text = str(payload)
+			_refresh_all()
 		"preview":
 			_refresh_cpu_preview()
 		"sourcing_changed":
@@ -1654,6 +1658,9 @@ func _update_responsive_layout():
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
+	var tree: Control = lab_screen.get("research_tree") if lab_screen != null else null
+	if tree != null:
+		tree.call("set_viewport_width", size.x)
 	if lab_stats_grid != null:
 		lab_stats_grid.columns = 1 if narrow else 3
 	var popup_width := clampf(size.x - 32.0, 300.0, 600.0)

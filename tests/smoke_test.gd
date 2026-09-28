@@ -27,6 +27,7 @@ const SENSATION_SCENARIO := preload("res://tests/scenarios/SensationScenario.gd"
 const LAUNCH_RANGE_SCENARIO := preload("res://tests/scenarios/LaunchRangeScenario.gd")
 const CEO_DECISION_SCENARIO := preload("res://tests/scenarios/CeoDecisionScenario.gd")
 const B2B_REPUTATION_SCENARIO := preload("res://tests/scenarios/B2BReputationScenario.gd")
+const RESEARCH_TREE_SCENARIO := preload("res://tests/scenarios/ResearchTreeScenario.gd")
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
@@ -1625,6 +1626,10 @@ func _ready() -> void:
 	var b2b_error := B2B_REPUTATION_SCENARIO.run()
 	if b2b_error != "":
 		_fail(b2b_error)
+		return
+	var tree_error := RESEARCH_TREE_SCENARIO.run(self)
+	if tree_error != "":
+		_fail(tree_error)
 		return
 
 	print("[CI] Smoke test passed")

@@ -4,6 +4,7 @@ signal action_requested(action: String, payload: Variant)
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const UI := preload("res://ui/UiKit.gd")
+const RESEARCH_TREE := preload("res://scripts/ResearchTree.gd")
 
 const APP_PANEL := UI.APP_PANEL
 const APP_PANEL_ALT := UI.APP_PANEL_ALT
@@ -84,6 +85,7 @@ var lab_detailed_nodes: Array[Control] = []
 var lab_expert_nodes: Array[Control] = []
 var research_box: VBoxContainer
 var knowhow_box: VBoxContainer
+var research_tree: Control
 var _knowhow_rows: Dictionary = {}
 var pager: Control
 var patent_card_node: Control
@@ -512,6 +514,11 @@ func _build() -> void:
 		new_page.add_child(node)
 
 	var research_page: VBoxContainer = pager.call("add_page", "RESEARCH", "Recherche")
+	research_page.add_child(_section("Arbre de recherche"))
+	research_tree = (load("res://ui/components/ResearchTreePanel.gd") as Script).new() as Control
+	research_tree.connect("action_requested", _on_research_tree_action)
+	research_page.add_child(research_tree)
+	research_page.add_child(_section("Répartir l'équipe Recherche"))
 	var research_card := _card(APP_PANEL, 14, 16)
 	research_card.add_child(research_box)
 	research_page.add_child(research_card)
@@ -582,6 +589,17 @@ func show_section_for_context(context: String) -> void:
 			show_section("PATENTS")
 		"Établi CPU", "Réglages avancés":
 			show_section("NEW")
+
+## Bouton « progresser » de l'arbre : un chercheur de plus, ou le programme Concept de la branche.
+func _on_research_tree_action(action: Dictionary) -> void:
+	match str(action.get("type", "")):
+		"CONCEPT":
+			_select_meta(concept_axis, str(action.get("axis", "")))
+			_emit_action("start_concept")
+		"ALLOCATE":
+			var result: Dictionary = RESEARCH_TREE.apply_action(action)
+			_emit_action("research_tree_message", str(result.get("message", "")))
+	refresh_research_content()
 
 ## Savoir-faire en barres (avant : une liste « • Cpu : 46.0 », « Cloud : 6.0 »…).
 func _knowhow_meter(key: String, title: String, hint: String, value: float, text: String = "") -> void:
@@ -693,6 +711,8 @@ func refresh_research_content() -> void:
 		tech_lines.append("• %s : %.1f" % [technology.capitalize(), float(ResearchManager.technologies[technology_value])])
 	tech_label.text = "\n".join(tech_lines)
 	_refresh_knowhow_meters()
+	if research_tree != null:
+		research_tree.call("refresh")
 
 	if concept_status_label != null:
 		var concept_lines: Array[String] = []
