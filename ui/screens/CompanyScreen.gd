@@ -58,8 +58,11 @@ func _build() -> void:
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(intro)
 
-	company_rep_label = UI.rich_label()
+	company_rep_label = UI.section("Image de l'entreprise")
 	box.add_child(company_rep_label)
+	reputation_box = VBoxContainer.new()
+	reputation_box.add_theme_constant_override("separation", 8)
+	box.add_child(reputation_box)
 
 	box.add_child(UI.section("Divisions de l'entreprise"))
 	var division_card := UI.card(UI.APP_SHELL, 12, 12)
@@ -288,28 +291,105 @@ func _build() -> void:
 	subsidiary_button.text = "Créer une filiale"
 	subsidiary_button.pressed.connect(_create_subsidiary)
 	box.add_child(subsidiary_button)
+	_install_pages(box)
+
+# --- Sous-pages (retour d'Alexandre, 28/09 : 4 écrans et demi à faire défiler) ---
+var pager: Control
+var reputation_box: VBoxContainer
+var _reputation_rows: Dictionary = {}
+
+const REPUTATION_ROWS := [
+	["innovation", "Innovation", "Des produits en avance"],
+	["reliability", "Fiabilité", "Peu de pannes et de retours"],
+	["value", "Rapport qualité-prix", "Le prix est justifié"],
+	["support", "Service client", "Le SAV répond bien"],
+	["sustainability", "Responsabilité", "Consommation, environnement"],
+	["prestige", "Prestige", "La marque fait envie"],
+	["professional", "Clientèle pro", "Les entreprises vous font confiance (contrats B2B)"],
+]
+
+## Une barre par critère au lieu d'une liste « • Innovation : 48/100 ».
+func _refresh_reputation_bars() -> void:
+	if reputation_box == null:
+		return
+	for row_value in REPUTATION_ROWS:
+		var key := str(row_value[0])
+		var value := clampf(float(CompanyManager.reputation.get(key, 0.0)), 0.0, 100.0)
+		if not _reputation_rows.has(key):
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 10)
+			var name_box := VBoxContainer.new()
+			name_box.custom_minimum_size.x = 210
+			name_box.add_theme_constant_override("separation", 0)
+			name_box.add_child(UI.label(str(row_value[1]), 15))
+			name_box.add_child(UI.muted_label(str(row_value[2]), 11))
+			row.add_child(name_box)
+			var bar := ProgressBar.new()
+			bar.min_value = 0
+			bar.max_value = 100
+			bar.show_percentage = false
+			bar.custom_minimum_size = Vector2(120, 16)
+			bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			bar.add_theme_stylebox_override("background", UI.stylebox(UI.APP_PANEL_ALT, 8, 1, UI.APP_LINE, 0))
+			row.add_child(bar)
+			var number := UI.label("", 16)
+			number.custom_minimum_size.x = 44
+			number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			row.add_child(number)
+			reputation_box.add_child(row)
+			_reputation_rows[key] = {"bar":bar, "number":number}
+		var parts: Dictionary = _reputation_rows[key]
+		var fill_color := UI.APP_GREEN if value >= 55.0 else (UI.APP_AMBER if value >= 25.0 else UI.APP_RED)
+		(parts.bar as ProgressBar).value = value
+		(parts.bar as ProgressBar).add_theme_stylebox_override("fill", UI.stylebox(fill_color, 8, 0, fill_color, 0))
+		(parts.number as Label).text = "%.0f" % value
+
+func _child_with_text(box: Node, text: String) -> Node:
+	for child in box.get_children():
+		if child is Label and (child as Label).text == text:
+			return child
+	return null
+
+func _install_pages(box: VBoxContainer) -> void:
+	# Locaux & RH en premier après l'aperçu : c'est là que tombent la plupart des décisions.
+	var executive_section := _child_with_text(box, "Direction, RH & environnement de travail")
+	var divisions_section := _child_with_text(box, "Divisions de l'entreprise")
+	if executive_section != null and divisions_section != null:
+		var exec_index := executive_section.get_index()
+		box.move_child(executive_section, divisions_section.get_index())
+		box.move_child(box.get_child(exec_index + 1), executive_section.get_index() + 1)
+	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
+	pager.call("split", box, [
+		{"key":"OVERVIEW", "label":"Aperçu", "start":company_rep_label},
+		{"key":"WORKPLACE", "label":"Locaux & RH", "start":executive_section},
+		{"key":"DIVISIONS", "label":"Divisions", "start":divisions_section},
+		{"key":"BUDGETS", "label":"Budgets & délégation", "start":_child_with_text(box, "Budgets mensuels")},
+		{"key":"GROUP", "label":"Groupe", "start":_child_with_text(box, "Groupe / filiales")},
+	])
+
+func show_section(key: String) -> void:
+	if pager != null:
+		pager.call("show_page", key)
+
+func current_section() -> String:
+	return str(pager.get("current")) if pager != null else ""
+
+func show_section_for_context(context: String) -> void:
+	match context:
+		"LOCAUX", "RH", "Locaux", "Bureau du fondateur":
+			show_section("WORKPLACE")
+		"ARBITRAGE", "Divisions":
+			show_section("DIVISIONS")
+		"FINANCE", "Budgets":
+			show_section("BUDGETS")
+		"Entreprise":
+			show_section("OVERVIEW")
 
 func refresh() -> void:
 	if company_rep_label == null or not CompanyManager.created:
 		return
-	var reputation := CompanyManager.reputation
-	var lines: Array[String] = ["Image de l'entreprise :"]
-	var reputation_labels := {
-		"innovation":"Innovation", "reliability":"Fiabilité", "value":"Rapport qualité-prix",
-		"support":"Service client", "sustainability":"Responsabilité", "prestige":"Prestige",
-		"professional":"Clientèle professionnelle"
-	}
-	for key in ["innovation", "reliability", "value", "support", "sustainability", "prestige", "professional"]:
-		lines.append("• %s : %.0f/100" % [str(reputation_labels.get(key, key)), float(reputation.get(key, 0.0))])
-	lines.append("\nÉquilibrage économique : %s" % BalanceManager.profile_label())
-	lines.append("Marge structurelle théorique au départ : %.1f mois • marché x%.2f • pression concurrentielle x%.2f" % [
-		BalanceManager.starting_runway_months(), BalanceManager.market_demand_factor(), BalanceManager.competitor_pressure_factor()
-	])
-	lines.append("\nFiliales : %d" % CompanyManager.subsidiaries.size())
-	for subsidiary_value in CompanyManager.subsidiaries:
-		var subsidiary: Dictionary = subsidiary_value
-		lines.append("• %s — %s — capital %s €" % [str(subsidiary.name), str(subsidiary.sector), UI.money(int(subsidiary.capital))])
-	company_rep_label.text = "\n".join(lines)
+	_refresh_reputation_bars()
 
 	var brief := ExecutiveManager.get_executive_brief()
 	var priority_lines: Array[String] = [

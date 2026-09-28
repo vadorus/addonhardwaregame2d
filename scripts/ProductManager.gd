@@ -601,7 +601,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	_record_market_feedback(product, report)
 	sales_report_created.emit(report)
 	if not contract.is_empty():
-		MarketManager.advance_contract(str(product.id), sold_b2b)
+		MarketManager.advance_contract(str(product.id), sold_b2b, capacity)
 	if not _reviewed_products.has(str(product.id)):
 		var scores := MarketManager.segment_scores(product)
 		var rows := MarketManager.benchmark_for(product)

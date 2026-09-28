@@ -75,6 +75,44 @@ static func prepare_touch_scroll_children(root: Node) -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		prepare_touch_scroll_children(child)
 
+## Ligne « nom + barre + chiffre » pour remplacer les listes « • X : 18.0/100 ».
+static func meter_row(title: String, hint: String = "") -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var name_box := VBoxContainer.new()
+	name_box.custom_minimum_size.x = 210
+	name_box.add_theme_constant_override("separation", 0)
+	name_box.add_child(label(title, 14))
+	if hint != "":
+		name_box.add_child(muted_label(hint, 11))
+	row.add_child(name_box)
+	var bar := ProgressBar.new()
+	bar.min_value = 0
+	bar.max_value = 100
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(110, 14)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.add_theme_stylebox_override("background", stylebox(APP_PANEL_ALT, 7, 1, APP_LINE, 0))
+	row.add_child(bar)
+	var number := label("", 15)
+	number.custom_minimum_size.x = 64
+	number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(number)
+	row.set_meta("bar", bar)
+	row.set_meta("number", number)
+	return row
+
+## value sur 100 ; text remplace le chiffre affiché si fourni (ex. « 3 pers. »).
+static func set_meter(row: HBoxContainer, value: float, text: String = "") -> void:
+	var bar: ProgressBar = row.get_meta("bar")
+	var number: Label = row.get_meta("number")
+	var clamped := clampf(value, 0.0, 100.0)
+	var fill := APP_GREEN if clamped >= 55.0 else (APP_AMBER if clamped >= 25.0 else APP_RED)
+	bar.value = clamped
+	bar.add_theme_stylebox_override("fill", stylebox(fill, 7, 0, fill, 0))
+	number.text = text if text != "" else "%.0f" % clamped
+
 static func content_box() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -32,6 +32,32 @@ func _ready() -> void:
 	after_sales_panel.connect("action_requested", _relay_action)
 	box.add_child(after_sales_panel)
 
+	# Sous-pages : marché, appels d'offres et SAV ne s'empilent plus (retour d'Alexandre, 28/09).
+	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
+	pager.call("split", box, [
+		{"key":"OVERVIEW", "label":"Ventes & marché", "start":overview_panel},
+		{"key":"TENDERS", "label":"Appels d'offres", "start":tender_panel},
+		{"key":"SAV", "label":"SAV", "start":after_sales_panel},
+	])
+
+var pager: Control
+
+func show_section(key: String) -> void:
+	if pager != null:
+		pager.call("show_page", key)
+
+func current_section() -> String:
+	return str(pager.get("current")) if pager != null else ""
+
+func show_section_for_context(context: String) -> void:
+	match context:
+		"SAV":
+			show_section("SAV")
+		"CONTRAT", "Appels d'offres":
+			show_section("TENDERS")
+		"MARCHÉ", "Marché":
+			show_section("OVERVIEW")
+
 func set_viewport_width(width: float) -> void:
 	if overview_panel != null and overview_panel.has_method("set_viewport_width"):
 		overview_panel.call("set_viewport_width", width)

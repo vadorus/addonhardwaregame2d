@@ -82,6 +82,11 @@ var lab_depth_hint_label: Label
 var lab_depth_buttons: Dictionary = {}
 var lab_detailed_nodes: Array[Control] = []
 var lab_expert_nodes: Array[Control] = []
+var research_box: VBoxContainer
+var knowhow_box: VBoxContainer
+var _knowhow_rows: Dictionary = {}
+var pager: Control
+var patent_card_node: Control
 
 func _ready() -> void:
 	_build()
@@ -263,23 +268,22 @@ func _build() -> void:
 	rd_budget.value_changed.connect(func(_value): _emit_action("preview"))
 	_add_labeled_control(configuration_box, "Budget mensuel développement CPU", rd_budget)
 
+	# Recherche et programmes Concept : sortis du formulaire « Nouveau CPU » (sous-page Recherche).
+	research_box = VBoxContainer.new()
+	research_box.add_theme_constant_override("separation", 11)
 	var research_heading := _eyebrow("RECHERCHE CONTINUE CPU")
-	configuration_box.add_child(research_heading)
-	_register_depth_node(research_heading, "DETAILED")
+	research_box.add_child(research_heading)
 	var research_intro := _muted_label("L’équipe Recherche prépare les générations suivantes pendant que l’équipe Développement transforme les connaissances en produit. Les deux équipes sont désormais indépendantes.", 12)
 	research_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(research_intro)
-	_register_depth_node(research_intro, "DETAILED")
+	research_box.add_child(research_intro)
 	research_overview_label = _muted_label("", 12)
 	research_overview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(research_overview_label)
-	_register_depth_node(research_overview_label, "DETAILED")
+	research_box.add_child(research_overview_label)
 	var research_grid := GridContainer.new()
 	research_grid.columns = 2
 	research_grid.add_theme_constant_override("h_separation", 8)
 	research_grid.add_theme_constant_override("v_separation", 6)
-	configuration_box.add_child(research_grid)
-	_register_depth_node(research_grid, "DETAILED")
+	research_box.add_child(research_grid)
 	for research_key in ResearchManager.get_cpu_research_domain_keys():
 		research_grid.add_child(_muted_label(ResearchManager.get_cpu_research_label(str(research_key)), 12))
 		var allocation := _spin(0, 30, 1, 0)
@@ -287,49 +291,40 @@ func _build() -> void:
 		research_grid.add_child(allocation)
 		research_alloc_controls[str(research_key)] = allocation
 	research_budget = _spin(0, 100000, 1000, 12000)
-	_add_labeled_control(configuration_box, "Budget mensuel recherche fondamentale", research_budget)
-	_register_depth_node(research_budget.get_parent(), "DETAILED")
+	_add_labeled_control(research_box, "Budget mensuel recherche fondamentale", research_budget)
 	var apply_research := Button.new()
 	apply_research.text = "Appliquer cette répartition de recherche"
 	apply_research.custom_minimum_size.y = 42
 	apply_research.pressed.connect(func(): _emit_action("apply_research_plan"))
-	configuration_box.add_child(apply_research)
-	_register_depth_node(apply_research, "DETAILED")
+	research_box.add_child(apply_research)
 
 	var concept_heading := _eyebrow("R&D CONCEPT CPU")
-	configuration_box.add_child(concept_heading)
-	_register_depth_node(concept_heading, "EXPERT")
+	research_box.add_child(concept_heading)
 	var concept_intro := _muted_label("Ces programmes ne visent pas forcément un produit immédiat. Ils servent de laboratoire avancé pour créer des technologies transférables aux générations futures.", 12)
 	concept_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(concept_intro)
-	_register_depth_node(concept_intro, "EXPERT")
+	research_box.add_child(concept_intro)
 	concept_axis = OptionButton.new()
 	for axis_value in ResearchManager.get_cpu_concept_axis_keys():
 		var axis := str(axis_value)
 		concept_axis.add_item(ResearchManager.get_cpu_concept_axis_label(axis))
 		concept_axis.set_item_metadata(concept_axis.item_count - 1, axis)
-	_add_labeled_control(configuration_box, "Axe expérimental", concept_axis)
-	_register_depth_node(concept_axis.get_parent(), "EXPERT")
+	_add_labeled_control(research_box, "Axe expérimental", concept_axis)
 	concept_budget = _spin(5000, 150000, 2500, 15000)
-	_add_labeled_control(configuration_box, "Budget mensuel du programme", concept_budget)
-	_register_depth_node(concept_budget.get_parent(), "EXPERT")
+	_add_labeled_control(research_box, "Budget mensuel du programme", concept_budget)
 	concept_ambition = OptionButton.new()
 	for data in [["Prudent",1],["Ambitieux",2],["Rupture",3]]:
 		concept_ambition.add_item(str(data[0]))
 		concept_ambition.set_item_metadata(concept_ambition.item_count - 1, int(data[1]))
 	concept_ambition.select(1)
-	_add_labeled_control(configuration_box, "Ambition", concept_ambition)
-	_register_depth_node(concept_ambition.get_parent(), "EXPERT")
+	_add_labeled_control(research_box, "Ambition", concept_ambition)
 	var concept_start := Button.new()
 	concept_start.text = "Lancer un programme Concept"
 	concept_start.custom_minimum_size.y = 42
 	concept_start.pressed.connect(func(): _emit_action("start_concept"))
-	configuration_box.add_child(concept_start)
-	_register_depth_node(concept_start, "EXPERT")
+	research_box.add_child(concept_start)
 	concept_status_label = _muted_label("Aucun programme Concept actif.", 12)
 	concept_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	configuration_box.add_child(concept_status_label)
-	_register_depth_node(concept_status_label, "EXPERT")
+	research_box.add_child(concept_status_label)
 
 	configuration_box.add_child(_eyebrow("RÉUNION D'ARCHITECTURE"))
 	var generation_intro := _muted_label("Demandez à Camille et à l'équipe de transformer ce brief en trois plans de génération.", 12)
@@ -507,25 +502,46 @@ func _build() -> void:
 	warning_panel.add_child(lab_warning_label)
 	preview_box.add_child(warning_panel)
 
-	box.add_child(_section("Savoir-faire de l'entreprise"))
+	# --- Sous-pages : une seule chose à l'écran à la fois (retour d'Alexandre, 28/09) ---
+	var pager_script: Script = load("res://ui/SectionPager.gd")
+	pager = pager_script.new() as Control
+	box.add_child(pager)
+	var new_page: VBoxContainer = pager.call("add_page", "NEW", "Nouveau CPU")
+	for node in [depth_card, lab_layout_grid]:
+		box.remove_child(node)
+		new_page.add_child(node)
+
+	var research_page: VBoxContainer = pager.call("add_page", "RESEARCH", "Recherche")
+	var research_card := _card(APP_PANEL, 14, 16)
+	research_card.add_child(research_box)
+	research_page.add_child(research_card)
+	research_page.add_child(_section("Savoir-faire de l'entreprise"))
 	var tech_card := _card(APP_SHELL, 12, 12)
+	var tech_box := VBoxContainer.new()
+	tech_box.add_theme_constant_override("separation", 8)
+	tech_card.add_child(tech_box)
+	knowhow_box = VBoxContainer.new()
+	knowhow_box.add_theme_constant_override("separation", 8)
+	tech_box.add_child(knowhow_box)
+	# L'ancien récapitulatif texte reste calculé (tests, détails) mais n'est plus affiché.
 	tech_label = _rich_label()
-	tech_card.add_child(tech_label)
-	box.add_child(tech_card)
+	tech_label.visible = false
+	tech_box.add_child(tech_label)
+	research_page.add_child(tech_card)
 
-	box.add_child(_section("Pipeline R&D et rapports de Camille"))
-	var projects_card := _card(APP_SHELL, 12, 12)
-	projects_label = _rich_label()
-	projects_card.add_child(projects_label)
-	box.add_child(projects_card)
-
+	var projects_page: VBoxContainer = pager.call("add_page", "PROJECTS", "Projets")
 	var decision_script: Script = load("res://ui/components/DecisionCard.gd")
 	project_decision_card = decision_script.new() as PanelContainer
 	project_decision_card.visible = false
 	project_decision_card.connect("option_selected", Callable(self, "_on_project_decision_pressed"))
-	box.add_child(project_decision_card)
+	projects_page.add_child(project_decision_card)
+	projects_page.add_child(_section("Historique des projets"))
+	var projects_card := _card(APP_SHELL, 12, 12)
+	projects_label = _rich_label()
+	projects_card.add_child(projects_label)
+	projects_page.add_child(projects_card)
 
-	box.add_child(_section("Brevets"))
+	var patents_page: VBoxContainer = pager.call("add_page", "PATENTS", "Brevets")
 	var patent_card := _card(APP_SHELL, 12, 12)
 	var patent_box := VBoxContainer.new()
 	patent_card.add_child(patent_box)
@@ -541,11 +557,72 @@ func _build() -> void:
 	license_pat.text = "Activer / désactiver la licence"
 	license_pat.pressed.connect(func(): _emit_action("toggle_patent_license"))
 	patent_actions.add_child(license_pat)
-	box.add_child(patent_card)
+	patents_page.add_child(patent_card)
+	pager.call("show_page", "NEW")
 
 	lab_reference_design = CPU_DESIGN.default_design()
 	lab_reference_name = "Design équilibré"
 	set_depth_mode("ESSENTIAL")
+
+## Ouvre la sous-page utile selon d'où vient le joueur (garage, Nora, décision).
+func show_section(key: String) -> void:
+	if pager != null:
+		pager.call("show_page", key)
+
+func current_section() -> String:
+	return str(pager.get("current")) if pager != null else ""
+
+func show_section_for_context(context: String) -> void:
+	match context:
+		"R&D", "Recherche", "Recherche & technologies":
+			show_section("RESEARCH")
+		"PROJECT_DECISION", "Projets":
+			show_section("PROJECTS")
+		"Brevets":
+			show_section("PATENTS")
+		"Établi CPU", "Réglages avancés":
+			show_section("NEW")
+
+## Savoir-faire en barres (avant : une liste « • Cpu : 46.0 », « Cloud : 6.0 »…).
+func _knowhow_meter(key: String, title: String, hint: String, value: float, text: String = "") -> void:
+	if not _knowhow_rows.has(key):
+		var row := UI.meter_row(title, hint)
+		knowhow_box.add_child(row)
+		_knowhow_rows[key] = row
+	var meter: HBoxContainer = _knowhow_rows[key]
+	UI.set_meter(meter, value, text)
+	var name_box := meter.get_child(0)
+	if hint != "" and name_box.get_child_count() > 1:
+		(name_box.get_child(1) as Label).text = hint
+
+func _knowhow_heading(key: String, text: String) -> void:
+	if not _knowhow_rows.has(key):
+		var heading := _eyebrow(text)
+		knowhow_box.add_child(heading)
+		_knowhow_rows[key] = heading
+
+func _refresh_knowhow_meters() -> void:
+	if knowhow_box == null:
+		return
+	_knowhow_heading("H_TEAM", "ÉQUIPE DÉVELOPPEMENT")
+	_knowhow_meter("DEV_SCORE", "Niveau de l'équipe", "%d personne(s)" % ResearchManager.get_development_team_size(), ResearchManager.development_team_score())
+	_knowhow_meter("DEV_CONF", "Confiance", "L'équipe maîtrise-t-elle le projet ?", ResearchManager.development_confidence())
+	_knowhow_heading("H_RESEARCH", "CONNAISSANCES DE RECHERCHE")
+	for research_key_value in ResearchManager.get_cpu_research_domain_keys():
+		var key := str(research_key_value)
+		var data := ResearchManager.get_cpu_research_domain(key)
+		var people := int(data.get("allocated", 0))
+		_knowhow_meter("R_" + key, ResearchManager.get_cpu_research_label(key),
+			"%d chercheur(s) dessus" % people if people > 0 else "Personne n'y travaille",
+			float(data.get("knowledge", 0.0)))
+	_knowhow_heading("H_SKILLS", "COMPÉTENCES DE L'ENTREPRISE")
+	for capability_value in ResearchManager.get_cpu_capability_keys():
+		var capability_key := str(capability_value)
+		_knowhow_meter("C_" + capability_key, ResearchManager.get_cpu_capability_label(capability_key), "", ResearchManager.get_cpu_capability(capability_key))
+	_knowhow_heading("H_FIELD", "EXPÉRIENCE TERRAIN (APPRISE DES PANNES ET DU SAV)")
+	for field_data in [["MANUFACTURING", "Fabrication"], ["THERMAL", "Thermique"], ["STABILITY", "Stabilité"], ["FIRMWARE", "Firmware"]]:
+		_knowhow_meter("F_" + str(field_data[0]), str(field_data[1]), "", AfterSalesManager.cpu_field_experience(str(field_data[0])))
+
 func refresh_research_content() -> void:
 	if tech_label == null:
 		return
@@ -614,6 +691,7 @@ func refresh_research_content() -> void:
 		var technology := str(technology_value)
 		tech_lines.append("• %s : %.1f" % [technology.capitalize(), float(ResearchManager.technologies[technology_value])])
 	tech_label.text = "\n".join(tech_lines)
+	_refresh_knowhow_meters()
 
 	if concept_status_label != null:
 		var concept_lines: Array[String] = []
@@ -864,6 +942,8 @@ func _refresh_project_decision() -> void:
 	if project_decision_card == null:
 		return
 	var decisions := ResearchManager.get_pending_project_decisions()
+	if pager != null:
+		pager.call("set_badge", "PROJECTS", "" if decisions.is_empty() else "⚠")
 	if decisions.is_empty():
 		project_decision_card.visible = false
 		project_decision_kicker = null
@@ -902,6 +982,7 @@ func focus_project_decision() -> void:
 	refresh_research_content()
 	if project_decision_card == null or not project_decision_card.visible:
 		return
+	show_section("PROJECTS")
 	call_deferred("_focus_project_decision_deferred")
 
 func _focus_project_decision_deferred() -> void:

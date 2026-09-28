@@ -91,6 +91,25 @@ static func _run_in_game(game: Control) -> String:
 	panel.call("choose", "DETAIL")
 	if tabs.current_tab != 1 or TimeManager.time_scale != 0.0:
 		return "CEO decision: detail should open Entreprise with time paused (tab %d, speed %.1f)" % [tabs.current_tab, TimeManager.time_scale]
+	# … et directement sur la sous-page « Locaux & RH », pas en haut d'une page de 4 écrans.
+	var company: Control = game.get("company_screen")
+	if str(company.call("current_section")) != "WORKPLACE":
+		return "CEO decision: detail should open the « Locaux & RH » sub-page (got %s)" % str(company.call("current_section"))
+
+	# Sous-pages : le garage mène à la bonne page du Laboratoire.
+	var lab: Control = game.get("lab_screen")
+	game.call("_on_dashboard_navigation", 3, "R&D")
+	if str(lab.call("current_section")) != "RESEARCH":
+		return "Lab: « Recherche & technologies » should open the Recherche sub-page (got %s)" % str(lab.call("current_section"))
+	game.call("_on_dashboard_navigation", 3, "Réglages avancés")
+	if str(lab.call("current_section")) != "NEW":
+		return "Lab: the workbench should open the Nouveau CPU sub-page"
+	var market: Control = game.get("market_screen")
+	game.call("_on_dashboard_navigation", 5, "SAV")
+	# (l'onglet Marché peut être encore verrouillé en début de partie)
+	if tabs.current_tab == 5 and str(market.call("current_section")) != "SAV":
+		return "Market: SAV context should open the SAV sub-page"
+	game.call("_show_tab", 0)
 	ExecutiveManager.resolve_hr_issue(hr_id2.substr(3), "DISCUSS")
 
 	# Une partie chargée repart en pause, même sauvegardée en ×3.

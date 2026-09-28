@@ -1743,6 +1743,12 @@ func maybe_generate_b2b(product: Dictionary):
 		return
 	var market_units := segment_market_units(target)
 	var units: int = maxi(20, int(float(market_units) * rng.randf_range(0.025, 0.09)))
+	# Correctif (partie Pixel du 28/09) : les clients demandaient jusqu'à 1 212 unités/mois
+	# à une usine qui en sort 201. Chaque mois finissait en livraison incomplète : pénalité
+	# + réputation « Clientèle pro » qui tombait à 0. Un client sérieux commande ce que
+	# vous pouvez livrer (35 à 60 % de la capacité, le reste reste au grand public).
+	var capacity := maxi(int(product.get("production_capacity", 0)), 1)
+	units = clampi(mini(units, int(float(capacity) * rng.randf_range(0.35, 0.60))), mini(20, capacity), capacity)
 	var months := rng.randi_range(6, 24)
 	var unit_price := int(float(product.get("price", 1)) * rng.randf_range(0.76, 0.92))
 	var customers_by_segment := {
@@ -1760,7 +1766,7 @@ func maybe_generate_b2b(product: Dictionary):
 	var contract := {
 		"id":"B2B-%03d" % _next_contract_id,"product_id":str(product.get("id", "")),"product_name":str(product.get("name", "")),
 		"customer":customer,"segment":target,"units_per_month":units,"unit_price":unit_price,"remaining_months":months,
-		"status":"PENDING"
+		"status":"PENDING","sized_to_capacity":true,"missed_months":0,"months_total":months
 	}
 	_next_contract_id += 1
 	contracts.append(contract)
@@ -1785,11 +1791,16 @@ func active_contract_for(product_id: String) -> Dictionary:
 			return contract
 	return {}
 
-func advance_contract(product_id: String, delivered_units: int = -1):
+func advance_contract(product_id: String, delivered_units: int = -1, capacity: int = -1):
 	for contract in contracts:
 		if str(contract.get("product_id", "")) == product_id and str(contract.get("status", "")) == "ACTIVE":
 			var promised := int(contract.get("units_per_month", 0))
+			# Anciens contrats (avant le correctif) signés au-delà de la capacité de l'usine :
+			# on ne punit que ce qui était réellement livrable.
+			if not bool(contract.get("sized_to_capacity", false)) and capacity > 0:
+				promised = mini(promised, capacity)
 			if delivered_units >= 0 and delivered_units < promised:
+				contract["missed_months"] = int(contract.get("missed_months", 0)) + 1
 				var shortfall := promised - delivered_units
 				var penalty := int(round(float(shortfall * int(contract.get("unit_price", 0))) * float(contract.get("penalty_rate", 0.08))))
 				if penalty > 0:
@@ -1800,7 +1811,15 @@ func advance_contract(product_id: String, delivered_units: int = -1):
 			contract["remaining_months"] = int(contract.get("remaining_months", 0)) - 1
 			if int(contract.get("remaining_months", 0)) <= 0:
 				contract["status"] = "COMPLETED"
-				CompanyManager.add_alert("Contrat B2B terminé avec %s." % str(contract.get("customer", "")))
+				# Un contrat honoré construit la réputation auprès des professionnels.
+				var missed := int(contract.get("missed_months", 0))
+				var total := maxi(int(contract.get("months_total", 12)), 1)
+				var reliability_ratio := 1.0 - clampf(float(missed) / float(total), 0.0, 1.0)
+				if reliability_ratio >= 0.75:
+					CompanyManager.change_reputation({"professional":1.5 + 2.5 * reliability_ratio, "reliability":0.4, "prestige":0.3})
+					CompanyManager.add_alert("Contrat B2B honoré avec %s : les clients professionnels vous font davantage confiance." % str(contract.get("customer", "")))
+				else:
+					CompanyManager.add_alert("Contrat B2B terminé avec %s (livraisons incomplètes %d mois sur %d)." % [str(contract.get("customer", "")), missed, total])
 	market_changed.emit()
 
 func _update_market_opportunities():

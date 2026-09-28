@@ -428,6 +428,10 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		return
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
+	# Écrans découpés en sous-pages : on ouvre directement la bonne.
+	var screen: Control = tabs.get_current_tab_control() if tabs != null else null
+	if screen != null and context != "" and screen.has_method("show_section_for_context"):
+		screen.call("show_section_for_context", context)
 	if tab_index == 3 and context == "PROJECT_DECISION" and lab_screen != null:
 		TimeManager.time_scale = 0.0
 		status_label.text = "Nora : le prototype attend votre décision."
@@ -1614,6 +1618,7 @@ func _update_nav_state():
 		return
 	if nav_panel != null:
 		nav_panel.visible = CompanyManager.created and tabs.current_tab != 0
+	call_deferred("_place_notification_feed")
 	if status_label != null:
 		# V0.7: the room-first QG keeps one thin status line so Nora/blocking
 		# decisions and non-blocking monthly tickers remain visible.
@@ -2610,6 +2615,15 @@ func _build_notification_feed() -> void:
 	notification_feed.connect("navigate_requested", func(tab_index: int): _show_tab(tab_index))
 	add_child(notification_feed)
 
+## Les cartes de notification cachaient les onglets Marché/Presse : on les place sous la barre d'onglets.
+func _place_notification_feed() -> void:
+	if notification_feed == null:
+		return
+	var top := 104.0
+	if nav_panel != null and nav_panel.visible:
+		top = maxf(top, nav_panel.get_global_rect().end.y - get_global_rect().position.y + 6.0)
+	notification_feed.offset_top = top
+
 ## Petite carte en haut de l'écran. kind : info, good, alert, press, unlock. tab >= 0 : un toucher ouvre l'écran.
 func notify(text: String, kind: String = "info", tab: int = -1) -> void:
 	if notification_feed == null or not CompanyManager.created:
@@ -2759,8 +2773,12 @@ func _on_ceo_decision_resolved(message: String) -> void:
 
 func _on_ceo_decision_detail(tab_index: int) -> void:
 	# Le joueur veut lire le dossier complet : on l'y emmène, le temps reste en pause.
+	var category := str((ceo_panel.get("decision") as Dictionary).get("category", ""))
 	close_ceo_decision(false)
 	_show_tab(tab_index)
+	var screen: Control = tabs.get_current_tab_control()
+	if screen != null and screen.has_method("show_section_for_context"):
+		screen.call("show_section_for_context", category)
 	status_label.text = "Temps en pause pendant que vous étudiez le dossier. ▶ pour reprendre."
 
 # --- Musique -----------------------------------------------------------------
