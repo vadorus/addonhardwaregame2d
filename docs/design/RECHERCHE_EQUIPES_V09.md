@@ -2,6 +2,42 @@
 
 *Conception d'Alexandre (28/09/2026), mise en forme par Claude. À valider avant tout code.*
 
+## MODÈLE RETENU (28/09, 22 h) — prime sur les sections plus bas en cas de contradiction
+
+**Idée centrale : l'architecture est la base du CPU.** Le joueur ne règle plus la fréquence à la main ;
+il choisit l'architecture de sa gamme, et ses équipes font le reste.
+
+1. **Architecture de départ.** En 1971, pas d'équipe R&D : les fondateurs partent d'une architecture simple
+   (4 bits, comme le 4004 commandé par un fabricant de calculatrices). On la reçoit, on ne la choisit pas.
+2. **Équipes R&D par axe** : Vitesse, Énergie, Fiabilité (une par axe, créées quand l'entreprise grandit).
+   Elles conçoivent les **architectures** (1 à 3 ans). **Les qualités d'une architecture dépendent du niveau de
+   chaque équipe au moment de la conception** ; le joueur peut l'orienter (« architecture orientée énergie »).
+   L'architecture fixe les limites : cœurs possibles, fréquence maximale, cache.
+3. **Les individus font le niveau des équipes.** Former un ingénieur (coût, moins disponible quelques mois,
+   niveau en hausse), recruter un expert (cher, gros coup de pouce), nommer un responsable (compte double,
+   donne les conseils). Pour orienter une architecture, on investit dans les personnes de l'axe voulu.
+4. **Équipe de développement : les modèles.** Le joueur choisit l'architecture de sa gamme et dit ce qu'il veut
+   (économique, performant, basse consommation) ; l'équipe **propose la configuration** dans les limites de
+   l'architecture. Un seul modèle ou plusieurs configurations, y compris pour des gammes différentes
+   (Gaming et Industriel peuvent partager la même architecture). Réglages fins en mode avancé.
+5. **Retour d'expérience** à chaque modèle vendu :
+   - vers l'équipe de **développement** : meilleure maîtrise de l'architecture (modèles suivants plus rapides,
+     moins de bugs, meilleur rendement ; propositions de modèle amélioré ou de refresh) ;
+   - vers les équipes **R&D** de l'axe concerné (beaucoup de pannes → l'équipe Fiabilité progresse) :
+     ça prépare la **prochaine architecture**.
+6. **Usure de l'architecture.** Plus elle a servi, plus elle est mûre, mais elle plafonne ; l'équipe de
+   développement le signale. C'est le moment de lancer la suivante. Deux horizons à piloter :
+   **les modèles d'aujourd'hui (développement) et l'architecture de demain (R&D).**
+7. **Choix de patron** (esprit « tick-tock ») : même architecture sur une gravure plus fine (rapide, sûr, gain moyen)
+   ou nouvelle architecture (plus long, cher, risqué, gros saut).
+8. **Même langue partout** : Vitesse → barre performance, Énergie → barre efficacité, Fiabilité → barre fiabilité,
+   dans la conception, les ventes et les notes de la presse. La gravure reste commune à tous les produits.
+9. **Autres produits plus tard** (GPU, RAM, carte mère…) : même structure (architectures + axes), décrits dans
+   un fichier de données ; affichés dès le début en pointillés avec leur condition d'ouverture.
+
+Onglets : **Conception** (axe principal : projets, frise des 5 étapes, créer) · **Recherche / Architectures** ·
+**Équipes** (cartes d'équipe, personnes, formation, conseils), reliés par des liens (« Débloqué par… », « Équipe… »).
+
 ## Pourquoi
 
 Aujourd'hui, six notions différentes font « progresser » l'entreprise : technologies (`cpu`, `manufacturing`),
