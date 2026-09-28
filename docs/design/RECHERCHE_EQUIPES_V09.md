@@ -71,9 +71,32 @@ au lieu de menus cachés dans Produits.
 - **Anciennes sauvegardes** : conversion des valeurs actuelles en niveaux de maîtrise (la partie *jade orp* doit se recharger).
 - **Équilibrage** : à refaire et à vérifier avec la partie automatique de 15 ans (rythme des déblocages, coût des équipes).
 
-## Questions ouvertes pour Alexandre
+## Décisions d'Alexandre (28/09, 21 h 40)
 
-1. Combien d'équipes spécialisées au maximum ? Une par domaine, ou plusieurs sur le même domaine ?
-2. Une équipe spécialisée coûte-t-elle seulement des salaires, ou aussi des locaux (lien avec les paliers garage → campus) ?
-3. L'expérience gagnée en vendant (SAV, retours terrain) va-t-elle à l'équipe du domaine concerné ?
-   Ex. beaucoup de pannes → l'équipe Fiabilité apprend plus vite.
+- **Une équipe par domaine** (Énergie, Performance, Fiabilité, Gravure…). Pas de doublon.
+- **Plus il y a de monde dans une équipe, plus elle avance vite**, pondéré par le niveau de chaque employé.
+  Recruter un bon ingénieur dans l'équipe Énergie accélère directement cette branche.
+
+## Gammes et modèles : c'est le patron qui décide
+
+Aujourd'hui, chaque CPU devient automatiquement une gamme de 3 modèles (Essentiel, Signature, Apex,
+`CpuProductLine.TIERS`). Nouvelle règle, comme dans la vraie vie :
+
+- **Le joueur crée ses gammes comme il veut** : un nom et une cible. Exemples : *Nova Gaming*, *Nova Grand public*,
+  *Nova Pro*, *Nova Défense*, *Nova Spatial*. Une gamme garde son identité d'une génération à l'autre.
+- **À chaque nouveau produit**, il choisit : *nouvelle gamme* ou *génération suivante d'une gamme existante*
+  (on repart du design précédent et l'équipe propose ses plans).
+- **Il décide du nombre de modèles** dans la génération : un seul modèle, ou jusqu'à trois (tri des puces :
+  entrée, cœur de gamme, haut de gamme), puis passe à une nouvelle gamme ou génération.
+  La technologie *Tri avancé (binning)* pourra permettre plus de modèles plus tard.
+- **Marchés à ajouter** : *Défense / aérospatial*. Historiquement gros acheteur de puces dès les années 70 ;
+  priorité fiabilité et résistance, prix élevé, petits volumes, ventes par appels d'offres
+  (le jeu a déjà un panneau d'appels d'offres, `TenderPanel`). *Spatial* peut en être une variante plus tardive.
+  Les 12 marchés existants (calculatrices → datacenters, dont *Gaming*) restent.
+
+## Propositions par défaut (à confirmer)
+
+1. **Coût d'une équipe spécialisée** : salaires + de la place dans les locaux. Pour ouvrir une nouvelle équipe,
+   il faut parfois déménager : ça relie la recherche aux paliers garage → atelier → labo → PME → campus.
+2. **Expérience gagnée en vendant** : elle va à l'équipe concernée. Beaucoup de pannes sur une gamme =
+   l'équipe Fiabilité apprend plus vite (on apprend de ses erreurs), mais la réputation en pâtit.
