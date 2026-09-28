@@ -71,6 +71,69 @@ au lieu de menus cachés dans Produits.
 - **Anciennes sauvegardes** : conversion des valeurs actuelles en niveaux de maîtrise (la partie *jade orp* doit se recharger).
 - **Équilibrage** : à refaire et à vérifier avec la partie automatique de 15 ans (rythme des déblocages, coût des équipes).
 
+## La vie d'une puce : du vrai processus au jeu
+
+### Le vrai processus (résumé)
+
+Définir le produit → architecture → conception logique → vérification (souvent plus de la moitié de l'effort)
+→ conception physique → envoi à l'usine (tape-out) → fabrication (~3 mois) → premier silicium (bugs : microcode
+ou nouvelle révision) → qualification → tri des puces (une puce = toute une gamme) → production en volume
+→ lancement → vie du produit (microcode, refresh, fin de série). En 1971, l'Intel 4004 : une petite équipe,
+~2 300 transistors en 10 µm, plans en partie dessinés à la main, commande d'un fabricant de calculatrices.
+
+### Correspondance avec le jeu
+
+| Vraie vie | Dans le jeu | Existe ? | Équipe |
+|---|---|---|---|
+| Définir le produit | Création : gamme, marché, priorité | En partie | Le patron |
+| Architecture | Création : cœurs, fréquence, cache | Oui | Performance |
+| Conception + vérification | Développement (phases, bulles de points) | Oui | Performance, Fiabilité |
+| Conception physique | Choix de la gravure | Oui | Gravure |
+| Tape-out + fabrication | Prototype (coût, attente) | Oui | Gravure |
+| Premier silicium | Décision prototype : corriger maintenant ou plus tard | Oui | Fiabilité |
+| Qualification | Décision de validation | Oui | Fiabilité |
+| Tri des puces | Nombre de modèles (1 à 3) | À faire | Gravure |
+| Production | Industrialisation | Oui | Gravure |
+| Lancement | Prix, presse, interview | Oui | Le patron |
+| Vie du produit | Conseils : microcode, stepping, fin de série | En partie | Toutes |
+
+## Règle d'or : clair, pas prise de tête, fun, on sent l'avancement
+
+*Demande d'Alexandre (28/09) : « faut que ça soit clair, pas casse-tête non plus, et fun à faire, qu'on sente l'avancement ».*
+
+**Le joueur ne voit que 5 grandes étapes**, toujours les mêmes de 1971 à 2010 (le réalisme reste dans la simulation) :
+
+1. **Idée** : quoi, pour qui, quels réglages (le parcours de création).
+2. **Conception** : l'équipe travaille, les bulles de points montent (performance, efficacité, fiabilité, bugs).
+3. **Prototype** : moment « premier silicium ».
+4. **Production** : tri des puces, puis usine.
+5. **Lancement et vie** : prix, notes de la presse, puis conseils des équipes.
+
+**Clair**
+- Une frise de 5 pastilles sur le projet, dans le garage et dans le Labo : l'étape en cours s'allume.
+- Chaque étape dit en une phrase ce qui se passe et quelle équipe travaille.
+- Au plus **une décision par étape**, avec 2 ou 3 choix. Chaque choix affiche sa conséquence en clair
+  (« +2 mois, −40 % de pannes »). Les réglages fins restent dans le mode avancé.
+
+**Pas prise de tête**
+- Jamais de tableau de chiffres pour avancer. Des jauges, des couleurs, des phrases de l'équipe.
+- Les options verrouillées disent pourquoi (« Débloqué par : … »), les technologies disent à quoi elles servent.
+
+**Fun, on sent l'avancement**
+- **Bulles de points** qui montent au-dessus de l'équipe pendant la conception (façon Game Dev Tycoon).
+- **Moment « premier silicium »** : on allume la puce, petit suspense, puis le résultat
+  (« Elle démarre ! 2 bugs trouvés. Corriger maintenant ou par microcode ? »).
+- **Moment « tri des puces »** : les puces tombent dans 3 bacs (entrée, cœur, haut de gamme) ;
+  on voit combien de bonnes puces on a, et on choisit combien de modèles sortir.
+- **Révélation des notes de la presse** au lancement (déjà faite).
+- Un son et une animation à chaque étape franchie. Des petits imprévus (percée, bug, départ d'un ingénieur).
+- **Rythme cible** : une étape = 1 à 3 minutes de jeu à vitesse normale ; un événement ou une décision
+  environ toutes les minutes ; un premier CPU complet en ~15 minutes.
+
+**La complexité grandit avec l'époque, pas avec les écrans** : en 1971 les étapes sont courtes et simples ;
+plus tard la vérification pèse plus lourd, et des technologies (conception assistée, émulation)
+raccourcissent les phases. Le joueur sent l'industrie évoluer sans nouvel écran à apprendre.
+
 ## Décisions d'Alexandre (28/09, 21 h 40)
 
 - **Une équipe par domaine** (Énergie, Performance, Fiabilité, Gravure…). Pas de doublon.
