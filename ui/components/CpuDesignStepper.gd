@@ -371,6 +371,8 @@ func _rebuild_step() -> void:
 		2: _build_goal_step()
 		3: _build_models_step()
 		4: _build_budget_step()
+	# Au doigt : glisser sur une carte ou une flèche doit faire défiler la page, pas bloquer le geste.
+	UI.prepare_touch_scroll_children(_content)
 
 func _build_line_step() -> void:
 	_content.add_child(_step_title("Nouvelle gamme ou suite d'une gamme ?"))
@@ -455,7 +457,9 @@ func _build_goal_step() -> void:
 	toggle.custom_minimum_size.y = 40
 	toggle.pressed.connect(func():
 		adjust = not adjust
-		_changed(false))
+		_changed(false)
+		if adjust:
+			_scroll_to_settings())
 	_content.add_child(toggle)
 	if not adjust:
 		return
@@ -536,6 +540,17 @@ func _tiers_text() -> String:
 		if tiers.has(str((card_value as Dictionary).key)):
 			names.append(str((card_value as Dictionary).label).to_lower())
 	return ", ".join(names)
+
+## Après « Ajuster moi-même » : la page descend d'elle-même jusqu'aux réglages.
+func _scroll_to_settings() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	for child in _content.get_children():
+		if child is Button and str((child as Button).text).begins_with("Masquer"):
+			var target := int((child as Control).position.y) - 8
+			var tween := create_tween()
+			tween.tween_property(_scroll, "scroll_vertical", target, 0.35).set_trans(Tween.TRANS_SINE)
+			return
 
 # --- Réglages ◀ ▶ (dans les limites de l'architecture) --------------------------------------
 
