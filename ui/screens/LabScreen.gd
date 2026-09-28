@@ -20,6 +20,7 @@ const APP_LINE := UI.APP_LINE
 
 var tech_label: Label
 var projects_label: Label
+var project_cards_box: VBoxContainer
 var project_decision_card: PanelContainer
 var project_decision_kicker: Label
 var project_decision_label: Label
@@ -556,10 +557,15 @@ func _build() -> void:
 	project_decision_card.visible = false
 	project_decision_card.connect("option_selected", Callable(self, "_on_project_decision_pressed"))
 	projects_page.add_child(project_decision_card)
-	projects_page.add_child(_section("Historique des projets"))
+	projects_page.add_child(_section("Vos projets"))
+	# V0.9 : une carte par projet (frise des 5 étapes) au lieu du mur de texte.
+	project_cards_box = VBoxContainer.new()
+	project_cards_box.add_theme_constant_override("separation", 10)
+	projects_page.add_child(project_cards_box)
 	var projects_card := _card(APP_SHELL, 12, 12)
 	projects_label = _rich_label()
 	projects_card.add_child(projects_label)
+	projects_card.visible = false
 	projects_page.add_child(projects_card)
 
 	var patents_page: VBoxContainer = pager.call("add_page", "PATENTS", "Brevets")
@@ -747,8 +753,10 @@ func refresh_research_content() -> void:
 		concept_status_label.text = "\n".join(concept_lines) if not concept_lines.is_empty() else "Aucun programme Concept actif ou terminé."
 
 	var project_lines: Array[String] = []
+	var card_data: Array = []
 	for project_value in ResearchManager.projects:
 		var project: Dictionary = project_value
+		var first_line := project_lines.size()
 		var phase := "Terminé"
 		if str(project.get("status", "")) == "DEVELOPMENT":
 			var pending_gate_value = project.get("pending_decision", {})
@@ -840,8 +848,10 @@ func refresh_research_content() -> void:
 		if not reports.is_empty():
 			var first_report: Dictionary = reports[0]
 			project_lines.append("  Camille : %s" % str(first_report.get("text", "")))
+		card_data.append({"project":project, "details":project_lines.slice(first_line + 1)})
 
 	projects_label.text = "\n\n".join(project_lines) if not project_lines.is_empty() else "Aucun projet. Réglez votre première architecture CPU ci-dessus."
+	_refresh_project_cards(card_data)
 	_refresh_project_decision()
 
 	var patent_lines: Array[String] = []
@@ -1027,6 +1037,34 @@ func _focus_project_decision_deferred() -> void:
 
 func _emit_action(action: String, payload: Variant = null) -> void:
 	action_requested.emit(action, payload)
+
+## V0.9 : cartes de projets. En cours d'abord, puis les plus récents.
+func _refresh_project_cards(card_data: Array) -> void:
+	if project_cards_box == null:
+		return
+	for child in project_cards_box.get_children():
+		project_cards_box.remove_child(child)
+		child.queue_free()
+	if card_data.is_empty():
+		project_cards_box.add_child(_muted_label("Aucun projet pour l'instant. Touchez « Concevoir un nouveau processeur » dans Nouveau CPU.", 14))
+		return
+	var ordered: Array = []
+	for i in range(card_data.size() - 1, -1, -1):
+		if str((card_data[i].project as Dictionary).get("status", "")) == "DEVELOPMENT":
+			ordered.append(card_data[i])
+	for i in range(card_data.size() - 1, -1, -1):
+		if str((card_data[i].project as Dictionary).get("status", "")) != "DEVELOPMENT":
+			ordered.append(card_data[i])
+	var card_script: Script = load("res://ui/components/ProjectCard.gd")
+	for entry in ordered:
+		var card := card_script.new() as PanelContainer
+		project_cards_box.add_child(card)
+		card.call("show_project", entry.project, entry.details)
+		card.connect("decision_requested", func(_id: String): focus_project_decision())
+	UI.prepare_touch_scroll_children(project_cards_box)
+
+func project_card_count() -> int:
+	return project_cards_box.get_child_count() if project_cards_box != null else 0
 
 func _label(text: String, size: int = 14) -> Label:
 	return UI.label(text, size)

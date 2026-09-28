@@ -68,6 +68,14 @@ static func run(host: Node) -> String:
 	ArchitectureManager.sync_unlocks(false)
 	if not ArchitectureManager.owned.has("A8") or ArchitectureManager.latest_id() != "A8":
 		return "V0.9 architectures: 8-bit architecture must be available in 1975"
+	# Carte de projet (Labo > Projets) : se construit et place un projet neuf en « Conception ».
+	var card := (load("res://ui/components/ProjectCard.gd") as Script).new() as PanelContainer
+	host.add_child(card)
+	card.call("show_project", project, ["détail de test"])
+	var stage := int(card.call("_stage_of", project))
+	card.queue_free()
+	if stage != 1:
+		return "V0.9 project card: a project in development must show the 'Conception' stage (got %d)" % stage
 	# Sauvegarde / chargement.
 	var state := ArchitectureManager.get_state()
 	ArchitectureManager.reset()
