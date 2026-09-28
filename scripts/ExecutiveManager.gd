@@ -314,9 +314,20 @@ func renovate_workplace() -> bool:
 	executive_changed.emit()
 	return true
 
+static func _thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	while digits.length() > 3:
+		out = " " + digits.substr(digits.length() - 3) + out
+		digits = digits.substr(0, digits.length() - 3)
+	return ("-" if value < 0 else "") + digits + out
+
+func maintenance_cost() -> int:
+	var tier := clampi(int(workplace.get("tier", 0)), 0, WORKPLACE_TIERS.size() - 1)
+	return 4000 + int(WORKPLACE_TIERS[tier].monthly_cost) * 2
+
 func maintain_workplace() -> bool:
-	var tier := int(workplace.get("tier", 0))
-	var cost := 4000 + int(WORKPLACE_TIERS[tier].monthly_cost) * 2
+	var cost := maintenance_cost()
 	if not Economy.can_afford(cost, "Entretien des locaux"):
 		return false
 	Economy.add_expense(cost, "Entretien des locaux")
@@ -447,6 +458,15 @@ func get_hr_issue(issue_id: String) -> Dictionary:
 			return issue
 	return {}
 
+## Coût du « geste financier » (prime / action collective) pour un dossier RH.
+func hr_bonus_cost(issue_id: String) -> int:
+	var subject_id := str(get_hr_issue(issue_id).get("subject_id", ""))
+	if subject_id != "":
+		var emp := PersonnelManager.get_employee(subject_id)
+		if not emp.is_empty():
+			return maxi(2500, int(emp.get("salary", 4000)) / 2)
+	return 3500
+
 func resolve_hr_issue(issue_id: String, action: String) -> bool:
 	var issue := get_hr_issue(issue_id)
 	if issue.is_empty() or str(issue.get("status", "")) != "OPEN":
@@ -461,11 +481,7 @@ func resolve_hr_issue(issue_id: String, action: String) -> bool:
 			elif str(issue.get("type", "")) == "OVERCROWDING":
 				workplace["condition"] = clampf(float(workplace.get("condition", 60.0)) + 2.0, 0.0, 100.0)
 		"BONUS":
-			var cost := 3500
-			if subject_id != "":
-				var emp := PersonnelManager.get_employee(subject_id)
-				if not emp.is_empty():
-					cost = maxi(2500, int(emp.get("salary", 4000)) / 2)
+			var cost := hr_bonus_cost(issue_id)
 			if not Economy.can_afford(cost, "Action RH exceptionnelle"):
 				return false
 			Economy.add_expense(cost, "Action RH exceptionnelle")
@@ -579,17 +595,25 @@ func get_ceo_decisions() -> Array:
 	if bool(workplace_recommendation.get("due", false)):
 		var workplace_upgrade: Dictionary = workplace_recommendation.get("upgrade", {})
 		var workplace_finance: Dictionary = workplace_recommendation.get("financial_advice", {})
+		var place := workplace_data()
+		var needs_space := int(place.get("occupancy", 0)) >= int(ceil(float(place.get("capacity", 1)) * 0.75))
+		var workplace_advice := "Passer à « %s » pour %d €. %s" % [
+			str(workplace_upgrade.get("name", "de nouveaux locaux")),
+			int(workplace_upgrade.get("upgrade_cost", 0)),
+			str(workplace_finance.get("recommendation", ""))
+		]
+		if not needs_space:
+			# Les locaux sont usés mais pas trop petits : pas la peine de déménager.
+			workplace_advice = "Il reste de la place (%d/%d) : une remise en état pour %s € suffit." % [
+				int(place.get("occupancy", 0)), int(place.get("capacity", 0)), _thousands(maintenance_cost())
+			]
 		decisions.append({
 			"id":"WORKPLACE:%d" % int(workplace_upgrade.get("tier", int(workplace.get("tier", 0)) + 1)),
 			"category":"LOCAUX",
 			"severity":float(workplace_recommendation.get("severity", 50.0)),
 			"title":"Décider des locaux",
 			"text":str(workplace_recommendation.get("reason", "Les locaux méritent un point.")),
-			"recommendation":"Passer à « %s » pour %d €. %s" % [
-				str(workplace_upgrade.get("name", "de nouveaux locaux")),
-				int(workplace_upgrade.get("upgrade_cost", 0)),
-				str(workplace_finance.get("recommendation", ""))
-			],
+			"recommendation":workplace_advice,
 			"target_tab":1,
 			"can_defer":true
 		})
@@ -609,6 +633,15 @@ func get_ceo_decisions() -> Array:
 
 	for case_value in AfterSalesManager.get_open_cases():
 		var case_data: Dictionary = case_value
+		# Un dossier déjà pris en main (enquête en cours, surveillance choisie) n'attend plus le PDG,
+		# sauf si la surveillance seule laisse la confiance client se dégrader.
+		var case_status := str(case_data.get("status", ""))
+		if case_status == "INVESTIGATING":
+			continue
+		if case_status == "MONITORING":
+			var hurting := float(case_data.get("severity", 0.0)) >= 55.0 and float(case_data.get("last_return_rate", 0.0)) >= 0.035
+			if not hurting or bool(case_data.get("warranty_active", false)):
+				continue
 		decisions.append({
 			"id":"SAV:%s" % str(case_data.get("id", "")),
 			"category":"SAV",
@@ -642,6 +675,8 @@ func get_ceo_decisions() -> Array:
 		var product: Dictionary = product_value
 		if str(product.get("status", "")) != "LAUNCHED" or int(product.get("months_on_market", 0)) != 1:
 			continue
+		if bool(product.get("market_feedback_seen", false)):
+			continue
 		var feedback := ProductManager.get_market_feedback(str(product.get("id", "")))
 		if feedback.is_empty():
 			continue
@@ -663,7 +698,7 @@ func get_ceo_decisions() -> Array:
 
 	for tender_value in MarketManager.open_tenders():
 		var tender: Dictionary = tender_value
-		if str(tender.get("status", "")) != "OPEN":
+		if str(tender.get("status", "")) != "OPEN" or bool(tender.get("ceo_ignored", false)):
 			continue
 		var deadline := int(tender.get("deadline_months", 0))
 		var tender_severity := 46.0

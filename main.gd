@@ -162,6 +162,9 @@ var slot_layer: ColorRect
 var slot_title_label: Label
 var slot_list: VBoxContainer
 var slot_mode := "load"
+var ceo_layer: ColorRect
+var ceo_panel: Control
+var _ceo_resume_scale := 0.0
 
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
@@ -172,6 +175,7 @@ func _ready():
 	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()
+	_build_ceo_layer()
 	_connect_signals()
 	TimeManager.month_changed.connect(_on_month_changed_music)
 	_start_music_for_current_year()
@@ -415,6 +419,10 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if context.begins_with("CEO:") and open_ceo_decision(context.substr(4)):
+		return
+	if context.begins_with("CEO:"):
+		context = ""
 	if CompanyManager.created and ResearchManager.projects.is_empty() and tab_index == 3 and context == "Établi CPU":
 		_show_first_cpu_workshop()
 		return
@@ -1874,6 +1882,12 @@ func _load_game_slot(slot: int) -> void:
 		setup_layer.visible=false
 		SimulationManager.is_game_over = Economy.money <= 0
 		game_over_layer.visible=false
+		# Une partie chargée reprend en pause : le joueur relit la situation avant de relancer
+		# (avant, la vitesse sauvegardée ×2/×3 repartait immédiatement).
+		TimeManager.time_scale = 0.0
+		if ceo_layer != null:
+			ceo_layer.visible = false
+		status_label.text = "Partie chargée — %s %d. Appuyez sur ▶ quand vous êtes prêt." % [_month_name(TimeManager.month), TimeManager.year]
 		if SimulationManager.is_game_over:
 			TimeManager.time_scale = 0.0
 			_on_game_over("Faillite : la trésorerie est épuisée.", {"money": Economy.money})
@@ -2534,6 +2548,9 @@ func _handle_back_request() -> void:
 	if first_cpu_workshop != null and first_cpu_workshop.visible:
 		_close_first_cpu_workshop()
 		return
+	if ceo_decision_visible():
+		ceo_panel.call("choose", "LATER")
+		return
 	# Les écrans de décision (lancement, événement de recherche, bilan, faillite) exigent un choix.
 	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer, review_layer]:
 		if blocking != null and blocking.visible:
@@ -2646,7 +2663,7 @@ func _show_pending_reviews() -> void:
 	if _pending_reviews.is_empty() or review_layer == null or review_layer.visible:
 		return
 	# Ne jamais empiler deux grands moments : on attend la fin du lancement ou d'un choix bloquant.
-	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer]:
+	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer]:
 		if other != null and other.visible:
 			return
 	var next: Dictionary = _pending_reviews.pop_front()
@@ -2668,6 +2685,83 @@ func _close_review_reveal() -> void:
 	if _review_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
 		TimeManager.time_scale = _review_resume_scale
 	_show_pending_reviews()
+
+# --- Décision du PDG traitée sur place (correctif trouvé sur Pixel) ------------------
+# « Traiter : Décider des locaux » ouvrait l'onglet Entreprise tout en haut : la décision
+# était plusieurs écrans plus bas et le temps continuait de défiler. Désormais une carte
+# s'ouvre au-dessus du garage, le temps est en pause, et chaque choix est un bouton chiffré.
+
+func _build_ceo_layer() -> void:
+	ceo_layer = ColorRect.new()
+	ceo_layer.color = Color(0.10, 0.06, 0.02, 0.62)
+	ceo_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ceo_layer.visible = false
+	ceo_layer.z_index = 105
+	add_child(ceo_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ceo_layer.add_child(center)
+	var panel_script: Script = load("res://ui/components/CeoDecisionPanel.gd")
+	ceo_panel = panel_script.new() as Control
+	ceo_panel.connect("resolved", _on_ceo_decision_resolved)
+	ceo_panel.connect("detail_requested", _on_ceo_decision_detail)
+	ceo_panel.connect("later_requested", func():
+		close_ceo_decision()
+		status_label.text = "Décision gardée pour plus tard : elle reste signalée au garage."
+	)
+	center.add_child(ceo_panel)
+
+func ceo_decision_visible() -> bool:
+	return ceo_layer != null and ceo_layer.visible
+
+## Ouvre la carte d'une décision PDG. false si elle n'existe plus (déjà traitée).
+func open_ceo_decision(decision_id: String) -> bool:
+	if ceo_layer == null:
+		return false
+	var found: Dictionary = {}
+	for value in ExecutiveManager.get_ceo_decisions():
+		if typeof(value) == TYPE_DICTIONARY and str(value.get("id", "")) == decision_id:
+			found = value
+			break
+	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
+		return false
+	if not ceo_layer.visible:
+		_ceo_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	ceo_panel.call("show_decision", found)
+	ceo_panel.call("fit_to", get_viewport_rect().size)
+	# Les textes à retour à la ligne ne connaissent leur hauteur qu'après une mise en page.
+	call_deferred("_refit_ceo_panel")
+	ceo_layer.visible = true
+	JUICE.fade_in(ceo_layer, 0.2)
+	SoundManager.play("decision")
+	status_label.text = "Temps en pause : %s." % str(found.get("title", "décision"))
+	return true
+
+func _refit_ceo_panel() -> void:
+	if ceo_decision_visible():
+		ceo_panel.call("fit_to", get_viewport_rect().size)
+
+func close_ceo_decision(resume: bool = true) -> void:
+	if not ceo_decision_visible():
+		return
+	ceo_layer.visible = false
+	if resume and _ceo_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
+		TimeManager.time_scale = _ceo_resume_scale
+	_refresh_all()
+	_show_pending_reviews()
+
+func _on_ceo_decision_resolved(message: String) -> void:
+	close_ceo_decision()
+	status_label.text = "✓ " + message
+	notify(message, "good")
+	SoundManager.play("success")
+
+func _on_ceo_decision_detail(tab_index: int) -> void:
+	# Le joueur veut lire le dossier complet : on l'y emmène, le temps reste en pause.
+	close_ceo_decision(false)
+	_show_tab(tab_index)
+	status_label.text = "Temps en pause pendant que vous étudiez le dossier. ▶ pour reprendre."
 
 # --- Musique -----------------------------------------------------------------
 
@@ -2806,8 +2900,6 @@ func _load_from_slot_picker(slot: int) -> void:
 	if menu_layer != null:
 		menu_layer.visible = false
 	_load_game_slot(slot)
-	TimeManager.time_scale = 0.0
-	status_label.text = "Partie chargée. Relancez le temps quand vous êtes prêt."
 
 # --- Lancement de gamme (correctif du bug « Lancement impossible » sur une gamme) ---------
 

@@ -38,6 +38,25 @@ Le dossier `build/` n'est pas versionné (voir `.gitignore`) : on régénère le
    - ces chemins sont renseignés dans *Éditeur → Paramètres de l'éditeur → Export → Android*.
 4. **Téléphone** : options développeur + débogage USB activés, autoriser le PC au premier branchement.
 
+### Deuxième PC (PC du travail) — attention à la clé de signature
+
+Le PC du travail (compte `Admin`) a ses outils dans `C:\Users\Admin\Tools` (`Godot\…console.exe`, `Android\Sdk\platform-tools\adb.exe`, `Java`, `PortableGit`) et **seulement les modèles d'export Android** (pas d'export Windows depuis ce PC).
+Chaque PC signe l'APK de debug avec **sa propre clé**. Android refuse alors la mise à jour (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) quand on passe d'un PC à l'autre, et `adb uninstall` **efface les sauvegardes**. Procédure sûre :
+
+```powershell
+$adb = "C:\Users\Admin\Tools\Android\Sdk\platform-tools\adb.exe"   # ou le chemin du PC maison
+# 1. sauvegarder la partie du téléphone sur le PC (via cmd : le « > » de PowerShell 5 abîmerait le fichier)
+cmd /c "`"$adb`" exec-out run-as com.vadorus.techempire cat files/tech_empire_save.json > save.json"
+# 2. réinstaller
+& $adb uninstall com.vadorus.techempire
+& $adb install build/android/TechEmpire-v0.8.1-debug.apk
+# 3. remettre la partie
+& $adb push save.json /data/local/tmp/te_save.json
+& $adb shell run-as com.vadorus.techempire sh -c "'mkdir -p files && cp /data/local/tmp/te_save.json files/tech_empire_save.json'"
+```
+
+Faire de même pour `tech_empire_slot_1.json` … `_3.json` s'ils existent (`run-as com.vadorus.techempire ls files`). Pour ne plus avoir à le faire : copier la même `debug.keystore` sur les deux PC.
+
 ## Faire les exports à la main
 
 ```powershell
@@ -72,7 +91,7 @@ Sauvegardes : 1 automatique + 3 emplacements manuels ; « Continuer » charge la
 
 À chaque nouvelle version Android, augmenter dans `export_presets.cfg` :
 
-- `version/code` (entier, **doit augmenter** sinon Android refuse la mise à jour) — actuellement `9` ;
+- `version/code` (entier, **doit augmenter** sinon Android refuse la mise à jour) — actuellement `10` ;
 - `version/name` (texte affiché) — actuellement `0.8.1` ;
 - le nom de l'APK dans `export_path`.
 

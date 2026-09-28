@@ -55,3 +55,15 @@ Aucune règle de gameplay, d'économie ou de simulation n'a été modifiée.
 - Rail de gauche : m�mes noms que la navigation (Entreprise, �quipe, Produits, March�).
 - Comparaison : `docs/reviews/V081_avant_apres.png`.
 
+
+## 28/09 — bugs trouvés dans la partie d'Alexandre sur le Pixel (« jade orp », 1975)
+
+| Constaté sur le téléphone | Correctif |
+| --- | --- |
+| « Traiter : Décider des locaux » ouvrait l'onglet Entreprise tout en haut ; la décision était plusieurs écrans plus bas. Même souci pour RH, arbitrages, SAV, appels d'offres. | Nouvelle **carte de décision du PDG** (`ui/components/CeoDecisionPanel.gd`) au-dessus du garage : le problème, le conseil de Nora et des boutons chiffrés qui règlent la décision sur place (emménager / remettre en état / reporter ; entretien / prime ; suivre ou non la recommandation ; enquête, garantie, correctif, échange, rappel ; « noté » ; laisser passer l'appel d'offres), plus « Voir le dossier complet » et « Plus tard ». Ouverte par le bouton vert, le repère « ⚠ » du garage et la priorité du tableau de bord. |
+| Le temps continuait en ×2 pendant qu'on cherchait la décision (3 mois passés). | Le temps est en pause tant que la carte est ouverte ; « Plus tard » / Retour rend la vitesse d'avant ; « Voir le dossier complet » garde la pause. |
+| « Continuer » relançait la partie à la vitesse sauvegardée. | Une partie chargée repart **en pause** : « Partie chargée — novembre 1975. Appuyez sur ▶ quand vous êtes prêt. » |
+| Nora conseillait de déménager (75 000 €) alors que le garage n'était qu'usé (3/8 places). | Si la place ne manque pas, Nora conseille la remise en état (5 000 €) ; le bouton vert de la carte suit ce conseil. |
+| Un dossier SAV déjà en enquête ou sous surveillance restait « décision requise » indéfiniment. | Il ne revient que si la surveillance seule laisse la confiance se dégrader (sans garantie étendue). |
+
+Test : `tests/scenarios/CeoDecisionScenario.gd` (dans le smoke test). Vérifié sur le Pixel 10 avec la vraie sauvegarde.

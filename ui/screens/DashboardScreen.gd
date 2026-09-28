@@ -410,6 +410,10 @@ func _on_garage_zone_requested(tab_index: int, zone_name: String) -> void:
 	navigate_requested.emit(tab_index, zone_name)
 
 func _dashboard_priority_pressed() -> void:
+	var id := dashboard_priority_selected_id
+	if id != "" and not id.begins_with("PROJECT:") and not id.begins_with("LAUNCH:"):
+		navigate_requested.emit(dashboard_priority_target_tab, "CEO:%s" % id)
+		return
 	navigate_requested.emit(dashboard_priority_target_tab, "")
 
 func _dashboard_priority_defer_pressed() -> void:

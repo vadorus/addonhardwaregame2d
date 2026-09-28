@@ -684,7 +684,7 @@ func _zone_actions(zone_name: String) -> Array:
 	var actions: Array = _base_zone_actions(zone_name)
 	# Une décision PDG signalée sur cette zone apparaît en tête du menu contextuel.
 	if str(_focus.get("kind", "")) == "ceo" and str(_focus.get("zone", "")) == zone_name:
-		actions.push_front({"label":"⚠ %s" % _short(str(_focus.get("title", "Décision")), 36), "tab":int(_focus.get("tab", 1)), "context":"", "enabled":true})
+		actions.push_front({"label":"⚠ %s" % _short(str(_focus.get("title", "Décision")), 36), "tab":int(_focus.get("tab", 1)), "context":str(_focus.get("context", "")), "enabled":true})
 	return actions
 
 func _base_zone_actions(zone_name: String) -> Array:
@@ -807,7 +807,8 @@ func _compute_focus() -> Dictionary:
 		"zone":str(CATEGORY_ZONE.get(category, "Bureau du fondateur")),
 		"label":_short("Traiter : %s" % title, 34),
 		"tab":int(best.get("target_tab", 1)),
-		"context":"",
+		# « CEO:<id> » : main.gd ouvre la carte de décision au lieu de l'onglet brut.
+		"context":"CEO:%s" % str(best.get("id", "")),
 		"title":title,
 		"category":category,
 		"advice":str(best.get("recommendation", "")),
