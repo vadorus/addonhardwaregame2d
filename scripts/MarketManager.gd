@@ -14,6 +14,7 @@ const MARKET_NEED_ORDER := [
 	"MOBILE_COMPUTING", "DATACENTER"
 ]
 
+const MAX_EARLY_NEED_YEARS := 7
 const MARKET_NEEDS := {
 	"CALCULATOR":{"historical_year":1971,"tech_trigger":0.0,"base_units":9000,"price_factor":0.72,"growth":0.020,"description":"Calculatrices, terminaux simples et logique programmable à bas coût."},
 	"EMBEDDED":{"historical_year":1971,"tech_trigger":0.0,"base_units":15000,"price_factor":0.58,"growth":0.026,"description":"Contrôle embarqué pour équipements, automatismes et électronique spécialisée."},
@@ -275,8 +276,12 @@ func is_segment_available(segment: String) -> bool:
 	if not MARKET_NEEDS.has(segment):
 		return false
 	var need: Dictionary = MARKET_NEEDS[segment]
-	if int(need.historical_year) <= 1971:
+	if int(need.historical_year) <= 1971 or known_segments.has(segment):
 		return true
+	# Équilibrage (28/09) : une avance technologique fait émerger un besoin plus tôt,
+	# mais pas des décennies avant (mesure : datacenters vendus dès 1977, historique 2002).
+	if TimeManager.year < int(need.historical_year) - MAX_EARLY_NEED_YEARS:
+		return false
 	return TimeManager.year >= int(need.historical_year) or market_technology_signal() >= float(need.tech_trigger)
 
 func available_segment_keys() -> Array:

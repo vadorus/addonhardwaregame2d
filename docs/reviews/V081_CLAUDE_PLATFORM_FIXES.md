@@ -86,3 +86,39 @@ Correctifs :
 - Nora vient proposer d'embaucher quand le projet en cours manque de développeurs et que la trésorerie le permet (conversation « On embauche ? », rappel dans 6 mois si refus).
 
 Après correctif : le CPU de 1972 ne se vend plus en 1979 ; le joueur qui suit Nora passe à 6 salariés et garde des cycles de 10-11 mois. **Reste à traiter** : la trésorerie s'accumule encore (13-15 M€ en 1986) — il manque des investissements qui rapportent (marketing, usine, nouveaux marchés) et le début de partie est très rentable (≈1 M€/an dès 1974 à 3 personnes).
+
+## 28/09 fin d'après-midi — les dépenses deviennent des investissements
+
+Sonde `_claude_probe/invest_probe.gd` : 10 variantes de joueur automatique sur 15 ans (1971 → 1986), toutes en suivant les conseils d'embauche de Nora.
+
+Ce que la sonde a révélé **avant** correctif :
+
+| Constat | Mesure |
+| --- | --- |
+| Le marketing ne coûtait presque rien | 1 000 €/mois : +15 M€ en 15 ans pour 161 k€ dépensés ; 30 000 €/mois n'apportait presque rien de plus (courbe `log`). |
+| La recherche se « terminait » en 4 ans | Avec programmes Concept, les 3 maîtrises CPU à 100/100 dès 1976 ; la techno CPU à 100 dès 1978 **sans aucune recherche**. Plus rien à financer ensuite. |
+| Les marchés arrivaient des décennies en avance | Datacenters vendus dès 1977 (historique : 2002), jeu vidéo dès 1975. |
+| La fab interne était un gouffre | −0,3 M€ (fab seule) et −9 M€ en fin de partie (MegaFab à 175 k€/mois) : la marge brute CPU est de 80 %, économiser sur le coût unitaire rapporte peu. |
+
+Correctifs :
+- **Notoriété = stock** (`CompanyManager.brand_awareness`) : elle monte d'environ 12 % de l'écart par mois vers la cible du budget, retombe si on coupe, et le budget de référence grandit avec les années (12 k€/mois en 1971, ~25 k€ en 1980). Sauvegardée ; les anciennes parties repartent au niveau entretenu par leur budget. Écran Entreprise > Budgets : jauge « Notoriété de la marque » + phrase « avec X €/mois : notoriété visée N % » et seuil de rendement décroissant.
+- **État de l'art** (`ResearchManager.industry_frontier / raise_capability / raise_technology`) : chaque maîtrise progresse à plein tant qu'on est derrière le meilleur concurrent ; au-delà, le gain baisse linéairement (−100 % à +16 points d'avance, plancher 6 %). S'applique à la recherche continue, aux programmes Concept, au développement et à l'apprentissage de production. Le résumé d'un Concept le dit quand l'avance rend le point coûteux.
+- **Besoins de marché** : une avance technologique peut faire émerger un besoin jusqu'à 7 ans avant sa date (le test « PC pro dès 1971 avec forte avance » reste vrai), jamais plus. Un besoin déjà apparu reste ouvert (sauvegardes existantes).
+- **Fab interne** : coût unitaire 0,82 → 0,70 selon le niveau (au lieu de 0,90 fixe), et la location de la capacité inutilisée est activée d'office à la mise en service (désactivable).
+
+Après correctif (trésorerie 1986, base = 12,2 M€) :
+
+| Stratégie | Trésorerie 1986 | Commentaire |
+| --- | --- | --- |
+| Marketing 1 000 €/mois | 13,0 M€ | effet léger, normal |
+| Marketing 10 000 €/mois | 18,7 M€ | 1,6 M€ dépensés → +6,5 M€ |
+| Marketing 30 000 €/mois | 26,2 M€ | rendement décroissant (+7,5 M€ pour les 20 k€ de plus) |
+| Fab interne | 13,8 M€ | +1,6 M€, plus d'indépendance fournisseur |
+| Recherche seule (6 chercheurs + Concepts) | 11,2 M€ | moins de cash mais **2,75 M€/an de CA en 1986 contre 0,55** : l'entreprise ne s'éteint pas |
+| Recherche + nouveaux marchés | 23,9 M€ | |
+| Recherche + marchés + marketing | 55,0 M€ | |
+| Tout (dont fab) | 60,8 M€ | |
+
+Test : `tests/scenarios/InvestmentBalanceScenario.gd` (dans le smoke test).
+
+**Reste à traiter** : les concurrents atteignent 95-100 dans toutes les compétences vers 1986 ; si la partie doit durer jusqu'aux années 2000, leur rythme (et donc l'état de l'art) doit être étalé. Et même avec des maîtrises au niveau des concurrents, les CPU proposés automatiquement (« plan recommandé ») restent un peu derrière en fin de période (écart −7 à −9 points) : à regarder côté planificateur de génération.

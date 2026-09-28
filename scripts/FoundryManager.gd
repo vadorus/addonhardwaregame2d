@@ -259,7 +259,8 @@ func route_quote(mode: String, foundry_id: String, node_nm: int) -> Dictionary:
 			"provider_id":"INTERNAL",
 			"provider_name":str(fab.name),
 			"setup_fee":0,
-			"cost_factor":0.90,
+			# Une fab plus grande amortit mieux ses coûts unitaires.
+			"cost_factor":0.86 - float(fab.tier) * 0.04,
 			"speed_factor":0.96 + condition_factor * 0.08,
 			"quality_delta":(precision - 50.0) * 0.10,
 			"defect_delta":-(precision - 45.0) * 0.00028,
@@ -403,8 +404,12 @@ func _process_internal_fab_construction():
 		internal_fab["tier"] = target_tier
 		internal_fab["condition"] = 96.0
 		internal_fab["construction"] = {}
+		# Équilibrage (28/09) : sans revente de capacité, une fab coûtait plus qu'elle ne
+		# rapportait (mesure 15 ans : −0,3 M€ ; avec revente : +1,2 M€). Activée d'office,
+		# désactivable dans Production.
+		internal_fab["sell_spare_capacity"] = true
 		CompanyManager.change_reputation({"professional":1.4,"innovation":0.8,"prestige":0.6})
-		CompanyManager.add_alert("Production : %s est opérationnelle." % str(INTERNAL_FAB_TIERS[target_tier].name))
+		CompanyManager.add_alert("Production : %s est opérationnelle. Sa capacité inutilisée est louée à d'autres fabricants (désactivable)." % str(INTERNAL_FAB_TIERS[target_tier].name))
 		fab_project_completed.emit(target_tier)
 	else:
 		internal_fab["construction"] = construction

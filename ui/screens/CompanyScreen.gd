@@ -28,6 +28,8 @@ var finance_advice_label: Label
 var hr_case_select: OptionButton
 var hr_case_label: Label
 var policy_marketing: SpinBox
+var awareness_meter: Control
+var marketing_hint: Label
 var policy_support: SpinBox
 var policy_environment: SpinBox
 var policy_support_level: OptionButton
@@ -230,11 +232,17 @@ func _build() -> void:
 	box.add_child(executive_card)
 
 	box.add_child(UI.section("Budgets mensuels"))
+	awareness_meter = UI.meter_row("Notoriété de la marque", "Elle se construit mois après mois avec le budget marketing")
+	box.add_child(awareness_meter)
+	marketing_hint = UI.label("", 13)
+	marketing_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(marketing_hint)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	box.add_child(grid)
 	grid.add_child(UI.label("Marketing", 14))
 	policy_marketing = UI.spin(0, 200000, 1000, 6000)
+	policy_marketing.value_changed.connect(func(_value): _refresh_marketing_hint())
 	grid.add_child(policy_marketing)
 	grid.add_child(UI.label("SAV / support", 14))
 	policy_support = UI.spin(0, 200000, 1000, 5000)
@@ -480,6 +488,7 @@ func refresh() -> void:
 	_refresh_division_delegation()
 
 	policy_marketing.value = float(CompanyManager.policies.marketing_budget)
+	_refresh_marketing_hint()
 	policy_support.value = float(CompanyManager.policies.support_budget)
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	UI.select_meta(policy_support_level, str(CompanyManager.policies.support_level))
@@ -682,6 +691,25 @@ func _resolve_hr_case(action: String) -> void:
 		return
 	_status("Dossier RH traité." if ExecutiveManager.resolve_hr_issue(UI.option_meta(hr_case_select), action) else "Impossible de traiter ce dossier avec cette action.")
 	refresh()
+
+func _refresh_marketing_hint() -> void:
+	if awareness_meter == null or marketing_hint == null or policy_marketing == null:
+		return
+	var current := CompanyManager.get_awareness_bonus()
+	var max_awareness := CompanyManager.AWARENESS_MAX
+	UI.set_meter(awareness_meter, current / max_awareness * 100.0, "%.0f %%" % (current / max_awareness * 100.0))
+	var budget := int(policy_marketing.value)
+	var target := CompanyManager.marketing_awareness_target(budget)
+	var target_pct := target / max_awareness * 100.0
+	var text := ""
+	if budget <= 0:
+		text = "Sans budget, la marque reste confidentielle : part de marché plafonnée (~3 %)."
+	else:
+		text = "Avec %s €/mois : notoriété visée %.0f %% (atteinte en 6 à 12 mois)." % [UI.money(budget), target_pct]
+	# Rendement décroissant : on indique le budget au-delà duquel chaque euro rapporte peu.
+	var sweet_spot := int(round(CompanyManager.marketing_reference_budget() * 1.2 / 1000.0)) * 1000
+	text += "\nAu-delà d'environ %s €/mois, chaque euro supplémentaire rapporte de moins en moins." % UI.money(sweet_spot)
+	marketing_hint.text = text
 
 func _apply_policies() -> void:
 	if CompanyManager.set_policies(

@@ -111,8 +111,53 @@ func get_cpu_capability_label(key: String) -> String:
 func add_cpu_capability_experience(key: String, amount: float):
 	if not CPU_CAPABILITIES.has(key):
 		return
-	cpu_capabilities[key] = clampf(get_cpu_capability(key) + maxf(amount, 0.0), 0.0, 100.0)
+	raise_capability(key, amount)
 	research_changed.emit()
+
+## Équilibrage (28/09) : mesure sur 15 ans — les maîtrises CPU atteignaient 100/100
+## dès 1976 (et la techno CPU dès 1978 sans aucune recherche), puis plus rien à
+## financer. Chaque maîtrise progresse maintenant librement jusqu'à l'état de l'art
+## du secteur (meilleur concurrent) ; au-delà, chaque point d'avance coûte de plus en
+## plus cher. La recherche devient un investissement continu pour rester devant.
+const FRONTIER_LEAD_SPAN := 16.0
+const FRONTIER_MIN_FACTOR := 0.06
+const FRONTIER_SKILLS := {
+	"ARCHITECTURE":"architecture_skill", "LAYOUT":"layout_skill", "MINIATURIZATION":"miniaturization_skill",
+	"manufacturing":"manufacturing_skill", "integration":"integration_skill", "cpu":"*"
+}
+
+func industry_frontier(key: String) -> float:
+	if not FRONTIER_SKILLS.has(key):
+		return 100.0
+	var skill := str(FRONTIER_SKILLS[key])
+	var best := 0.0
+	for competitor in MarketManager.competitors.get("CPU", []):
+		if skill == "*":
+			best = maxf(best, MarketManager._competitor_technology_signal(competitor))
+		else:
+			best = maxf(best, float(competitor.get(skill, 0.0)))
+	# Sans concurrent (bac à sable, tests isolés) : pas de frein.
+	return best if best > 0.0 else 100.0
+
+func frontier_gain_factor(key: String, current: float) -> float:
+	var lead := current - industry_frontier(key)
+	if lead <= 0.0:
+		return 1.0
+	return clampf(1.0 - lead / FRONTIER_LEAD_SPAN, FRONTIER_MIN_FACTOR, 1.0)
+
+func raise_capability(key: String, amount: float) -> float:
+	if amount <= 0.0:
+		return 0.0
+	var before := get_cpu_capability(key)
+	cpu_capabilities[key] = clampf(before + amount * frontier_gain_factor(key, before), 0.0, 100.0)
+	return float(cpu_capabilities[key]) - before
+
+func raise_technology(key: String, amount: float) -> float:
+	if amount <= 0.0:
+		return 0.0
+	var before := float(technologies.get(key, 0.0))
+	technologies[key] = clampf(before + amount * frontier_gain_factor(key, before), 0.0, 100.0)
+	return float(technologies[key]) - before
 
 func get_cpu_concept_axis_keys() -> Array:
 	return CPU_CONCEPT_AXES.keys()
@@ -210,24 +255,29 @@ func _complete_concept_program(program: Dictionary):
 	var gain := 5.0 + float(ambition) * 3.5
 	if axis == "MINIATURIZATION":
 		gain += 2.0
-	cpu_capabilities[capability_key] = clampf(get_cpu_capability(capability_key) + gain, 0.0, 100.0)
+	var nominal_gain := gain
+	gain = raise_capability(capability_key, gain)
 	if cpu_research_domains.has(domain):
-		cpu_research_domains[domain]["knowledge"] = clampf(float(cpu_research_domains[domain].get("knowledge", 0.0)) + gain * 0.30, 0.0, 100.0)
+		cpu_research_domains[domain]["knowledge"] = clampf(float(cpu_research_domains[domain].get("knowledge", 0.0)) + nominal_gain * 0.30, 0.0, 100.0)
 		cpu_research_domains[domain]["experience"] = clampf(float(cpu_research_domains[domain].get("experience", 0.0)) + 1.5 + float(ambition), 0.0, 100.0)
 	if axis == "MINIATURIZATION":
-		technologies["manufacturing"] = clampf(float(technologies.get("manufacturing", 12.0)) + gain * 0.58, 0.0, 100.0)
+		raise_technology("manufacturing", nominal_gain * 0.58)
 	elif axis == "LOW_POWER":
-		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 1.5 + float(ambition), 0.0, 100.0)
+		raise_capability("LAYOUT", 1.5 + float(ambition))
 	elif axis == "ARCHITECTURE":
-		technologies["cpu"] = clampf(float(technologies.get("cpu", 18.0)) + gain * 0.35, 0.0, 100.0)
+		raise_technology("cpu", nominal_gain * 0.35)
 	elif axis == "RELIABILITY":
-		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 1.0, 0.0, 100.0)
+		raise_capability("LAYOUT", 1.0)
 	program["status"] = "COMPLETED"
 	program["stage"] = "TRANSFÉRABLE"
+	var summary := "Technologie transférable : +%.1f de maîtrise en %s." % [gain, get_cpu_capability_label(capability_key)]
+	if gain < nominal_gain * 0.7:
+		summary += " Vous devancez déjà le secteur : chaque point d'avance coûte plus cher."
 	program["result"] = {
 		"capability":capability_key,
 		"gain":gain,
-		"summary":"Technologie transférable : +%.1f de maîtrise en %s." % [gain, get_cpu_capability_label(capability_key)]
+		"nominal_gain":nominal_gain,
+		"summary":summary
 	}
 	CompanyManager.add_alert("%s terminé : la technologie est maintenant transférable aux projets produits." % str(program.get("name", "Concept CPU")))
 
@@ -589,11 +639,11 @@ func _process_continuous_research():
 			milestone_index += 1
 		data["milestones"] = milestone_index
 		if key == "ARCHITECTURE":
-			cpu_capabilities["ARCHITECTURE"] = clampf(get_cpu_capability("ARCHITECTURE") + gain * 0.11, 0.0, 100.0)
-			cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + gain * 0.035, 0.0, 100.0)
+			raise_capability("ARCHITECTURE", gain * 0.11)
+			raise_capability("LAYOUT", gain * 0.035)
 		elif key == "EFFICIENCY":
-			cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + gain * 0.065, 0.0, 100.0)
-	technologies["cpu"] = clampf(float(technologies.get("cpu", 18.0)) + total_gain * 0.16, 0.0, 100.0)
+			raise_capability("LAYOUT", gain * 0.065)
+	raise_technology("cpu", total_gain * 0.16)
 	research_changed.emit()
 
 func _apply_development_learning(project: Dictionary):
@@ -611,12 +661,12 @@ func _apply_development_learning(project: Dictionary):
 	data["experience"] = clampf(float(data.get("experience", 0.0)) + 0.10 * development_capacity_factor(), 0.0, 100.0)
 	data["knowledge"] = clampf(float(data.get("knowledge", 0.0)) + 0.04, 0.0, 100.0)
 	if domain == "ARCHITECTURE":
-		cpu_capabilities["ARCHITECTURE"] = clampf(get_cpu_capability("ARCHITECTURE") + 0.045, 0.0, 100.0)
-		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.015, 0.0, 100.0)
+		raise_capability("ARCHITECTURE", 0.045)
+		raise_capability("LAYOUT", 0.015)
 	elif domain == "EFFICIENCY":
-		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.030, 0.0, 100.0)
+		raise_capability("LAYOUT", 0.030)
 	elif domain == "RELIABILITY":
-		cpu_capabilities["LAYOUT"] = clampf(get_cpu_capability("LAYOUT") + 0.020, 0.0, 100.0)
+		raise_capability("LAYOUT", 0.020)
 
 func prepare_cpu_generation_proposals(segment: String, approach: String, focus: String, monthly_budget: int, base_design: Dictionary) -> Array:
 	if not DivisionManager.is_operational("CPU"):
@@ -1000,8 +1050,9 @@ func _process_project_month(project: Dictionary):
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
-	technologies[specialization] = clampf(tech + knowledge_gain, 0.0, 100.0)
-	technologies["integration"] = clampf(float(technologies.get("integration", 10.0)) + knowledge_gain * 0.18, 0.0, 100.0)
+	technologies[specialization] = tech
+	raise_technology(specialization, knowledge_gain)
+	raise_technology("integration", knowledge_gain * 0.18)
 	_apply_development_learning(project)
 	if float(project.phase_progress) >= 100.0:
 		project.phase_progress = float(project.phase_progress) - 100.0

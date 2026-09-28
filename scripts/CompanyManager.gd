@@ -49,6 +49,7 @@ func reset(name: String, sector: String, capital: int = 100_000):
 		"sustainability":50.0,"prestige":35.0,"professional":45.0
 	}
 	policies = {"marketing_budget":0,"support_budget":0,"environment_budget":0,"support_level":"STANDARD"}
+	brand_awareness = AWARENESS_MIN
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
 		"Développement":{"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0},
@@ -94,6 +95,7 @@ func process_month():
 	var marketing := int(policies.get("marketing_budget", 0))
 	if marketing > 0:
 		Economy.add_expense(marketing, "Marketing")
+	_update_brand_awareness()
 
 	# Aucun SAV structurel avant d'avoir de vrais clients ou un dossier terrain.
 	var support := int(policies.get("support_budget", 0))
@@ -115,8 +117,27 @@ func change_reputation(changes: Dictionary):
 func get_brand_score() -> float:
 	return (float(reputation.prestige) + float(reputation.reliability) + float(reputation.innovation)) / 3.0
 
+## Équilibrage (28/09) : l'ancienne courbe log() donnait 60 % de l'effet maximal
+## pour 1 000 €/mois (mesure : +15 M€ sur 15 ans pour 161 k€ dépensés). La notoriété
+## est maintenant un stock : elle monte en quelques mois de campagne soutenue,
+## retombe si l'on coupe le budget, et coûte plus cher quand les marchés grossissent.
+const AWARENESS_MIN := 0.02
+const AWARENESS_MAX := 0.34
+const AWARENESS_MONTHLY_SHIFT := 0.12
+var brand_awareness := AWARENESS_MIN
+
+func marketing_reference_budget() -> float:
+	return 12000.0 * (1.0 + maxf(float(TimeManager.year - 1971), 0.0) * 0.12)
+
+func marketing_awareness_target(budget: int = -1) -> float:
+	var spend := float(policies.get("marketing_budget", 0) if budget < 0 else budget)
+	return AWARENESS_MIN + (AWARENESS_MAX - AWARENESS_MIN) * (1.0 - exp(-spend / marketing_reference_budget()))
+
 func get_awareness_bonus() -> float:
-	return clampf(log(1.0 + float(policies.marketing_budget)) / 35.0, 0.02, 0.34)
+	return clampf(brand_awareness, AWARENESS_MIN, AWARENESS_MAX)
+
+func _update_brand_awareness():
+	brand_awareness = clampf(lerpf(brand_awareness, marketing_awareness_target(), AWARENESS_MONTHLY_SHIFT), AWARENESS_MIN, AWARENESS_MAX)
 
 func get_support_modifier() -> float:
 	match str(policies.support_level):
@@ -186,7 +207,8 @@ func get_state() -> Dictionary:
 	return {
 		"company_name":company_name,"founded_year":founded_year,"starting_sector":starting_sector,
 		"created":created,"reputation":reputation,"policies":policies,"departments":departments,
-		"subsidiaries":subsidiaries,"brands":brands,"alerts":alerts
+		"subsidiaries":subsidiaries,"brands":brands,"alerts":alerts,
+		"brand_awareness":brand_awareness
 	}
 
 func load_state(state: Dictionary):
@@ -211,4 +233,6 @@ func load_state(state: Dictionary):
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
 	brands = state.get("brands", []).duplicate(true)
 	alerts = state.get("alerts", []).duplicate(true)
+	# Anciennes sauvegardes : la notoriété repart du niveau que le budget actuel entretient.
+	brand_awareness = clampf(float(state.get("brand_awareness", marketing_awareness_target())), AWARENESS_MIN, AWARENESS_MAX)
 	company_changed.emit()
