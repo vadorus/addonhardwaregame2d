@@ -14,18 +14,45 @@ func _ready() -> void:
 	_build()
 	refresh()
 
+## Parties de ce panneau que l'écran Marché répartit en sous-pages.
+var product_nodes: Array = []
+var needs_nodes: Array = []
+var competitor_nodes: Array = []
+var ranking_box: VBoxContainer
+var needs_box: VBoxContainer
+var competitors_box: VBoxContainer
+
 func _build() -> void:
 	add_child(UI.section("Votre produit"))
 	market_product_select = OptionButton.new()
+	market_product_select.custom_minimum_size.y = 42
 	market_product_select.item_selected.connect(func(_i): refresh())
 	add_child(market_product_select)
 	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")
 	product_pulse_panel = pulse_script.new() as Control
 	add_child(product_pulse_panel)
+	add_child(UI.eyebrow("CLASSEMENT FACE AUX CONCURRENTS"))
+	ranking_box = VBoxContainer.new()
+	ranking_box.add_theme_constant_override("separation", 6)
+	add_child(ranking_box)
+	# Ancien récapitulatif texte : conservé (tests, détails) mais plus affiché.
 	market_label = UI.rich_label()
+	market_label.visible = false
 	add_child(market_label)
+	product_nodes = get_children()
 
-	add_child(UI.section("Comparaison concurrentielle"))
+	add_child(UI.section("Besoins du marché"))
+	needs_box = VBoxContainer.new()
+	needs_box.add_theme_constant_override("separation", 8)
+	add_child(needs_box)
+	needs_nodes = get_children().slice(product_nodes.size())
+
+	var first_competitor_index := get_child_count()
+	add_child(UI.section("Concurrents"))
+	competitors_box = VBoxContainer.new()
+	competitors_box.add_theme_constant_override("separation", 8)
+	add_child(competitors_box)
+	add_child(UI.section("Comparaison détaillée"))
 	var intro := UI.muted_label("Comparez les informations publiques disponibles. Les données internes des concurrents restent cachées : la simulation les utilise, mais votre entreprise ne les connaît pas automatiquement.", 12)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(intro)
@@ -35,11 +62,98 @@ func _build() -> void:
 	market_comparison_label = UI.rich_label()
 	market_comparison_label.custom_minimum_size.y = 150
 	add_child(market_comparison_label)
+	competitor_nodes = get_children().slice(first_competitor_index)
+
+func _clear(node: Node) -> void:
+	for child in node.get_children():
+		node.remove_child(child)
+		child.queue_free()
+
+func _info_card(title: String, subtitle: String, body: String, badge: String = "") -> Control:
+	var card := UI.card(UI.APP_PANEL, 12, 10)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	card.add_child(row)
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 2)
+	row.add_child(column)
+	var head := UI.label(title, 15)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(head)
+	if subtitle != "":
+		column.add_child(UI.label(subtitle, 13))
+	if body != "":
+		var text := UI.muted_label(body, 12)
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(text)
+	if badge != "":
+		var tag := UI.label(badge, 13)
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tag.add_theme_stylebox_override("normal", UI.stylebox(UI.APP_CYAN_DARK, 12, 0, UI.APP_CYAN_DARK, 8))
+		row.add_child(tag)
+	return card
+
+## Besoins, concurrents et classement en fiches (avant : un seul long texte).
+func _refresh_cards() -> void:
+	if needs_box == null:
+		return
+	_clear(needs_box)
+	needs_box.add_child(UI.muted_label("Marché CPU %d • maturité technologique %.0f/100" % [TimeManager.year, MarketManager.market_technology_signal()], 13))
+	for row_value in MarketManager.market_landscape():
+		var row: Dictionary = row_value
+		needs_box.add_child(_info_card(str(row.get("label", "")),
+			"~%s unités/mois • prix de référence %s €" % [UI.money(int(row.get("units", 0))), UI.money(int(row.get("reference_price", 0)))],
+			str(row.get("description", ""))))
+	var next_needs := MarketManager.next_market_needs()
+	if not next_needs.is_empty():
+		needs_box.add_child(UI.eyebrow("BIENTÔT"))
+		for next_value in next_needs:
+			var next_need: Dictionary = next_value
+			needs_box.add_child(_info_card(str(next_need.get("label", "")), "",
+				"Vers %d, ou plus tôt quand la maturité technologique atteindra %.0f." % [int(next_need.get("historical_year", 0)), float(next_need.get("tech_trigger", 0.0))],
+				"À venir"))
+
+	_clear(competitors_box)
+	for competitor_value in MarketManager.cpu_competitor_public_profiles():
+		var competitor: Dictionary = competitor_value
+		var extra: Array[String] = []
+		for key_label in [["technology_partner", "Partenaire"], ["public_b2b_customer", "Client B2B"], ["recent_public_action", "Récemment"]]:
+			var value := str(competitor.get(str(key_label[0]), ""))
+			if value != "":
+				extra.append("%s : %s" % [str(key_label[1]), value])
+		competitors_box.add_child(_info_card(
+			"%s — %s" % [str(competitor.get("company", "")), str(competitor.get("product", ""))],
+			"Cible %s • %s € • %s" % [MarketManager.segment_label(str(competitor.get("target_segment", "EMBEDDED"))), UI.money(int(competitor.get("price", 0))), str(competitor.get("market_signal", "Présence limitée"))],
+			" • ".join(extra),
+			"%.0f pts" % float(competitor.get("benchmark_score", 0.0))))
+	# Les fiches ne doivent pas bloquer le défilement au doigt.
+	UI.prepare_touch_scroll_children(needs_box)
+	UI.prepare_touch_scroll_children(competitors_box)
+
+	_clear(ranking_box)
+	if market_product_select.item_count == 0:
+		ranking_box.add_child(UI.muted_label("Aucun de vos CPU n'est encore en vente.", 13))
+		return
+	var product := ProductManager.get_product(UI.option_meta(market_product_select))
+	if product.is_empty():
+		return
+	var benchmark := MarketManager.benchmark_for(product)
+	var best := 1.0
+	for entry in benchmark:
+		best = maxf(best, float(entry.score))
+	for i in range(benchmark.size()):
+		var entry: Dictionary = benchmark[i]
+		var meter := UI.meter_row("%d. %s%s" % [i + 1, str(entry.name), "  ← vous" if bool(entry.player) else ""], "%s €" % UI.money(int(entry.price)))
+		UI.set_meter(meter, float(entry.score) / best * 100.0, "%.0f pts" % float(entry.score))
+		ranking_box.add_child(meter)
+	UI.prepare_touch_scroll_children(ranking_box)
 
 func refresh() -> void:
 	_refresh_product_options()
 	_refresh_product_pulse()
 	_refresh_overview()
+	_refresh_cards()
 	_refresh_comparison()
 
 func set_viewport_width(width: float) -> void:

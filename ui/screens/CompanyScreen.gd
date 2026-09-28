@@ -344,6 +344,7 @@ func _refresh_reputation_bars() -> void:
 		(parts.bar as ProgressBar).value = value
 		(parts.bar as ProgressBar).add_theme_stylebox_override("fill", UI.stylebox(fill_color, 8, 0, fill_color, 0))
 		(parts.number as Label).text = "%.0f" % value
+	UI.prepare_touch_scroll_children(reputation_box)
 
 func _child_with_text(box: Node, text: String) -> Node:
 	for child in box.get_children():
@@ -351,7 +352,32 @@ func _child_with_text(box: Node, text: String) -> Node:
 			return child
 	return null
 
+var workplace_meters: VBoxContainer
+var benefit_cost_label: Label
+
+func _insert_before(parent: Node, node: Node, anchor: Node) -> void:
+	parent.add_child(node)
+	parent.move_child(node, anchor.get_index())
+
+## Locaux & RH en blocs titrés : conseil de Nora, locaux (barres + boutons), avantages, avis financier, RH.
+func _structure_workplace_page() -> void:
+	var ebox := executive_label.get_parent()
+	_insert_before(ebox, UI.eyebrow("CONSEIL DE NORA"), executive_label)
+	_insert_before(ebox, UI.eyebrow("LOCAUX"), workplace_label)
+	workplace_meters = VBoxContainer.new()
+	workplace_meters.add_theme_constant_override("separation", 6)
+	ebox.add_child(workplace_meters)
+	ebox.move_child(workplace_meters, workplace_label.get_index() + 1)
+	var actions := workplace_defer_button.get_parent()
+	ebox.move_child(actions, workplace_meters.get_index() + 1)
+	if not benefit_controls.is_empty():
+		var benefit_grid := (benefit_controls.values()[0] as Control).get_parent()
+		_insert_before(ebox, UI.eyebrow("AVANTAGES SALARIÉS"), benefit_grid)
+		benefit_cost_label = UI.muted_label("", 12)
+		_insert_before(ebox, benefit_cost_label, benefit_grid)
+
 func _install_pages(box: VBoxContainer) -> void:
+	_structure_workplace_page()
 	# Locaux & RH en premier après l'aperçu : c'est là que tombent la plupart des décisions.
 	var executive_section := _child_with_text(box, "Direction, RH & environnement de travail")
 	var divisions_section := _child_with_text(box, "Divisions de l'entreprise")
@@ -392,18 +418,8 @@ func refresh() -> void:
 	_refresh_reputation_bars()
 
 	var brief := ExecutiveManager.get_executive_brief()
-	var priority_lines: Array[String] = [
-		"Nora Bernard — bras droit / vice-présidente",
-		"%s" % str(brief.get("headline", "")),
-		"Conseil : %s" % str(brief.get("text", "")),
-		"%s • %s" % [str(brief.get("hr_role", "")), str(brief.get("finance_role", ""))]
-	]
-	for priority_value in brief.get("priorities", []):
-		var priority: Dictionary = priority_value
-		priority_lines.append("• [%s] %s — %s" % [
-			str(priority.get("category", "")), str(priority.get("text", "")), str(priority.get("action", ""))
-		])
-	executive_label.text = "\n".join(priority_lines)
+	# Deux lignes : la situation et le conseil. Les décisions elles-mêmes s'ouvrent en carte depuis le garage.
+	executive_label.text = "%s\n%s" % [str(brief.get("headline", "")), str(brief.get("text", ""))]
 
 	var workspace := ExecutiveManager.workplace_data()
 	var upgrade := ExecutiveManager.next_workplace_upgrade()
@@ -417,12 +433,27 @@ func refresh() -> void:
 			reminder_text = "Nora : décision reportée — nouveau point dans %d mois." % int(recommendation.get("months_until_reminder", 0))
 		else:
 			reminder_text = "Nora : %s Vous pouvez déménager maintenant ou reporter." % str(recommendation.get("reason", "un agrandissement devient pertinent."))
-	workplace_label.text = "Locaux : %s • état %.0f/100 • environnement %.0f/100\nCapacité %d personnes • occupation %d • %s\n%s\nAvantages salariés : %s €/mois • coût locaux : %s €/mois • moral moyen %.0f/100" % [
-		str(workspace.get("name", "Garage")), float(workspace.get("condition", 0.0)), float(workspace.get("score", 0.0)),
-		int(workspace.get("capacity", 0)), int(workspace.get("occupancy", 0)), next_text,
-		reminder_text, UI.money(ExecutiveManager.monthly_benefit_cost()),
-		UI.money(ExecutiveManager.monthly_workplace_cost()), ExecutiveManager.staff_average_morale()
+	workplace_label.text = "%s • loyer %s €/mois • %s\n%s" % [
+		str(workspace.get("name", "Garage")), UI.money(ExecutiveManager.monthly_workplace_cost()), next_text, reminder_text
 	]
+	if workplace_meters != null:
+		for child in workplace_meters.get_children():
+			workplace_meters.remove_child(child)
+			child.queue_free()
+		var capacity := maxi(int(workspace.get("capacity", 1)), 1)
+		var occupancy := int(workspace.get("occupancy", 0))
+		var rows := [
+			["État des locaux", "Sous 42, Nora vous alerte", float(workspace.get("condition", 0.0)), ""],
+			["Place libre", "%d personne(s) pour %d places" % [occupancy, capacity], 100.0 - float(occupancy) / float(capacity) * 100.0, "%d/%d" % [occupancy, capacity]],
+			["Moral moyen", "Effet des locaux et des avantages", ExecutiveManager.staff_average_morale(), ""],
+		]
+		for row_data in rows:
+			var meter := UI.meter_row(str(row_data[0]), str(row_data[1]))
+			UI.set_meter(meter, float(row_data[2]), str(row_data[3]))
+			workplace_meters.add_child(meter)
+		UI.prepare_touch_scroll_children(workplace_meters)
+	if benefit_cost_label != null:
+		benefit_cost_label.text = "Coût actuel des avantages : %s €/mois" % UI.money(ExecutiveManager.monthly_benefit_cost())
 	workplace_defer_button.visible = not upgrade.is_empty()
 	workplace_defer_button.disabled = bool(recommendation.get("snoozed", false))
 
@@ -437,10 +468,12 @@ func refresh() -> void:
 	for sector_value in DivisionManager.get_active_division_keys():
 		var sector := str(sector_value)
 		var division := DivisionManager.get_division(sector)
-		division_lines.append("[%s]  %s — active" % [sector, str(division.get("label", sector))])
+		division_lines.append("%s — active" % str(division.get("label", sector)))
+		var strategy_labels := {"BALANCED":"équilibrée", "PERFORMANCE":"performance", "EFFICIENCY":"efficacité", "RELIABILITY":"fiabilité", "INNOVATION":"innovation"}
+		var strategy := str(division.get("strategy", "BALANCED")).to_upper()
 		division_lines.append("Maturité %.0f/100 • %d génération(s) terminée(s) • stratégie %s" % [
 			float(division.get("maturity", 0.0)), int(division.get("generation_count", 0)),
-			str(division.get("strategy", "BALANCED")).to_lower()
+			str(strategy_labels.get(strategy, strategy.to_lower()))
 		])
 	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
 	division_label.text = "\n".join(division_lines)

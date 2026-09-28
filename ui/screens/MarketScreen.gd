@@ -34,11 +34,20 @@ func _ready() -> void:
 
 	# Sous-pages : marché, appels d'offres et SAV ne s'empilent plus (retour d'Alexandre, 28/09).
 	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
-	pager.call("split", box, [
-		{"key":"OVERVIEW", "label":"Ventes & marché", "start":overview_panel},
-		{"key":"TENDERS", "label":"Appels d'offres", "start":tender_panel},
-		{"key":"SAV", "label":"SAV", "start":after_sales_panel},
-	])
+	box.add_child(pager)
+	for part in [["OVERVIEW", "Mes ventes", "product_nodes"], ["NEEDS", "Besoins du marché", "needs_nodes"], ["COMPETITORS", "Concurrents", "competitor_nodes"]]:
+		var page: VBoxContainer = pager.call("add_page", str(part[0]), str(part[1]))
+		for node_value in overview_panel.get(str(part[2])):
+			var node: Node = node_value
+			node.get_parent().remove_child(node)
+			page.add_child(node)
+	overview_panel.visible = false
+	for part in [["TENDERS", "Appels d'offres", tender_panel], ["SAV", "SAV", after_sales_panel]]:
+		var page: VBoxContainer = pager.call("add_page", str(part[0]), str(part[1]))
+		var panel: Control = part[2]
+		box.remove_child(panel)
+		page.add_child(panel)
+	pager.call("show_page", "OVERVIEW")
 
 var pager: Control
 
@@ -57,6 +66,10 @@ func show_section_for_context(context: String) -> void:
 			show_section("TENDERS")
 		"MARCHÉ", "Marché":
 			show_section("OVERVIEW")
+		"Besoins":
+			show_section("NEEDS")
+		"Concurrents":
+			show_section("COMPETITORS")
 
 func set_viewport_width(width: float) -> void:
 	if overview_panel != null and overview_panel.has_method("set_viewport_width"):

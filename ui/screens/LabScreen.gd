@@ -622,6 +622,7 @@ func _refresh_knowhow_meters() -> void:
 	_knowhow_heading("H_FIELD", "EXPÉRIENCE TERRAIN (APPRISE DES PANNES ET DU SAV)")
 	for field_data in [["MANUFACTURING", "Fabrication"], ["THERMAL", "Thermique"], ["STABILITY", "Stabilité"], ["FIRMWARE", "Firmware"]]:
 		_knowhow_meter("F_" + str(field_data[0]), str(field_data[1]), "", AfterSalesManager.cpu_field_experience(str(field_data[0])))
+	UI.prepare_touch_scroll_children(knowhow_box)
 
 func refresh_research_content() -> void:
 	if tech_label == null:

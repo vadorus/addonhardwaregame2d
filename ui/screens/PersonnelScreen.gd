@@ -54,35 +54,115 @@ func _build() -> void:
 	explainer_box.add_child(team_explainer_label)
 	box.add_child(explainer_card)
 
-	box.add_child(UI.section("Membres de l'équipe"))
+	var members_section := UI.section("Membres de l'équipe")
+	box.add_child(members_section)
+	members_box = VBoxContainer.new()
+	members_box.add_theme_constant_override("separation", 8)
+	box.add_child(members_box)
+	# Récapitulatif texte conservé (tests), remplacé à l'écran par des fiches.
 	staff_label = UI.rich_label()
 	staff_label.add_theme_font_size_override("font_size", 13)
+	staff_label.visible = false
 	box.add_child(staff_label)
 
-	box.add_child(UI.section("Recrutement"))
-	var recruit_intro := UI.muted_label("Recrutez seulement quand vous avez identifié un besoin. Renforcer la R&D améliore la recherche ; renforcer Développement augmente la capacité à mener les projets produits.", 12)
+	var recruit_section := UI.section("Recrutement")
+	box.add_child(recruit_section)
+	var recruit_intro := UI.muted_label("Recrutez quand un besoin est identifié : la R&D fait progresser la recherche, le Développement accélère les projets CPU.", 12)
 	recruit_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(recruit_intro)
 
+	var recruit_row := HFlowContainer.new()
+	recruit_row.add_theme_constant_override("h_separation", 8)
+	box.add_child(recruit_row)
 	recruit_department = OptionButton.new()
+	recruit_department.custom_minimum_size = Vector2(220, 42)
 	for department in ["R&D","Développement","Production","Marketing","Support","Finance"]:
 		recruit_department.add_item(department)
 		recruit_department.set_item_metadata(recruit_department.item_count - 1, department)
-	box.add_child(recruit_department)
-
+	recruit_row.add_child(recruit_department)
 	var search_button := Button.new()
 	search_button.text = "Chercher un candidat"
+	search_button.custom_minimum_size.y = 42
 	search_button.pressed.connect(_generate_candidate)
-	box.add_child(search_button)
+	recruit_row.add_child(search_button)
 
+	candidate_card = UI.card(UI.APP_PANEL, 12, 12)
+	candidate_box = VBoxContainer.new()
+	candidate_box.add_theme_constant_override("separation", 6)
+	candidate_card.add_child(candidate_box)
+	box.add_child(candidate_card)
 	candidate_label = UI.rich_label()
+	candidate_label.visible = false
 	box.add_child(candidate_label)
 
-	var hire_button := Button.new()
+	hire_button = Button.new()
 	hire_button.text = "Recruter ce candidat"
+	hire_button.custom_minimum_size.y = 44
 	hire_button.pressed.connect(_hire_candidate)
 	box.add_child(hire_button)
+
+	# Sous-pages : membres / recrutement / explications (retour d'Alexandre, 28/09).
+	box.move_child(nora_card, box.get_child_count() - 1)
+	box.move_child(explainer_card, box.get_child_count() - 1)
+	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
+	pager.call("split", box, [
+		{"key":"MEMBERS", "label":"Membres", "start":members_section},
+		{"key":"RECRUIT", "label":"Recrutement", "start":recruit_section},
+		{"key":"ORG", "label":"Comment ça marche", "start":nora_card},
+	])
 	refresh()
+
+var pager: Control
+var members_box: VBoxContainer
+var candidate_card: PanelContainer
+var candidate_box: VBoxContainer
+var hire_button: Button
+
+func show_section(key: String) -> void:
+	if pager != null:
+		pager.call("show_page", key)
+
+func current_section() -> String:
+	return str(pager.get("current")) if pager != null else ""
+
+func show_section_for_context(context: String) -> void:
+	match context:
+		"Équipe", "Membres":
+			show_section("MEMBERS")
+		"Recrutement":
+			show_section("RECRUIT")
+
+func _clear(node: Node) -> void:
+	for child in node.get_children():
+		node.remove_child(child)
+		child.queue_free()
+
+static func _specialty_label(key: String) -> String:
+	var labels := {"cpu":"processeurs", "product":"produit", "gpu":"graphique", "manufacturing":"fabrication", "software":"logiciel",
+		"integration":"intégration", "marketing":"marketing", "support":"SAV", "finance":"finance", "research":"recherche"}
+	if key == "":
+		return "—"
+	return str(labels.get(key.to_lower(), key.capitalize()))
+
+func _member_card(employee: Dictionary) -> Control:
+	var card := UI.card(UI.APP_PANEL, 12, 10)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	card.add_child(column)
+	var title := UI.label("%s — %s%s" % [str(employee.get("name", "")), str(employee.get("role", "")), _leader_mark(employee)], 15)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(title)
+	column.add_child(UI.muted_label("%s • %.0f ans d'expérience • %s €/mois" % [
+		str(employee.get("department", "")), float(employee.get("experience_years", 0.0)), UI.money(int(employee.get("salary", 0)))
+	], 12))
+	var skill := UI.meter_row("Compétence", "Spécialité : %s" % _specialty_label(str(employee.get("specialization", ""))))
+	UI.set_meter(skill, float(employee.get("skill", 0)))
+	column.add_child(skill)
+	if employee.has("morale"):
+		var morale := UI.meter_row("Moral", "")
+		UI.set_meter(morale, float(employee.get("morale", 70.0)))
+		column.add_child(morale)
+	return card
 
 func refresh() -> void:
 	if staff_label == null or candidate_label == null or team_explainer_label == null:
@@ -126,10 +206,40 @@ func refresh() -> void:
 			])
 		lines.append("")
 	staff_label.text = "\n".join(lines)
+	if members_box != null:
+		_clear(members_box)
+		for department in departments:
+			var first := true
+			for employee_value in PersonnelManager.staff:
+				var employee: Dictionary = employee_value
+				if str(employee.get("department", "")) != department:
+					continue
+				if first:
+					members_box.add_child(UI.eyebrow("%s — %s" % [department.to_upper(), _department_purpose(department)]))
+					first = false
+				members_box.add_child(_member_card(employee))
+		UI.prepare_touch_scroll_children(members_box)
 
+	if candidate_box != null:
+		_clear(candidate_box)
+	if hire_button != null:
+		hire_button.disabled = PersonnelManager.candidate.is_empty()
 	if PersonnelManager.candidate.is_empty():
 		candidate_label.text = "Aucun candidat sélectionné."
+		if candidate_box != null:
+			candidate_box.add_child(UI.muted_label("Choisissez un métier puis « Chercher un candidat ».", 13))
 		return
+	var shown: Dictionary = PersonnelManager.candidate
+	if candidate_box != null:
+		var head := UI.label("%s — %s" % [str(shown.get("name", "")), str(shown.get("department", ""))], 17)
+		candidate_box.add_child(head)
+		candidate_box.add_child(UI.muted_label("Spécialité : %s • %.0f ans d'expérience" % [_specialty_label(str(shown.get("specialization", ""))), float(shown.get("experience_years", 0.0))], 12))
+		for meter_data in [["Compétence", "skill"], ["Potentiel", "aptitude"], ["Leadership", "leadership"]]:
+			var meter := UI.meter_row(str(meter_data[0]), "")
+			UI.set_meter(meter, float(shown.get(str(meter_data[1]), 0)))
+			candidate_box.add_child(meter)
+		candidate_box.add_child(UI.label("Salaire %s €/mois • prime d'embauche %s €" % [UI.money(int(shown.get("salary", 0))), UI.money(int(shown.get("salary", 0)) * 2)], 14))
+		UI.prepare_touch_scroll_children(candidate_box)
 	var candidate: Dictionary = PersonnelManager.candidate
 	var profile: Dictionary = candidate.get("profile", {})
 	candidate_label.text = "%s — %s\nCompétence %d • aptitude %d • expérience %.1f ans • leadership %d\nSpécialisation : %s\nRigueur %.0f • résolution %.0f • travail d'équipe %.0f • stress %.0f • process %.0f\nSalaire : %s €/mois • prime d'embauche : %s €" % [
