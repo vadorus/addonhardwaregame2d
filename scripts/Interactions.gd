@@ -18,7 +18,34 @@ static func pending() -> Array:
 		var contract: Dictionary = contract_value
 		if str(contract.get("status", "")) == "PENDING":
 			result.append({"key":"CLIENT:%s" % str(contract.get("id", "")), "speaker":"CLIENT:%s" % str(contract.get("customer", ""))})
+	var interview := press_interview_product()
+	if not interview.is_empty():
+		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
 	return result
+
+## Produit tout juste lancé, pas encore testé, dont personne n'a encore parlé à la presse.
+static func press_interview_product() -> Dictionary:
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED" and int(product.get("months_on_market", 0)) == 0 and not product.has("press_pitch"):
+			return product
+	return {}
+
+static func journalist_outlet() -> String:
+	for outlet_value in MediaManager.available_outlets():
+		var outlet: Dictionary = outlet_value
+		if str(outlet.get("channel", "")) == "SPECIALIST_PRESS":
+			return str(outlet.get("name", "La presse"))
+	return "La presse"
+
+## Votre réponse vaut pour toute la gamme lancée en même temps.
+static func _set_press_pitch(product_id: String, pitch: String) -> void:
+	var generation := str(ProductManager.get_product(product_id).get("generation_id", ""))
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		var same := str(product.get("id", "")) == product_id or (generation != "" and str(product.get("generation_id", "")) == generation)
+		if same and str(product.get("status", "")) == "LAUNCHED" and int(product.get("months_on_market", 0)) == 0:
+			product["press_pitch"] = pitch
 
 ## Première conversation en attente pour ce personnage (ou vide).
 static func pending_for(speaker_key: String) -> String:
@@ -47,6 +74,8 @@ static func _person(speaker_key: String) -> Dictionary:
 		return {"key":"NORA", "name":str(nora.get("name", "Nora Bernard")), "role":"Votre bras droit"}
 	if speaker_key.begins_with("CLIENT:"):
 		return {"key":speaker_key, "name":speaker_key.substr(7), "role":"Acheteur • visite au garage"}
+	if speaker_key.begins_with("PRESS:"):
+		return {"key":speaker_key, "name":"Journaliste de %s" % speaker_key.substr(6), "role":"Interview avant les premiers tests"}
 	var employee := PersonnelManager.get_employee(speaker_key)
 	return {"key":speaker_key, "name":str(employee.get("name", "Un salarié")), "role":str(employee.get("role", ""))}
 
@@ -102,6 +131,19 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"BONUS", "label":"Je débloque une prime (%s €)." % _money(cost), "hint":"Effet plus fort sur le moral", "enabled":Economy.can_afford(cost)},
 				{"id":"LATER", "label":"Pas maintenant.", "hint":"Le problème reste ouvert"},
 			]}
+	elif key.begins_with("PRESS:"):
+		var product := ProductManager.get_product(sid)
+		if product.is_empty() or product.has("press_pitch") or int(product.get("months_on_market", 0)) != 0:
+			return {}
+		return {"key":key, "person":_person("PRESS:%s" % journalist_outlet()), "mood":"NEUTRAL", "kicker":"INTERVIEW",
+			"text":"Votre %s arrive en boutique. Nos lecteurs veulent savoir : qu'est-ce qui le rend spécial ?" % str(product.get("name", "CPU")),
+			"note":"Votre réponse colore les premiers tests de la presse.",
+			"choices":[
+				{"id":"BOLD", "label":"« C'est tout simplement le meilleur CPU du marché. »", "hint":"Tests en hausse si c'est vrai (n°1 du benchmark), en forte baisse sinon", "primary":false},
+				{"id":"HONEST", "label":"« Un CPU solide et honnête. Jugez sur pièce. »", "hint":"Petit bonus assuré : la presse apprécie la franchise", "primary":true},
+				{"id":"TECH", "label":"« Parlons chiffres : fiabilité, consommation, fréquence. »", "hint":"Labos et presse spécialisée +, grand public −"},
+				{"id":"NONE", "label":"« Pas de commentaire. »", "hint":"Aucun effet"},
+			]}
 	elif key.begins_with("CLIENT:"):
 		for contract_value in MarketManager.contracts:
 			var contract: Dictionary = contract_value
@@ -131,6 +173,13 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 	if key.begins_with("HR:"):
 		var ok := ExecutiveManager.resolve_hr_issue(sid, choice_id)
 		return {"ok":ok, "message":"Merci, ça fait du bien." if ok else "Trésorerie insuffisante pour cette prime."}
+	if key.begins_with("PRESS:"):
+		if ProductManager.get_product(sid).is_empty():
+			return {"ok":false, "message":""}
+		_set_press_pitch(sid, choice_id)
+		var messages := {"BOLD":"Promesse faite : le benchmark dira si vous aviez raison.", "HONEST":"La presse apprécie votre franchise.",
+			"TECH":"Les labos ont noté vos chiffres.", "NONE":"Le journaliste repart sans citation."}
+		return {"ok":true, "message":str(messages.get(choice_id, ""))}
 	if key.begins_with("CLIENT:"):
 		var ok := MarketManager.accept_contract(sid) if choice_id == "SIGN" else MarketManager.decline_contract(sid)
 		return {"ok":ok, "message":"Contrat signé : à vous de livrer !" if choice_id == "SIGN" else "Le client repart, sans rancune."}

@@ -82,7 +82,7 @@ func refresh() -> void:
 	for item_value in INTERACTIONS.pending():
 		var speaker := str((item_value as Dictionary).get("speaker", ""))
 		talkers[speaker] = true
-		if speaker.begins_with("CLIENT:") and visitor_key == "":
+		if (speaker.begins_with("CLIENT:") or speaker.begins_with("PRESS:")) and visitor_key == "":
 			visitor_key = speaker
 	_sync_visitor(visitor_key)
 	for member in _members:
@@ -92,14 +92,16 @@ func refresh() -> void:
 func _sync_visitor(visitor_key: String) -> void:
 	var current: Control = null
 	for member in _members:
-		if str(member.get("member_id")).begins_with("CLIENT:"):
+		var member_key := str(member.get("member_id"))
+		if member_key.begins_with("CLIENT:") or member_key.begins_with("PRESS:"):
 			current = member
 	if current != null and str(current.get("member_id")) != visitor_key:
 		_members.erase(current)
 		current.queue_free()
 		current = null
 	if current == null and visitor_key != "":
-		_add_member({"id":visitor_key, "name":visitor_key.substr(7), "role":"Client en visite", "department":"Client",
+		var is_press := visitor_key.begins_with("PRESS:")
+		_add_member({"id":visitor_key, "name":visitor_key.substr(6 if is_press else 7), "role":"Journaliste" if is_press else "Client en visite", "department":"Visiteur",
 			"pose":"STAND", "facing":-1.0, "at":VISITOR_SPOT})
 		_place_members()
 		if is_visible_in_tree():
@@ -256,6 +258,8 @@ func line_for(member: Control) -> String:
 	var id := str(member.get("member_id"))
 	if id.begins_with("CLIENT:"):
 		return "Bonjour ! J'aurais une commande à vous proposer, vous avez une minute ?"
+	if id.begins_with("PRESS:"):
+		return "Bonjour ! Une petite interview sur votre nouveau CPU ?"
 	if bool(member.get("alert")):
 		return "Vous auriez une minute ? J'ai besoin de vous parler."
 	if id == "NORA":

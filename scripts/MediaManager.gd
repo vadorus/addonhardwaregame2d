@@ -49,7 +49,7 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 	var published: Array = []
 	for outlet_value in selected:
 		var outlet: Dictionary = outlet_value
-		var review_score := _outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total)
+		var review_score := press_pitch_adjusted(_outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total), str(product.get("press_pitch", "")), str(outlet.get("channel", "")), benchmark_rank)
 		var sentiment := clampf((review_score - 56.0) / 34.0, -1.0, 1.0)
 		var tone := _tone_for_score(review_score)
 		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total)
@@ -66,6 +66,19 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 		)
 	if not published.is_empty():
 		reviews_published.emit(str(product.get("name", "Produit")), published)
+
+## Effet de l'interview donnée au lancement (conversation avec le journaliste).
+static func press_pitch_adjusted(score: float, pitch: String, channel: String, benchmark_rank: int) -> float:
+	var delta := 0.0
+	match pitch:
+		"BOLD":
+			# Promettre le meilleur CPU : récompensé si c'est vrai, sévèrement puni sinon.
+			delta = 6.0 if benchmark_rank == 1 else -8.0
+		"HONEST":
+			delta = 3.0
+		"TECH":
+			delta = 4.0 if channel in ["BENCHMARK", "BENCHMARK_SITE", "SPECIALIST_PRESS"] else -2.0
+	return clampf(score + delta, 0.0, 100.0)
 
 func _select_review_outlets(product: Dictionary) -> Array:
 	var available := available_outlets()

@@ -38,4 +38,20 @@ static func run() -> String:
 	MarketManager.advance_contract("PROD-Z", 40, 200)
 	if float(CompanyManager.reputation.get("professional", 0.0)) >= before or int(missed.get("missed_months", 0)) != 1:
 		return "B2B: a real shortfall is no longer penalized"
+
+	# Interview presse au lancement : la réponse change réellement les notes.
+	if MediaManager.press_pitch_adjusted(60.0, "BOLD", "BENCHMARK", 1) <= 60.0 or MediaManager.press_pitch_adjusted(60.0, "BOLD", "BENCHMARK", 3) >= 60.0:
+		return "Press: overpromising should be rewarded only if the CPU really is n°1"
+	if MediaManager.press_pitch_adjusted(60.0, "", "BENCHMARK", 3) != 60.0:
+		return "Press: no interview must not change review scores"
+	var interactions: Script = load("res://scripts/Interactions.gd")
+	var fresh := {"id":"PROD-PRESS", "name":"tvX", "status":"LAUNCHED", "months_on_market":0, "generation_id":"GEN-P"}
+	ProductManager.products.append(fresh)
+	if not str(interactions.call("pending_for", "PRESS:%s" % str(interactions.call("journalist_outlet")))).begins_with("PRESS:"):
+		ProductManager.products.erase(fresh)
+		return "Press: a freshly launched CPU should bring a journalist to the garage"
+	interactions.call("choose", "PRESS:PROD-PRESS", "HONEST")
+	ProductManager.products.erase(fresh)
+	if str(fresh.get("press_pitch", "")) != "HONEST":
+		return "Press: the interview answer was not recorded"
 	return ""

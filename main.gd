@@ -1366,6 +1366,13 @@ func _close_launch_moment() -> void:
 	if not SimulationManager.is_game_over and _blocking_company_decision().is_empty():
 		TimeManager.time_scale = maxf(_launch_resume_scale, 1.0)
 	_show_pending_reviews()
+	# Un journaliste veut une interview avant les premiers tests.
+	call_deferred("_open_press_interview")
+
+func _open_press_interview() -> void:
+	var product: Dictionary = INTERACTIONS.press_interview_product()
+	if not product.is_empty() and not dialogue_visible() and not review_reveal_visible():
+		open_dialogue("PRESS:%s" % str(product.get("id", "")))
 
 func _build_game_over_layer():
 	game_over_layer = ColorRect.new()
