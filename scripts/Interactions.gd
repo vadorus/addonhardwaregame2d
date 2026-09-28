@@ -20,6 +20,8 @@ static func pending() -> Array:
 			result.append({"key":"CLIENT:%s" % str(contract.get("id", "")), "speaker":"CLIENT:%s" % str(contract.get("customer", ""))})
 	if not hiring_need().is_empty():
 		result.append({"key":"HIRE:DEV", "speaker":"NORA"})
+	if tech_final_pending():
+		result.append({"key":"MILESTONE:TECH_FINAL", "speaker":"NORA"})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -52,6 +54,36 @@ static func hiring_need() -> Dictionary:
 	var plus_one: float = estimator.call("staffing_factor", devs + 1, complexity)
 	return {"project":str(project.get("name", "le CPU")), "required":int(ceil(required)), "devs":devs,
 		"gain_pct":int(round((plus_one / maxf(now, 0.01) - 1.0) * 100.0))}
+
+## Fin du contenu technologique de cette version (décision d'Alexandre, 28/09) :
+## on le dit clairement au joueur, puis la partie continue en mode libre.
+static func tech_final_pending() -> bool:
+	if bool(ExecutiveManager.workplace.get("tech_final_announced", false)):
+		return false
+	if TimeManager.year >= MarketManager.FINAL_TECH_YEAR:
+		return true
+	for key in ResearchManager.get_cpu_capability_keys():
+		if ResearchManager.get_cpu_capability(str(key)) < 99.5:
+			return false
+	return float(ResearchManager.technologies.get("manufacturing", 0.0)) >= 99.5
+
+static func _career_summary() -> String:
+	var launched := 0
+	var units := 0
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED" or int(product.get("months_on_market", 0)) > 0:
+			launched += 1
+		units += int(product.get("units_sold_total", 0))
+	var parts: Array[String] = [
+		"%d ans d'activité depuis %d" % [TimeManager.year - CompanyManager.founded_year, CompanyManager.founded_year],
+		"%d générations de CPU, %d références" % [ProductManager.cpu_generations.size(), launched],
+		"%d personnes dans l'équipe" % PersonnelManager.staff.size(),
+		"trésorerie %s €" % _money(Economy.money),
+	]
+	if units > 0:
+		parts.insert(2, "%s puces vendues" % _money(units))
+	return " • ".join(parts)
 
 ## Produit tout juste lancé, pas encore testé, dont personne n'a encore parlé à la presse.
 static func press_interview_product() -> Dictionary:
@@ -173,6 +205,15 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"HIRE2", "label":"Recrute-en deux.", "hint":"Encore plus vite, deux salaires de plus"},
 				{"id":"LATER", "label":"On reste comme ça pour l'instant.", "hint":"Nora n'en reparle pas avant 6 mois"},
 			]}
+	elif key == "MILESTONE:TECH_FINAL":
+		if not tech_final_pending():
+			return {}
+		return {"key":key, "person":_person("NORA"), "mood":"HAPPY", "kicker":"SOMMET TECHNOLOGIQUE",
+			"text":"Patron… on y est. Gravure, architecture, cartographie : on a atteint le sommet de ce que la technologie permet dans cette version du monde. Les prochaines percées arriveront avec les futures mises à jour. D'ici là, l'entreprise continue : parts de marché à prendre, rivaux à dépasser, clients à fidéliser.",
+			"note":"Bilan : %s" % _career_summary(),
+			"choices":[
+				{"id":"CONTINUE", "label":"On continue : l'empire n'est pas fini !", "hint":"La partie continue en mode libre", "primary":true},
+			]}
 	elif key.begins_with("PRESS:"):
 		var product := ProductManager.get_product(sid)
 		if product.is_empty() or product.has("press_pitch") or int(product.get("months_on_market", 0)) != 0:
@@ -217,6 +258,10 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 			if PersonnelManager.hire_candidate():
 				hired += 1
 		return {"ok":hired > 0, "message":("%d développeur(s) rejoignent l'équipe !" % hired) if hired > 0 else "Trésorerie insuffisante pour recruter."}
+	if key == "MILESTONE:TECH_FINAL":
+		ExecutiveManager.workplace["tech_final_announced"] = true
+		CompanyManager.add_alert("Sommet technologique atteint : la partie continue en mode libre. De nouvelles technologies arriveront avec les mises à jour.")
+		return {"ok":true, "message":"Mode libre : l'empire continue."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
 	if key.begins_with("RND:"):

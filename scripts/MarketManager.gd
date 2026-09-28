@@ -15,6 +15,23 @@ const MARKET_NEED_ORDER := [
 ]
 
 const MAX_EARLY_NEED_YEARS := 7
+## Rythme de la campagne (28/09) : les concurrents atteignaient 95-100 partout dès 1986.
+## L'état de l'art du secteur suit maintenant un plafond daté qui atteint 100 en
+## FINAL_TECH_YEAR. Au-delà, le contenu technologique de cette version est épuisé
+## (Nora l'annonce) ; la suite viendra avec les mises à jour / DLC.
+const FINAL_TECH_YEAR := 2010
+const ERA_CEILING_START := 32.0
+const ERA_CEILING_SOFT_SPAN := 8.0
+
+func era_technology_ceiling(year: int = -1) -> float:
+	var y := TimeManager.year if year < 0 else year
+	var t := clampf(float(y - 1971) / float(FINAL_TECH_YEAR - 1971), 0.0, 1.0)
+	return lerpf(ERA_CEILING_START, 100.0, t)
+
+## Freine une progression qui approche le plafond de l'époque (0 au plafond).
+func era_gain_factor(current: float) -> float:
+	return clampf((era_technology_ceiling() - current) / ERA_CEILING_SOFT_SPAN, 0.0, 1.0)
+
 const MARKET_NEEDS := {
 	"CALCULATOR":{"historical_year":1971,"tech_trigger":0.0,"base_units":9000,"price_factor":0.72,"growth":0.020,"description":"Calculatrices, terminaux simples et logique programmable à bas coût."},
 	"EMBEDDED":{"historical_year":1971,"tech_trigger":0.0,"base_units":15000,"price_factor":0.58,"growth":0.026,"description":"Contrôle embarqué pour équipements, automatismes et électronique spécialisée."},
@@ -974,11 +991,11 @@ func _advance_cpu_competitor(competitor: Dictionary):
 			manufacturing_gain *= 1.18
 		"BALANCED":
 			integration_gain *= 1.22
-	competitor["architecture_skill"] = clampf(float(competitor.get("architecture_skill", 20.0)) + arch_gain, 0.0, 100.0)
-	competitor["layout_skill"] = clampf(float(competitor.get("layout_skill", 20.0)) + layout_gain, 0.0, 100.0)
-	competitor["miniaturization_skill"] = clampf(float(competitor.get("miniaturization_skill", 20.0)) + mini_gain, 0.0, 100.0)
-	competitor["manufacturing_skill"] = clampf(float(competitor.get("manufacturing_skill", 20.0)) + manufacturing_gain, 0.0, 100.0)
-	competitor["integration_skill"] = clampf(float(competitor.get("integration_skill", 20.0)) + integration_gain, 0.0, 100.0)
+	var skill_gains := {"architecture_skill":arch_gain, "layout_skill":layout_gain, "miniaturization_skill":mini_gain,
+		"manufacturing_skill":manufacturing_gain, "integration_skill":integration_gain}
+	for skill_key in skill_gains.keys():
+		var skill_value := float(competitor.get(skill_key, 20.0))
+		competitor[skill_key] = clampf(skill_value + float(skill_gains[skill_key]) * era_gain_factor(skill_value), 0.0, 100.0)
 
 	var progress_gain := 4.8 + float(competitor.get("architecture_skill", 20.0)) * 0.035 + float(competitor.get("integration_skill", 20.0)) * 0.015
 	progress_gain *= clampf(0.82 + budget_factor * 0.18, 0.62, 1.28)
@@ -1030,10 +1047,15 @@ func _launch_competitor_generation(competitor: Dictionary):
 	_clear_competitor_sourcing(competitor)
 
 func _configure_competitor_product(competitor: Dictionary, initial: bool):
-	var arch := float(competitor.get("architecture_skill", 20.0))
-	var layout := float(competitor.get("layout_skill", 20.0))
-	var manufacturing := float(competitor.get("manufacturing_skill", 20.0))
-	var integration := float(competitor.get("integration_skill", 20.0))
+	# Les notes des CPU du joueur sont relatives au procédé de leur époque ; celles des
+	# rivaux étaient absolues, si bien qu'en fin de partie ils dominaient mécaniquement
+	# (mesure 28/09 : écart −17 en 2010 malgré des maîtrises égales). On note donc les
+	# rivaux sur leur avance/retard par rapport à l'état de l'art — identique en 1971.
+	var era_shift := maxf(era_technology_ceiling() - ERA_CEILING_START, 0.0)
+	var arch := float(competitor.get("architecture_skill", 20.0)) - era_shift
+	var layout := float(competitor.get("layout_skill", 20.0)) - era_shift
+	var manufacturing := float(competitor.get("manufacturing_skill", 20.0)) - era_shift
+	var integration := float(competitor.get("integration_skill", 20.0)) - era_shift
 	var node_nm := int(competitor.get("node_nm", 10000))
 	var node_profile: Dictionary = CPU_DESIGN.node_profile(node_nm)
 	var node_score := float(node_profile.get("score", 8.0))
@@ -1065,6 +1087,9 @@ func _configure_competitor_product(competitor: Dictionary, initial: bool):
 		clampf(innovation, 20.0, 96.0), clampf(ecosystem, 20.0, 94.0),
 		clampf(sustainability, 20.0, 94.0)
 	)
+	# Rendement, défauts et capacité restent absolus : une usine de 2005 produit plus qu'en 1975.
+	manufacturing = float(competitor.get("manufacturing_skill", 20.0))
+	layout = float(competitor.get("layout_skill", 20.0))
 	var yield_rate := clampf(0.48 + manufacturing * 0.0042 + layout * 0.0012 - float(node_profile.get("difficulty", 0.65)) * 0.055, 0.42, 0.93)
 	competitor["yield_rate"] = yield_rate
 	competitor["defect_rate"] = clampf(0.075 - manufacturing * 0.00055 - layout * 0.00018, 0.006, 0.07)

@@ -122,3 +122,25 @@ Après correctif (trésorerie 1986, base = 12,2 M€) :
 Test : `tests/scenarios/InvestmentBalanceScenario.gd` (dans le smoke test).
 
 **Reste à traiter** : les concurrents atteignent 95-100 dans toutes les compétences vers 1986 ; si la partie doit durer jusqu'aux années 2000, leur rythme (et donc l'état de l'art) doit être étalé. Et même avec des maîtrises au niveau des concurrents, les CPU proposés automatiquement (« plan recommandé ») restent un peu derrière en fin de période (écart −7 à −9 points) : à regarder côté planificateur de génération.
+
+## 28/09 soir — une campagne jusqu'en 2010, puis mode libre
+
+Décision d'Alexandre : pas de générateur de nouveautés. Quand le joueur atteint le niveau technologique final, le jeu le lui dit clairement ; les technologies suivantes viendront avec les mises à jour / DLC ; la partie continue et doit rester intéressante par d'autres systèmes.
+
+Correctifs :
+- **Plafond daté de l'état de l'art** (`MarketManager.era_technology_ceiling`, `FINAL_TECH_YEAR = 2010`) : 32 en 1971, 100 en 2010. Les compétences des concurrents et la technologie des fonderies ralentissent en approchant ce plafond. Avant : concurrents à 95-100 partout dès 1986.
+- **Notes des CPU rivaux relatives à leur époque** : celles du joueur l'étaient déjà (par rapport au procédé), celles des rivaux étaient absolues ; en fin de partie les rivaux dominaient mécaniquement (écart −17 en 2010 avec des maîtrises égales). Identique en 1971 ; rendement, défauts et capacité des rivaux restent absolus.
+- **Annonce de fin de contenu** (`Interactions` « MILESTONE:TECH_FINAL ») : Nora vient voir le joueur (« ! » dans le garage) quand ses maîtrises et sa fabrication sont au maximum, ou au plus tard en 2010, avec un bilan de carrière. Une seule fois ; la partie continue en mode libre.
+
+Parties automatiques de 40 ans (1971 → 2011) :
+
+| Stratégie | Annonce « sommet » | Trésorerie 2010 | Écart produit vs rivaux 2010 |
+| --- | --- | --- | --- |
+| N'investit pas | 2010 | 32 M€ | −7 |
+| Recherche | 2003 | 96 M€ | + |
+| Recherche + nouveaux marchés | 2003 | 217 M€ | +5 |
+| Tout (marketing, fab) | 2003 | 502 M€ | +8 |
+
+Les 12 besoins de marché s'ouvrent progressivement jusqu'en 1998.
+
+**À construire pour le mode libre** (la trésorerie atteint des centaines de M€) : de quoi dépenser et se battre une fois la technologie plafonnée — rachats de concurrents, filiales / nouvelles divisions, guerre des prix et parts de marché, événements de marché.

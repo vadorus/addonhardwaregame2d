@@ -383,7 +383,9 @@ func process_month():
 func _progress_external_foundries():
 	for foundry_id in external_foundries.keys():
 		var p: Dictionary = external_foundries[foundry_id]
-		p["technology_score"] = clampf(float(p.technology_score) + float(p.research_rate), 0.0, 100.0)
+		# Les fonderies suivent le rythme de la campagne (plafond daté, 100 en 2010).
+		var score := float(p.technology_score)
+		p["technology_score"] = clampf(score + float(p.research_rate) * MarketManager.era_gain_factor(score - 6.0), 0.0, 100.0)
 		p["precision"] = clampf(float(p.precision) + float(p.research_rate) * 0.10, 0.0, 98.0)
 
 func _process_internal_fab_construction():

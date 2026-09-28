@@ -52,6 +52,31 @@ static func run() -> String:
 	if MarketManager.is_segment_available("DATACENTER") or MarketManager.is_segment_available("GAMING"):
 		return "Market: maximal technology should not unlock 1990s needs in the 1970s"
 
+	# --- Rythme de campagne : l'état de l'art atteint 100 en 2010, pas en 1986.
+	if absf(MarketManager.era_technology_ceiling(1971) - MarketManager.ERA_CEILING_START) > 0.01 or MarketManager.era_technology_ceiling(1986) > 70.0 or MarketManager.era_technology_ceiling(MarketManager.FINAL_TECH_YEAR) < 99.9:
+		return "Campaign pacing: era ceiling should rise from 1971 to %d" % MarketManager.FINAL_TECH_YEAR
+	if MarketManager.era_gain_factor(MarketManager.era_technology_ceiling()) > 0.001:
+		return "Campaign pacing: competitors at the era ceiling should stop progressing"
+	var interactions: Script = load("res://scripts/Interactions.gd")
+	ExecutiveManager.workplace.erase("tech_final_announced")
+	for key in ResearchManager.cpu_capabilities.keys():
+		ResearchManager.cpu_capabilities[key] = 60.0
+	if bool(interactions.call("tech_final_pending")):
+		return "Tech final: announced before the end of the technology content"
+	var real_year := TimeManager.year
+	TimeManager.year = MarketManager.FINAL_TECH_YEAR
+	var final_dialogue: Dictionary = interactions.call("dialogue", "MILESTONE:TECH_FINAL")
+	var pending_ok := str(interactions.call("pending_for", "NORA")) != ""
+	interactions.call("choose", "MILESTONE:TECH_FINAL", "CONTINUE")
+	var still_pending: bool = interactions.call("tech_final_pending")
+	TimeManager.year = real_year
+	if final_dialogue.is_empty() or not str(final_dialogue.get("note", "")).begins_with("Bilan"):
+		return "Tech final: Nora's announcement with the career summary is missing"
+	if not pending_ok:
+		return "Tech final: Nora should come to talk (garage « ! »)"
+	if still_pending:
+		return "Tech final: the announcement should only happen once"
+
 	# --- Fab interne : coûts unitaires plus bas qu'en sous-traitance.
 	FoundryManager.internal_fab["tier"] = 1
 	var node := 10000
