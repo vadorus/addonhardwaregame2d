@@ -1290,6 +1290,12 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 		SoundManager.play("error")
 		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
 		return
+	# V0.9 : gamme (nouvelle ou suite) + architecture + modèles choisis, reliés au projet.
+	var arch_id := str(spec.get("architecture_id", ArchitectureManager.latest_id()))
+	var line_id := str(spec.get("line_id", ""))
+	if line_id == "":
+		line_id = ArchitectureManager.create_line(str(spec.get("new_line_name", "Nova")), str(spec.get("segment", "")), arch_id)
+	ArchitectureManager.register_project(str(spec.get("name", "Nova CPU")), line_id, arch_id, spec.get("model_tiers", []))
 	cpu_stepper.call("close")
 	SoundManager.play("launch")
 	TimeManager.time_scale = 1.0
@@ -1369,6 +1375,10 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 		return
 	if first_cpu_workshop != null:
 		first_cpu_workshop.call("close")
+	# V0.9 : le premier CPU ouvre la première gamme, sur l'architecture de départ.
+	var base_name := project_name.rstrip(" 0123456789").strip_edges()
+	var first_line := ArchitectureManager.create_line(base_name if base_name != "" else project_name, str(spec.get("segment", MarketManager.default_segment())), ArchitectureManager.latest_id())
+	ArchitectureManager.register_project(project_name, first_line, ArchitectureManager.latest_id(), [])
 	TimeManager.time_scale = 1.0
 	status_label.text = "%s entre en développement. Nora ouvre maintenant les outils de direction utiles au suivi du projet." % project_name
 	_refresh_all()

@@ -74,17 +74,29 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 	)
 	var generation: Dictionary = built.get("generation", {})
 	var model_ids: Array = []
+	var arch_id := str(project.get("architecture_id", ""))
+	if arch_id == "":
+		arch_id = ArchitectureManager.latest_id()
+	var labels: Array = []
 	for template_value in built.get("products", []):
 		var product: Dictionary = template_value
 		product["id"] = "PROD-%03d" % _next_id
 		product["company"] = CompanyManager.company_name
+		product["architecture_id"] = arch_id
+		product["line_id"] = str(project.get("line_id", ""))
 		_ensure_lifecycle_fields(product)
 		_next_id += 1
 		products.append(product)
 		model_ids.append(str(product.id))
+		labels.append(str(product.get("sku_label", "")))
 	generation["model_ids"] = model_ids
+	generation["architecture_id"] = arch_id
+	generation["line_id"] = str(project.get("line_id", ""))
 	cpu_generations.append(generation)
-	CompanyManager.add_alert("%s devient une gamme de %d CPU : Essentiel, Signature et Apex." % [str(project.get("name", "Nouvelle architecture")), model_ids.size()])
+	if model_ids.size() == 1:
+		CompanyManager.add_alert("%s devient un CPU unique." % str(project.get("name", "Nouvelle architecture")))
+	else:
+		CompanyManager.add_alert("%s devient une gamme de %d CPU : %s." % [str(project.get("name", "Nouvelle architecture")), model_ids.size(), ", ".join(labels)])
 	cpu_range_created.emit(generation.duplicate(true))
 
 func _create_single_product(project: Dictionary) -> void:
@@ -485,6 +497,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 			_refresh_cpu_launch_forecasts(str(product.get("generation_id", "")))
 			CompanyManager.add_alert("%s est officiellement lancé." % str(product.name))
 			MarketManager.activate_reserved_contracts(str(product.id))
+			ArchitectureManager.on_product_launched(product)
 			product_launched.emit(product)
 			products_changed.emit()
 			return true

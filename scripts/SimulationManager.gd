@@ -23,6 +23,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	AfterSalesManager.reset()
 	MarketManager.reset()
 	MediaManager.reset()
+	ArchitectureManager.reset()
 
 func process_month_end() -> Dictionary:
 	if is_game_over:
@@ -48,6 +49,7 @@ func process_month_end() -> Dictionary:
 	FoundryManager.process_month()
 	ProductionManager.process_month()
 	ProductManager.process_month()
+	ArchitectureManager.process_month()
 	SupplierManager.process_month()
 	AfterSalesManager.process_month()
 	MarketManager.process_month(ProductManager.products)

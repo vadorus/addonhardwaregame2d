@@ -54,7 +54,8 @@ func save_to_slot(slot: int, quiet: bool = false) -> bool:
 		"products":ProductManager.get_state(),
 		"after_sales":AfterSalesManager.get_state(),
 		"market":MarketManager.get_state(),
-		"media":MediaManager.get_state()
+		"media":MediaManager.get_state(),
+		"architectures":ArchitectureManager.get_state()
 	}
 	if not _write_atomic(JSON.stringify(state), slot_path(slot), _slot_temp(slot), _slot_backup(slot)):
 		save_completed.emit(false, "Impossible d'écrire la sauvegarde de façon sûre.")
@@ -101,6 +102,8 @@ func load_from_slot(slot: int) -> bool:
 	AfterSalesManager.load_state(state.get("after_sales", {}))
 	MarketManager.load_state(state.get("market", {}))
 	MediaManager.load_state(state.get("media", {}))
+	# V0.9 : en dernier, car une ancienne partie déduit ses architectures et gammes des produits et projets.
+	ArchitectureManager.load_state(state.get("architectures", {}))
 	save_completed.emit(true, "Partie chargée.")
 	return true
 

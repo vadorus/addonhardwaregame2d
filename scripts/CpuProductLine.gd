@@ -27,6 +27,10 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	var generation_plan: Dictionary = project.get("generation_plan", {}).duplicate(true)
 	var potential_models := clampi(maxi(int(generation_plan.get("potential_models", 3)), 3), 3, 6)
 	var base_yield := _estimate_yield(architecture, architecture_estimate, project_metrics, division_maturity)
+	# V0.9 : une architecture mûre (retour d'expérience des modèles précédents) donne un meilleur rendement.
+	var arch_id := str(project.get("architecture_id", ""))
+	if arch_id != "":
+		base_yield = clampf(base_yield + ArchitectureManager.yield_bonus(arch_id), 0.46, 0.94)
 	var yield_rate := clampf(base_yield + float(industrialization.get("yield_delta", 0.0)), 0.40, 0.94)
 	var capacity_factor := clampf(float(industrialization.get("capacity_factor", 1.0)), 0.55, 2.60)
 	# Le plan commercial fixe la capacité recommandée. Une bonne industrialisation peut offrir
@@ -36,12 +40,29 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	if foundry_capacity > 0:
 		effective_monthly_capacity = mini(effective_monthly_capacity, foundry_capacity)
 	var bin_distribution := _bin_distribution(yield_rate, industrialization)
+	# V0.9 : le patron choisit les modèles de la gamme (1 à 3). Les puces des modèles non retenus
+	# sont reclassées dans les modèles gardés (parts renormalisées).
+	var wanted: Array = []
+	var tiers_value = project.get("model_tiers", [])
+	if typeof(tiers_value) == TYPE_ARRAY:
+		for tier_value in tiers_value:
+			wanted.append(str(tier_value))
+	var selected: Array = []
+	for tier_value in TIERS:
+		if wanted.is_empty() or wanted.has(str((tier_value as Dictionary).key)):
+			selected.append(tier_value)
+	if selected.is_empty():
+		selected = TIERS.duplicate()
+	var share_total := 0.0
+	for tier_value in selected:
+		share_total += float(bin_distribution[str((tier_value as Dictionary).key)])
 	var products: Array = []
-	for tier_index in range(TIERS.size()):
-		var tier: Dictionary = TIERS[tier_index]
+	for tier_value in selected:
+		var tier: Dictionary = tier_value
+		var tier_index := TIERS.find(tier)
 		products.append(_build_product(
 			project, tier, tier_index, generation_id, generation_index, architecture,
-			project_metrics, yield_rate, float(bin_distribution[str(tier.key)]),
+			project_metrics, yield_rate, float(bin_distribution[str(tier.key)]) / maxf(share_total, 0.01),
 			base_unit_cost, reference_price, effective_monthly_capacity, industrialization, capability_snapshot
 		))
 	var generation := {
