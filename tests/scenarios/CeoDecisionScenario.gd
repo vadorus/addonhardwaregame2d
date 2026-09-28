@@ -39,6 +39,15 @@ static func _run_in_game(game: Control) -> String:
 	# Le bouton vert du garage doit mener à la carte de décision, pas à l'onglet brut.
 	var dashboard: Control = game.get("dashboard_screen")
 	var garage: Control = dashboard.get("dashboard_garage")
+	# L'équipe est visible dans le garage : un personnage par salarié (5 postes max) + Nora.
+	garage.call("_refresh_gameplay_overlays")
+	var crew: Control = garage.call("crew")
+	var expected_crew := mini(PersonnelManager.staff.size(), 5) + 1
+	if int(crew.call("member_count")) != expected_crew:
+		return "Garage crew: expected %d characters, got %d" % [expected_crew, int(crew.call("member_count"))]
+	var first_member: Control = (crew.get("_members") as Array)[0]
+	if str(crew.call("line_for", first_member)) == "":
+		return "Garage crew: characters have nothing to say"
 	var focus: Dictionary = garage.call("focus_decision")
 	if not str(focus.get("context", "")).begins_with("CEO:"):
 		return "CEO decision: garage focus does not route to the decision card (%s)" % str(focus)

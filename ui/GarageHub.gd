@@ -83,6 +83,10 @@ var decision_source: Callable = Callable()
 var _focus: Dictionary = {}
 var _last_focus_key := ""
 var _phase_row: HBoxContainer
+var _crew: Control
+
+func crew() -> Control:
+	return _crew
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(0, 560)
@@ -125,6 +129,11 @@ func _build_background() -> void:
 	_background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
+
+	# L'équipe, dessinée à ses postes dans le décor (sous les repères et les cartes).
+	_crew = (load("res://ui/GarageCrew.gd") as Script).new() as Control
+	_crew.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_crew)
 
 func _build_overlay() -> void:
 	_room_badge = PanelContainer.new()
@@ -492,6 +501,10 @@ func _layout_zones() -> void:
 		var project_w := clampf(size.x * 0.29, 300.0, 370.0)
 		_project_panel.size = Vector2(project_w, 0.0)
 		_project_panel.position = Vector2(size.x - project_w - 14.0, 14.0)
+		if _crew != null:
+			_crew.set("project_target", _project_panel.position + Vector2(project_w * 0.35, 70.0))
+	if _crew != null:
+		_crew.call("set_art_rect", art_rect)
 	if _tasks_panel != null:
 		var tasks_w := clampf(size.x * 0.25, 250.0, 330.0)
 		_tasks_panel.size = Vector2(tasks_w, 0.0)
@@ -883,6 +896,8 @@ func _refresh_gameplay_overlays() -> void:
 	if _project_title == null or _project_stage == null or _project_progress == null:
 		return
 	_update_focus()
+	if _crew != null:
+		_crew.call("refresh")
 	var active_project: Dictionary = {}
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":
