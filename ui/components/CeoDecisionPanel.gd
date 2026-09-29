@@ -212,6 +212,11 @@ func options_for(value: Dictionary) -> Array:
 			if not request.is_empty():
 				options.append(_paid("Financer le projet", "La filiale grossit 1,5 fois plus qu'avec une injection ordinaire, tant que son marché n'est pas saturé.", "SUB_FUND", int(request.get("amount", 0)), true))
 				options.append(_free("Refuser", "La filiale est un peu freinée ; son directeur s'en remettra.", "SUB_REFUSE"))
+		"STRATEGIE":
+			if MarketManager.STRATEGIC.PROGRAMS.has(sid):
+				options.append(_paid("Lancer l'accréditation", "Audit de %d mois ; ensuite les appels d'offres arrivent. Conformité : %s par mois." % [MarketManager.STRATEGIC.ACCREDITATION_MONTHS, eur(MarketManager.STRATEGIC.compliance_cost(sid))],
+					"STRATEGIC_START", MarketManager.STRATEGIC.accreditation_cost(sid), true))
+				options.append(_free("Pas maintenant", "Nora n'en reparlera pas avant 3 ans.", "STRATEGIC_LATER"))
 		"CONTRAT":
 			options.append(_free("Préparer une offre", "Choisir le CPU et le prix dans Marché.", "DETAIL", true))
 			options.append(_free("Laisser passer cet appel d'offres", "Nora ne vous en reparlera plus.", "TENDER_IGNORE"))
@@ -300,6 +305,12 @@ func choose(action: String) -> bool:
 		"SUB_FUND", "SUB_REFUSE":
 			ok = CompanyManager.SUBSIDIARIES.answer_request(sid, action == "SUB_FUND")
 			message = ("Projet financé : la filiale va grossir." if action == "SUB_FUND" else "Projet refusé.") if ok else "Financement impossible (trésorerie insuffisante)."
+		"STRATEGIC_START":
+			ok = MarketManager.STRATEGIC.start_accreditation(sid)
+			message = "Audit lancé : réponse dans %d mois." % MarketManager.STRATEGIC.ACCREDITATION_MONTHS if ok else "Accréditation impossible (trésorerie insuffisante)."
+		"STRATEGIC_LATER":
+			ok = MarketManager.STRATEGIC.snooze(sid)
+			message = "Pas pour l'instant : Nora en reparlera dans 3 ans."
 		"RIVAL_LATER":
 			MarketManager.snooze_attack_advice(12)
 			ok = true

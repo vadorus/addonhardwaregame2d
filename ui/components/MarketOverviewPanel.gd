@@ -113,6 +113,14 @@ func _refresh_cards() -> void:
 			needs_box.add_child(_info_card(str(next_need.get("label", "")), "",
 				"Vers %d, ou plus tôt quand la maturité technologique atteindra %.0f." % [int(next_need.get("historical_year", 0)), float(next_need.get("tech_trigger", 0.0))],
 				"À venir"))
+	# Lot F3 : défense et aérospatial, ouverts par une accréditation (Nora la propose).
+	var strategic_lines: Array = MarketManager.STRATEGIC.summary_lines()
+	if not strategic_lines.is_empty():
+		needs_box.add_child(UI.eyebrow("MARCHÉS STRATÉGIQUES"))
+		for line_value in strategic_lines:
+			var line := UI.muted_label(str(line_value), 12)
+			line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			needs_box.add_child(line)
 
 	_clear(competitors_box)
 	for competitor_value in MarketManager.cpu_competitor_public_profiles():

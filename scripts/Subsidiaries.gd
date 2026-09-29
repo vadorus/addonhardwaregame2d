@@ -68,8 +68,68 @@ static func mandate_label(mandate: String) -> String:
 ## Chiffre d'affaires maximal d'une filiale : 25 % de son marché (qui peut grandir ou décliner).
 static func market_cap(sub: Dictionary) -> float:
 	var segment := str(sub.get("segment", ""))
-	var market := float(MarketManager.segment_market_units(segment)) * MarketManager.segment_reference_price(segment)
+	var market := diversification_market(segment) if DIVERSIFICATION.has(segment) \
+		else float(MarketManager.segment_market_units(segment)) * MarketManager.segment_reference_price(segment)
 	return maxf(market * MARKET_SHARE_CAP, MIN_MARKET_CAP)
+
+# --- Lot F3 : diversification sans nouvelle technologie (PC, mémoire, cartes graphiques) ------------
+# Le joueur ne conçoit pas ces produits : il crée (ou rachète) une filiale qui les fabrique. Chaque marché a
+# sa taille, qui grandit jusqu'à un plateau. Une filiale PC achète les processeurs du groupe (client captif) ;
+# une filiale GPU pousse les CPU gaming et stations de travail.
+const DIVERSIFICATION := {
+	"PC":{"label":"Ordinateurs (PC)", "first_year":1977, "base_market":3_000_000.0, "growth":0.10, "plateau_year":2008,
+		"boost_segments":["HOME_PC", "BUSINESS_PC"]},
+	"RAM":{"label":"Mémoire (RAM)", "first_year":1971, "base_market":1_500_000.0, "growth":0.10, "plateau_year":2010,
+		"boost_segments":[]},
+	"GPU":{"label":"Cartes graphiques (GPU)", "first_year":1995, "base_market":8_000_000.0, "growth":0.12, "plateau_year":2020,
+		"boost_segments":["GAMING", "WORKSTATION"]}
+}
+const DIVERSIFICATION_ORDER := ["PC", "RAM", "GPU"]
+const CAPTIVE_BOOST_PER_SHARE := 1.5
+const CAPTIVE_BOOST_MAX := 0.30
+
+static func is_diversification_open(sector: String) -> bool:
+	return DIVERSIFICATION.has(sector) and TimeManager.year >= int(DIVERSIFICATION[sector].first_year)
+
+## Chiffre d'affaires mensuel de tout le marché (toutes marques confondues) cette année.
+static func diversification_market(sector: String) -> float:
+	if not DIVERSIFICATION.has(sector):
+		return 0.0
+	var data: Dictionary = DIVERSIFICATION[sector]
+	var years := clampi(TimeManager.year, int(data.first_year), int(data.plateau_year)) - int(data.first_year)
+	return float(data.base_market) * pow(1.0 + float(data.growth), float(years))
+
+static func segment_label(sub: Dictionary) -> String:
+	var segment := str(sub.get("segment", ""))
+	if DIVERSIFICATION.has(segment):
+		return str(DIVERSIFICATION[segment].label)
+	return MarketManager.segment_label(segment)
+
+## Client captif : une filiale PC (ou GPU) achète les CPU du groupe sur ses marchés.
+static func captive_demand_factor(product: Dictionary) -> float:
+	if str(product.get("company", CompanyManager.company_name)) != CompanyManager.company_name:
+		return 1.0
+	var target := MarketManager.normalize_segment(str(product.get("target_segment", "")))
+	var boost := 0.0
+	for sub_value in CompanyManager.subsidiaries:
+		var sub: Dictionary = sub_value
+		var segment := str(sub.get("segment", ""))
+		if not DIVERSIFICATION.has(segment) or str(sub.get("mandate", "")) == "INTEGRATE":
+			continue
+		if not (DIVERSIFICATION[segment].boost_segments as Array).has(target):
+			continue
+		var share := float(sub.get("revenue", 0.0)) / maxf(diversification_market(segment), 1.0)
+		boost += share * CAPTIVE_BOOST_PER_SHARE
+	return 1.0 + minf(boost, CAPTIVE_BOOST_MAX)
+
+## Secteurs proposés à la création d'une filiale : processeurs, puis la diversification ouverte cette année.
+static func founding_sectors() -> Array:
+	var rows: Array = [{"key":"CPU", "label":"Processeurs", "open":true}]
+	for sector in DIVERSIFICATION_ORDER:
+		var data: Dictionary = DIVERSIFICATION[sector]
+		var open := is_diversification_open(sector)
+		rows.append({"key":sector, "label":str(data.label) if open else "%s - à partir de %d" % [str(data.label), int(data.first_year)], "open":open})
+	return rows
 
 ## Rendement d'un euro investi : plein effet loin du plafond, presque nul tout près.
 static func growth_efficiency(sub: Dictionary) -> float:
@@ -115,6 +175,8 @@ static func adopt_acquired(competitor: Dictionary, price: int) -> Dictionary:
 static func found(name: String, sector: String, capital: int) -> bool:
 	var clean := name.strip_edges()
 	if clean == "" or capital < MIN_CAPITAL or not Economy.can_afford(capital, "Capital filiale"):
+		return false
+	if sector != "CPU" and not is_diversification_open(sector):
 		return false
 	Economy.add_expense(capital, "Capital filiale")
 	var segment := MarketManager.default_segment() if sector == "CPU" else sector
@@ -215,11 +277,17 @@ static func group_dividends() -> int:
 
 # --- Décisions du joueur -----------------------------------------------------------------------------
 
+static func can_integrate(sub: Dictionary) -> bool:
+	return not DIVERSIFICATION.has(str(sub.get("segment", "")))
+
 static func set_mandate(id: String, mandate: String) -> bool:
 	var sub := get_subsidiary(id)
 	if sub.is_empty() or not MANDATES.has(mandate) or str(sub.get("mandate", "")) == "INTEGRATE":
 		return false
 	if str(sub.get("mandate", "")) == mandate:
+		return false
+	# Lot F3 : une filiale PC, RAM ou GPU vend d'autres produits ; ses clients n'achètent pas des CPU.
+	if mandate == "INTEGRATE" and not can_integrate(sub):
 		return false
 	sub["mandate"] = mandate
 	if mandate == "INTEGRATE":

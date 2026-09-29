@@ -844,6 +844,20 @@ func get_ceo_decisions() -> Array:
 			"target_tab":1,
 			"can_defer":true
 		})
+	# Lot F3 : Nora propose d'ouvrir un marché stratégique (défense, aérospatial).
+	var strategic_idea: Dictionary = MarketManager.STRATEGIC.advice()
+	if not strategic_idea.is_empty():
+		var hint := str(strategic_idea.hint)
+		decisions.append({
+			"id":"STRATEGIE:%s" % str(strategic_idea.program),
+			"category":"STRATEGIE",
+			"severity":38.0,
+			"title":"Nora : entrer sur le marché de %s ?" % str(strategic_idea.market_name),
+			"text":"%s%s cherchent des fournisseurs de processeurs. Il faut d'abord un audit : %s € et %d mois." % [hint.substr(0, 1).to_upper(), hint.substr(1), _group_digits(int(strategic_idea.cost)), MarketManager.STRATEGIC.ACCREDITATION_MONTHS],
+			"recommendation":"Ensuite arrivent de gros appels d'offres : jusqu'à 3 fois le prix habituel, sur 2 à 3 ans, mais une fiabilité très élevée est exigée (80 à 90). Une conformité mensuelle est à payer.",
+			"target_tab":5,
+			"can_defer":true
+		})
 	if GarageBusiness.loan_offer_pending():
 		decisions.append({
 			"id":"FINANCE:LOAN",

@@ -46,7 +46,7 @@ func _card(sub: Dictionary) -> Control:
 	column.add_theme_constant_override("separation", 4)
 	card.add_child(column)
 	var origin := "rachetée en %d" % int(sub.get("year", 0)) if str(sub.get("origin", "")) == "ACQUIRED" else "créée en %d" % int(sub.get("year", 0))
-	var title := UI.label("%s  (%s, %s)" % [str(sub.get("name", "")), origin, MarketManager.segment_label(str(sub.get("segment", "")))], 15)
+	var title := UI.label("%s  (%s, %s)" % [str(sub.get("name", "")), origin, SUBS.segment_label(sub)], 15)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(title)
 	var profit := int(sub.get("last_profit", 0))
@@ -57,6 +57,17 @@ func _card(sub: Dictionary) -> Control:
 	var history := UI.muted_label("Dividendes versés : %s € • capital investi : %s €" % [UI.money(int(sub.get("dividends", 0))), UI.money(int(sub.get("invested", 0)))], 12)
 	history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(history)
+	# Lot F3 : une filiale PC ou GPU achète vos processeurs (client captif).
+	var segment := str(sub.get("segment", ""))
+	if SUBS.DIVERSIFICATION.has(segment) and not (SUBS.DIVERSIFICATION[segment].boost_segments as Array).is_empty():
+		var share := float(sub.get("revenue", 0.0)) / maxf(SUBS.diversification_market(segment), 1.0)
+		var labels: Array[String] = []
+		for target in SUBS.DIVERSIFICATION[segment].boost_segments:
+			labels.append(MarketManager.segment_label(str(target)))
+		var captive := UI.muted_label("Achète vos processeurs : +%.0f %% de demande pour vos CPU %s (part de son marché : %.1f %%)." % [
+			minf(share * SUBS.CAPTIVE_BOOST_PER_SHARE, SUBS.CAPTIVE_BOOST_MAX) * 100.0, " et ".join(labels), share * 100.0], 12)
+		captive.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(captive)
 	var mandate_line := UI.label("Mandat : %s" % SUBS.mandate_label(mandate), 13)
 	column.add_child(mandate_line)
 	var hint := UI.muted_label(str(SUBS.MANDATE_HINTS.get(mandate, "")), 11)
@@ -70,7 +81,7 @@ func _card(sub: Dictionary) -> Control:
 	buttons.add_theme_constant_override("v_separation", 6)
 	column.add_child(buttons)
 	for other in SUBS.MANDATES:
-		if str(other) == mandate:
+		if str(other) == mandate or (str(other) == "INTEGRATE" and not SUBS.can_integrate(sub)):
 			continue
 		var switch := Button.new()
 		switch.text = SUBS.mandate_label(str(other))

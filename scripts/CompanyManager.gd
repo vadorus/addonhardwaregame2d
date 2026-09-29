@@ -190,7 +190,8 @@ func department_management_modifier(department: String) -> float:
 
 ## Lot F2 : la filiale est désormais une vraie entreprise (règles dans Subsidiaries.gd).
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
-	if not GameData.is_sector_active(sector):
+	# Lot F3 : processeurs, ou diversification (PC, mémoire, cartes graphiques) ouverte cette année.
+	if not GameData.is_sector_active(sector) and not SUBSIDIARIES.is_diversification_open(sector):
 		return false
 	return SUBSIDIARIES.found(name, sector, capital)
 

@@ -304,7 +304,7 @@ func _build() -> void:
 	subsidiary_grid.add_child(subsidiary_name)
 	subsidiary_grid.add_child(UI.label("Secteur", 14))
 	subsidiary_sector = OptionButton.new()
-	_fill_sector_options(subsidiary_sector)
+	_fill_subsidiary_sectors()
 	subsidiary_grid.add_child(subsidiary_sector)
 	subsidiary_grid.add_child(UI.label("Capital", 14))
 	subsidiary_capital = UI.spin(50000, 500000000, 50000, 1000000)
@@ -489,6 +489,7 @@ func refresh() -> void:
 	_refresh_reputation_bars()
 	if subsidiaries_panel != null:
 		subsidiaries_panel.call("refresh")
+	_fill_subsidiary_sectors()
 	_refresh_objectives()
 
 	var brief := ExecutiveManager.get_executive_brief()
@@ -848,6 +849,20 @@ func _fill_sector_options(option: OptionButton) -> void:
 		var item_index := option.item_count - 1
 		option.set_item_metadata(item_index, sector_key)
 		option.set_item_disabled(item_index, not active)
+
+## Lot F3 : processeurs + diversification (PC, RAM, GPU), chacune ouverte à partir de son année.
+func _fill_subsidiary_sectors() -> void:
+	if subsidiary_sector == null:
+		return
+	var keep := UI.option_meta(subsidiary_sector) if subsidiary_sector.item_count > 0 else "CPU"
+	subsidiary_sector.clear()
+	for row_value in CompanyManager.SUBSIDIARIES.founding_sectors():
+		var row: Dictionary = row_value
+		subsidiary_sector.add_item(str(row.label))
+		var index := subsidiary_sector.item_count - 1
+		subsidiary_sector.set_item_metadata(index, str(row.key))
+		subsidiary_sector.set_item_disabled(index, not bool(row.open))
+	UI.select_meta(subsidiary_sector, keep)
 
 func _status(message: String) -> void:
 	status_changed.emit(message)
