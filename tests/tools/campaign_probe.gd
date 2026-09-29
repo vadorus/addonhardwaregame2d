@@ -31,6 +31,7 @@ func _ready() -> void:
 				last_launch_year = TimeManager.year
 			_retire_old()
 		_handle_threats()
+		_handle_offers()
 		var report := SimulationManager.process_month_end()
 		_last_income = int(report.get("income", 0))
 		if SimulationManager.is_game_over:
@@ -42,6 +43,8 @@ func _ready() -> void:
 			var row := _year_row(TimeManager.year - 1, rivals, previous_rivals)
 			rows.append(row)
 			print(row.text)
+			if TimeManager.year % 10 == 1:
+				_print_rivals()
 			_print_latest()
 			previous_rivals = rivals
 			_year_news = 0
@@ -49,6 +52,7 @@ func _ready() -> void:
 			_year_threats = 0
 			_year_threat_spend = 0
 	_summary(rows)
+	_corporate_summary()
 	get_tree().quit(0)
 
 var _last_income := 0
@@ -197,3 +201,37 @@ func _print_latest() -> void:
 		str(latest.name), str(latest.target_segment), int(latest.price), int(latest.get("last_month_sales", 0)),
 		int(latest.get("last_month_demand", 0)), float(demand.get("score", 0.0)), float(demand.get("share", 0.0)),
 		float(demand.get("age_penalty", 0.0)), str(demand.get("lifecycle", "")), CompanyManager.get_awareness_bonus()])
+## Lot F1 : comme un joueur, la sonde rachète quand elle peut payer sans se mettre en danger.
+var _acquired := 0
+var _acquire_spend := 0
+
+func _handle_offers() -> void:
+	var offer: Dictionary = MarketManager.RIVAL_LIFE.open_offer()
+	if offer.is_empty():
+		return
+	var price := int(offer.get("price", 0))
+	# PROBE_NO_BUY=1 : le joueur ne rachète jamais (on regarde le monde vivre sans lui).
+	var never_buy := OS.get_environment("PROBE_NO_BUY") == "1"
+	if not never_buy and float(Economy.money) >= float(price) * 1.3:
+		if MarketManager.RIVAL_LIFE.accept_offer(str(offer.id)):
+			_acquired += 1
+			_acquire_spend += price
+			print("[PROBE]   rachat de %s (%s) pour %s EUR en %d" % [str(offer.company), str(offer.kind), _k(price), TimeManager.year])
+	else:
+		MarketManager.RIVAL_LIFE.decline_offer(str(offer.id))
+		print("[PROBE]   offre refusee (trop chere) : %s %s EUR en %d" % [str(offer.company), _k(price), TimeManager.year])
+
+func _print_rivals() -> void:
+	for rival in MarketManager.competitors.get("CPU", []):
+		print("[PROBE]     rival %s : CA %s/mois, resultat %s, tresorerie %s, prix %s, sante '%s'" % [
+			str(rival.company), _k(int(rival.get("last_month_revenue", 0))), _k(int(rival.get("last_month_profit", 0))),
+			_k(int(rival.get("cash", 0))), _k(MarketManager.RIVAL_LIFE.valuation(rival)), MarketManager.RIVAL_LIFE.health_label(rival)])
+
+func _corporate_summary() -> void:
+	var counts := {}
+	for entry in MarketManager.corporate_log:
+		counts[str(entry.kind)] = int(counts.get(str(entry.kind), 0)) + 1
+	print("[PROBE] vie des rivaux 1971-2030 : %s" % str(counts))
+	print("[PROBE] rachats par le joueur : %d pour %s EUR" % [_acquired, _k(_acquire_spend)])
+	for entry in MarketManager.corporate_log:
+		print("[PROBE]   %d/%d %s %s %s %s" % [int(entry.month), int(entry.year), str(entry.kind), str(entry.company), str(entry.other), _k(int(entry.amount))])

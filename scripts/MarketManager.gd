@@ -5,6 +5,7 @@ signal opportunity_created(contract)
 signal market_need_unlocked(need)
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const RIVAL_LIFE := preload("res://scripts/RivalLife.gd")
 
 # Les dates sont des repères historiques, pas des verrous rigides :
 # une partie technologiquement en avance peut faire émerger un besoin plus tôt.
@@ -216,6 +217,15 @@ var attacks: Array = []
 var _next_attack_id := 1
 ## Nora ne propose pas d'offensive avant ce mois (index année*12+mois).
 var attack_advice_snooze_until := 0
+# Lot F1 : vie des rivaux et rachats (règles dans RivalLife.gd).
+var rival_offers: Array = []
+var acquisitions: Array = []
+var acquisition_boosts: Array = []
+var corporate_log: Array = []
+var offer_snooze: Dictionary = {}
+var _next_offer_id := 1
+var last_healthy_offer_age := 0
+var last_entrant_age := 0
 const ATTACK_MONTHS := 4
 const ATTACK_PLAYER_BOOST := 1.20
 const ATTACK_RIVAL_SHARE_FACTOR := 0.75
@@ -238,6 +248,14 @@ func reset():
 	attacks = []
 	_next_attack_id = 1
 	attack_advice_snooze_until = 0
+	rival_offers = []
+	acquisitions = []
+	acquisition_boosts = []
+	corporate_log = []
+	offer_snooze = {}
+	_next_offer_id = 1
+	last_healthy_offer_age = 0
+	last_entrant_age = 0
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
@@ -534,6 +552,10 @@ func _add_new_market_entrant() -> void:
 	for competitor_value in competitors.get("CPU", []):
 		if str((competitor_value as Dictionary).get("id", "")) == "NEXUS_ENTRANT":
 			return
+	# Lot F1 : une société rachetée ou disparue ne renaît pas sous le même nom.
+	for entry_value in corporate_log:
+		if str((entry_value as Dictionary).get("company", "")) == "Nexus Micro":
+			return
 	var era := era_technology_ceiling()
 	var entrant := {
 		"id":"NEXUS_ENTRANT","sector":"CPU","company":"Nexus Micro","product_prefix":"Nexus",
@@ -546,6 +568,7 @@ func _add_new_market_entrant() -> void:
 		"capacity":10000,"unit_cost":70,"price":110,"target_segment":"EMBEDDED","metrics":{},"history":[]
 	}
 	entrant = _migrate_competitor(entrant, "CPU")
+	entrant["born_age"] = market_age_months
 	_configure_competitor_product(entrant, true)
 	competitors["CPU"].append(entrant)
 
@@ -954,7 +977,7 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var rival_pressure := _rival_pressure(product, target, score)
 	var rival_multiplier := float(rival_pressure.get("multiplier", 1.0))
 	var scale_fit := company_scale_fit(target) if str(product.get("company", "")) == CompanyManager.company_name else 1.0
-	var attack_multiplier := attack_demand_factor(product)
+	var attack_multiplier := attack_demand_factor(product) * RIVAL_LIFE.acquisition_demand_factor(product)
 	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
@@ -1347,6 +1370,8 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	var share := clampf(0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015, 0.012, 0.31)
 	# Lot D : sous l'offensive du joueur, le rival perd une partie de ses clients.
 	share *= attack_share_factor(str(competitor.get("id", "")))
+	# Lot F1 : une génération ratée (ou réussie) pèse sur les ventes pendant un à deux ans.
+	share *= RIVAL_LIFE.fortune_factor(competitor)
 	var units := mini(remaining_capacity, int(float(market_units) * share))
 	var margin := maxi(int(competitor.get("price", 1)) - int(competitor.get("unit_cost", 1)), 1)
 	var operating_profit := units * margin + b2b_profit
@@ -1355,10 +1380,14 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	var rd_budget := clampi(int(round(float(base_rd_budget) * float(competitor.get("ai_rd_multiplier", 1.0)))), 1800, 34000)
 	var supplier_fee := maxi(int(competitor.get("ai_supplier_monthly_fee", 0)), 0)
 	var fixed_cost := 7000 + int(competitor.get("generation_index", 1)) * 600 + supplier_fee
-	cash += operating_profit - rd_budget - fixed_cost
+	# Lot F1 : les frais de structure suivent le chiffre d'affaires, et l'excédent de trésorerie ressort.
+	var revenue := units * int(competitor.get("price", 1))
+	var overhead := RIVAL_LIFE.overhead(competitor, revenue, operating_profit)
+	cash += operating_profit - rd_budget - fixed_cost - overhead
 	competitor["last_month_units"] = units
-	competitor["last_month_profit"] = operating_profit - rd_budget - fixed_cost
-	competitor["cash"] = cash
+	competitor["last_month_revenue"] = revenue
+	competitor["last_month_profit"] = operating_profit - rd_budget - fixed_cost - overhead
+	competitor["cash"] = RIVAL_LIFE.after_payout(cash, revenue)
 
 	var budget_factor := clampf(float(rd_budget) / 15000.0, 0.12, 2.2)
 	var strategy := str(competitor.get("strategy", "BALANCED"))
@@ -1399,13 +1428,28 @@ func _advance_cpu_competitor(competitor: Dictionary):
 		competitor["cash"] = int(competitor.cash) - generation_cost
 		_launch_competitor_generation(competitor)
 
-	if int(competitor.cash) < -120000:
-		_clear_competitor_sourcing(competitor)
-		competitor["cash"] = 90000
-		competitor["restructurings"] = int(competitor.get("restructurings", 0)) + 1
-		competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) - 3.0, 20.0, 90.0)
-		competitor["capacity"] = maxi(2500, int(float(competitor.get("capacity", 8000)) * 0.84))
-		competitor["development_progress"] = minf(float(competitor.get("development_progress", 0.0)), 62.0)
+	# Lot F1 : un rival à sec n'est plus renfloué ici ; RivalLife décide (rachat, fusion, faillite).
+
+## Tout début de partie seulement (moins de 3 rivaux avant 1980) : l'ancien renflouement.
+func _restructure_competitor(competitor: Dictionary) -> void:
+	_clear_competitor_sourcing(competitor)
+	competitor["cash"] = 90000
+	competitor["restructurings"] = int(competitor.get("restructurings", 0)) + 1
+	competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) - 3.0, 20.0, 90.0)
+	competitor["capacity"] = maxi(2500, int(float(competitor.get("capacity", 8000)) * 0.84))
+	competitor["development_progress"] = minf(float(competitor.get("development_progress", 0.0)), 62.0)
+
+## Retire un rival du marché (rachat, fusion, faillite). Les offensives en cours s'arrêtent d'elles-mêmes.
+func remove_competitor(competitor_id: String) -> void:
+	var rows: Array = competitors.get("CPU", [])
+	var kept: Array = []
+	for competitor_value in rows:
+		if str((competitor_value as Dictionary).get("id", "")) != competitor_id:
+			kept.append(competitor_value)
+		else:
+			_clear_competitor_sourcing(competitor_value)
+	competitors["CPU"] = kept
+	market_changed.emit()
 
 
 func _launch_competitor_generation(competitor: Dictionary):
@@ -1437,6 +1481,7 @@ func _launch_competitor_generation(competitor: Dictionary):
 		history.pop_back()
 	competitor["history"] = history
 	_clear_competitor_sourcing(competitor)
+	RIVAL_LIFE.roll_generation_fortune(competitor, rng)
 
 func _configure_competitor_product(competitor: Dictionary, initial: bool):
 	# Les notes des CPU du joueur sont relatives au procédé de leur époque ; celles des
@@ -1587,6 +1632,8 @@ func cpu_competitor_public_profiles() -> Array:
 			"recent_public_action":str(competitor.get("ai_public_action", "")),
 			"technology_partner":str(competitor.get("ai_supplier_name", "")) if bool(competitor.get("ai_supplier_public", false)) else str(competitor.get("public_generation_partner", "")),
 			"public_b2b_customer":_active_competitor_b2b_customer(competitor),
+			# Lot F1 : ce que la presse sait de sa santé (génération ratée, pertes, difficultés).
+			"health":RIVAL_LIFE.health_label(competitor),
 			"metrics":{
 				"performance":float(metrics.get("performance", 50.0)),
 				"efficiency":float(metrics.get("efficiency", 50.0)),
@@ -2497,6 +2544,7 @@ func process_month(products: Array):
 	_advance_market_threats()
 	_advance_attacks()
 	_advance_competitors()
+	RIVAL_LIFE.process_month()
 	_update_market_opportunities()
 	_update_tenders()
 	_maybe_spawn_market_threat()
@@ -2520,6 +2568,14 @@ func get_state() -> Dictionary:
 		"attacks":attacks,
 		"next_attack_id":_next_attack_id,
 		"attack_advice_snooze_until":attack_advice_snooze_until,
+		"rival_offers":rival_offers,
+		"acquisitions":acquisitions,
+		"acquisition_boosts":acquisition_boosts,
+		"corporate_log":corporate_log,
+		"offer_snooze":offer_snooze,
+		"next_offer_id":_next_offer_id,
+		"last_healthy_offer_age":last_healthy_offer_age,
+		"last_entrant_age":last_entrant_age,
 		"rng_seed":SaveCodec.int64_to_json(rng.seed),
 		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
@@ -2609,6 +2665,15 @@ func load_state(state: Dictionary):
 	attacks = (state.get("attacks", []) as Array).duplicate(true)
 	_next_attack_id = int(state.get("next_attack_id", attacks.size() + 1))
 	attack_advice_snooze_until = int(state.get("attack_advice_snooze_until", 0))
+	rival_offers = (state.get("rival_offers", []) as Array).duplicate(true)
+	acquisitions = (state.get("acquisitions", []) as Array).duplicate(true)
+	acquisition_boosts = (state.get("acquisition_boosts", []) as Array).duplicate(true)
+	corporate_log = (state.get("corporate_log", []) as Array).duplicate(true)
+	offer_snooze = (state.get("offer_snooze", {}) as Dictionary).duplicate(true)
+	_next_offer_id = int(state.get("next_offer_id", rival_offers.size() + 1))
+	# Anciennes parties : pas de rafale d'offres ni d'entrants au chargement.
+	last_healthy_offer_age = int(state.get("last_healthy_offer_age", market_age_months))
+	last_entrant_age = int(state.get("last_entrant_age", market_age_months))
 	_next_threat_id = int(state.get("next_threat_id", market_threats.size() + 1))
 	_last_threat_market_age = int(state.get("last_threat_market_age", maxi(market_age_months - 36, 0)))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "43021"), 43021)

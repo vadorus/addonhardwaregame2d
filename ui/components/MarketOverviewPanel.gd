@@ -118,6 +118,10 @@ func _refresh_cards() -> void:
 	for competitor_value in MarketManager.cpu_competitor_public_profiles():
 		var competitor: Dictionary = competitor_value
 		var extra: Array[String] = []
+		# Lot F1 : santé du rival (génération ratée, difficultés) - c'est là que naissent les rachats.
+		var health := str(competitor.get("health", ""))
+		if health != "":
+			extra.append("État : %s" % health)
 		for key_label in [["technology_partner", "Partenaire"], ["public_b2b_customer", "Client B2B"], ["recent_public_action", "Récemment"]]:
 			var value := str(competitor.get(str(key_label[0]), ""))
 			if value != "":

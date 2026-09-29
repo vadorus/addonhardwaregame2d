@@ -199,6 +199,13 @@ func options_for(value: Dictionary) -> Array:
 			options.append(_paid("Lancer l'offensive", "%d mois de pression commerciale sur le rival." % MarketManager.ATTACK_MONTHS, "RIVAL_ATTACK", MarketManager.attack_cost(), true))
 			options.append(_free("Voir le produit", "Ouvre Produits › Vendre.", "DETAIL"))
 			options.append(_free("Pas maintenant", "Nora n'en reparlera pas avant 12 mois.", "RIVAL_LATER"))
+		"RACHAT":
+			var offer: Dictionary = MarketManager.RIVAL_LIFE.get_offer(sid)
+			if not offer.is_empty():
+				options.append(_paid("Racheter %s" % str(offer.get("company", "")),
+					"Ses clients vous rejoignent pendant 2 ans, une partie de ses ingénieurs aussi, et le rival disparaît.",
+					"ACQUIRE", int(offer.get("price", 0)), str(offer.get("kind", "")) == "FRAGILE"))
+				options.append(_free("Laisser passer", "Nora n'en reparlera pas avant 18 mois. Un rival pourrait le reprendre.", "ACQUIRE_DECLINE"))
 		"CONTRAT":
 			options.append(_free("Préparer une offre", "Choisir le CPU et le prix dans Marché.", "DETAIL", true))
 			options.append(_free("Laisser passer cet appel d'offres", "Nora ne vous en reparlera plus.", "TENDER_IGNORE"))
@@ -277,6 +284,13 @@ func choose(action: String) -> bool:
 			var parts := sid.split("|")
 			ok = parts.size() == 2 and MarketManager.attack_rival(parts[0], parts[1])
 			message = "Offensive lancée : le rival va réagir." if ok else "Offensive impossible (trésorerie ou rival introuvable)."
+		"ACQUIRE":
+			var company := str(MarketManager.RIVAL_LIFE.get_offer(sid).get("company", "la société"))
+			ok = MarketManager.RIVAL_LIFE.accept_offer(sid)
+			message = "Rachat de %s conclu : ses clients et une partie de ses ingénieurs vous rejoignent." % company if ok else "Rachat impossible (trésorerie ou offre expirée)."
+		"ACQUIRE_DECLINE":
+			ok = MarketManager.RIVAL_LIFE.decline_offer(sid)
+			message = "Offre déclinée : Nora n'en reparlera pas avant 18 mois."
 		"RIVAL_LATER":
 			MarketManager.snooze_attack_advice(12)
 			ok = true

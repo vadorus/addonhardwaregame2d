@@ -814,6 +814,22 @@ func get_ceo_decisions() -> Array:
 			"target_tab":4,
 			"can_defer":true
 		})
+	# Lot F1 : Nora a trouvé une société à racheter (rival en difficulté à prix cassé, ou rival sain au prix fort).
+	var offer: Dictionary = MarketManager.RIVAL_LIFE.open_offer()
+	if not offer.is_empty():
+		var fragile := str(offer.get("kind", "")) == "FRAGILE"
+		decisions.append({
+			"id":"RACHAT:%s" % str(offer.get("id", "")),
+			"category":"RACHAT",
+			"severity":58.0 if fragile else 42.0,
+			"title":"Nora : racheter %s ?" % str(offer.get("company", "")),
+			"text":("%s perd de l'argent depuis des mois. Ses actionnaires cèdent la société pour %s € ; l'offre tient encore %d mois." if fragile
+				else "%s est en bonne santé, mais ses actionnaires accepteraient %s €. L'offre tient encore %d mois.") % [
+				str(offer.get("company", "")), _group_digits(int(offer.get("price", 0))), int(offer.get("months_left", 0))],
+			"recommendation":"Vous récupérez ses clients sur le marché %s pendant 2 ans (+25 %% de demande), une partie de son savoir-faire, et un concurrent de moins. Sinon, un rival pourrait le reprendre." % MarketManager.segment_label(str(offer.get("segment", ""))),
+			"target_tab":5,
+			"can_defer":true
+		})
 	if GarageBusiness.loan_offer_pending():
 		decisions.append({
 			"id":"FINANCE:LOAN",
