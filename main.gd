@@ -446,6 +446,7 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 	if CompanyManager.created and context == "NOUVEAU_CPU":
 		open_cpu_stepper()
 		return
+	tab_index = _tab_for_context(tab_index, context)
 	var before := tabs.current_tab if tabs != null else -1
 	_show_tab(tab_index)
 	# Écrans découpés en sous-pages : on ouvre directement la bonne.
@@ -463,6 +464,13 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		products_screen.call_deferred("focus_product_launch")
 		return
 	# V0.9 : plus de message « X ouvert » : il restait affiché une fois revenu au garage.
+
+## Lot A (29/09) : le SAV n'existe plus qu'en Produits › SAV (il était aussi dans Marché).
+## Les anciennes décisions et repères qui visent l'onglet Marché pour un dossier SAV y sont redirigés.
+func _tab_for_context(tab_index: int, context: String) -> int:
+	if context == "SAV" and tab_index == 5:
+		return 4
+	return tab_index
 
 func _create_company_tab():
 	var company_script: Script = load("res://ui/screens/CompanyScreen.gd")
@@ -2183,13 +2191,32 @@ func _refresh_navigation_progression():
 		if not ExecutiveManager.is_interface_feature_unlocked(current_feature):
 			tabs.current_tab = 0
 	_update_nav_state()
-	if not newly_unlocked.is_empty() and status_label != null:
-		var labels: Array[String] = []
-		for feature_value in newly_unlocked:
-			labels.append(str(ExecutiveManager.interface_feature_info(str(feature_value)).get("label", feature_value)))
-		status_label.text = "Nora : nouvelle fonction disponible — %s." % ", ".join(labels)
-		notify("Nouvelle fonction disponible : %s" % ", ".join(labels), "unlock")
-		SoundManager.play("unlock")
+	for feature_value in newly_unlocked:
+		var label := str(ExecutiveManager.interface_feature_info(str(feature_value)).get("label", feature_value))
+		if label not in _pending_unlock_labels:
+			_pending_unlock_labels.append(label)
+	_flush_unlock_notice()
+
+## Lot A (29/09) : pendant un lancement (révélation des tests, grand moment), les annonces
+## « nouvelle fonction » attendent : le joueur vit un moment à la fois.
+var _pending_unlock_labels: Array[String] = []
+
+func _big_moment_active() -> bool:
+	if not _pending_reviews.is_empty():
+		return true
+	for layer in [launch_layer, review_layer, research_event_layer, first_cpu_workshop, setup_layer, dialogue_layer]:
+		if layer != null and layer.visible:
+			return true
+	return false
+
+func _flush_unlock_notice() -> void:
+	if _pending_unlock_labels.is_empty() or status_label == null or _big_moment_active():
+		return
+	var labels := ", ".join(_pending_unlock_labels)
+	_pending_unlock_labels.clear()
+	status_label.text = "Nora : nouvelle fonction disponible — %s." % labels
+	notify("Nouvelle fonction disponible : %s" % labels, "unlock")
+	SoundManager.play("unlock")
 
 func _apply_research_plan():
 	var allocations := {}
@@ -2787,7 +2814,12 @@ func _on_news_changed() -> void:
 	SoundManager.play("notify")
 
 func _on_decision_raised(title: String, tab: int) -> void:
-	notify("Décision requise : %s" % title, "alert", tab)
+	# Lot A : une seule carte « À faire (n) », n = décisions réellement en attente.
+	var pending := ExecutiveManager.get_ceo_decisions().size() if CompanyManager.created else 0
+	if pending > 1:
+		notify("À faire (%d) — dernière : %s" % [pending, title], "alert", tab)
+	else:
+		notify("Décision requise : %s" % title, "alert", tab)
 	SoundManager.play("decision")
 
 func _build_review_layer() -> void:
@@ -2837,6 +2869,7 @@ func _close_review_reveal() -> void:
 	if _review_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
 		TimeManager.time_scale = _review_resume_scale
 	_show_pending_reviews()
+	_flush_unlock_notice()
 
 # --- Décision du PDG traitée sur place (correctif trouvé sur Pixel) ------------------
 # « Traiter : Décider des locaux » ouvrait l'onglet Entreprise tout en haut : la décision
@@ -2996,6 +3029,7 @@ func _on_ceo_decision_detail(tab_index: int) -> void:
 	# Le joueur veut lire le dossier complet : on l'y emmène, le temps reste en pause.
 	var category := str((ceo_panel.get("decision") as Dictionary).get("category", ""))
 	close_ceo_decision(false)
+	tab_index = _tab_for_context(tab_index, category)
 	_show_tab(tab_index)
 	var screen: Control = tabs.get_current_tab_control()
 	if screen != null and screen.has_method("show_section_for_context"):

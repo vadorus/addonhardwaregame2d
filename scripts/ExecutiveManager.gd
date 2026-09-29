@@ -65,7 +65,12 @@ var interface_unlocks := {
 	"TEAM":false,
 	"PRODUCTS":false,
 	"MARKET":false,
-	"PRESS":false
+	"PRESS":false,
+	# Lot A (29/09) : les sous-pages d'Entreprise s'ouvrent une à une (au lieu de 5 d'un coup au mois 2).
+	"CO_WORKPLACE":false,
+	"CO_BUDGETS":false,
+	"CO_DIVISIONS":false,
+	"CO_GROUP":false
 }
 var unlock_history: Array = []
 
@@ -82,7 +87,11 @@ func reset():
 		"TEAM":false,
 		"PRODUCTS":false,
 		"MARKET":false,
-		"PRESS":false
+		"PRESS":false,
+		"CO_WORKPLACE":false,
+		"CO_BUDGETS":false,
+		"CO_DIVISIONS":false,
+		"CO_GROUP":false
 	}
 	unlock_history = []
 	executive_changed.emit()
@@ -126,6 +135,16 @@ func sync_interface_unlocks() -> Array:
 		"MARKET":has_launched_product,
 		"PRESS":has_public_product_feedback or has_market_history
 	}
+	# Sous-pages d'Entreprise : chacune arrive quand elle devient utile.
+	var company_open := is_interface_feature_unlocked("COMPANY") or bool(rules["COMPANY"])
+	var staff_count := PersonnelManager.staff.size()
+	if company_open:
+		rules["CO_WORKPLACE"] = staff_count >= 4 or not get_open_hr_issues().is_empty() \
+			or int(workplace.get("tier", 0)) > 0 or int(workplace.get("upgrade_reminder_at", -1)) >= 0 \
+			or months_operated >= 6 or bool(workplace_upgrade_recommendation().get("recommended", false))
+		rules["CO_BUDGETS"] = has_launched_product or months_operated >= 24
+		rules["CO_DIVISIONS"] = staff_count >= 10 or DivisionManager.get_active_division_keys().size() >= 2
+		rules["CO_GROUP"] = Economy.money >= 5000000 or not CompanyManager.subsidiaries.is_empty()
 	for feature_value in rules.keys():
 		var feature := str(feature_value)
 		if bool(rules[feature]) and not is_interface_feature_unlocked(feature):
@@ -157,13 +176,21 @@ func interface_feature_info(feature: String) -> Dictionary:
 		"TEAM":
 			return {"label":"Équipe","message":"Le projet est lancé : les compétences et l'organisation humaine ont maintenant un impact concret."}
 		"COMPANY":
-			return {"label":"Entreprise","message":"Après vos premiers mois, budgets, avantages, locaux et conseil financier deviennent utiles."}
+			return {"label":"Entreprise","message":"Un aperçu de votre entreprise : réputation, notoriété et conseil de Nora. Locaux, budgets et divisions s'ouvriront au fil de la croissance."}
 		"PRODUCTS":
 			return {"label":"Production & Produits","message":"Votre CPU quitte le laboratoire : industrialisation, binning et préparation commerciale entrent en jeu."}
 		"MARKET":
-			return {"label":"Marché","message":"Votre premier CPU est vendu : concurrence, demande, contrats et SAV deviennent visibles."}
+			return {"label":"Marché","message":"Votre premier CPU est vendu : concurrence, demande et contrats deviennent visibles."}
 		"PRESS":
 			return {"label":"Presse","message":"Le marché commence à parler de vous. Les avis et événements publics comptent désormais."}
+		"CO_WORKPLACE":
+			return {"label":"Entreprise › Locaux & RH","message":"L'équipe grandit : locaux, avantages et dossiers RH méritent votre attention."}
+		"CO_BUDGETS":
+			return {"label":"Entreprise › Budgets","message":"Votre CPU est en vente : marketing, R&D et fonctionnement ont maintenant un budget à piloter."}
+		"CO_DIVISIONS":
+			return {"label":"Entreprise › Divisions","message":"Dix personnes : il est temps d'organiser l'entreprise en divisions avec leurs responsables."}
+		"CO_GROUP":
+			return {"label":"Entreprise › Groupe","message":"Votre trésorerie permet de voir plus grand : filiales et nouveaux secteurs."}
 	return {"label":feature,"message":""}
 
 func next_interface_unlock_hint() -> Dictionary:
@@ -657,18 +684,22 @@ func get_ceo_decisions() -> Array:
 			var hurting := float(case_data.get("severity", 0.0)) >= 55.0 and float(case_data.get("last_return_rate", 0.0)) >= 0.035
 			if not hurting or bool(case_data.get("warranty_active", false)):
 				continue
+		# Lot A (29/09) : un dossier ordinaire (gravité < 60) n'est plus une « crise » qui bloque
+		# le temps juste après un lancement ; seule une vraie crise exige une réponse immédiate.
+		var sav_severity := float(case_data.get("severity", 55.0))
+		var is_crisis := sav_severity >= 60.0
 		decisions.append({
 			"id":"SAV:%s" % str(case_data.get("id", "")),
 			"category":"SAV",
-			"severity":float(case_data.get("severity", 55.0)),
-			"title":"Crise SAV — %s" % str(case_data.get("product_name", "Produit")),
+			"severity":sav_severity,
+			"title":"%s — %s" % ["Crise SAV" if is_crisis else "Dossier SAV", str(case_data.get("product_name", "Produit"))],
 			"text":"%s • gravité %.0f/100" % [
 				AfterSalesManager.issue_label(str(case_data.get("issue_type", ""))),
 				float(case_data.get("severity", 0.0))
 			],
 			"recommendation":"Diagnostiquez, surveillez ou engagez une action corrective selon les éléments disponibles.",
-			"target_tab":5,
-			"can_defer":false
+			"target_tab":4,
+			"can_defer":not is_crisis
 		})
 
 	for product_value in ProductManager.products:
@@ -937,12 +968,20 @@ func load_state(state: Dictionary):
 		"TEAM":false,
 		"PRODUCTS":false,
 		"MARKET":false,
-		"PRESS":false
+		"PRESS":false,
+		"CO_WORKPLACE":false,
+		"CO_BUDGETS":false,
+		"CO_DIVISIONS":false,
+		"CO_GROUP":false
 	}
 	var saved_unlocks = state.get("interface_unlocks", {})
 	if typeof(saved_unlocks) == TYPE_DICTIONARY:
 		for feature in interface_unlocks.keys():
 			interface_unlocks[feature] = bool(saved_unlocks.get(feature, interface_unlocks[feature]))
+		# Sauvegarde d'avant le lot A : le joueur avait déjà toutes les sous-pages d'Entreprise.
+		if not saved_unlocks.has("CO_WORKPLACE") and bool(saved_unlocks.get("COMPANY", false)):
+			for feature in ["CO_WORKPLACE", "CO_BUDGETS", "CO_DIVISIONS", "CO_GROUP"]:
+				interface_unlocks[feature] = true
 	interface_unlocks["QG"] = true
 	interface_unlocks["LAB"] = true
 	unlock_history = state.get("unlock_history", []).duplicate(true)

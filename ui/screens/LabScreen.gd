@@ -577,7 +577,9 @@ func _build() -> void:
 	projects_card.visible = false
 	projects_page.add_child(projects_card)
 
-	var patents_page: VBoxContainer = pager.call("add_page", "PATENTS", "Brevets")
+	# Lot A (29/09) : la sous-page Brevets n'était qu'une coquille. Un brevet naît d'une découverte :
+	# il vit maintenant en bas de Recherche, avec ses boutons visibles seulement quand ils servent.
+	research_page.add_child(_section("Brevets"))
 	var patent_card := _card(APP_SHELL, 12, 12)
 	var patent_box := VBoxContainer.new()
 	patent_card.add_child(patent_box)
@@ -585,15 +587,15 @@ func _build() -> void:
 	patent_box.add_child(patents_label)
 	var patent_actions := HFlowContainer.new()
 	patent_box.add_child(patent_actions)
-	var file_pat := Button.new()
-	file_pat.text = "Déposer le premier brevet candidat (8 000 €)"
-	file_pat.pressed.connect(func(): _emit_action("file_patent"))
-	patent_actions.add_child(file_pat)
-	var license_pat := Button.new()
-	license_pat.text = "Activer / désactiver la licence"
-	license_pat.pressed.connect(func(): _emit_action("toggle_patent_license"))
-	patent_actions.add_child(license_pat)
-	patents_page.add_child(patent_card)
+	patent_file_button = Button.new()
+	patent_file_button.text = "Déposer le premier brevet candidat (8 000 €)"
+	patent_file_button.pressed.connect(func(): _emit_action("file_patent"))
+	patent_actions.add_child(patent_file_button)
+	patent_license_button = Button.new()
+	patent_license_button.text = "Activer / désactiver la licence"
+	patent_license_button.pressed.connect(func(): _emit_action("toggle_patent_license"))
+	patent_actions.add_child(patent_license_button)
+	research_page.add_child(patent_card)
 	pager.call("show_page", "NEW")
 
 	lab_reference_design = CPU_DESIGN.default_design()
@@ -615,13 +617,15 @@ func show_section_for_context(context: String) -> void:
 		"PROJECT_DECISION", "Projets":
 			show_section("PROJECTS")
 		"Brevets":
-			show_section("PATENTS")
+			show_section("RESEARCH")
 		"Établi CPU", "Réglages avancés":
 			show_section("NEW")
 			set_expert_form_open(true)
 
 var expert_box: VBoxContainer
 var expert_toggle: Button
+var patent_file_button: Button
+var patent_license_button: Button
 
 func set_expert_form_open(open: bool) -> void:
 	if expert_box == null:
@@ -888,6 +892,10 @@ func refresh_research_content() -> void:
 			"licencié" if bool(patent.get("licensed", false)) else "exclusif"
 		])
 	patents_label.text = "\n".join(patent_lines) if not patent_lines.is_empty() else "Aucun brevet. Les architectures les plus innovantes peuvent générer des inventions brevetables."
+	if patent_file_button != null:
+		patent_file_button.visible = not PatentManager.candidates.is_empty()
+	if patent_license_button != null:
+		patent_license_button.visible = not PatentManager.patents.is_empty()
 
 func _register_depth_node(node: Control, depth: String) -> void:
 	if node == null:

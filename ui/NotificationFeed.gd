@@ -16,9 +16,16 @@ func _ready() -> void:
 	add_theme_constant_override("separation", 6)
 	z_index = 50
 
+var _serial := 0
+
 func push(text: String, kind: String = "info", tab: int = -1) -> Control:
 	if text.strip_edges() == "":
 		return null
+	# Lot A (29/09) : les décisions ne s'empilent plus en 3 bulles rouges ; une seule carte « À faire (n) ».
+	if kind == "alert":
+		for child in get_children():
+			if str(child.get_meta("kind", "")) == "alert" and child.get_meta("dismissing", false) == false:
+				return _merge_alert(child, text, tab)
 	while get_child_count() >= MAX_VISIBLE:
 		var oldest := get_child(0)
 		remove_child(oldest)
@@ -41,6 +48,7 @@ func push(text: String, kind: String = "info", tab: int = -1) -> Control:
 	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if tab >= 0 else Control.CURSOR_ARROW
 	card.set_meta("kind", kind)
 	card.set_meta("tab", tab)
+	card.set_meta("count", 1)
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -53,10 +61,39 @@ func push(text: String, kind: String = "info", tab: int = -1) -> Control:
 	card.gui_input.connect(_on_card_input.bind(card))
 	add_child(card)
 	JUICE.fade_in(card, 0.22) # fondu seulement : le conteneur gère la position des cartes
+	_arm_timer(card)
+	return card
+
+func _arm_timer(card: Control) -> void:
+	_serial += 1
+	card.set_meta("serial", _serial)
 	if is_inside_tree():
 		var timer := get_tree().create_timer(LIFETIME)
-		timer.timeout.connect(_dismiss.bind(card))
+		timer.timeout.connect(_dismiss_if_current.bind(card, _serial))
+
+func _merge_alert(card: Control, text: String, tab: int) -> Control:
+	var count := int(card.get_meta("count", 1)) + 1
+	card.set_meta("count", count)
+	if tab >= 0:
+		card.set_meta("tab", tab)
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var label := card.get_child(0) as Label
+	if label != null:
+		if text.begins_with("À faire"):
+			label.text = text # le jeu connaît le vrai nombre de décisions en attente
+		else:
+			label.text = "À faire (%d) — dernière : %s" % [count, text.trim_prefix("Décision requise : ")]
+	# La carte reste le temps de lire la nouvelle entrée.
+	_arm_timer(card)
 	return card
+
+func _dismiss_if_current(card, serial: int) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	if int(card.get_meta("serial", -1)) != serial:
+		return
+	_dismiss(card)
 
 func toast_count() -> int:
 	return get_child_count()
@@ -87,6 +124,7 @@ func _dismiss(card) -> void:
 	# Non typé : la carte a pu être retirée (plus ancienne) avant la fin de son minuteur.
 	if card == null or not is_instance_valid(card) or card.get_parent() != self:
 		return
+	card.set_meta("dismissing", true)
 	var tween: Tween = card.create_tween()
 	tween.tween_property(card, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(func():

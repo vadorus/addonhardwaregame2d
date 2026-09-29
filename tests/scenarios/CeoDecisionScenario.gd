@@ -155,11 +155,14 @@ static func _run_in_game(game: Control) -> String:
 	game.call("_on_dashboard_navigation", 3, "Réglages avancés")
 	if str(lab.call("current_section")) != "NEW":
 		return "Lab: the workbench should open the Nouveau CPU sub-page"
-	var market: Control = game.get("market_screen")
+	# Lot A : le SAV n'existe plus qu'en Produits › SAV ; un ancien repère « Marché + SAV » y mène.
+	var products: Control = game.get("products_screen")
 	game.call("_on_dashboard_navigation", 5, "SAV")
-	# (l'onglet Marché peut être encore verrouillé en début de partie)
-	if tabs.current_tab == 5 and str(market.call("current_section")) != "SAV":
-		return "Market: SAV context should open the SAV sub-page"
+	if tabs.current_tab == 5:
+		return "SAV context should no longer open the Market tab"
+	# (l'onglet Produits peut être encore verrouillé en début de partie)
+	if tabs.current_tab == 4 and str(products.call("current_section")) != "SUPPORT":
+		return "Products: SAV context should open the SAV stage"
 	game.call("_show_tab", 0)
 
 	# Une partie chargée repart en pause, même sauvegardée en ×3.

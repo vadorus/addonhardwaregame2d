@@ -402,8 +402,32 @@ func _install_pages(box: VBoxContainer) -> void:
 		{"key":"GROUP", "label":"Groupe", "start":_child_with_text(box, "Groupe / filiales")},
 	])
 
+const PAGE_UNLOCKS := [
+	["WORKPLACE", "CO_WORKPLACE", "Locaux & RH quand l'équipe grandit"],
+	["BUDGETS", "CO_BUDGETS", "Budgets après votre premier lancement"],
+	["DIVISIONS", "CO_DIVISIONS", "Divisions à 10 salariés"],
+	["GROUP", "CO_GROUP", "Groupe à 5 M€ de trésorerie"],
+]
+
+## Lot A (29/09) : l'Entreprise s'ouvrait avec 5 sous-pages au mois 2. Elles arrivent maintenant une à une.
+func _refresh_page_unlocks() -> void:
+	if pager == null:
+		return
+	var upcoming: Array[String] = []
+	for entry_value in PAGE_UNLOCKS:
+		var entry: Array = entry_value
+		var open := ExecutiveManager.is_interface_feature_unlocked(str(entry[1]))
+		# Page ouverte par une décision : elle reste visible tant que le joueur la consulte.
+		var shown := open or str(pager.get("current")) == str(entry[0])
+		pager.call("set_page_available", str(entry[0]), shown)
+		if not open and upcoming.size() < 2:
+			upcoming.append(str(entry[2]))
+	pager.call("set_hint", "Plus tard : %s." % ", ".join(upcoming) if not upcoming.is_empty() else "")
+
 func show_section(key: String) -> void:
 	if pager != null:
+		# Une décision peut viser une page encore cachée : on l'ouvre plutôt que de laisser le joueur perdu.
+		pager.call("set_page_available", key, true)
 		pager.call("show_page", key)
 
 func current_section() -> String:
@@ -423,6 +447,7 @@ func show_section_for_context(context: String) -> void:
 func refresh() -> void:
 	if company_rep_label == null or not CompanyManager.created:
 		return
+	_refresh_page_unlocks()
 	_refresh_reputation_bars()
 
 	var brief := ExecutiveManager.get_executive_brief()

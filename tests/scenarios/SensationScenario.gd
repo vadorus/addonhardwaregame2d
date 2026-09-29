@@ -35,6 +35,14 @@ static func run(host: Node) -> String:
 	if str(texts.back()) != "Notification 5":
 		feed.queue_free()
 		return "Newest notification is not shown last"
+	# Lot A : trois décisions d'affilée = une seule carte « À faire (3) ».
+	feed.call("clear")
+	for title in ["Lancer Nova 1 ?", "Premier retour marché", "Crise SAV"]:
+		feed.call("push", "Décision requise : %s" % title, "alert", 4)
+	var alert_texts: Array = feed.call("toast_texts")
+	if alert_texts.size() != 1 or not str(alert_texts[0]).begins_with("À faire (3)"):
+		feed.queue_free()
+		return "Decisions should merge into one « À faire (n) » card (got %s)" % str(alert_texts)
 	feed.queue_free()
 
 	# Révélation des notes : une carte par média, moyenne et verdict.

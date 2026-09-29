@@ -89,6 +89,39 @@ func add_page(key: String, label: String) -> VBoxContainer:
 	_buttons[key] = button
 	return new_page
 
+## Lot A (29/09) : une sous-page peut rester cachée tant qu'elle n'est pas utile (déblocage progressif).
+## La page reste joignable par show_page (une décision peut y mener), seule la pastille disparaît.
+func set_page_available(key: String, available: bool) -> void:
+	if not _buttons.has(key):
+		return
+	(_buttons[key] as Button).visible = available
+	var visible_count := 0
+	for other in _order:
+		if (_buttons[other] as Button).visible:
+			visible_count += 1
+	# Une seule pastille ne sert à rien : on cache la rangée.
+	_row.visible = visible_count > 1
+	if not available and current == key:
+		for other in _order:
+			if (_buttons[other] as Button).visible:
+				show_page(str(other))
+				return
+
+func is_page_available(key: String) -> bool:
+	return _buttons.has(key) and (_buttons[key] as Button).visible
+
+var _hint_label: Label
+
+## Petite ligne sous les pastilles (« Plus tard : Budgets après votre premier lancement… »).
+func set_hint(text: String) -> void:
+	if _hint_label == null:
+		_hint_label = UI.muted_label("", 11)
+		_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		add_child(_hint_label)
+		move_child(_hint_label, _row.get_index() + 1)
+	_hint_label.text = text
+	_hint_label.visible = text != ""
+
 func get_page(key: String) -> VBoxContainer:
 	return _pages.get(key)
 

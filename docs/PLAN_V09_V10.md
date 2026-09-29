@@ -46,7 +46,7 @@ UX_ART_DIRECTION, décisions d'Alexandre) à **ce qu'on a vu** (revue de tous le
 Chaque lot se termine par : smoke test vert, sonde de progression (`progression_probe`) relancée,
 build Android installé sur le Pixel, commit + push, note dans `docs/reviews/`.
 
-### Lot A — Nettoyage et lisibilité (petit, 1 session)
+### Lot A — Nettoyage et lisibilité (petit, 1 session) — ✅ fait le 29/09 (`docs/reviews/V09_LOT_A_NETTOYAGE.md`)
 
 But : moins d'écrans en double, une seule chose à regarder à la fois.
 - Supprimer Produits › Concevoir (le Labo suffit) → Produits = Fabriquer / Vendre / Supporter.

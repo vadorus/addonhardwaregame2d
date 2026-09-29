@@ -7,8 +7,7 @@ const UI := preload("res://ui/UiKit.gd")
 var mode_grid: GridContainer
 var mode_buttons := {}
 var pages := {}
-var current_mode := "DESIGN"
-var design_status_label: Label
+var current_mode := "BUILD"
 var industrialization_panel: Control
 var lifecycle_panel: Control
 var after_sales_panel: Control
@@ -21,36 +20,47 @@ func _ready() -> void:
 	_build()
 	UI.configure_touch_scroll(self)
 	UI.prepare_touch_scroll_children(self)
-	_select_mode("DESIGN")
+	_select_mode(_default_mode())
 	refresh()
+
+## Premier affichage : Vendre dès qu'un CPU existe, sinon Fabriquer.
+func _default_mode() -> String:
+	return "SELL" if not ProductManager.products.is_empty() else "BUILD"
+
+func show_section_for_context(context: String) -> void:
+	match context:
+		"SAV", "Supporter":
+			focus_support()
+		"PRODUCTION", "Fabriquer", "Stock & production":
+			_select_mode("BUILD")
+		"PRODUCT_LAUNCH", "Vendre":
+			_select_mode("SELL")
+
+func current_section() -> String:
+	return current_mode
 
 func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
 	box.add_child(UI.eyebrow("COCKPIT PRODUIT"))
-	box.add_child(UI.label("Un produit, quatre responsabilités", 24))
+	box.add_child(UI.label("Fabriquer, vendre, suivre", 24))
 	var intro := UI.muted_label(
-		"Concevez, industrialisez, vendez puis supportez la même génération sans perdre son histoire.",
+		"La conception se fait au Laboratoire. Ici, vos CPU sortent de l'usine, trouvent leurs clients et sont suivis après la vente.",
 		12
 	)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(intro)
 
+	# Lot A (29/09) : « Concevoir » ne faisait que renvoyer au Labo, et le SAV existait aussi dans
+	# Marché. Le cockpit garde trois étapes ; le SAV n'existe plus qu'ici.
 	mode_grid = GridContainer.new()
-	mode_grid.columns = 4
+	mode_grid.columns = 3
 	mode_grid.add_theme_constant_override("h_separation", 8)
 	mode_grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_grid)
-	_add_mode_button("DESIGN", "1  CONCEVOIR")
-	_add_mode_button("BUILD", "2  FABRIQUER")
-	_add_mode_button("SELL", "3  VENDRE")
-	_add_mode_button("SUPPORT", "4  SUPPORTER")
-
-	var design_page := VBoxContainer.new()
-	design_page.add_theme_constant_override("separation", 10)
-	box.add_child(design_page)
-	pages["DESIGN"] = design_page
-	_build_design_page(design_page)
+	_add_mode_button("BUILD", "1  FABRIQUER")
+	_add_mode_button("SELL", "2  VENDRE")
+	_add_mode_button("SUPPORT", "3  SAV")
 
 	var industrialization_script: Script = load("res://ui/components/IndustrializationPanel.gd")
 	industrialization_panel = industrialization_script.new() as Control
@@ -79,29 +89,6 @@ func _add_mode_button(mode: String, title: String) -> void:
 	mode_grid.add_child(button)
 	mode_buttons[mode] = button
 
-func _build_design_page(page: VBoxContainer) -> void:
-	page.add_child(UI.section("Concevoir la prochaine génération"))
-	var card := UI.card(UI.APP_PANEL_ALT, 12, 14)
-	page.add_child(card)
-	var card_box := VBoxContainer.new()
-	card_box.add_theme_constant_override("separation", 8)
-	card.add_child(card_box)
-	card_box.add_child(UI.eyebrow("DU BESOIN AU PROTOTYPE"))
-	var copy := UI.muted_label(
-		"Le cockpit garde l'histoire du produit. Les réglages techniques détaillés restent dans le laboratoire, tandis qu'ici vous suivez la génération de bout en bout.",
-		12
-	)
-	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card_box.add_child(copy)
-	design_status_label = UI.rich_label()
-	design_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card_box.add_child(design_status_label)
-	var open_lab := Button.new()
-	open_lab.text = "Ouvrir le laboratoire CPU"
-	open_lab.custom_minimum_size.y = 44
-	open_lab.pressed.connect(func(): action_requested.emit("open_lab", {}))
-	card_box.add_child(open_lab)
-
 func _select_mode(mode: String) -> void:
 	current_mode = mode
 	for key_value in pages.keys():
@@ -115,14 +102,13 @@ func _select_mode(mode: String) -> void:
 
 func set_viewport_width(width: float) -> void:
 	if mode_grid != null:
-		mode_grid.columns = 2 if width < 760.0 else 4
+		mode_grid.columns = 3
 	if industrialization_panel != null and industrialization_panel.has_method("set_viewport_width"):
 		industrialization_panel.call("set_viewport_width", width)
 	if lifecycle_panel != null and lifecycle_panel.has_method("set_viewport_width"):
 		lifecycle_panel.call("set_viewport_width", width)
 
 func refresh() -> void:
-	_refresh_design_summary()
 	if industrialization_panel != null:
 		industrialization_panel.call("refresh")
 	if lifecycle_panel != null:
@@ -130,23 +116,6 @@ func refresh() -> void:
 	if after_sales_panel != null:
 		after_sales_panel.call("refresh")
 	_refresh_mode_badges()
-
-func _refresh_design_summary() -> void:
-	if design_status_label == null:
-		return
-	# 29/09 : comptait tous les projets de l'histoire (8) au lieu des projets en cours (1).
-	var active_projects := ResearchManager.get_active_development_project_count()
-	var ready_products := 0
-	var launched_products := 0
-	for product_value in ProductManager.products:
-		var product: Dictionary = product_value
-		match str(product.get("status", "")):
-			"READY": ready_products += 1
-			"LAUNCHED": launched_products += 1
-	var open_sav := AfterSalesManager.get_open_cases().size()
-	design_status_label.text = "Projet(s) R&D actif(s) : %d\nPrêts à lancer : %d\nProduits sur le marché : %d\nDossiers SAV ouverts : %d" % [
-		active_projects, ready_products, launched_products, open_sav
-	]
 
 func _refresh_mode_badges() -> void:
 	if mode_buttons.is_empty():
@@ -161,10 +130,9 @@ func _refresh_mode_badges() -> void:
 			launched_products += 1
 	var active_jobs := ProductionManager.get_active_jobs().size()
 	var open_sav := AfterSalesManager.get_open_cases().size()
-	mode_buttons["DESIGN"].text = "1  CONCEVOIR"
-	mode_buttons["BUILD"].text = "2  FABRIQUER%s" % ("  • %d" % active_jobs if active_jobs > 0 else "")
-	mode_buttons["SELL"].text = "3  VENDRE%s" % ("  • %d" % (ready_products + launched_products) if ready_products + launched_products > 0 else "")
-	mode_buttons["SUPPORT"].text = "4  SUPPORTER%s" % ("  • %d" % open_sav if open_sav > 0 else "")
+	mode_buttons["BUILD"].text = "1  FABRIQUER%s" % ("  • %d" % active_jobs if active_jobs > 0 else "")
+	mode_buttons["SELL"].text = "2  VENDRE%s" % ("  • %d" % (ready_products + launched_products) if ready_products + launched_products > 0 else "")
+	mode_buttons["SUPPORT"].text = "3  SAV%s" % ("  • %d" % open_sav if open_sav > 0 else "")
 
 func focus_product_launch() -> void:
 	refresh()
