@@ -771,6 +771,19 @@ func get_ceo_decisions() -> Array:
 			"target_tab":0,
 			"can_defer":true
 		})
+	# Lot E1 : l'équipe de développement propose une correction sur un CPU en vente.
+	var advice: Dictionary = (load("res://scripts/TeamLessons.gd") as Script).call("pending_advice")
+	if not advice.is_empty():
+		decisions.append({
+			"id":"ADVICE:%s:%s" % [str(advice.generation_id), str(advice.type)],
+			"category":"ÉQUIPE",
+			"severity":48.0,
+			"title":"L'équipe propose un %s" % str(advice.label),
+			"text":"Gamme %s : %s." % [str(advice.generation_name), str(advice.reason)],
+			"recommendation":"%s (%d €)." % [str(advice.effect), int(advice.cost)],
+			"target_tab":4,
+			"can_defer":true
+		})
 	if GarageBusiness.loan_offer_pending():
 		decisions.append({
 			"id":"FINANCE:LOAN",

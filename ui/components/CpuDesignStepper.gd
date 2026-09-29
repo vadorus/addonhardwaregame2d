@@ -427,6 +427,7 @@ func _build_architecture_step() -> void:
 		_content.add_child(_architecture_card(locked[0], false))
 
 func _build_goal_step() -> void:
+	_build_lessons_card()
 	_content.add_child(_step_title("Que voulez-vous de ce processeur ?"))
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -485,6 +486,41 @@ func _build_goal_step() -> void:
 		tdp_ratio = 1.3
 	_content.add_child(_stepper_row("Enveloppe électrique", "%d W  (besoin ~%.0f W)" % [tdp_w, ceil(required)], tdp_ratio,
 		func(): _shift_tdp(-1), func(): _shift_tdp(1)))
+
+const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
+
+## Lot E1 : avant de choisir, l'équipe raconte ce qu'elle a appris de la génération précédente
+## (SAV, verdict du marché, presse, point faible face aux rivaux) et propose une correction.
+func _build_lessons_card() -> void:
+	var data: Dictionary = TEAM_LESSONS.lessons(segment)
+	if not bool(data.get("has_data", false)):
+		return
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(Color("eef3e6"), 12, 1, Color("6e8f4e"), 12))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
+	box.add_child(UI.label("Ce que l'équipe a appris de %s" % str(data.get("generation_name", "la génération précédente")), 15))
+	for line_value in data.get("lines", []):
+		var line := UI.muted_label("• " + str(line_value), 13)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(line)
+	var suggested := str(data.get("suggested_profile", ""))
+	if suggested != "" and PROFILES.has(suggested):
+		var follow := Button.new()
+		follow.focus_mode = Control.FOCUS_NONE
+		follow.custom_minimum_size.y = 40
+		var already := profile == suggested
+		follow.text = ("✓ Conseil suivi : %s" if already else "Suivre le conseil de l'équipe : %s") % str(PROFILES[suggested].label)
+		follow.disabled = already
+		follow.pressed.connect(_follow_team_advice.bind(suggested))
+		box.add_child(follow)
+	_content.add_child(card)
+
+func _follow_team_advice(key: String) -> void:
+	profile = key
+	_apply_proposal()
+	_changed(false)
 
 func _build_models_step() -> void:
 	_content.add_child(_step_title("Combien de modèles dans cette génération ?"))

@@ -64,6 +64,10 @@ func _build() -> void:
 	_model_numbers = UI.muted_label("", 13)
 	_model_numbers.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_model_numbers)
+	# Lot E1 : ce que disent les clients, par type de client (selon ce que chacun regarde sur ce marché).
+	_voices_label = UI.rich_label()
+	_voices_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_voices_label)
 
 	product_details_label = UI.rich_label()
 	add_child(_collapsible("Fiche technique complète", product_details_label))
@@ -371,6 +375,15 @@ func _refresh_model_summary(product: Dictionary) -> void:
 		if lost > 0:
 			parts.append("⚠ rupture : %s clients repartis sans CPU le mois dernier (demande %s)" % [UI.money(lost), UI.money(int(product.get("last_month_demand", 0)))])
 	_model_numbers.text = "  •  ".join(parts)
+	if _voices_label != null:
+		_voices_label.visible = status == "LAUNCHED"
+		if status == "LAUNCHED":
+			var voice_lines: Array[String] = ["Ce que disent les clients :"]
+			for voice_value in TEAM_LESSONS.customer_voices(product):
+				var voice: Dictionary = voice_value
+				var mark := "+" if str(voice.mood) == "HAPPY" else ("−" if str(voice.mood) == "UNHAPPY" else "=")
+				voice_lines.append("%s %s : « %s »" % [mark, str(voice.who), str(voice.text)])
+			_voices_label.text = "\n".join(voice_lines)
 	# Lancement : capacité + veille seulement pour un modèle prêt ; prix modifiable en vente.
 	var is_ready := status == "READY"
 	if _capacity_title != null:
@@ -627,6 +640,8 @@ func select_first_ready() -> bool:
 func selected_product_id() -> String:
 	return UI.option_meta(product_select) if product_select.item_count > 0 else ""
 
+const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
+var _voices_label: Label
 var sale_capacity: SpinBox
 var _capacity_apply_button: Button
 

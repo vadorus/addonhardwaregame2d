@@ -2937,7 +2937,7 @@ func open_ceo_decision(decision_id: String) -> bool:
 	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
 		return false
 	# Les dossiers RH et les visites de clients se règlent en parlant à la personne.
-	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:")) and open_dialogue(decision_id):
+	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:") or decision_id.begins_with("ADVICE:")) and open_dialogue(decision_id):
 		return true
 	if not ceo_layer.visible:
 		_ceo_resume_scale = TimeManager.time_scale

@@ -5,6 +5,8 @@ extends RefCounted
 ##
 ## Clés : « HR:<id> », « RND:<id> », « CLIENT:<id> ».
 
+const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
+
 ## Toutes les conversations en attente, avec qui parle.
 static func pending() -> Array:
 	var result: Array = []
@@ -32,6 +34,10 @@ static func pending() -> Array:
 		result.append({"key":"MILESTONE:FIRST_SILICON", "speaker":_dev_speaker()})
 	if not GarageBusiness.first_binning_generation().is_empty():
 		result.append({"key":"MILESTONE:FIRST_BINNING", "speaker":"NORA"})
+	# Lot E1 : l'équipe de développement vient proposer une correction sur un CPU en vente.
+	var advice: Dictionary = TEAM_LESSONS.pending_advice()
+	if not advice.is_empty():
+		result.append({"key":"ADVICE:%s:%s" % [str(advice.generation_id), str(advice.type)], "speaker":_dev_speaker()})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -258,6 +264,19 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
 				{"id":"DECLINE", "label":"Non, on se serre la ceinture.", "hint":"Nora n'en reparle pas avant un an"},
 			]}
+	elif key.begins_with("ADVICE:"):
+		var advice: Dictionary = TEAM_LESSONS.pending_advice()
+		if advice.is_empty() or key != "ADVICE:%s:%s" % [str(advice.generation_id), str(advice.type)]:
+			return {}
+		return {"key":key, "person":_person(_dev_speaker()), "mood":"NEUTRAL", "kicker":"L'ÉQUIPE A UNE IDÉE",
+			"text":"Patron, sur la gamme %s, %s. On peut sortir un %s : %s. On s'y met ?" % [
+				str(advice.generation_name), str(advice.reason), str(advice.label), str(advice.effect)],
+			"note":"Coût : %s € pour %d modèle(s) en vente." % [_money(int(advice.cost)), int(advice.products)],
+			"choices":[
+				{"id":"APPLY", "label":"Vas-y, on corrige.", "hint":"%s • %s €" % [str(advice.effect), _money(int(advice.cost))], "primary":true, "enabled":Economy.can_afford(int(advice.cost))},
+				{"id":"NO", "label":"Non, gardons l'argent.", "hint":"L'équipe ne reviendra pas sur ce point pour cette gamme"},
+				{"id":"LATER", "label":"On en reparle plus tard.", "hint":"Le « ! » reste au-dessus de sa tête"},
+			]}
 	elif key == "MILESTONE:FIRST_SILICON":
 		var project := GarageBusiness.first_silicon_project()
 		if project.is_empty():
@@ -356,6 +375,15 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 		return {"ok":true, "message":"Pas de prêt : chaque euro compte."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
+	if key.begins_with("ADVICE:"):
+		var parts := key.split(":")
+		if parts.size() < 3:
+			return {"ok":false, "message":""}
+		if choice_id == "APPLY":
+			var count: int = TEAM_LESSONS.apply_advice(parts[1], parts[2])
+			return {"ok":count > 0, "message":("Correction lancée sur %d modèle(s)." % count) if count > 0 else "Trésorerie insuffisante pour cette correction."}
+		TEAM_LESSONS.decline_advice(parts[1], parts[2])
+		return {"ok":true, "message":"L'équipe se concentre sur la suite."}
 	if key.begins_with("STUDY:"):
 		var ok := GarageBusiness.accept_study(sid) if choice_id == "SIGN" else GarageBusiness.decline_study(sid)
 		return {"ok":ok, "message":"Contrat signé : l'avance est encaissée." if choice_id == "SIGN" else "Le client repart, sans rancune."}
