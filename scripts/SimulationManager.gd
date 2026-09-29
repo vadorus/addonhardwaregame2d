@@ -25,6 +25,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	MediaManager.reset()
 	ArchitectureManager.reset()
 	GarageBusiness.reset()
+	Objectives.reset()
 
 func process_month_end() -> Dictionary:
 	if is_game_over:
@@ -56,6 +57,7 @@ func process_month_end() -> Dictionary:
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()
 	GarageBusiness.process_month()
+	Objectives.process_month()
 	var report := Economy.close_month()
 	month_processed.emit(report)
 	if Economy.money <= 0:

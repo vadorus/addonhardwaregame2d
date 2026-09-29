@@ -329,6 +329,15 @@ func _build_gameplay_overlays() -> void:
 	_tasks_label.max_lines_visible = 4
 	_tasks_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tasks_box.add_child(_tasks_label)
+	# Lot C : les trois objectifs de Nora (un par piste), sous sa prochaine étape.
+	_objectives_title = Label.new()
+	_objectives_title.text = "OBJECTIFS"
+	_objectives_title.add_theme_font_size_override("font_size", 11)
+	_objectives_title.add_theme_color_override("font_color", Color("9a6a3a"))
+	tasks_box.add_child(_objectives_title)
+	_objectives_box = VBoxContainer.new()
+	_objectives_box.add_theme_constant_override("separation", 2)
+	tasks_box.add_child(_objectives_box)
 	_feedback_panel = PanelContainer.new()
 	_feedback_panel.z_index = 15
 	_feedback_panel.add_theme_stylebox_override("panel", _paper_style())
@@ -957,6 +966,7 @@ func _refresh_gameplay_overlays() -> void:
 
 	if _tasks_label != null:
 		_tasks_label.text = _nora_message()
+	_refresh_objectives()
 
 	if _feedback_label != null:
 		if not MediaManager.news.is_empty():
@@ -970,6 +980,45 @@ func _refresh_gameplay_overlays() -> void:
 			_feedback_label.text = "Le marché ne vous connaît pas encore. Votre premier produit changera ça."
 	_refresh_primary_action()
 	call_deferred("_layout_zones")
+
+var _objectives_title: Label
+var _objectives_box: VBoxContainer
+
+## Objectifs visibles dès que le premier projet existe (la toute première minute reste « une seule action »).
+func _refresh_objectives() -> void:
+	if _objectives_box == null:
+		return
+	var show := CompanyManager.created and not ResearchManager.projects.is_empty()
+	_objectives_title.visible = show
+	_objectives_box.visible = show
+	if _tasks_label != null:
+		_tasks_label.max_lines_visible = 3 if show else 4
+	for child in _objectives_box.get_children():
+		_objectives_box.remove_child(child)
+		child.queue_free()
+	if not show:
+		return
+	_objectives_title.text = "OBJECTIFS  •  %d/%d atteints" % [Objectives.completed_count(), Objectives.total_count()]
+	for objective_value in Objectives.active_objectives():
+		var objective: Dictionary = objective_value
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		row.tooltip_text = "%s\nRécompense : %s" % [str(objective.get("hint", "")), Objectives.reward_label(objective)]
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		var title := Label.new()
+		title.text = "• " + str(objective.get("title", ""))
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.clip_text = true
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title.add_theme_font_size_override("font_size", 12)
+		title.add_theme_color_override("font_color", INK)
+		row.add_child(title)
+		var progress := Label.new()
+		progress.text = Objectives.progress_text(objective)
+		progress.add_theme_font_size_override("font_size", 11)
+		progress.add_theme_color_override("font_color", MUTED)
+		row.add_child(progress)
+		_objectives_box.add_child(row)
 
 func _run_primary_action() -> void:
 	if _primary_action == null or _primary_action.disabled:

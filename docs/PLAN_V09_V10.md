@@ -77,7 +77,7 @@ But : le premier CPU reste le fil rouge, mais le joueur a quelque chose à faire
 Critères : la sonde ne montre plus de trésorerie < 30 k€ sans proposition de levier ; au moins
 2 contrats proposés avant le 1er lancement.
 
-### Lot C — Objectifs de Nora et paliers de locaux (moyen, 2 sessions)
+### Lot C — Objectifs de Nora et paliers de locaux (moyen, 2 sessions) — ✅ fait le 29/09 (`docs/reviews/V09_LOT_C_OBJECTIFS_LOCAUX.md`)
 
 But : le joueur sait toujours quoi viser, et le décor raconte sa progression.
 - 3 objectifs affichés en permanence au QG, choisis selon le moment : « Lancer un 1er CPU »,

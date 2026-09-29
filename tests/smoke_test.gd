@@ -32,6 +32,7 @@ const INVESTMENT_BALANCE_SCENARIO := preload("res://tests/scenarios/InvestmentBa
 const FABRICATION_PAGE_SCENARIO := preload("res://tests/scenarios/FabricationPageScenario.gd")
 const PRODUCTION_CAPACITY_SCENARIO := preload("res://tests/scenarios/ProductionCapacityScenario.gd")
 const GARAGE_BUSINESS_SCENARIO := preload("res://tests/scenarios/GarageBusinessScenario.gd")
+const OBJECTIVES_SCENARIO := preload("res://tests/scenarios/ObjectivesScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1651,6 +1652,10 @@ func _ready() -> void:
 	var business_error := GARAGE_BUSINESS_SCENARIO.run()
 	if business_error != "":
 		_fail(business_error)
+		return
+	var objectives_error := OBJECTIVES_SCENARIO.run()
+	if objectives_error != "":
+		_fail(objectives_error)
 		return
 	var stepper_error := CPU_STEPPER_SCENARIO.run(self)
 	if stepper_error != "":

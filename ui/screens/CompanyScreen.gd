@@ -66,6 +66,14 @@ func _build() -> void:
 	reputation_box.add_theme_constant_override("separation", 8)
 	box.add_child(reputation_box)
 
+	# Lot C : le parcours complet des objectifs de Nora (le QG n'affiche que les trois en cours).
+	box.add_child(UI.section("Objectifs de Nora"))
+	var objectives_card := UI.card(UI.APP_SHELL, 12, 12)
+	objectives_label = UI.rich_label()
+	objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objectives_card.add_child(objectives_label)
+	box.add_child(objectives_card)
+
 	box.add_child(UI.section("Divisions de l'entreprise"))
 	var division_card := UI.card(UI.APP_SHELL, 12, 12)
 	division_label = UI.rich_label()
@@ -402,6 +410,28 @@ func _install_pages(box: VBoxContainer) -> void:
 		{"key":"GROUP", "label":"Groupe", "start":_child_with_text(box, "Groupe / filiales")},
 	])
 
+var objectives_label: Label
+
+func _refresh_objectives() -> void:
+	if objectives_label == null:
+		return
+	var active_ids := {}
+	for objective in Objectives.active_objectives():
+		active_ids[str((objective as Dictionary).get("id", ""))] = true
+	var lines: Array[String] = ["%d objectifs atteints sur %d." % [Objectives.completed_count(), Objectives.total_count()]]
+	for track in Objectives.TRACK_ORDER:
+		var parts: Array[String] = []
+		for objective_value in Objectives.TRACKS[track]:
+			var objective: Dictionary = objective_value
+			var oid := str(objective.get("id", ""))
+			if Objectives.is_completed(oid):
+				parts.append("✓ %s" % str(objective.title))
+			elif active_ids.has(oid):
+				parts.append("En cours : %s (%s • récompense : %s)" % [str(objective.title), Objectives.progress_text(objective), Objectives.reward_label(objective)])
+				break
+		lines.append("\n%s\n%s" % [str(Objectives.TRACK_LABELS[track]).to_upper(), "\n".join(parts)])
+	objectives_label.text = "\n".join(lines)
+
 const PAGE_UNLOCKS := [
 	["WORKPLACE", "CO_WORKPLACE", "Locaux & RH quand l'équipe grandit"],
 	["BUDGETS", "CO_BUDGETS", "Budgets après votre premier lancement"],
@@ -449,6 +479,7 @@ func refresh() -> void:
 		return
 	_refresh_page_unlocks()
 	_refresh_reputation_bars()
+	_refresh_objectives()
 
 	var brief := ExecutiveManager.get_executive_brief()
 	# Deux lignes : la situation et le conseil. Les décisions elles-mêmes s'ouvrent en carte depuis le garage.

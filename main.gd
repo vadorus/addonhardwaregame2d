@@ -227,6 +227,7 @@ func _process(_delta):
 func _connect_signals():
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
+	Objectives.objective_completed.connect(_on_objective_completed)
 	CompanyManager.company_changed.connect(_request_refresh_all)
 	CompanyManager.reputation_changed.connect(_request_refresh_all)
 	DivisionManager.divisions_changed.connect(_request_refresh_all)
@@ -3029,6 +3030,12 @@ func _on_dialogue_choice(key: String, choice_id: String) -> void:
 		call_deferred("_on_dashboard_navigation", 3, "PROJECT_DECISION")
 	elif key == "MILESTONE:FIRST_BINNING":
 		call_deferred("_on_dashboard_navigation", 4, "PRODUCT_LAUNCH")
+
+## Lot C : un objectif de Nora atteint = une petite fête, et le suivant apparaît au QG.
+func _on_objective_completed(objective: Dictionary) -> void:
+	var reward := Objectives.reward_label(objective)
+	notify("Objectif atteint : %s%s" % [str(objective.get("title", "")), (" — " + reward) if reward != "" else ""], "good", 0)
+	SoundManager.play("unlock")
 
 ## Lot B : les deux grands moments du premier CPU viennent d'eux-mêmes (sans empiler les fenêtres).
 func _maybe_open_milestone() -> void:
