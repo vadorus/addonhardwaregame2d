@@ -569,6 +569,58 @@ func benchmark_rank(product: Dictionary) -> int:
 			return i + 1
 	return rows.size()
 
+func press_comparison(product: Dictionary) -> Dictionary:
+	var current_score := benchmark_score(product)
+	var sector := str(product.get("sector", "CPU"))
+	var target := normalize_segment(str(product.get("target_segment", default_segment())))
+	var generation_id := str(product.get("generation_id", ""))
+	var generation_index := int(product.get("generation_index", 0))
+	var previous: Dictionary = {}
+	var previous_generation := -1
+	var previous_age := 999999
+	for candidate_value in ProductManager.products:
+		var candidate: Dictionary = candidate_value
+		if str(candidate.get("id", "")) == str(product.get("id", "")) or str(candidate.get("sector", "")) != sector:
+			continue
+		if str(candidate.get("company", "")) != CompanyManager.company_name:
+			continue
+		if generation_id != "" and str(candidate.get("generation_id", "")) == generation_id:
+			continue
+		var candidate_generation := int(candidate.get("generation_index", 0))
+		var candidate_age := maxi(int(candidate.get("months_on_market", 0)), 0)
+		if generation_index > 0 and candidate_generation > 0:
+			if candidate_generation >= generation_index or candidate_generation <= previous_generation:
+				continue
+			previous = candidate
+			previous_generation = candidate_generation
+		elif previous_generation < 0 and candidate_age > 0 and candidate_age < previous_age:
+			previous = candidate
+			previous_age = candidate_age
+
+	var rival_pool: Array = []
+	for rival_value in competitors.get(sector, []):
+		var rival: Dictionary = rival_value
+		if normalize_segment(str(rival.get("target_segment", target))) == target:
+			rival_pool.append(rival)
+	if rival_pool.is_empty():
+		rival_pool = competitors.get(sector, []).duplicate()
+	var best_rival: Dictionary = {}
+	var best_rival_score := -1.0
+	for rival_value in rival_pool:
+		var rival: Dictionary = rival_value
+		var rival_score := benchmark_score(rival)
+		if rival_score > best_rival_score:
+			best_rival = rival
+			best_rival_score = rival_score
+
+	var result := {"current_score":current_score,"has_previous":not previous.is_empty(),"has_rival":not best_rival.is_empty()}
+	if not previous.is_empty():
+		var previous_score := benchmark_score(previous)
+		result.merge({"previous_name":str(previous.get("name", "Ancienne génération")),"previous_score":previous_score,"previous_delta":current_score-previous_score})
+	if not best_rival.is_empty():
+		result.merge({"rival_name":str(best_rival.get("name", "Concurrent")),"rival_company":str(best_rival.get("company", "")),"rival_score":best_rival_score,"rival_delta":current_score-best_rival_score})
+	return result
+
 func _segment_expectation_drift(segment: String) -> float:
 	var target := normalize_segment(segment)
 	var base := 0.08

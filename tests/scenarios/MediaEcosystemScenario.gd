@@ -1,4 +1,4 @@
-﻿extends RefCounted
+extends RefCounted
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
@@ -28,6 +28,48 @@ static func run() -> String:
 	if float(media_signal.get("demand_multiplier", 1.0)) <= 1.0 or int(after.get("units", 0)) <= int(before.get("units", 0)):
 		_restore(snapshot)
 		return "Positive independent coverage does not influence later demand"
+
+	# M3: press scores must move with the era, the previous generation and the best rival.
+	product["generation_id"] = "CPU-GEN-002"
+	product["generation_index"] = 2
+	var previous := product.duplicate(true)
+	previous["id"] = "PROD-CI-MEDIA-OLD"
+	previous["name"] = "Nova Media I"
+	previous["generation_id"] = "CPU-GEN-001"
+	previous["generation_index"] = 1
+	previous["months_on_market"] = 18
+	previous["metrics"] = {"performance":62.0,"efficiency":63.0,"reliability":66.0,"usability":62.0,"innovation":58.0,"ecosystem":58.0,"sustainability":58.0}
+	var rival := product.duplicate(true)
+	rival["id"] = "RIVAL-CI-MEDIA"
+	rival["name"] = "Raptor Press"
+	rival["company"] = "Rival Systems"
+	rival["generation_id"] = ""
+	rival["generation_index"] = 0
+	rival["metrics"] = {"performance":96.0,"efficiency":92.0,"reliability":94.0,"usability":82.0,"innovation":91.0,"ecosystem":82.0,"sustainability":80.0}
+	ProductManager.products = [previous, product]
+	MarketManager.competitors["CPU"] = [rival]
+	var comparison := MarketManager.press_comparison(product)
+	if str(comparison.get("previous_name", "")) != "Nova Media I" or str(comparison.get("rival_name", "")) != "Raptor Press":
+		_restore(snapshot)
+		return "M3 press comparison does not identify the previous generation and best rival"
+	if float(comparison.get("previous_delta", 0.0)) <= 0.0 or float(comparison.get("rival_delta", 0.0)) >= 0.0:
+		_restore(snapshot)
+		return "M3 press comparison deltas do not reflect progress and competitive pressure"
+	if MediaManager._era_relative_score(70.0, {"has_rival":true,"rival_delta":-12.0,"has_previous":false}) >= 70.0:
+		_restore(snapshot)
+		return "M3 stronger rivals do not lower press scores"
+	if MediaManager._era_relative_score(70.0, {"has_rival":true,"rival_delta":12.0,"has_previous":false}) <= 70.0:
+		_restore(snapshot)
+		return "M3 beating the era reference does not raise press scores"
+	MediaManager.news = []
+	MediaManager.publish_product_review(product, {"EMBEDDED":74.0}, 2, 4)
+	var compared_reviews := _product_news("PROD-CI-MEDIA")
+	if compared_reviews.is_empty() or str(compared_reviews[0].get("comparison_previous_name", "")) != "Nova Media I" or str(compared_reviews[0].get("comparison_rival_name", "")) != "Raptor Press":
+		_restore(snapshot)
+		return "M3 public reviews do not preserve comparison metadata"
+	if not str(compared_reviews[0].get("body", "")).contains("Nova Media I") or not str(compared_reviews[0].get("body", "")).contains("Raptor Press"):
+		_restore(snapshot)
+		return "M3 review copy does not explain the generational and rival comparison"
 
 	TimeManager.load_state({"day":1,"month":1,"year":2012,"time_scale":0.0,"timer":0.0})
 	MediaManager.news = []

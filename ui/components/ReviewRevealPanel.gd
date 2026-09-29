@@ -166,4 +166,9 @@ func _review_card(review: Dictionary) -> Control:
 	var headline := LOOK.muted_label("« %s »" % str(review.get("headline", "")), 13)
 	headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_box.add_child(headline)
+	var comparison_summary := str(review.get("comparison_summary", ""))
+	if comparison_summary != "":
+		var comparison_label := LOOK.muted_label(comparison_summary, 12)
+		comparison_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text_box.add_child(comparison_label)
 	return card

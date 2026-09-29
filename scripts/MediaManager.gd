@@ -80,13 +80,16 @@ func available_outlets(year: int = TimeManager.year) -> Array:
 func publish_product_review(product: Dictionary, segment_scores: Dictionary, benchmark_rank: int, benchmark_total: int):
 	var selected := _select_review_outlets(product)
 	var published: Array = []
+	var comparison := MarketManager.press_comparison(product)
+	var comparison_summary := _comparison_summary(comparison)
 	for outlet_value in selected:
 		var outlet: Dictionary = outlet_value
-		var review_score := press_pitch_adjusted(_outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total), str(product.get("press_pitch", "")), str(outlet.get("channel", "")), benchmark_rank)
+		var raw_score := _outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total)
+		var review_score := press_pitch_adjusted(_era_relative_score(raw_score, comparison), str(product.get("press_pitch", "")), str(outlet.get("channel", "")), benchmark_rank)
 		var sentiment := clampf((review_score - 56.0) / 34.0, -1.0, 1.0)
 		var tone := _tone_for_score(review_score)
-		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total)
-		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score, "headline":str(text.headline)})
+		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total, comparison)
+		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score, "headline":str(text.headline), "comparison_summary":comparison_summary})
 		add_news(
 			channel_label(str(outlet.channel)),
 			str(text.headline),
@@ -95,7 +98,11 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 				"source_id":str(outlet.id), "source_name":str(outlet.name), "channel":str(outlet.channel),
 				"product_id":str(product.get("id", "")), "product_name":str(product.get("name", "Produit")),
 				"generation_id":str(product.get("generation_id", "")),
-				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach)
+				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach),
+				"comparison_previous_name":str(comparison.get("previous_name", "")),
+				"comparison_previous_delta":float(comparison.get("previous_delta", 0.0)),
+				"comparison_rival_name":str(comparison.get("rival_name", "")),
+				"comparison_rival_delta":float(comparison.get("rival_delta", 0.0))
 			}
 		)
 	if not published.is_empty():
@@ -113,6 +120,26 @@ static func press_pitch_adjusted(score: float, pitch: String, channel: String, b
 		"TECH":
 			delta = 4.0 if channel in ["BENCHMARK", "BENCHMARK_SITE", "SPECIALIST_PRESS"] else -2.0
 	return clampf(score + delta, 0.0, 100.0)
+
+func _era_relative_score(base_score: float, comparison: Dictionary) -> float:
+	var adjusted := base_score
+	if bool(comparison.get("has_rival", false)):
+		adjusted += clampf(float(comparison.get("rival_delta", 0.0)) * 0.52, -14.0, 14.0)
+	if bool(comparison.get("has_previous", false)):
+		adjusted += clampf(float(comparison.get("previous_delta", 0.0)) * 0.30, -9.0, 9.0)
+	return clampf(adjusted, 0.0, 100.0)
+
+func _comparison_summary(comparison: Dictionary) -> String:
+	var parts: Array[String] = []
+	if bool(comparison.get("has_previous", false)):
+		var delta := float(comparison.get("previous_delta", 0.0))
+		var direction := "+%.1f" % delta if delta >= 0.0 else "%.1f" % delta
+		parts.append("vs %s : %s" % [str(comparison.get("previous_name", "ancienne génération")), direction])
+	if bool(comparison.get("has_rival", false)):
+		var rival_delta := float(comparison.get("rival_delta", 0.0))
+		var rival_direction := "+%.1f" % rival_delta if rival_delta >= 0.0 else "%.1f" % rival_delta
+		parts.append("vs %s : %s" % [str(comparison.get("rival_name", "meilleur rival")), rival_direction])
+	return " • ".join(parts)
 
 func _select_review_outlets(product: Dictionary) -> Array:
 	var available := available_outlets()
@@ -186,7 +213,7 @@ func _tone_for_score(score: float) -> String:
 	if score >= 42.0: return "réservé"
 	return "critique"
 
-func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: float, benchmark_rank: int, benchmark_total: int) -> Dictionary:
+func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: float, benchmark_rank: int, benchmark_total: int, comparison: Dictionary = {}) -> Dictionary:
 	var channel := str(outlet.channel)
 	var source := str(outlet.name)
 	var product_name := str(product.get("name", "Produit"))
@@ -214,6 +241,24 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 		sentences.append("Seul bémol : %s." % flaw)
 	else:
 		sentences.append("Mais %s, et ça se sent." % flaw)
+	if bool(comparison.get("has_previous", false)):
+		var previous_delta := float(comparison.get("previous_delta", 0.0))
+		var previous_name := str(comparison.get("previous_name", "la génération précédente"))
+		if previous_delta >= 2.5:
+			sentences.append("Par rapport à %s, la progression est nette (+%.1f points au benchmark)." % [previous_name, previous_delta])
+		elif previous_delta <= -2.5:
+			sentences.append("Déception : il recule face à %s (%.1f points au benchmark)." % [previous_name, previous_delta])
+		else:
+			sentences.append("Face à %s, l'évolution reste limitée (%+.1f point)." % [previous_name, previous_delta])
+	if bool(comparison.get("has_rival", false)):
+		var rival_delta := float(comparison.get("rival_delta", 0.0))
+		var rival_name := str(comparison.get("rival_name", "le meilleur rival"))
+		if rival_delta >= 2.5:
+			sentences.append("Il devance désormais %s de %.1f points." % [rival_name, rival_delta])
+		elif rival_delta <= -2.5:
+			sentences.append("%s garde %.1f points d'avance : la barre est plus haute." % [rival_name, absf(rival_delta)])
+		else:
+			sentences.append("Il joue dans la même cour que %s (%+.1f point)." % [rival_name, rival_delta])
 	if benchmark_total > 1 and channel in ["BENCHMARK", "BENCHMARK_SITE"]:
 		sentences.append("Il %s." % ("prend la tête de notre classement" if benchmark_rank == 1 else "se classe %de sur %d processeurs testés" % [benchmark_rank, benchmark_total]))
 	var quotes: Array = QUOTES.get(tone, QUOTES["mitigé"])
