@@ -45,18 +45,26 @@ func _ready() -> void:
 	if market_guard_error != "":
 		_fail(market_guard_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var garage_error := GARAGE_SCENARIO.run(self)
 	if garage_error != "":
 		_fail(garage_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var new_player_entry_error := NEW_PLAYER_ENTRY_SCENARIO.run(self)
 	if new_player_entry_error != "":
 		_fail(new_player_entry_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var first_cpu_workshop_error := FIRST_CPU_WORKSHOP_SCENARIO.run(self)
 	if first_cpu_workshop_error != "":
 		_fail(first_cpu_workshop_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var industrialization_gate_error := INDUSTRIALIZATION_GATE_SCENARIO.run(self)
 	if industrialization_gate_error != "":
 		_fail(industrialization_gate_error)
@@ -172,54 +180,80 @@ func _ready() -> void:
 	if not CompanyManager.created:
 		_fail("Company was not created")
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var first_cpu_journey_error := FIRST_CPU_JOURNEY_SCENARIO.run(self)
 	if first_cpu_journey_error != "":
 		_fail(first_cpu_journey_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var first_cpu_runway_error := FIRST_CPU_RUNWAY_SCENARIO.run()
 	if first_cpu_runway_error != "":
 		_fail(first_cpu_runway_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var garage_economy_matrix_error := GARAGE_ECONOMY_MATRIX_SCENARIO.run()
 	if garage_economy_matrix_error != "":
 		_fail("Garage economy matrix: " + garage_economy_matrix_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var launch_feedback_error := LAUNCH_FEEDBACK_SCENARIO.run(self)
 	if launch_feedback_error != "":
 		_fail(launch_feedback_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var media_ecosystem_error := MEDIA_ECOSYSTEM_SCENARIO.run()
 	if media_ecosystem_error != "":
 		_fail(media_ecosystem_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var after_sales_dossier_error := AFTER_SALES_DOSSIER_SCENARIO.run(self)
 	if after_sales_dossier_error != "":
 		_fail(after_sales_dossier_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var product_cockpit_error := PRODUCT_COCKPIT_SCENARIO.run(self)
 	if product_cockpit_error != "":
 		_fail(product_cockpit_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var lab_depth_error := LAB_DEPTH_SCENARIO.run(self)
 	if lab_depth_error != "":
 		_fail(lab_depth_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var next_gen_market_learning_error := NEXT_GENERATION_MARKET_LEARNING_SCENARIO.run()
 	if next_gen_market_learning_error != "":
 		_fail(next_gen_market_learning_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var full_cpu_player_journey_error := FULL_CPU_PLAYER_JOURNEY_SCENARIO.run()
 	if full_cpu_player_journey_error != "":
 		_fail(full_cpu_player_journey_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var prototype_decision_error := PROTOTYPE_DECISION_SCENARIO.run(self)
 	if prototype_decision_error != "":
 		_fail(prototype_decision_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var validation_decision_error := VALIDATION_DECISION_SCENARIO.run(self)
 	if validation_decision_error != "":
 		_fail(validation_decision_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var company_policy_error := COMPANY_POLICY_SCENARIO.run()
 	if company_policy_error != "":
 		_fail(company_policy_error)
@@ -271,6 +305,8 @@ func _ready() -> void:
 	if Economy.money != BalanceManager.starting_capital():
 		_fail("Unexpected starting money: %s (expected %s for %s)" % [Economy.money, BalanceManager.starting_capital(), BalanceManager.active_profile])
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var difficulty_error := DIFFICULTY_SCENARIO.run()
 	if difficulty_error != "":
 		_fail(difficulty_error)
@@ -579,6 +615,8 @@ func _ready() -> void:
 		_fail("CPU development accepted a process that miniaturization cannot yet support")
 		return
 
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var supplier_error := SUPPLIER_SCENARIO.run()
 	if supplier_error != "":
 		_fail(supplier_error)
@@ -1613,22 +1651,32 @@ func _ready() -> void:
 		_fail("Bankruptcy did not pause the simulation")
 		return
 
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var garage_decision_error := GARAGE_DECISION_SCENARIO.run(self)
 	if garage_decision_error != "":
 		_fail(garage_decision_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var platform_error := PLATFORM_SCENARIO.run(self)
 	if platform_error != "":
 		_fail(platform_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var sensation_error := SENSATION_SCENARIO.run(self)
 	if sensation_error != "":
 		_fail(sensation_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)
 	if launch_range_error != "":
 		_fail(launch_range_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var ceo_decision_error := CEO_DECISION_SCENARIO.run(self)
 	if ceo_decision_error != "":
 		_fail(ceo_decision_error)
@@ -1637,46 +1685,68 @@ func _ready() -> void:
 	if b2b_error != "":
 		_fail(b2b_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var tree_error := RESEARCH_TREE_SCENARIO.run(self)
 	if tree_error != "":
 		_fail(tree_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var investment_error := INVESTMENT_BALANCE_SCENARIO.run()
 	if investment_error != "":
 		_fail(investment_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var fabrication_error := FABRICATION_PAGE_SCENARIO.run(self)
 	if fabrication_error != "":
 		_fail(fabrication_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var capacity_error := PRODUCTION_CAPACITY_SCENARIO.run()
 	if capacity_error != "":
 		_fail(capacity_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var business_error := GARAGE_BUSINESS_SCENARIO.run()
 	if business_error != "":
 		_fail(business_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var objectives_error := OBJECTIVES_SCENARIO.run()
 	if objectives_error != "":
 		_fail(objectives_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var lessons_error := TEAM_LESSONS_SCENARIO.run()
 	if lessons_error != "":
 		_fail(lessons_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var teams_error := RESEARCH_TEAMS_SCENARIO.run()
 	if teams_error != "":
 		_fail(teams_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var tick_tock_error := ARCHITECTURE_TICK_TOCK_SCENARIO.run()
 	if tick_tock_error != "":
 		_fail(tick_tock_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var range_error := RANGE_AND_RIVAL_SCENARIO.run()
 	if range_error != "":
 		_fail(range_error)
 		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
 	var stepper_error := CPU_STEPPER_SCENARIO.run(self)
 	if stepper_error != "":
 		_fail(stepper_error)
