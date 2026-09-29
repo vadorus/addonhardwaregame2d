@@ -758,6 +758,31 @@ func get_ceo_decisions() -> Array:
 			"can_defer":false
 		})
 
+	# Lot B : un client propose un contrat d'études ; Nora propose un prêt quand la trésorerie est courte.
+	for study_value in GarageBusiness.open_offers():
+		var study: Dictionary = study_value
+		decisions.append({
+			"id":"STUDY:%s" % str(study.get("id", "")),
+			"category":"SOUS-TRAITANCE",
+			"severity":52.0,
+			"title":"%s propose un contrat" % str(study.get("customer", "Un client")),
+			"text":"Concevoir %s en %d mois pour %d €." % [str(study.get("task", "une puce")), int(study.get("months", 2)), int(study.get("pay", 0))],
+			"recommendation":"De l'argent tout de suite, mais votre équipe Développement sera en partie occupée.",
+			"target_tab":0,
+			"can_defer":true
+		})
+	if GarageBusiness.loan_offer_pending():
+		decisions.append({
+			"id":"FINANCE:LOAN",
+			"category":"FINANCEMENT",
+			"severity":74.0,
+			"title":"Nora a vu la banque",
+			"text":"Moins de 6 mois de trésorerie : un prêt de %d € est possible." % int(GarageBusiness.loan_terms().get("amount", 0)),
+			"recommendation":"Un prêt donne de l'air jusqu'au lancement ; il se rembourse chaque mois.",
+			"target_tab":0,
+			"can_defer":true
+		})
+
 	for threat_value in MarketManager.open_market_threats():
 		var threat: Dictionary = threat_value
 		var threat_kind := str(threat.get("kind", ""))

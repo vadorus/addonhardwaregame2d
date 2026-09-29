@@ -2078,6 +2078,7 @@ func _on_month_closed(report: Dictionary):
 			_runway_warned = false
 		SoundManager.play("cash" if result > 0 else "month")
 	_refresh_all()
+	call_deferred("_maybe_open_milestone")
 	# V0.8.1 : sauvegarde automatique à chaque clôture de mois (PC et Android).
 	_autosave("mensuelle")
 
@@ -2935,7 +2936,7 @@ func open_ceo_decision(decision_id: String) -> bool:
 	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
 		return false
 	# Les dossiers RH et les visites de clients se règlent en parlant à la personne.
-	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:")) and open_dialogue(decision_id):
+	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:")) and open_dialogue(decision_id):
 		return true
 	if not ceo_layer.visible:
 		_ceo_resume_scale = TimeManager.time_scale
@@ -3024,6 +3025,19 @@ func _on_dialogue_choice(key: String, choice_id: String) -> void:
 	if key.begins_with("RND:"):
 		# Une autre découverte R&D attend ? La suivante vient vous voir.
 		call_deferred("_show_next_pending_research_event")
+	elif key == "MILESTONE:FIRST_SILICON":
+		call_deferred("_on_dashboard_navigation", 3, "PROJECT_DECISION")
+	elif key == "MILESTONE:FIRST_BINNING":
+		call_deferred("_on_dashboard_navigation", 4, "PRODUCT_LAUNCH")
+
+## Lot B : les deux grands moments du premier CPU viennent d'eux-mêmes (sans empiler les fenêtres).
+func _maybe_open_milestone() -> void:
+	if dialogue_visible() or ceo_decision_visible() or _big_moment_active() or not CompanyManager.created:
+		return
+	if not GarageBusiness.first_silicon_project().is_empty():
+		open_dialogue("MILESTONE:FIRST_SILICON")
+	elif not GarageBusiness.first_binning_generation().is_empty():
+		open_dialogue("MILESTONE:FIRST_BINNING")
 
 func _on_crew_member_opened(member_id: String) -> void:
 	var key: String = INTERACTIONS.pending_for(member_id)

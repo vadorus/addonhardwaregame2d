@@ -61,7 +61,7 @@ But : moins d'écrans en double, une seule chose à regarder à la fois.
 Critères : au mois 2 d'une partie neuve, Entreprise montre 1 sous-page ; jamais plus d'une fenêtre
 bloquante au même mois pendant le 1er lancement (vérifié par la sonde).
 
-### Lot B — Remplir le début de partie (moyen, 1-2 sessions)
+### Lot B — Remplir le début de partie (moyen, 1-2 sessions) — ✅ fait le 29/09 (`docs/reviews/V09_LOT_B_DEBUT_DE_PARTIE.md`)
 
 But : le premier CPU reste le fil rouge, mais le joueur a quelque chose à faire chaque minute.
 - **Contrats de sous-traitance** (façon Game Dev Tycoon) pendant le 1er projet : « Delta Office veut

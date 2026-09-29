@@ -1070,7 +1070,8 @@ func _process_project_month(project: Dictionary):
 	if str(project.sector) != "CPU":
 		progress = (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0)) * supplier_execution * management
 	else:
-		progress *= segment_team_factor
+		# Lot B : une partie de l'équipe travaille sur un contrat d'études pour un client.
+		progress *= segment_team_factor * GarageBusiness.development_speed_factor()
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))

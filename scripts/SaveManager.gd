@@ -55,7 +55,8 @@ func save_to_slot(slot: int, quiet: bool = false) -> bool:
 		"after_sales":AfterSalesManager.get_state(),
 		"market":MarketManager.get_state(),
 		"media":MediaManager.get_state(),
-		"architectures":ArchitectureManager.get_state()
+		"architectures":ArchitectureManager.get_state(),
+		"garage_business":GarageBusiness.get_state()
 	}
 	if not _write_atomic(JSON.stringify(state), slot_path(slot), _slot_temp(slot), _slot_backup(slot)):
 		save_completed.emit(false, "Impossible d'écrire la sauvegarde de façon sûre.")
@@ -104,6 +105,8 @@ func load_from_slot(slot: int) -> bool:
 	MediaManager.load_state(state.get("media", {}))
 	# V0.9 : en dernier, car une ancienne partie déduit ses architectures et gammes des produits et projets.
 	ArchitectureManager.load_state(state.get("architectures", {}))
+	# Lot B : après les produits (une ancienne partie déjà lancée ne rejoue pas le « premier silicium »).
+	GarageBusiness.load_state(state.get("garage_business", {}))
 	save_completed.emit(true, "Partie chargée.")
 	return true
 

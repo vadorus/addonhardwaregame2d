@@ -22,6 +22,16 @@ static func pending() -> Array:
 		result.append({"key":"HIRE:DEV", "speaker":"NORA"})
 	if tech_final_pending():
 		result.append({"key":"MILESTONE:TECH_FINAL", "speaker":"NORA"})
+	# Lot B : clients avec une petite puce à concevoir, prêt bancaire, grands moments du premier CPU.
+	for study_value in GarageBusiness.open_offers():
+		var study: Dictionary = study_value
+		result.append({"key":"STUDY:%s" % str(study.get("id", "")), "speaker":"CLIENT:%s" % str(study.get("customer", ""))})
+	if GarageBusiness.loan_offer_pending():
+		result.append({"key":"FINANCE:LOAN", "speaker":"NORA"})
+	if not GarageBusiness.first_silicon_project().is_empty():
+		result.append({"key":"MILESTONE:FIRST_SILICON", "speaker":_dev_speaker()})
+	if not GarageBusiness.first_binning_generation().is_empty():
+		result.append({"key":"MILESTONE:FIRST_BINNING", "speaker":"NORA"})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -124,6 +134,13 @@ static func _rnd_speaker() -> String:
 			return str(employee.get("id", ""))
 	return "NORA"
 
+static func _dev_speaker() -> String:
+	for employee_value in PersonnelManager.staff:
+		var employee: Dictionary = employee_value
+		if str(employee.get("department", "")) == "Développement":
+			return str(employee.get("id", ""))
+	return _rnd_speaker()
+
 static func _hr_speaker(issue: Dictionary) -> String:
 	var subject := str(issue.get("subject_id", ""))
 	if str(issue.get("type", "")) == "MORALE" and not PersonnelManager.get_employee(subject).is_empty():
@@ -214,6 +231,69 @@ static func dialogue(key: String) -> Dictionary:
 			"choices":[
 				{"id":"CONTINUE", "label":"On continue : l'empire n'est pas fini !", "hint":"La partie continue en mode libre", "primary":true},
 			]}
+	elif key.begins_with("STUDY:"):
+		var study := GarageBusiness.get_study(sid)
+		if study.is_empty() or str(study.get("status", "")) != "OFFER":
+			return {}
+		var busy := int(round(float(study.get("load", 0.3)) * 100.0))
+		var own_project := ResearchManager.get_active_development_project_count() > 0
+		return {"key":key, "person":_person("CLIENT:%s" % str(study.get("customer", ""))), "mood":"HAPPY", "kicker":"UN CLIENT PASSE AU GARAGE",
+			"text":"Bonjour ! On m'a dit que vous saviez concevoir des puces. Il nous faudrait %s, livré dans %d mois. On paie %s €, dont %s € d'avance à la signature. Ça vous intéresse ?" % [
+				str(study.get("task", "une puce")), int(study.get("months", 2)), _money(int(study.get("pay", 0))), _money(GarageBusiness.study_advance(study))],
+			"note":("Pendant %d mois, environ %d %% de votre équipe Développement y travaillera : votre propre CPU avancera moins vite." % [int(study.get("months", 2)), busy]) if own_project else "Votre équipe n'a pas de projet en cours : ce contrat ne ralentit rien.",
+			"choices":[
+				{"id":"SIGN", "label":"Marché conclu, on s'en occupe !", "hint":"Avance tout de suite, solde à la livraison • clientèle pro +1", "primary":true},
+				{"id":"DECLINE", "label":"Désolé, on est concentrés sur notre CPU.", "hint":"Le client repart ; aucune pénalité"},
+				{"id":"LATER", "label":"Laissez-moi y réfléchir.", "hint":"L'offre tient encore quelques semaines"},
+			]}
+	elif key == "FINANCE:LOAN":
+		if not GarageBusiness.loan_offer_pending():
+			return {}
+		var terms := GarageBusiness.loan_terms()
+		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
+			"text":"Patron, au rythme actuel on tient à peine %d mois. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
+				int(floor(GarageBusiness.cash_runway_months())), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
+			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
+			"choices":[
+				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
+				{"id":"DECLINE", "label":"Non, on se serre la ceinture.", "hint":"Nora n'en reparle pas avant un an"},
+			]}
+	elif key == "MILESTONE:FIRST_SILICON":
+		var project := GarageBusiness.first_silicon_project()
+		if project.is_empty():
+			return {}
+		var review: Dictionary = project.get("pending_decision", {})
+		var confidence := float(review.get("confidence", 55.0))
+		var story := "Il a démarré du premier coup. Toute l'équipe a applaudi."
+		var mood := "HAPPY"
+		if confidence < 50.0:
+			story = "Il a fallu deux nuits blanches et un fer à souder, mais il tourne… en chauffant plus que prévu."
+			mood = "WORRIED"
+		elif confidence < 68.0:
+			story = "Premier essai : rien. Deuxième essai, après une soudure refaite : il calcule !"
+		return {"key":key, "person":_person(_dev_speaker()), "mood":mood, "kicker":"PREMIER SILICIUM",
+			"text":"On vient de mettre sous tension le tout premier prototype de %s. %s" % [str(project.get("name", "notre CPU")), story],
+			"note":"Confiance de l'équipe : %.0f %%. Point faible signalé : %s. C'est maintenant que se décide la suite du projet." % [confidence, GameData.metric_label(str(review.get("weakness", "reliability")))],
+			"choices":[
+				{"id":"SEE", "label":"Montre-moi ça au banc de test !", "hint":"Ouvre la revue du prototype", "primary":true},
+			]}
+	elif key == "MILESTONE:FIRST_BINNING":
+		var generation := GarageBusiness.first_binning_generation()
+		if generation.is_empty():
+			return {}
+		var yield_rate := float(generation.get("yield_rate", 0.7))
+		var parts: Array[String] = []
+		for product_value in ProductManager.products:
+			var product: Dictionary = product_value
+			if str(product.get("generation_id", "")) == str(generation.get("id", "")):
+				parts.append("%d %% en %s" % [int(round(float(product.get("bin_share", 0.0)) * yield_rate * 100.0)), str(product.get("sku_label", product.get("name", "")))])
+		var scrap := int(round((1.0 - yield_rate) * 100.0))
+		return {"key":key, "person":_person("NORA"), "mood":"HAPPY" if yield_rate >= 0.65 else "NEUTRAL", "kicker":"TRI DES PUCES",
+			"text":"Les premières plaquettes de %s sont sorties de l'usine. On a testé chaque puce une par une : %s, et %d %% au rebut." % [str(generation.get("name", "notre CPU")), ", ".join(parts), scrap],
+			"note":"Chaque puce est classée selon sa qualité réelle : les meilleures deviennent le modèle haut de gamme. Un meilleur rendement = plus de puces vendables.",
+			"choices":[
+				{"id":"GO", "label":"Parfait, préparons le lancement !", "hint":"Direction Produits › Vendre", "primary":true},
+			]}
 	elif key.begins_with("PRESS:"):
 		var product := ProductManager.get_product(sid)
 		if product.is_empty() or product.has("press_pitch") or int(product.get("months_on_market", 0)) != 0:
@@ -262,8 +342,23 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 		ExecutiveManager.workplace["tech_final_announced"] = true
 		CompanyManager.add_alert("Sommet technologique atteint : la partie continue en mode libre. De nouvelles technologies arriveront avec les mises à jour.")
 		return {"ok":true, "message":"Mode libre : l'empire continue."}
+	if key == "MILESTONE:FIRST_SILICON":
+		GarageBusiness.mark_shown("first_silicon_shown")
+		return {"ok":true, "message":"Premier silicium ! Place à la revue du prototype."}
+	if key == "MILESTONE:FIRST_BINNING":
+		GarageBusiness.mark_shown("first_binning_shown")
+		return {"ok":true, "message":"Puces triées : chaque modèle de la gamme est prêt à être lancé."}
+	if key == "FINANCE:LOAN":
+		if choice_id == "ACCEPT":
+			var ok := GarageBusiness.accept_loan()
+			return {"ok":ok, "message":"Prêt signé : la trésorerie respire." if ok else "La banque ne peut plus suivre."}
+		GarageBusiness.decline_loan()
+		return {"ok":true, "message":"Pas de prêt : chaque euro compte."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
+	if key.begins_with("STUDY:"):
+		var ok := GarageBusiness.accept_study(sid) if choice_id == "SIGN" else GarageBusiness.decline_study(sid)
+		return {"ok":ok, "message":"Contrat signé : l'avance est encaissée." if choice_id == "SIGN" else "Le client repart, sans rancune."}
 	if key.begins_with("RND:"):
 		var ok := ResearchManager.resolve_research_event(sid, choice_id == "PURSUE")
 		return {"ok":ok, "message":"La piste devient prioritaire pour 3 mois." if choice_id == "PURSUE" else "Piste notée pour plus tard."}
