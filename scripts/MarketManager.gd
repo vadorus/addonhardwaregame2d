@@ -211,6 +211,15 @@ var _next_tender_id := 1
 var _next_threat_id := 1
 var _last_threat_market_age := 0
 var market_age_months := 0
+## Lot D : offensives commerciales du joueur contre un rival.
+var attacks: Array = []
+var _next_attack_id := 1
+## Nora ne propose pas d'offensive avant ce mois (index année*12+mois).
+var attack_advice_snooze_until := 0
+const ATTACK_MONTHS := 4
+const ATTACK_PLAYER_BOOST := 1.20
+const ATTACK_RIVAL_SHARE_FACTOR := 0.75
+const ATTACK_RIVAL_SHARE_NO_REACTION := 0.62
 var rng := RandomNumberGenerator.new()
 
 func _ready():
@@ -226,6 +235,9 @@ func reset():
 	_next_threat_id = 1
 	_last_threat_market_age = 0
 	market_age_months = 0
+	attacks = []
+	_next_attack_id = 1
+	attack_advice_snooze_until = 0
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
@@ -942,7 +954,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var rival_pressure := _rival_pressure(product, target, score)
 	var rival_multiplier := float(rival_pressure.get("multiplier", 1.0))
 	var scale_fit := company_scale_fit(target) if str(product.get("company", "")) == CompanyManager.company_name else 1.0
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit)))
+	var attack_multiplier := attack_demand_factor(product)
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -955,7 +968,7 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"best_rival_name":str(rival_pressure.get("name", "")),"best_rival_company":str(rival_pressure.get("company", "")),
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
-		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit
+		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit,"attack_multiplier":attack_multiplier
 	}
 
 ## Lot M (Claude, 29/09) : sonde 40 ans — une entreprise de 8 à 10 personnes atteignait 1 milliard d'euros
@@ -1026,7 +1039,7 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 		var breadth_factor := 1.0 + minf(float(maxi(ids.size() - 1, 0)) * 0.14, 0.35)
 		var family_potential := int(round(float(best_units) * breadth_factor))
 		var conversion := clampf(weighted_conversion / maxf(conversion_weight, 0.001), 0.05, 1.12)
-		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion)))
+		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion * attack_segment_boost(segment))))
 		var portfolio_units := mini(requested_units, mini(family_potential, share_cap_units))
 		var portfolio_share := float(portfolio_units) / float(market_units)
 
@@ -1332,6 +1345,8 @@ func _advance_cpu_competitor(competitor: Dictionary):
 	var market_units := segment_market_units(target)
 	var score := _evaluate_competitor(competitor, target)
 	var share := clampf(0.06 + (score - 50.0) * 0.004 + (float(competitor.get("brand", 50.0)) - 50.0) * 0.0015, 0.012, 0.31)
+	# Lot D : sous l'offensive du joueur, le rival perd une partie de ses clients.
+	share *= attack_share_factor(str(competitor.get("id", "")))
 	var units := mini(remaining_capacity, int(float(market_units) * share))
 	var margin := maxi(int(competitor.get("price", 1)) - int(competitor.get("unit_cost", 1)), 1)
 	var operating_profit := units * margin + b2b_profit
@@ -2286,9 +2301,201 @@ func _update_market_opportunities():
 		CompanyManager.add_alert("Marché : %s devient une opportunité commerciale." % segment_label(segment))
 		market_need_unlocked.emit(event.duplicate(true))
 
+# --- Lot D : attaquer un rival -------------------------------------------------------------------
+
+## Coût d'une offensive (publicité, remises aux revendeurs, force de vente) : 40 % d'un mois de CA,
+## 20 000 € minimum.
+func attack_cost() -> int:
+	return clampi(int(round(maxf(20000.0, _recent_monthly_revenue() * 0.40))), 20000, 2500000)
+
+## Rivaux présents sur le même marché que ce modèle.
+func attack_targets(product: Dictionary) -> Array:
+	var result: Array = []
+	if str(product.get("status", "")) != "LAUNCHED":
+		return result
+	var segment := normalize_segment(str(product.get("target_segment", default_segment())))
+	for comp_value in competitors.get(str(product.get("sector", "CPU")), []):
+		var comp: Dictionary = comp_value
+		if normalize_segment(str(comp.get("target_segment", ""))) != segment:
+			continue
+		result.append({"id":str(comp.get("id", "")), "company":str(comp.get("company", "")), "name":str(comp.get("name", "")),
+			"price":int(comp.get("price", 0)), "units":int(comp.get("last_month_units", 0))})
+	result.sort_custom(func(a, b): return int(a.units) > int(b.units))
+	return result
+
+func active_attacks() -> Array:
+	return attacks.filter(func(a): return int(a.get("months_remaining", 0)) > 0)
+
+func attack_for_product(product_id: String) -> Dictionary:
+	for attack in active_attacks():
+		if str(attack.get("product_id", "")) == product_id:
+			return attack
+	return {}
+
+func _attack_on_competitor(competitor_id: String) -> Dictionary:
+	for attack in active_attacks():
+		if str(attack.get("competitor_id", "")) == competitor_id:
+			return attack
+	return {}
+
+func attack_rival(product_id: String, competitor_id: String) -> bool:
+	var product := ProductManager.get_product(product_id)
+	if product.is_empty() or not attack_for_product(product_id).is_empty() or not _attack_on_competitor(competitor_id).is_empty():
+		return false
+	var competitor := _cpu_competitor_internal(competitor_id)
+	var valid := false
+	for target in attack_targets(product):
+		if str(target.get("id", "")) == competitor_id:
+			valid = true
+	if competitor.is_empty() or not valid:
+		return false
+	var cost := attack_cost()
+	var label := "Offensive commerciale — %s" % str(product.get("name", "CPU"))
+	if not Economy.can_afford(cost, label):
+		return false
+	Economy.add_expense(cost, label)
+	attacks.append({
+		"id":"ATK-%03d" % _next_attack_id, "product_id":product_id, "product_name":str(product.get("name", "CPU")),
+		"competitor_id":competitor_id, "company":str(competitor.get("company", "")), "rival_product":str(competitor.get("name", "")),
+		"segment":normalize_segment(str(product.get("target_segment", default_segment()))),
+		"months_remaining":ATTACK_MONTHS, "reaction":"", "cost":cost,
+		"rival_units_before":int(competitor.get("last_month_units", 0)), "rival_price_before":int(competitor.get("price", 0)),
+		"player_units_before":int(product.get("last_month_sales", 0)), "month":TimeManager.month, "year":TimeManager.year
+	})
+	_next_attack_id += 1
+	MediaManager.publish_business_event(
+		"%s part à l'assaut du marché %s" % [CompanyManager.company_name, segment_label(normalize_segment(str(product.get("target_segment", ""))))],
+		"Remises, publicité et démarchage des revendeurs : %s vise directement les clients du %s de %s." % [str(product.get("name", "CPU")), str(competitor.get("name", "")), str(competitor.get("company", ""))],
+		"attack_%s" % competitor_id)
+	CompanyManager.add_alert("Offensive lancée contre %s pour %d mois. Surveillez sa réaction." % [str(competitor.get("company", "")), ATTACK_MONTHS])
+	market_changed.emit()
+	return true
+
+## Nora repère un rival qui écrase l'un de vos marchés et propose une offensive (si vous en avez les moyens).
+func attack_advice() -> Dictionary:
+	if TimeManager.year * 12 + TimeManager.month < attack_advice_snooze_until or not active_attacks().is_empty():
+		return {}
+	var cost := attack_cost()
+	if float(cost) > float(Economy.money) * 0.25:
+		return {}
+	var best_by_segment := {}
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "LAUNCHED" or ProductManager.is_in_clearance(product) or int(product.get("months_on_market", 0)) < 2:
+			continue
+		var segment := normalize_segment(str(product.get("target_segment", default_segment())))
+		if not best_by_segment.has(segment) or int(product.get("last_month_sales", 0)) > int((best_by_segment[segment] as Dictionary).get("last_month_sales", 0)):
+			best_by_segment[segment] = product
+	var best: Dictionary = {}
+	for segment in best_by_segment.keys():
+		var product: Dictionary = best_by_segment[segment]
+		var player_units := int(product.get("last_month_sales", 0))
+		for target in attack_targets(product):
+			var rival_units := int(target.get("units", 0))
+			if rival_units < maxi(player_units * 2, 200):
+				continue
+			if best.is_empty() or rival_units > int(best.get("rival_units", 0)):
+				best = {"product_id":str(product.get("id", "")), "product_name":str(product.get("name", "CPU")),
+					"competitor_id":str(target.get("id", "")), "company":str(target.get("company", "")), "rival_product":str(target.get("name", "")),
+					"rival_units":rival_units, "player_units":player_units, "segment":segment, "cost":cost}
+	return best
+
+func snooze_attack_advice(months: int = 12) -> void:
+	attack_advice_snooze_until = TimeManager.year * 12 + TimeManager.month + months
+	market_changed.emit()
+
+## Bonus de demande pour le modèle qui mène l'offensive.
+func attack_demand_factor(product: Dictionary) -> float:
+	return ATTACK_PLAYER_BOOST if not attack_for_product(str(product.get("id", ""))).is_empty() else 1.0
+
+## Le plafond de part de marché du joueur s'élargit sur le marché attaqué.
+func attack_segment_boost(segment: String) -> float:
+	for attack in active_attacks():
+		if str(attack.get("segment", "")) == segment:
+			return ATTACK_PLAYER_BOOST
+	return 1.0
+
+## Part de marché gardée par un rival attaqué (1,0 sans offensive).
+func attack_share_factor(competitor_id: String) -> float:
+	var attack := _attack_on_competitor(competitor_id)
+	if attack.is_empty():
+		return 1.0
+	return ATTACK_RIVAL_SHARE_NO_REACTION if str(attack.get("reaction", "")) == "NONE" else ATTACK_RIVAL_SHARE_FACTOR
+
+func attack_reaction_label(reaction: String) -> String:
+	match reaction:
+		"PRICE_CUT": return "baisse ses prix"
+		"ADVERTISING": return "riposte par la publicité"
+		"EARLY_RELEASE": return "avance sa prochaine génération"
+		"NONE": return "ne réagit pas"
+	return "n'a pas encore réagi"
+
+## Le rival réagit le premier mois, selon son caractère : prix, publicité, sortie anticipée ou rien.
+func _choose_attack_reaction(competitor: Dictionary) -> String:
+	if float(competitor.get("development_progress", 0.0)) >= 55.0 and float(competitor.get("ai_research_drive", 50.0)) >= 55.0:
+		return "EARLY_RELEASE"
+	if float(competitor.get("ai_price_aggression", 50.0)) >= 50.0:
+		return "PRICE_CUT"
+	if int(competitor.get("cash", 0)) >= 250000:
+		return "ADVERTISING"
+	return "NONE"
+
+func _apply_attack_reaction(attack: Dictionary, competitor: Dictionary) -> void:
+	var reaction := _choose_attack_reaction(competitor)
+	attack["reaction"] = reaction
+	var company := str(competitor.get("company", "Le rival"))
+	var headline := ""
+	var body := ""
+	match reaction:
+		"PRICE_CUT":
+			var old_price := int(competitor.get("price", 1))
+			var new_price := maxi(int(competitor.get("unit_cost", 1)) + 2, int(round(float(old_price) * 0.85)))
+			competitor["price"] = new_price
+			attack["rival_price_after"] = new_price
+			headline = "%s casse ses prix face à %s" % [company, CompanyManager.company_name]
+			body = "Le %s passe de %d € à %d €. La guerre des prix est déclarée." % [str(competitor.get("name", "")), old_price, new_price]
+		"ADVERTISING":
+			competitor["cash"] = int(competitor.get("cash", 0)) - 60000
+			competitor["brand"] = clampf(float(competitor.get("brand", 50.0)) + 4.0, 20.0, 95.0)
+			headline = "%s lance une grande campagne publicitaire" % company
+			body = "Pour contrer l'offensive de %s, %s affiche le %s partout." % [CompanyManager.company_name, company, str(competitor.get("name", ""))]
+		"EARLY_RELEASE":
+			competitor["development_progress"] = minf(float(competitor.get("development_progress", 0.0)) + 30.0, 100.0)
+			headline = "%s avance la sortie de sa prochaine puce" % company
+			body = "Sous pression, %s presse ses ingénieurs : sa nouvelle génération arrivera plus tôt que prévu." % company
+		_:
+			headline = "%s laisse filer ses clients" % company
+			body = "Pas de réponse de %s à l'offensive de %s : ses revendeurs se tournent vers la concurrence." % [company, CompanyManager.company_name]
+	MediaManager.publish_business_event(headline, body, "attack_reaction_%s" % str(competitor.get("id", "")))
+	CompanyManager.add_alert("Offensive : %s %s." % [company, attack_reaction_label(reaction)])
+
+func _advance_attacks() -> void:
+	for attack_value in attacks:
+		var attack: Dictionary = attack_value
+		var remaining := int(attack.get("months_remaining", 0))
+		if remaining <= 0:
+			continue
+		var competitor := _cpu_competitor_internal(str(attack.get("competitor_id", "")))
+		if competitor.is_empty():
+			attack["months_remaining"] = 0
+			continue
+		if str(attack.get("reaction", "")) == "":
+			_apply_attack_reaction(attack, competitor)
+		attack["months_remaining"] = remaining - 1
+		if remaining - 1 <= 0:
+			var before := maxi(int(attack.get("rival_units_before", 0)), 1)
+			var after := int(competitor.get("last_month_units", 0))
+			var lost := clampf(1.0 - float(after) / float(before), -1.0, 1.0)
+			attack["rival_units_after"] = after
+			CompanyManager.add_alert("Fin de l'offensive contre %s : ses ventes ont %s de %.0f %% (%s)." % [
+				str(attack.get("company", "")), "baissé" if lost >= 0.0 else "augmenté", absf(lost) * 100.0, attack_reaction_label(str(attack.get("reaction", "")))])
+	if attacks.size() > 12:
+		attacks = attacks.slice(attacks.size() - 12)
+
 func process_month(products: Array):
 	market_age_months += 1
 	_advance_market_threats()
+	_advance_attacks()
 	_advance_competitors()
 	_update_market_opportunities()
 	_update_tenders()
@@ -2310,6 +2517,9 @@ func get_state() -> Dictionary:
 		"next_threat_id":_next_threat_id,
 		"last_threat_market_age":_last_threat_market_age,
 		"market_age_months":market_age_months,
+		"attacks":attacks,
+		"next_attack_id":_next_attack_id,
+		"attack_advice_snooze_until":attack_advice_snooze_until,
 		"rng_seed":SaveCodec.int64_to_json(rng.seed),
 		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
@@ -2396,6 +2606,9 @@ func load_state(state: Dictionary):
 	_next_contract_id = int(state.get("next_contract_id", 1))
 	_next_tender_id = int(state.get("next_tender_id", tenders.size() + 1))
 	market_age_months = int(state.get("market_age_months", 0))
+	attacks = (state.get("attacks", []) as Array).duplicate(true)
+	_next_attack_id = int(state.get("next_attack_id", attacks.size() + 1))
+	attack_advice_snooze_until = int(state.get("attack_advice_snooze_until", 0))
 	_next_threat_id = int(state.get("next_threat_id", market_threats.size() + 1))
 	_last_threat_market_age = int(state.get("last_threat_market_age", maxi(market_age_months - 36, 0)))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "43021"), 43021)

@@ -92,7 +92,7 @@ But : le joueur sait toujours quoi viser, et le décor raconte sa progression.
 Critères : partie neuve jouée 48 mois → au moins 1 déménagement et 6 objectifs réussis ;
 la partie d'Alexandre (1985, 22 M€) reçoit des objectifs adaptés à son niveau dès le chargement.
 
-### Lot D — Gamme et marché actif (moyen, 2 sessions)
+### Lot D — Gamme et marché actif (moyen, 2 sessions) — ✅ fait le 29/09 (`docs/reviews/V09_LOT_D_GAMME_MARCHE_ACTIF.md`)
 
 But : le joueur agit sur le marché au lieu de le regarder.
 - **Retirer du marché** : déstockage (prix bas pendant 2-3 mois) puis arrêt ; Nora le conseille

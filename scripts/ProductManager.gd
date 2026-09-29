@@ -32,6 +32,17 @@ var cpu_generations: Array = []
 var _next_id := 1
 var _next_generation_id := 1
 var _reviewed_products: Dictionary = {}
+## Lot D : Nora ne reparle pas de la gamme avant ce mois (index année*12+mois).
+var range_advice_snooze_until := 0
+
+## Lot D (29/09) : fin de série puis retrait du marché.
+const CLEARANCE_MONTHS := 3
+const CLEARANCE_PRICE_FACTOR := 0.75
+const CLEARANCE_DEMAND_BONUS := 8.0
+const RETIRE_AGE_MONTHS := 36
+const RETIRE_SHARE_OF_RANGE := 0.05
+const RETIRE_MUSEUM_MONTHS := 96
+const RETIRE_DEAD_SHARE := 0.01
 
 func _ready():
 	pass
@@ -42,6 +53,7 @@ func reset():
 	_next_id = 1
 	_next_generation_id = 1
 	_reviewed_products = {}
+	range_advice_snooze_until = 0
 	products_changed.emit()
 
 func create_from_industrialization(project: Dictionary, industrialization: Dictionary = {}):
@@ -207,6 +219,8 @@ func _ensure_lifecycle_fields(product: Dictionary) -> void:
 	product["control_software"] = software
 
 func promotion_label(key: String) -> String:
+	if key == "CLEARANCE":
+		return "fin de série"
 	return str(PROMOTION_TYPES.get(key, {}).get("label", key.capitalize()))
 
 func revision_label(key: String) -> String:
@@ -570,6 +584,13 @@ func process_month():
 
 func _tick_post_launch_state(product: Dictionary):
 	_ensure_lifecycle_fields(product)
+	# Lot D : une fin de série dure 3 mois, puis le modèle quitte le marché.
+	var clearance_left := int(product.get("clearance_months_remaining", 0))
+	if clearance_left > 0:
+		product["clearance_months_remaining"] = clearance_left - 1
+		if clearance_left - 1 <= 0:
+			retire_product(str(product.get("id", "")), true)
+			return
 	var remaining := int(product.get("promotion_months_remaining", 0))
 	if remaining > 0:
 		remaining -= 1
@@ -768,6 +789,150 @@ func get_generation(generation_id: String) -> Dictionary:
 			return generation
 	return {}
 
+# --- Lot D : gamme active (fin de série, retrait, conseil de Nora) ------------------------------
+
+func is_in_clearance(product: Dictionary) -> bool:
+	return int(product.get("clearance_months_remaining", 0)) > 0
+
+## Raison qui empêche de retirer ce modèle ("" si c'est possible).
+func retire_block_reason(product: Dictionary) -> String:
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return "Ce modèle n'est pas en vente."
+	if not MarketManager.active_contract_for(str(product.get("id", ""))).is_empty():
+		return "Un client professionnel a un contrat en cours sur ce modèle."
+	return ""
+
+## Fin de série : prix -25 %, petite relance de la demande, retrait automatique dans 3 mois.
+func start_clearance(product_id: String) -> bool:
+	var product := get_product(product_id)
+	if retire_block_reason(product) != "" or is_in_clearance(product):
+		return false
+	var old_price := int(product.get("price", 1))
+	var new_price := maxi(int(product.get("unit_cost", 1)) + 1, int(round(float(old_price) * CLEARANCE_PRICE_FACTOR)))
+	product["clearance_months_remaining"] = CLEARANCE_MONTHS
+	product["clearance_from_price"] = old_price
+	product["price"] = new_price
+	product["promotion_type"] = "CLEARANCE"
+	product["promotion_months_remaining"] = CLEARANCE_MONTHS
+	product["promotion_bonus"] = CLEARANCE_DEMAND_BONUS
+	var history: Array = product.get("commercial_history", [])
+	history.push_front({"type":"CLEARANCE","month":TimeManager.month,"year":TimeManager.year,"from":old_price,"to":new_price})
+	if history.size() > 20:
+		history.pop_back()
+	product["commercial_history"] = history
+	CompanyManager.add_alert("%s passe en fin de série : %d € → %d €, retrait du marché dans %d mois." % [str(product.get("name", "Produit")), old_price, new_price, CLEARANCE_MONTHS])
+	lifecycle_action_applied.emit(product, "CLEARANCE")
+	products_changed.emit()
+	return true
+
+## Retrait du marché : plus de ventes ni de réservation de capacité. Le SAV des unités vendues continue.
+func retire_product(product_id: String, silent: bool = false) -> bool:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return false
+	if not silent and retire_block_reason(product) != "":
+		return false
+	product["status"] = "RETIRED"
+	product["clearance_months_remaining"] = 0
+	product["promotion_type"] = "NONE"
+	product["promotion_months_remaining"] = 0
+	product["promotion_bonus"] = 0.0
+	product["retired_month"] = TimeManager.month
+	product["retired_year"] = TimeManager.year
+	product["last_month_sales"] = 0
+	CompanyManager.add_alert("%s est retiré du marché (%s puces vendues au total)." % [str(product.get("name", "Produit")), _thousands(int(product.get("units_sold_total", 0)))])
+	lifecycle_action_applied.emit(product, "RETIRE")
+	products_changed.emit()
+	return true
+
+## Passe plusieurs modèles en fin de série d'un coup. Renvoie le nombre de modèles concernés.
+func start_clearance_many(product_ids: Array) -> int:
+	var count := 0
+	for product_id in product_ids:
+		if start_clearance(str(product_id)):
+			count += 1
+	return count
+
+## Modèles que Nora conseille de sortir, marché par marché :
+## - dépassés : une génération plus récente est en vente sur le même marché, et le modèle a 3 ans
+##   ou fait moins de 5 % des ventes de ce marché ;
+## - pièces de musée : 8 ans et plus sur le marché ;
+## - versions mortes : après un an, moins de 1 % des ventes d'un marché qui vend vraiment.
+## Il reste toujours au moins un modèle en vente.
+func retire_candidates() -> Array:
+	var launched: Array = []
+	var segment_sales := {}
+	var newest := {}
+	for product_value in products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "LAUNCHED":
+			continue
+		launched.append(product)
+		var key := _market_key(product)
+		segment_sales[key] = int(segment_sales.get(key, 0)) + int(product.get("last_month_sales", 0))
+		if not newest.has(key) or int(product.get("months_on_market", 0)) < int((newest[key] as Dictionary).get("months_on_market", 0)):
+			newest[key] = product
+	var result: Array = []
+	for product in launched:
+		if is_in_clearance(product) or retire_block_reason(product) != "":
+			continue
+		var months := int(product.get("months_on_market", 0))
+		if months < 6:
+			continue
+		var key := _market_key(product)
+		var market_total := int(segment_sales.get(key, 0))
+		var share := float(product.get("last_month_sales", 0)) / maxf(float(market_total), 1.0)
+		var newest_product: Dictionary = newest[key]
+		var newer_exists := _generation_key(product) != _generation_key(newest_product)
+		if months >= RETIRE_MUSEUM_MONTHS \
+				or (newer_exists and (months >= RETIRE_AGE_MONTHS or share < RETIRE_SHARE_OF_RANGE)) \
+				or (months >= 12 and share < RETIRE_DEAD_SHARE and market_total >= 100):
+			result.append(product)
+	if not result.is_empty() and result.size() >= launched.size():
+		# Ne jamais vider la vitrine : on garde le meilleur vendeur.
+		var best: Dictionary = result[0]
+		for product in result:
+			if int(product.get("last_month_sales", 0)) > int(best.get("last_month_sales", 0)):
+				best = product
+		result.erase(best)
+	return result
+
+func _market_key(product: Dictionary) -> String:
+	return MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment())))
+
+func _generation_key(product: Dictionary) -> String:
+	return str(product.get("generation_id", product.get("id", "")))
+
+func retire_candidate_ids() -> Array:
+	var ids: Array = []
+	for product in retire_candidates():
+		ids.append(str(product.get("id", "")))
+	return ids
+
+func range_advice_due() -> bool:
+	if TimeManager.year * 12 + TimeManager.month < range_advice_snooze_until:
+		return false
+	return retire_candidates().size() >= 2
+
+func snooze_range_advice(months: int = 6) -> void:
+	range_advice_snooze_until = TimeManager.year * 12 + TimeManager.month + months
+	products_changed.emit()
+
+func launched_count() -> int:
+	var count := 0
+	for product in products:
+		if str(product.get("status", "")) == "LAUNCHED":
+			count += 1
+	return count
+
+static func _thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	while digits.length() > 3:
+		out = " " + digits.substr(digits.length() - 3) + out
+		digits = digits.substr(0, digits.length() - 3)
+	return digits + out
+
 func active_departments() -> Array:
 	for product in products:
 		if str(product.status) == "LAUNCHED":
@@ -780,7 +945,8 @@ func get_state() -> Dictionary:
 		"cpu_generations":cpu_generations,
 		"next_id":_next_id,
 		"next_generation_id":_next_generation_id,
-		"reviewed_products":_reviewed_products
+		"reviewed_products":_reviewed_products,
+		"range_advice_snooze_until":range_advice_snooze_until
 	}
 
 func load_state(state: Dictionary):
@@ -844,6 +1010,7 @@ func load_state(state: Dictionary):
 	_next_id = int(state.get("next_id", 1))
 	_next_generation_id = int(state.get("next_generation_id", cpu_generations.size() + 1))
 	_reviewed_products = state.get("reviewed_products", {}).duplicate(true)
+	range_advice_snooze_until = int(state.get("range_advice_snooze_until", 0))
 	products_changed.emit()
 
 func _rebuild_missing_generations() -> void:

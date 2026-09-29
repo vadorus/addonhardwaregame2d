@@ -30,6 +30,12 @@ var _model_numbers: Label
 var _price_apply_button: Button
 var _capacity_title: Label
 var _intel_card: Control
+# Lot D : gamme active.
+var _range_advice_box: VBoxContainer
+var _clearance_button: Button
+var _retire_button: Button
+var _attack_select: OptionButton
+var _attack_button: Button
 
 const STATUS_LABELS := {"READY":"Prêt à lancer", "LAUNCHED":"En vente", "RETIRED":"Retiré", "DISCONTINUED":"Arrêté"}
 const AMBER := Color("d9822b")
@@ -47,6 +53,9 @@ func _build() -> void:
 	products_label = UI.muted_label("", 13)
 	products_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(products_label)
+	_range_advice_box = VBoxContainer.new()
+	_range_advice_box.add_theme_constant_override("separation", 6)
+	add_child(_range_advice_box)
 	_range_box = VBoxContainer.new()
 	_range_box.add_theme_constant_override("separation", 8)
 	add_child(_range_box)
@@ -173,6 +182,26 @@ func _build() -> void:
 	firmware_release_button.pressed.connect(_emit_firmware)
 	lifecycle_grid.add_child(firmware_release_button)
 
+	# Lot D : attaquer le rival qui domine ce marché.
+	lifecycle_grid.add_child(UI.label("Attaquer un rival", 13))
+	_attack_select = OptionButton.new()
+	lifecycle_grid.add_child(_attack_select)
+	_attack_button = Button.new()
+	_attack_button.text = "Lancer l'offensive"
+	_attack_button.pressed.connect(_emit_attack)
+	lifecycle_grid.add_child(_attack_button)
+
+	# Lot D : fin de série (prix -25 % pendant 3 mois) puis retrait, ou retrait immédiat.
+	lifecycle_grid.add_child(UI.label("Fin de vie", 13))
+	_clearance_button = Button.new()
+	_clearance_button.text = "Fin de série (-25 %%, %d mois)" % ProductManager.CLEARANCE_MONTHS
+	_clearance_button.pressed.connect(_emit_clearance)
+	lifecycle_grid.add_child(_clearance_button)
+	_retire_button = Button.new()
+	_retire_button.text = "Retirer maintenant"
+	_retire_button.pressed.connect(_emit_retire)
+	lifecycle_grid.add_child(_retire_button)
+
 	control_software_button = Button.new()
 	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
 	control_software_button.pressed.connect(_emit_control_software)
@@ -196,11 +225,15 @@ func refresh() -> void:
 func _refresh_product_list() -> void:
 	var current_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""
 	product_select.clear()
-	for product_value in ProductManager.products:
-		var product: Dictionary = product_value
-		var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
-		product_select.add_item("%s — %s — %s" % [str(product.name), tier, _status_label(str(product.status))])
-		product_select.set_item_metadata(product_select.item_count - 1, str(product.id))
+	# Lot D : les modèles retirés passent en fin de liste.
+	for pass_retired in [false, true]:
+		for product_value in ProductManager.products:
+			var product: Dictionary = product_value
+			if (str(product.status) == "RETIRED") != pass_retired:
+				continue
+			var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
+			product_select.add_item("%s — %s — %s" % [str(product.name), tier, _product_status_text(product)])
+			product_select.set_item_metadata(product_select.item_count - 1, str(product.id))
 	if current_id != "":
 		UI.select_meta(product_select, current_id)
 	if (product_select.selected < 0 or current_id == "") and product_select.item_count > 0:
@@ -213,6 +246,41 @@ func _refresh_product_list() -> void:
 
 static func _status_label(status: String) -> String:
 	return str(STATUS_LABELS.get(status, status.capitalize()))
+
+static func _product_status_text(product: Dictionary) -> String:
+	if ProductManager.is_in_clearance(product):
+		return "Fin de série (%d mois)" % int(product.get("clearance_months_remaining", 0))
+	return _status_label(str(product.get("status", "")))
+
+## Lot D : Nora propose de sortir les vieux modèles de la gamme.
+func _refresh_range_advice() -> void:
+	if _range_advice_box == null:
+		return
+	for child in _range_advice_box.get_children():
+		_range_advice_box.remove_child(child)
+		child.queue_free()
+	var candidates := ProductManager.retire_candidates()
+	if candidates.is_empty():
+		return
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(Color("fbe8cc"), 12, 1, AMBER, 10))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
+	box.add_child(UI.label("Nora : %d modèle(s) à sortir de la gamme" % candidates.size(), 15))
+	var names: Array[String] = []
+	for product_value in candidates:
+		var product: Dictionary = product_value
+		names.append("%s (%d mois, %s/mois)" % [str(product.get("name", "")), int(product.get("months_on_market", 0)), UI.money(int(product.get("last_month_sales", 0)))])
+	var list := UI.muted_label("Dépassés par une génération plus récente, trop anciens ou presque sans ventes : %s." % ", ".join(names), 12)
+	list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(list)
+	var button := Button.new()
+	button.text = "Passer ces %d modèle(s) en fin de série" % candidates.size()
+	button.custom_minimum_size.y = 40
+	button.pressed.connect(_emit_clearance_many)
+	box.add_child(button)
+	_range_advice_box.add_child(card)
 
 func _default_product_id() -> String:
 	var best_id := ""
@@ -233,6 +301,7 @@ func _refresh_range() -> void:
 	for child in _range_box.get_children():
 		_range_box.remove_child(child)
 		child.queue_free()
+	_refresh_range_advice()
 	var launched := 0
 	var ready_count := 0
 	var monthly_units := 0
@@ -299,7 +368,7 @@ func _generation_card(generation: Dictionary, selected_id: String) -> Control:
 		if model.is_empty():
 			continue
 		var status := str(model.get("status", ""))
-		var text := "%s  •  %s\n%s €  •  %s" % [str(model.get("sku_label", "Modèle")), _status_label(status),
+		var text := "%s  •  %s\n%s €  •  %s" % [str(model.get("sku_label", "Modèle")), _product_status_text(model),
 			UI.money(int(model.get("price", 0))),
 			("%s ventes/mois" % UI.money(int(model.get("last_month_sales", 0)))) if status == "LAUNCHED" else "à lancer"]
 		var button := Button.new()
@@ -348,7 +417,7 @@ func _refresh_model_summary(product: Dictionary) -> void:
 	if _model_header == null:
 		return
 	var status := str(product.get("status", ""))
-	_model_header.text = "%s — %s  (%s)" % [str(product.get("name", "CPU")), str(product.get("sku_label", "")), _status_label(status)]
+	_model_header.text = "%s — %s  (%s)" % [str(product.get("name", "CPU")), str(product.get("sku_label", "")), _product_status_text(product)]
 	for child in _model_meters.get_children():
 		_model_meters.remove_child(child)
 		child.queue_free()
@@ -519,6 +588,41 @@ func _refresh_post_launch(product: Dictionary) -> void:
 	]
 	firmware_release_button.disabled = not bool(lifecycle.get("firmware_available", false))
 	control_software_button.disabled = not bool(lifecycle.get("control_software_available", false))
+	_refresh_end_of_life(product)
+	_refresh_attack(product)
+
+func _refresh_end_of_life(product: Dictionary) -> void:
+	if _clearance_button == null:
+		return
+	var block := ProductManager.retire_block_reason(product)
+	var in_clearance := ProductManager.is_in_clearance(product)
+	_clearance_button.disabled = block != "" or in_clearance
+	_retire_button.disabled = block != ""
+	_clearance_button.tooltip_text = block
+	_retire_button.tooltip_text = block
+	_clearance_button.text = ("Fin de série : retrait dans %d mois" % int(product.get("clearance_months_remaining", 0))) if in_clearance else ("Fin de série (-25 %%, %d mois)" % ProductManager.CLEARANCE_MONTHS)
+
+func _refresh_attack(product: Dictionary) -> void:
+	if _attack_select == null:
+		return
+	_attack_select.clear()
+	var targets := MarketManager.attack_targets(product)
+	for target_value in targets:
+		var target: Dictionary = target_value
+		_attack_select.add_item("%s — %s (%s €)" % [str(target.get("company", "")), str(target.get("name", "")), UI.money(int(target.get("price", 0)))])
+		_attack_select.set_item_metadata(_attack_select.item_count - 1, str(target.get("id", "")))
+	var running := MarketManager.attack_for_product(str(product.get("id", "")))
+	if not running.is_empty():
+		_attack_button.text = "Offensive en cours (%d mois)" % int(running.get("months_remaining", 0))
+		_attack_button.disabled = true
+	elif targets.is_empty():
+		_attack_button.text = "Aucun rival sur ce marché"
+		_attack_button.disabled = true
+	else:
+		var cost := MarketManager.attack_cost()
+		_attack_button.text = "Lancer l'offensive — %s €" % UI.money(cost)
+		_attack_button.disabled = not Economy.can_afford(cost)
+	_attack_select.disabled = targets.is_empty()
 
 func _refresh_launch_intel() -> void:
 	if product_select.item_count == 0:
@@ -676,6 +780,24 @@ func _emit_update_price() -> void:
 	if product_select.item_count == 0:
 		return
 	action_requested.emit("update_price", {"product_id":UI.option_meta(product_select),"price":int(product_price.value)})
+
+func _emit_clearance() -> void:
+	if product_select.item_count == 0:
+		return
+	action_requested.emit("start_clearance", {"product_id":UI.option_meta(product_select)})
+
+func _emit_retire() -> void:
+	if product_select.item_count == 0:
+		return
+	action_requested.emit("retire_product", {"product_id":UI.option_meta(product_select)})
+
+func _emit_clearance_many() -> void:
+	action_requested.emit("clearance_many", {"product_ids":ProductManager.retire_candidate_ids()})
+
+func _emit_attack() -> void:
+	if product_select.item_count == 0 or _attack_select.item_count == 0:
+		return
+	action_requested.emit("attack_rival", {"product_id":UI.option_meta(product_select), "competitor_id":UI.option_meta(_attack_select)})
 
 func _emit_promotion() -> void:
 	if product_select.item_count == 0:

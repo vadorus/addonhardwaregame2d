@@ -1,11 +1,16 @@
-Lot E2 : équipes de recherche Vitesse / Énergie / Fiabilité
+Lot D : fin de série et retrait, offensive contre un rival, 3 profils de recrutement
 
-- ResearchTeams : chaque chercheur appartient à un axe (ou libre),
-  chef d'équipe, formation (2 mois, +6 compétence), recrutement d'expert
-- Le niveau d'équipe multiplie les gains de connaissance par axe
-- Anciennes sauvegardes : répartition automatique selon les allocations
-- Labo > Recherche : panneau Équipes (membres, niveau, conseil du chef)
-- Test ResearchTeamsScenario
+- Fin de série (prix -25 % pendant 3 mois puis retrait) ou retrait immédiat ;
+  bloqué si un contrat client est en cours ; SAV conservé
+- Conseil de Nora par marché : dépassés, pièces de musée (8 ans), versions mortes ;
+  carte dans Produits + décision GAMME au bureau du PDG
+- Offensive contre un rival du même marché (4 mois, 40 % d'un mois de CA) :
+  +20 % de demande, le rival perd des clients et réagit (prix, pub, sortie
+  anticipée ou rien) avec brèves presse ; Nora la propose face à un rival dominant
+- Recrutement : Nora présente 3 profils (expert, junior prometteur qui progresse,
+  généraliste)
+- Test RangeAndRivalScenario ; note docs/reviews/V09_LOT_D_GAMME_MARCHE_ACTIF.md
+- Partie d'Alexandre : 21 -> 10 modèles en un clic, CA mensuel inchangé
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01HnCWBwmbhWGCMNHAJgipmS

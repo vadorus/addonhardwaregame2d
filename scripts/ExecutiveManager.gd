@@ -784,6 +784,36 @@ func get_ceo_decisions() -> Array:
 			"target_tab":4,
 			"can_defer":true
 		})
+	# Lot D : trop de vieux modèles en vente — Nora propose de faire le ménage.
+	if ProductManager.range_advice_due():
+		var old_models := ProductManager.retire_candidates()
+		var names: Array = []
+		for model_value in old_models:
+			if names.size() < 4:
+				names.append(str((model_value as Dictionary).get("name", "CPU")))
+		decisions.append({
+			"id":"RANGE:CLEARANCE",
+			"category":"GAMME",
+			"severity":46.0,
+			"title":"Nora : %d modèles à sortir de la gamme" % old_models.size(),
+			"text":"%s%s : dépassés, trop anciens ou presque sans ventes. %d modèles sont en vente au total." % [", ".join(names), "…" if old_models.size() > names.size() else "", ProductManager.launched_count()],
+			"recommendation":"Une fin de série (prix -25 %% pendant %d mois) écoule le stock, puis le modèle est retiré. La gamme reste lisible et vos meilleurs CPU récupèrent les clients." % ProductManager.CLEARANCE_MONTHS,
+			"target_tab":4,
+			"can_defer":true
+		})
+	# Lot D : un rival écrase l'un de vos marchés — Nora propose une offensive.
+	var attack_idea: Dictionary = MarketManager.attack_advice()
+	if not attack_idea.is_empty():
+		decisions.append({
+			"id":"RIVAL:%s|%s" % [str(attack_idea.product_id), str(attack_idea.competitor_id)],
+			"category":"RIVAL",
+			"severity":44.0,
+			"title":"Nora : attaquer %s ?" % str(attack_idea.company),
+			"text":"Sur le marché %s, le %s vend %s puces par mois contre %s pour votre %s." % [MarketManager.segment_label(str(attack_idea.segment)), str(attack_idea.rival_product), _group_digits(int(attack_idea.rival_units)), _group_digits(int(attack_idea.player_units)), str(attack_idea.product_name)],
+			"recommendation":"Une offensive de %d mois (publicité, remises, revendeurs) prend des clients au rival. Il réagira : baisse de prix, publicité ou sortie anticipée." % MarketManager.ATTACK_MONTHS,
+			"target_tab":4,
+			"can_defer":true
+		})
 	if GarageBusiness.loan_offer_pending():
 		decisions.append({
 			"id":"FINANCE:LOAN",
@@ -1037,3 +1067,11 @@ func load_state(state: Dictionary):
 	interface_unlocks["LAB"] = true
 	unlock_history = state.get("unlock_history", []).duplicate(true)
 	executive_changed.emit()
+
+static func _group_digits(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	while digits.length() > 3:
+		out = " " + digits.substr(digits.length() - 3) + out
+		digits = digits.substr(0, digits.length() - 3)
+	return ("-" if value < 0 else "") + digits + out

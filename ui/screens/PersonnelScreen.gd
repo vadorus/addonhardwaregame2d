@@ -81,7 +81,7 @@ func _build() -> void:
 		recruit_department.set_item_metadata(recruit_department.item_count - 1, department)
 	recruit_row.add_child(recruit_department)
 	var search_button := Button.new()
-	search_button.text = "Chercher un candidat"
+	search_button.text = "Nora cherche 3 profils"
 	search_button.custom_minimum_size.y = 42
 	search_button.pressed.connect(_generate_candidate)
 	recruit_row.add_child(search_button)
@@ -280,12 +280,14 @@ func refresh() -> void:
 
 	if candidate_box != null:
 		_clear(candidate_box)
+		_build_shortlist()
 	if hire_button != null:
 		hire_button.disabled = PersonnelManager.candidate.is_empty()
+		hire_button.text = "Recruter %s" % str(PersonnelManager.candidate.get("name", "ce candidat")) if not PersonnelManager.candidate.is_empty() else "Recruter ce candidat"
 	if PersonnelManager.candidate.is_empty():
 		candidate_label.text = "Aucun candidat sélectionné."
 		if candidate_box != null:
-			candidate_box.add_child(UI.muted_label("Choisissez un métier puis « Chercher un candidat ».", 13))
+			candidate_box.add_child(UI.muted_label("Choisissez un profil ci-dessus." if not PersonnelManager.shortlist.is_empty() else "Choisissez un métier puis « Nora cherche 3 profils ».", 13))
 		return
 	var shown: Dictionary = PersonnelManager.candidate
 	if candidate_box != null:
@@ -343,14 +345,51 @@ func _selected_department() -> String:
 	return str(recruit_department.get_item_metadata(recruit_department.selected))
 
 func _generate_candidate() -> void:
-	PersonnelManager.generate_candidate(_selected_department())
+	PersonnelManager.generate_shortlist(_selected_department())
 	refresh()
 	data_changed.emit()
+
+## Lot D : les 3 profils trouvés par Nora (expert, junior prometteur, généraliste).
+func _build_shortlist() -> void:
+	if PersonnelManager.shortlist.is_empty():
+		return
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 8)
+	candidate_box.add_child(row)
+	var selected_name := str(PersonnelManager.candidate.get("name", ""))
+	for i in range(PersonnelManager.shortlist.size()):
+		var profile: Dictionary = PersonnelManager.shortlist[i]
+		var kind: Dictionary = PersonnelManager.SHORTLIST_PROFILES.get(str(profile.get("shortlist_kind", "")), {})
+		var chosen := selected_name != "" and selected_name == str(profile.get("name", ""))
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(220, 0)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.add_theme_stylebox_override("panel", UI.stylebox(Color("fbe8cc") if chosen else UI.APP_PANEL_ALT, 12, 2 if chosen else 1, Color("d9822b") if chosen else UI.APP_LINE, 10))
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 3)
+		card.add_child(box)
+		box.add_child(UI.eyebrow(str(kind.get("label", "Profil")).to_upper()))
+		box.add_child(UI.label(str(profile.get("name", "")), 15))
+		box.add_child(UI.muted_label("Compétence %d • %.0f ans d'exp. • %s €/mois" % [int(profile.get("skill", 0)), float(profile.get("experience_years", 0.0)), UI.money(int(profile.get("salary", 0)))], 12))
+		var pitch := UI.muted_label(str(kind.get("pitch", "")), 12)
+		pitch.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(pitch)
+		var pick := Button.new()
+		pick.text = "✓ Choisi" if chosen else "Choisir"
+		pick.disabled = chosen
+		pick.custom_minimum_size.y = 38
+		pick.pressed.connect(_pick_shortlist.bind(i))
+		box.add_child(pick)
+		row.add_child(card)
+
+func _pick_shortlist(index: int) -> void:
+	if PersonnelManager.select_shortlist(index):
+		call_deferred("refresh")
 
 func _hire_candidate() -> void:
 	if PersonnelManager.hire_candidate():
 		status_changed.emit("Candidat recruté.")
-		PersonnelManager.generate_candidate(_selected_department())
 		refresh()
 		data_changed.emit()
 	else:
