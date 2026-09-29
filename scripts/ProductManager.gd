@@ -569,8 +569,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var royalty_cost := int(round(float(revenue) * royalty_rate))
 	if royalty_cost > 0:
 		Economy.add_expense(royalty_cost, "Royalties technologie — %s" % str(product.name))
-	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 240.0, 0.005, 0.22)
-	return_rate += float(product.get("defect_rate", 0.0)) * 0.42
+	# 29/09 (revue level design) : un CPU fiable à 80/100 revenait à 12 % en SAV, ce qui ouvrait
+	# une « crise SAV » à chaque lancement et gâchait le moment de la sortie. Taux réalistes :
+	# ~5-6 % pour un CPU correct, crise seulement si la fiabilité ou les défauts sont vraiment faibles.
+	var return_rate: float = clampf((100.0 - float(product.metrics.reliability)) / 420.0, 0.004, 0.22)
+	return_rate += float(product.get("defect_rate", 0.0)) * 0.35
 	return_rate = clampf(return_rate, 0.005, 0.28)
 	return_rate /= CompanyManager.get_support_modifier()
 	var returns := int(total_units * return_rate)

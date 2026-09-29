@@ -1694,6 +1694,7 @@ func _show_tab(index: int):
 	if tabs.current_tab != safe_index and status_label != null and (status_label.text.begins_with("Nora : cette fonction") or status_label.text.begins_with("Nora : pas encore")):
 		status_label.text = ""
 	tabs.current_tab = safe_index
+	_place_notification_feed()
 	_update_nav_state()
 
 func _on_dock_tab(index: int) -> void:
@@ -2743,6 +2744,7 @@ func _build_notification_feed() -> void:
 	notification_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	notification_feed.connect("navigate_requested", func(tab_index: int): _show_tab(tab_index))
 	add_child(notification_feed)
+	_place_notification_feed()
 
 ## Les cartes de notification cachaient les onglets Marché/Presse : on les place sous la barre d'onglets.
 func _place_notification_feed() -> void:
@@ -2751,6 +2753,13 @@ func _place_notification_feed() -> void:
 	var top := 104.0
 	if nav_panel != null and nav_panel.visible:
 		top = maxf(top, nav_panel.get_global_rect().end.y - get_global_rect().position.y + 6.0)
+	# Au QG, la carte « Projet en cours » occupe le coin droit : bulle au centre (au-dessus du décor).
+	# Dans les onglets, le titre est à gauche/centre : bulle à droite.
+	var on_hq := tabs == null or tabs.current_tab == 0
+	notification_feed.set_anchors_preset(Control.PRESET_CENTER_TOP if on_hq else Control.PRESET_TOP_RIGHT)
+	notification_feed.offset_left = -180.0 if on_hq else -372.0
+	notification_feed.offset_right = 180.0 if on_hq else -12.0
+	notification_feed.grow_horizontal = Control.GROW_DIRECTION_BOTH if on_hq else Control.GROW_DIRECTION_BEGIN
 	notification_feed.offset_top = top
 
 ## Petite carte en haut de l'écran. kind : info, good, alert, press, unlock. tab >= 0 : un toucher ouvre l'écran.
