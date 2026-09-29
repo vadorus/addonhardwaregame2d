@@ -140,6 +140,11 @@ les rivaux ne restent pas figés.
 - Passe Android : tailles de texte, zones de toucher, performances sur le Pixel 10.
 - Relecture de tous les textes (français naturel, pas de jargon interne).
 
+> **Ajout du 29/09 (audit `docs/reviews/V09_AUDIT_LEAD_TYCOON.md`)** : proposition d'un lot M
+> « marché vivant et croissance qui paie » (courbes de vente, segments qui montent et descendent,
+> projets plus gros pour les grandes équipes, presse qui attend mieux que la génération précédente,
+> menaces) à placer avant ou avec le lot C. En attente de la décision d'Alexandre.
+
 ## 4. Ordre recommandé
 
 1. **Lot A** (rapide, rend tout le reste plus lisible).
