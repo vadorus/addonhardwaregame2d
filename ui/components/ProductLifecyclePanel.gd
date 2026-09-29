@@ -23,6 +23,16 @@ var revision_select: OptionButton
 var firmware_select: OptionButton
 var firmware_release_button: Button
 var control_software_button: Button
+var _range_box: VBoxContainer
+var _model_header: Label
+var _model_meters: VBoxContainer
+var _model_numbers: Label
+var _price_apply_button: Button
+var _capacity_title: Label
+var _intel_card: Control
+
+const STATUS_LABELS := {"READY":"Prêt à lancer", "LAUNCHED":"En vente", "RETIRED":"Retiré", "DISCONTINUED":"Arrêté"}
+const AMBER := Color("d9822b")
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
@@ -30,30 +40,56 @@ func _ready() -> void:
 	refresh()
 
 func _build() -> void:
-	add_child(UI.section("Gamme CPU / lancer"))
-	products_label = UI.rich_label()
+	# V0.9 (29/09) : la page listait 21 lignes « LAUNCHED » puis une fiche de 15 lignes.
+	# Maintenant : la gamme en cartes (générations récentes d'abord, anciennes repliées),
+	# un modèle sélectionné résumé en jauges, et la fiche technique complète repliée.
+	add_child(UI.section("Votre gamme"))
+	products_label = UI.muted_label("", 13)
+	products_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(products_label)
+	_range_box = VBoxContainer.new()
+	_range_box.add_theme_constant_override("separation", 8)
+	add_child(_range_box)
 
+	add_child(UI.section("Modèle sélectionné"))
 	product_select = OptionButton.new()
-	product_select.item_selected.connect(func(_i): _refresh_product_details())
+	product_select.item_selected.connect(_on_product_selected)
 	add_child(product_select)
+	_model_header = UI.label("", 18)
+	_model_header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_model_header)
+	_model_meters = VBoxContainer.new()
+	_model_meters.add_theme_constant_override("separation", 2)
+	add_child(_model_meters)
+	_model_numbers = UI.muted_label("", 13)
+	_model_numbers.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_model_numbers)
 
 	product_details_label = UI.rich_label()
-	add_child(product_details_label)
+	add_child(_collapsible("Fiche technique complète", product_details_label))
 
 	launch_grid = GridContainer.new()
 	launch_grid.columns = 2
 	add_child(launch_grid)
-	launch_grid.add_child(UI.label("Prix de vente", 14))
+	launch_grid.add_child(UI.label("Prix de vente (€)", 14))
+	var price_row := HBoxContainer.new()
+	price_row.add_theme_constant_override("separation", 8)
 	product_price = UI.spin(1, 1000000, 5, 300)
 	product_price.value_changed.connect(func(_value): _refresh_launch_intel())
-	launch_grid.add_child(product_price)
-	launch_grid.add_child(UI.label("Capacité mensuelle", 14))
+	price_row.add_child(product_price)
+	_price_apply_button = Button.new()
+	_price_apply_button.text = "Appliquer le nouveau prix"
+	_price_apply_button.pressed.connect(_emit_update_price)
+	price_row.add_child(_price_apply_button)
+	launch_grid.add_child(price_row)
+	_capacity_title = UI.label("Capacité mensuelle", 14)
+	launch_grid.add_child(_capacity_title)
 	product_capacity = UI.spin(1, 1000000, 100, 5000)
 	product_capacity.value_changed.connect(func(_value): _refresh_launch_intel())
 	launch_grid.add_child(product_capacity)
 
 	var intel_card := UI.card(UI.APP_CYAN_DARK, 10, 10)
+	_intel_card = intel_card
 	add_child(intel_card)
 	var intel_box := VBoxContainer.new()
 	intel_box.add_theme_constant_override("separation", 6)
@@ -78,17 +114,15 @@ func _build() -> void:
 	post_launch_group.add_theme_constant_override("separation", 10)
 	add_child(post_launch_group)
 	post_launch_group.add_child(UI.section("Vie après lancement"))
-	var intro := UI.muted_label("Un CPU lancé continue d'évoluer : prix et promotion sont commerciaux, le stepping modifie uniquement les nouvelles unités, tandis que firmware et logiciel peuvent toucher le parc compatible.", 12)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	post_launch_group.add_child(intro)
 	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")
 	product_pulse_panel = pulse_script.new() as Control
 	post_launch_group.add_child(product_pulse_panel)
-	post_launch_label = UI.rich_label()
-	post_launch_group.add_child(post_launch_label)
 
+	# Une action = une ligne : ce qu'on choisit, puis le bouton qui l'applique.
 	lifecycle_grid = GridContainer.new()
-	lifecycle_grid.columns = 2
+	lifecycle_grid.columns = 3
+	lifecycle_grid.add_theme_constant_override("h_separation", 8)
+	lifecycle_grid.add_theme_constant_override("v_separation", 8)
 	post_launch_group.add_child(lifecycle_grid)
 
 	lifecycle_grid.add_child(UI.label("Promotion", 13))
@@ -97,6 +131,10 @@ func _build() -> void:
 		promotion_select.add_item(ProductManager.promotion_label(promotion_key))
 		promotion_select.set_item_metadata(promotion_select.item_count - 1, promotion_key)
 	lifecycle_grid.add_child(promotion_select)
+	var promote := Button.new()
+	promote.text = "Lancer la promotion"
+	promote.pressed.connect(_emit_promotion)
+	lifecycle_grid.add_child(promote)
 
 	lifecycle_grid.add_child(UI.label("Révision matérielle", 13))
 	revision_select = OptionButton.new()
@@ -104,6 +142,10 @@ func _build() -> void:
 		revision_select.add_item(ProductManager.revision_label(revision_key))
 		revision_select.set_item_metadata(revision_select.item_count - 1, revision_key)
 	lifecycle_grid.add_child(revision_select)
+	var revise := Button.new()
+	revise.text = "Valider le stepping"
+	revise.pressed.connect(_emit_revision)
+	lifecycle_grid.add_child(revise)
 
 	lifecycle_grid.add_child(UI.label("Firmware / microcode", 13))
 	firmware_select = OptionButton.new()
@@ -112,43 +154,25 @@ func _build() -> void:
 		firmware_select.set_item_metadata(firmware_select.item_count - 1, firmware_key)
 	UI.select_meta(firmware_select, "BALANCED")
 	lifecycle_grid.add_child(firmware_select)
-
-	var actions := HFlowContainer.new()
-	actions.add_theme_constant_override("h_separation", 8)
-	actions.add_theme_constant_override("v_separation", 8)
-	post_launch_group.add_child(actions)
-
-	var price_update := Button.new()
-	price_update.text = "Appliquer le nouveau prix"
-	price_update.pressed.connect(_emit_update_price)
-	actions.add_child(price_update)
-
-	var promote := Button.new()
-	promote.text = "Lancer la promotion"
-	promote.pressed.connect(_emit_promotion)
-	actions.add_child(promote)
-
-	var revise := Button.new()
-	revise.text = "Valider le stepping"
-	revise.pressed.connect(_emit_revision)
-	actions.add_child(revise)
-
 	firmware_release_button = Button.new()
 	firmware_release_button.text = "Publier le firmware"
 	firmware_release_button.pressed.connect(_emit_firmware)
-	actions.add_child(firmware_release_button)
+	lifecycle_grid.add_child(firmware_release_button)
 
 	control_software_button = Button.new()
 	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
 	control_software_button.pressed.connect(_emit_control_software)
-	actions.add_child(control_software_button)
+	post_launch_group.add_child(control_software_button)
+
+	post_launch_label = UI.rich_label()
+	post_launch_group.add_child(_collapsible("Historique et retours du terrain", post_launch_label))
 
 func set_viewport_width(width: float) -> void:
 	var columns := 1 if width < 700.0 else 2
 	if launch_grid != null:
 		launch_grid.columns = columns
 	if lifecycle_grid != null:
-		lifecycle_grid.columns = columns
+		lifecycle_grid.columns = 1 if width < 700.0 else 3
 	if product_pulse_panel != null and product_pulse_panel.has_method("set_viewport_width"):
 		product_pulse_panel.call("set_viewport_width", width)
 
@@ -157,47 +181,190 @@ func refresh() -> void:
 
 func _refresh_product_list() -> void:
 	var current_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""
-	var lines: Array[String] = []
-	for generation_value in ProductManager.cpu_generations:
-		var generation: Dictionary = generation_value
-		var ready_count := 0
-		var launched_count := 0
-		for model_id in generation.get("model_ids", []):
-			var model := ProductManager.get_product(str(model_id))
-			if str(model.get("status", "")) == "READY":
-				ready_count += 1
-			elif str(model.get("status", "")) == "LAUNCHED":
-				launched_count += 1
-		lines.append("G%d • %s — rendement %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • dies électriques %.0f/100 ± %.1f • gravure %.0f/100 • %d modèles (%d prêts, %d lancés) • potentiel restant %d" % [
-			int(generation.get("generation_index", 1)), str(generation.get("name", "Architecture CPU")),
-			float(generation.get("yield_rate", 0.0)) * 100.0, float(generation.get("manufacturing_quality", 60.0)),
-			float(generation.get("defect_rate", 0.025)) * 100.0,
-			float(generation.get("die_quality_mean", generation.get("silicon_quality_mean", 60.0))),
-			float(generation.get("die_variation", generation.get("silicon_variation", 10.0))),
-			float(generation.get("lithography_precision", 55.0)), int(generation.get("model_ids", []).size()),
-			ready_count, launched_count, int(generation.get("future_model_slots", 0))
-		])
-	for product_value in ProductManager.products:
-		var product: Dictionary = product_value
-		var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
-		var lifecycle := MarketManager.product_lifecycle_label(product) if str(product.status) == "LAUNCHED" else "Non lancé"
-		lines.append("  • %s [%s] — %s | %s | coût %s € | prix %s € | ventes %s | satisfaction %.1f" % [
-			str(product.name), tier, str(product.status), lifecycle, UI.money(int(product.unit_cost)),
-			UI.money(int(product.price)), UI.money(int(product.units_sold_total)), float(product.customer_satisfaction)
-		])
-	products_label.text = "\n".join(lines) if not lines.is_empty() else "Aucun produit. Terminez d'abord un projet R&D."
-
 	product_select.clear()
 	for product_value in ProductManager.products:
 		var product: Dictionary = product_value
 		var tier := str(product.get("sku_label", GameData.SECTORS[str(product.sector)].label))
-		product_select.add_item("%s — %s — %s" % [str(product.name), tier, str(product.status)])
+		product_select.add_item("%s — %s — %s" % [str(product.name), tier, _status_label(str(product.status))])
 		product_select.set_item_metadata(product_select.item_count - 1, str(product.id))
 	if current_id != "":
 		UI.select_meta(product_select, current_id)
-	if product_select.selected < 0 and product_select.item_count > 0:
-		product_select.select(0)
+	if (product_select.selected < 0 or current_id == "") and product_select.item_count > 0:
+		# Par défaut : un modèle prêt à lancer, sinon votre meilleure vente (pas le plus vieux CPU).
+		UI.select_meta(product_select, _default_product_id())
+		if product_select.selected < 0:
+			product_select.select(0)
+	_refresh_range()
 	_refresh_product_details()
+
+static func _status_label(status: String) -> String:
+	return str(STATUS_LABELS.get(status, status.capitalize()))
+
+func _default_product_id() -> String:
+	var best_id := ""
+	var best_sales := -1
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "READY":
+			return str(product.get("id", ""))
+		if str(product.get("status", "")) == "LAUNCHED" and int(product.get("last_month_sales", 0)) > best_sales:
+			best_sales = int(product.get("last_month_sales", 0))
+			best_id = str(product.get("id", ""))
+	return best_id
+
+## La gamme en cartes : une carte par génération (les 2 plus récentes ouvertes, les autres repliées).
+func _refresh_range() -> void:
+	if _range_box == null:
+		return
+	for child in _range_box.get_children():
+		_range_box.remove_child(child)
+		child.queue_free()
+	var launched := 0
+	var ready_count := 0
+	var monthly_units := 0
+	var best_name := ""
+	var best_units := -1
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		match str(product.get("status", "")):
+			"LAUNCHED":
+				launched += 1
+				monthly_units += int(product.get("last_month_sales", 0))
+				if int(product.get("last_month_sales", 0)) > best_units:
+					best_units = int(product.get("last_month_sales", 0))
+					best_name = str(product.get("name", ""))
+			"READY":
+				ready_count += 1
+	if ProductManager.products.is_empty():
+		products_label.text = "Aucun produit. Terminez d'abord un projet du Labo."
+		return
+	products_label.text = "%d modèle(s) en vente • %d prêt(s) à lancer • %s puces vendues le mois dernier%s" % [
+		launched, ready_count, UI.money(monthly_units), (" • meilleure vente : %s (%s/mois)" % [best_name, UI.money(best_units)]) if best_name != "" else ""]
+	var generations: Array = ProductManager.cpu_generations.duplicate()
+	generations.reverse()
+	var older := VBoxContainer.new()
+	older.add_theme_constant_override("separation", 8)
+	var older_count := 0
+	var selected_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""
+	for i in range(generations.size()):
+		var generation: Dictionary = generations[i]
+		var has_ready := false
+		for model_id in generation.get("model_ids", []):
+			if str(ProductManager.get_product(str(model_id)).get("status", "")) == "READY":
+				has_ready = true
+		var card := _generation_card(generation, selected_id)
+		if i < 2 or has_ready:
+			_range_box.add_child(card)
+		else:
+			older.add_child(card)
+			older_count += 1
+	if older_count > 0:
+		_range_box.add_child(_collapsible("Anciennes générations (%d)" % older_count, older))
+	else:
+		older.queue_free()
+
+func _generation_card(generation: Dictionary, selected_id: String) -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL, 14, 1, UI.APP_LINE, 10))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	box.add_child(head)
+	head.add_child(UI.label("G%d • %s" % [int(generation.get("generation_index", 1)), str(generation.get("name", "CPU"))], 16))
+	var sub := UI.muted_label("rendement %.0f %% • qualité usine %.0f/100" % [float(generation.get("yield_rate", 0.0)) * 100.0, float(generation.get("manufacturing_quality", 60.0))], 12)
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(sub)
+	var models := HFlowContainer.new()
+	models.add_theme_constant_override("h_separation", 6)
+	models.add_theme_constant_override("v_separation", 6)
+	box.add_child(models)
+	for model_id_value in generation.get("model_ids", []):
+		var model := ProductManager.get_product(str(model_id_value))
+		if model.is_empty():
+			continue
+		var status := str(model.get("status", ""))
+		var text := "%s  •  %s\n%s €  •  %s" % [str(model.get("sku_label", "Modèle")), _status_label(status),
+			UI.money(int(model.get("price", 0))),
+			("%s ventes/mois" % UI.money(int(model.get("last_month_sales", 0)))) if status == "LAUNCHED" else "à lancer"]
+		var button := Button.new()
+		button.text = text
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size = Vector2(200, 54)
+		var active := str(model.get("id", "")) == selected_id
+		var bg := AMBER if active else (Color("fff1dc") if status == "READY" else Color("f3e8d8"))
+		var border := AMBER if (active or status == "READY") else UI.APP_LINE
+		for state in ["normal", "hover", "pressed", "focus"]:
+			button.add_theme_stylebox_override(state, UI.stylebox(bg.darkened(0.05) if state == "hover" else bg, 10, 2 if status == "READY" else 1, border, 8))
+		for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			button.add_theme_color_override(color_name, Color.WHITE if active else UI.APP_TEXT)
+		var model_id := str(model.get("id", ""))
+		button.pressed.connect(func(): _select_model(model_id))
+		models.add_child(button)
+	return card
+
+func _on_product_selected(_index: int) -> void:
+	_refresh_product_details()
+	call_deferred("_refresh_range")
+
+func _select_model(product_id: String) -> void:
+	UI.select_meta(product_select, product_id)
+	call_deferred("_refresh_range")
+	_refresh_product_details()
+
+func _collapsible(title: String, content: Control) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	var toggle := Button.new()
+	toggle.text = "%s  ▾" % title
+	toggle.flat = true
+	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	box.add_child(toggle)
+	content.visible = false
+	box.add_child(content)
+	toggle.pressed.connect(_toggle_collapsible.bind(toggle, content, title))
+	return box
+
+func _toggle_collapsible(toggle: Button, content: Control, title: String) -> void:
+	content.visible = not content.visible
+	toggle.text = "%s  %s" % [title, "▴" if content.visible else "▾"]
+
+func _refresh_model_summary(product: Dictionary) -> void:
+	if _model_header == null:
+		return
+	var status := str(product.get("status", ""))
+	_model_header.text = "%s — %s  (%s)" % [str(product.get("name", "CPU")), str(product.get("sku_label", "")), _status_label(status)]
+	for child in _model_meters.get_children():
+		_model_meters.remove_child(child)
+		child.queue_free()
+	var metrics: Dictionary = product.get("metrics", {})
+	var rows := [["Performance", float(metrics.get("performance", 0.0))], ["Efficacité", float(metrics.get("efficiency", 0.0))],
+		["Fiabilité", float(metrics.get("reliability", 0.0))]]
+	if status == "LAUNCHED":
+		rows.append(["Satisfaction clients", float(product.get("customer_satisfaction", 0.0))])
+	for row_data in rows:
+		var row := UI.meter_row(str(row_data[0]))
+		UI.set_meter(row, float(row_data[1]), "%.0f/100" % float(row_data[1]))
+		_model_meters.add_child(row)
+	var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0)) - int(round(float(product.get("price", 0)) * float(product.get("royalty_rate", 0.0))))
+	var parts: Array[String] = ["coût %s €" % UI.money(int(product.get("unit_cost", 0))), "prix %s €" % UI.money(int(product.get("price", 0))),
+		"marge %s €/puce" % UI.money(margin), "capacité %s/mois" % UI.money(int(product.get("production_capacity", 0)))]
+	if status == "LAUNCHED":
+		parts.append("%s vendues au total" % UI.money(int(product.get("units_sold_total", 0))))
+		parts.append("%s (%d mois)" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0))])
+	_model_numbers.text = "  •  ".join(parts)
+	# Lancement : capacité + veille seulement pour un modèle prêt ; prix modifiable en vente.
+	var is_ready := status == "READY"
+	if _capacity_title != null:
+		_capacity_title.visible = is_ready
+		product_capacity.visible = is_ready
+	if _intel_card != null:
+		_intel_card.visible = is_ready
+	if _price_apply_button != null:
+		_price_apply_button.visible = status == "LAUNCHED"
+	if launch_button != null:
+		launch_button.visible = is_ready
 
 func _refresh_product_details() -> void:
 	if product_select.item_count == 0:
@@ -209,6 +376,7 @@ func _refresh_product_details() -> void:
 		return
 	post_launch_group.visible = str(product.get("status", "")) == "LAUNCHED"
 	_refresh_launch_buttons(product)
+	_refresh_model_summary(product)
 	if product_pulse_panel != null and product_pulse_panel.has_method("refresh_product"):
 		product_pulse_panel.call("refresh_product", product)
 	var metrics: Dictionary = product.get("metrics", {})
@@ -434,6 +602,7 @@ func select_first_ready() -> bool:
 		if str(candidate.get("status", "")) == "READY":
 			product_select.select(i)
 			_refresh_product_details()
+			call_deferred("_refresh_range")
 			return true
 	return false
 

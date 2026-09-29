@@ -106,7 +106,9 @@ func refresh() -> void:
 		UI.select_meta(after_sales_case_select, current)
 	if after_sales_case_select.selected < 0 and after_sales_case_select.item_count > 0:
 		after_sales_case_select.select(0)
-	after_sales_label.text = "Équipe SAV %.0f/100  •  %d dossier(s) ouvert(s)\nExpérience terrain : fabrication %.0f  •  thermique %.0f  •  stabilité %.0f  •  firmware %.0f" % [
+	# Pas de liste déroulante vide quand tout va bien.
+	after_sales_case_select.visible = after_sales_case_select.item_count > 0
+	after_sales_label.text = ("Aucun dossier ouvert : vos clients n'ont rien signalé ce mois-ci.\n" if open_cases.is_empty() else "") + "Équipe SAV %.0f/100  •  %d dossier(s) ouvert(s)\nExpérience terrain : fabrication %.0f  •  thermique %.0f  •  stabilité %.0f  •  firmware %.0f" % [
 		AfterSalesManager.support_team_score(),
 		open_cases.size(),
 		AfterSalesManager.cpu_field_experience("MANUFACTURING"),

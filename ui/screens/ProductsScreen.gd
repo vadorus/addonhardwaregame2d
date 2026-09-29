@@ -134,7 +134,8 @@ func refresh() -> void:
 func _refresh_design_summary() -> void:
 	if design_status_label == null:
 		return
-	var active_projects := ResearchManager.projects.size()
+	# 29/09 : comptait tous les projets de l'histoire (8) au lieu des projets en cours (1).
+	var active_projects := ResearchManager.get_active_development_project_count()
 	var ready_products := 0
 	var launched_products := 0
 	for product_value in ProductManager.products:

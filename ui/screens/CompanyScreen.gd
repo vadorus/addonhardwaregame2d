@@ -540,12 +540,13 @@ func _refresh_division_delegation() -> void:
 	var decision_lines: Array[String] = []
 	for decision_value in DivisionManager.get_recent_decisions(sector, 3):
 		var decision: Dictionary = decision_value
-		decision_lines.append("• %s" % str(decision.get("text", "")))
+		# Anciennes sauvegardes : le journal contenait les clés anglaises brutes.
+		decision_lines.append("• %s" % str(decision.get("text", "")).replace(": balanced", ": priorité équilibrée").replace("cible embedded", "cible systèmes embarqués"))
 	division_mandate_label.text = "%s\nMode : %s • exécution %.0f%%\nMandat : %s • cible %s • risque %s • plafond %s €/mois • engagements actuels %s €/mois\nQualité %.0f/100 • croissance %.0f/100%s" % [
 		director_text,
 		DivisionManager.control_mode_label(str(division.get("control_mode", "DIRECT"))),
 		DivisionManager.management_modifier(sector) * 100.0,
-		str(mandate.get("priority", "BALANCED")).to_lower(),
+		DivisionManager.priority_label(str(mandate.get("priority", "BALANCED"))),
 		MarketManager.segment_label(MarketManager.normalize_segment(str(mandate.get("target_segment", MarketManager.default_segment())))).to_lower(),
 		DivisionManager.risk_label(str(mandate.get("risk_tolerance", "MODERATE"))).to_lower(),
 		UI.money(int(mandate.get("monthly_budget_ceiling", 60000))),

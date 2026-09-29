@@ -171,11 +171,16 @@ func _refresh_product_pulse() -> void:
 func _refresh_product_options() -> void:
 	var current := UI.option_meta(market_product_select) if market_product_select.item_count > 0 else ""
 	market_product_select.clear()
+	# 29/09 : la liste s'ouvrait sur le plus vieux CPU (30 ventes/mois). Meilleures ventes d'abord.
+	var launched: Array = []
 	for product_value in ProductManager.products:
+		if str((product_value as Dictionary).status) == "LAUNCHED":
+			launched.append(product_value)
+	launched.sort_custom(func(a, b): return int(a.get("last_month_sales", 0)) > int(b.get("last_month_sales", 0)))
+	for product_value in launched:
 		var product: Dictionary = product_value
-		if str(product.status) == "LAUNCHED":
-			market_product_select.add_item(str(product.name))
-			market_product_select.set_item_metadata(market_product_select.item_count - 1, str(product.id))
+		market_product_select.add_item("%s — %s ventes/mois" % [str(product.name), UI.money(int(product.get("last_month_sales", 0)))])
+		market_product_select.set_item_metadata(market_product_select.item_count - 1, str(product.id))
 	if current != "":
 		UI.select_meta(market_product_select, current)
 	if market_product_select.selected < 0 and market_product_select.item_count > 0:

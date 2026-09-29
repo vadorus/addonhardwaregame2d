@@ -87,6 +87,8 @@ func refresh() -> void:
 func _source_line(news: Dictionary) -> String:
 	var source := str(news.get("source_name", ""))
 	var channel := MediaManager.channel_label(str(news.get("channel", ""))) if news.has("channel") else str(news.get("category", "Actualité"))
+	if channel == "Business":
+		channel = "Brève économique"
 	return channel if source.is_empty() else "%s — %s" % [source, channel]
 
 func _news_card(news: Dictionary) -> Control:

@@ -11,6 +11,7 @@ var tender_bid_price: SpinBox
 var tender_label: Label
 var tender_submit_button: Button
 var contract_label: Label
+var _accept_button: Button
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
@@ -49,10 +50,10 @@ func _build() -> void:
 	contract_label = UI.rich_label()
 	add_child(contract_label)
 
-	var accept := Button.new()
-	accept.text = "Accepter la première proposition B2B"
-	accept.pressed.connect(func(): action_requested.emit("accept_pending_contract", {}))
-	add_child(accept)
+	_accept_button = Button.new()
+	_accept_button.text = "Accepter la première proposition B2B"
+	_accept_button.pressed.connect(func(): action_requested.emit("accept_pending_contract", {}))
+	add_child(_accept_button)
 
 func refresh() -> void:
 	_refresh_tenders()
@@ -64,8 +65,9 @@ func _refresh_tenders() -> void:
 	tender_select.clear()
 	for tender_value in MarketManager.open_tenders():
 		var tender: Dictionary = tender_value
-		tender_select.add_item("%s — %s [%s]" % [
-			str(tender.get("customer", "")), str(tender.get("title", "")), str(tender.get("status", "OPEN"))
+		var tender_status := str(tender.get("status", "OPEN"))
+		tender_select.add_item("%s — %s%s" % [
+			str(tender.get("customer", "")), str(tender.get("title", "")), "  (offre envoyée)" if tender_status == "SUBMITTED" else ""
 		])
 		tender_select.set_item_metadata(tender_select.item_count - 1, str(tender.get("id", "")))
 	if current_tender != "":
@@ -78,7 +80,7 @@ func _refresh_tenders() -> void:
 		var product: Dictionary = product_value
 		if str(product.get("sector", "")) != "CPU" or str(product.get("status", "")) not in ["READY", "LAUNCHED"]:
 			continue
-		tender_product_select.add_item("%s — %s" % [str(product.get("name", "CPU")), str(product.get("status", ""))])
+		tender_product_select.add_item("%s — %s" % [str(product.get("name", "CPU")), "prêt à lancer" if str(product.get("status", "")) == "READY" else "en vente"])
 		tender_product_select.set_item_metadata(tender_product_select.item_count - 1, str(product.get("id", "")))
 	if current_product != "":
 		UI.select_meta(tender_product_select, current_product)
@@ -155,16 +157,56 @@ func _refresh_detail() -> void:
 		tender_submit_button.disabled = false
 	tender_label.text = "\n".join(lines)
 
+## 29/09 : l'historique alignait plus de 100 lignes « COMPLETED ». On montre ce qui compte :
+## les contrats en cours / en attente, puis un bilan chiffré et seulement les 5 derniers terminés.
+const CONTRACT_STATUS := {"PENDING":"en attente de votre réponse", "ACTIVE":"en cours", "COMPLETED":"terminé", "DECLINED":"refusé"}
+
 func _refresh_contracts() -> void:
-	var lines: Array[String] = []
+	var current: Array[String] = []
+	var finished: Array[String] = []
+	var completed := 0
+	var declined := 0
+	var monthly_revenue := 0
+	var pending := 0
+	for contract_value in MarketManager.contracts:
+		if str((contract_value as Dictionary).get("status", "")) == "PENDING":
+			pending += 1
+	if _accept_button != null:
+		_accept_button.visible = pending > 0
 	for contract_value in MarketManager.contracts:
 		var contract: Dictionary = contract_value
-		lines.append("• %s — %s — %s unités/mois à %s € — %d mois — %s" % [
+		var status := str(contract.get("status", ""))
+		var line := "• %s — %s — %s unités/mois à %s €" % [
 			str(contract.get("customer", "")), str(contract.get("product_name", "")),
-			UI.money(int(contract.get("units_per_month", 0))), UI.money(int(contract.get("unit_price", 0))),
-			int(contract.get("remaining_months", 0)), str(contract.get("status", ""))
-		])
-	contract_label.text = "\n".join(lines) if not lines.is_empty() else "Aucune proposition. Les marchés industriels, scientifiques et professionnels peuvent générer des contrats quand un CPU devient crédible."
+			UI.money(int(contract.get("units_per_month", 0))), UI.money(int(contract.get("unit_price", 0)))]
+		match status:
+			"PENDING", "ACTIVE":
+				if status == "ACTIVE":
+					monthly_revenue += int(contract.get("units_per_month", 0)) * int(contract.get("unit_price", 0))
+				current.append("%s — %s%s" % [line, str(CONTRACT_STATUS.get(status, status)),
+					(" (encore %d mois)" % int(contract.get("remaining_months", 0))) if status == "ACTIVE" else ""])
+			"COMPLETED":
+				completed += 1
+				finished.append(line + " — terminé")
+			"DECLINED":
+				declined += 1
+				finished.append(line + " — refusé")
+	if MarketManager.contracts.is_empty():
+		contract_label.text = "Aucune proposition. Les marchés industriels, scientifiques et professionnels peuvent générer des contrats quand un CPU devient crédible."
+		return
+	var lines: Array[String] = []
+	if current.is_empty():
+		lines.append("Aucun contrat en cours.")
+	else:
+		lines.append("En cours : %d contrat(s) • ~%s €/mois" % [current.size(), UI.money(monthly_revenue)])
+		lines.append_array(current)
+	lines.append("")
+	lines.append("Bilan : %d contrat(s) honoré(s) • %d refusé(s)" % [completed, declined])
+	if not finished.is_empty():
+		lines.append("Derniers terminés :")
+		for i in range(maxi(finished.size() - 5, 0), finished.size()):
+			lines.append(finished[i])
+	contract_label.text = "\n".join(lines)
 
 func _emit_submit() -> void:
 	if tender_select.item_count == 0 or tender_product_select.item_count == 0:

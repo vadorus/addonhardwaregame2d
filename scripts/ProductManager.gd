@@ -588,11 +588,19 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.last_month_returns = returns
 	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
 	product.customer_satisfaction = satisfaction
-	var rep_delta := (satisfaction - 55.0) / 35.0
+	# 29/09 : chaque modèle en vente pesait autant sur la réputation, même un vieux CPU à 30 ventes/mois.
+	# Avec 21 modèles, la fiabilité de la partie d'Alexandre était tombée à 0/100. Le poids d'un
+	# modèle suit maintenant sa part des ventes de l'entreprise.
+	var company_units := 0
+	for other in products:
+		if str(other.get("status", "")) == "LAUNCHED":
+			company_units += int(other.get("last_month_sales", 0))
+	var weight := clampf(float(total_units) / maxf(float(company_units), 1.0), 0.0, 1.0)
+	var rep_delta := (satisfaction - 55.0) / 35.0 * weight
 	CompanyManager.change_reputation({
 		"reliability":rep_delta*0.22,"value":rep_delta*0.18,"support":rep_delta*0.15,
-		"innovation":(float(product.metrics.innovation)-60.0)/180.0,
-		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0
+		"innovation":(float(product.metrics.innovation)-60.0)/180.0 * weight,
+		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0 * weight
 	})
 	var net_contribution := revenue - production_cost - capacity_reservation_cost - royalty_cost - warranty_cost
 	var report := {
@@ -620,6 +628,13 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		var rows := MarketManager.benchmark_for(product)
 		MediaManager.publish_product_review(product, scores, MarketManager.benchmark_rank(product), rows.size())
 		_reviewed_products[str(product.id)] = true
+		# 29/09 : la presse teste une gamme, pas chaque modèle (3 modèles × 3 médias = 9 articles
+		# quasi identiques). Les autres modèles de la génération profitent du même test.
+		var generation_id := str(product.get("generation_id", ""))
+		if generation_id != "":
+			for sibling in products:
+				if str(sibling.get("generation_id", "")) == generation_id:
+					_reviewed_products[str(sibling.get("id", ""))] = true
 
 func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
 	_ensure_lifecycle_fields(product)

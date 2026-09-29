@@ -1812,7 +1812,7 @@ func maybe_generate_b2b(product: Dictionary):
 	_next_contract_id += 1
 	contracts.append(contract)
 	CompanyManager.add_alert("Proposition B2B : %s souhaite négocier %d unités/mois de %s." % [customer, units, str(product.get("name", ""))])
-	MediaManager.publish_business_event("%s attire l'attention du B2B" % str(product.get("name", "")), "%s étudie un contrat d'approvisionnement après les premiers résultats techniques." % customer)
+	MediaManager.publish_b2b_interest(str(product.get("name", "")), customer)
 	opportunity_created.emit(contract)
 	market_changed.emit()
 

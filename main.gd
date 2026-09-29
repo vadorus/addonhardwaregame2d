@@ -1761,6 +1761,8 @@ func _update_responsive_layout():
 		products_screen.call("set_viewport_width", size.x)
 	if market_screen != null and market_screen.has_method("set_viewport_width"):
 		market_screen.call("set_viewport_width", size.x)
+	if personnel_screen != null and personnel_screen.has_method("set_viewport_width"):
+		personnel_screen.call("set_viewport_width", size.x)
 	if launch_moment_panel != null and launch_moment_panel.has_method("set_viewport_width"):
 		launch_moment_panel.call("set_viewport_width", size.x)
 	var compact := size.x < 900.0
@@ -2733,11 +2735,12 @@ func _play_click() -> void:
 func _build_notification_feed() -> void:
 	var feed_script: Script = load("res://ui/NotificationFeed.gd")
 	notification_feed = feed_script.new() as Control
-	notification_feed.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	notification_feed.offset_left = -180.0
-	notification_feed.offset_right = 180.0
+	# 29/09 : centrée, la bulle recouvrait le titre des pages ; à droite, elle ne gêne plus la lecture.
+	notification_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	notification_feed.offset_left = -372.0
+	notification_feed.offset_right = -12.0
 	notification_feed.offset_top = 104.0
-	notification_feed.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	notification_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	notification_feed.connect("navigate_requested", func(tab_index: int): _show_tab(tab_index))
 	add_child(notification_feed)
 

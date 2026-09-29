@@ -127,6 +127,11 @@ func control_mode_label(mode: String) -> String:
 			return "Délégation autonome"
 	return mode.capitalize()
 
+## 29/09 : « balanced », « embedded » apparaissaient tels quels dans l'écran Divisions.
+static func priority_label(priority: String) -> String:
+	return str({"BALANCED":"équilibrée", "PERFORMANCE":"performance", "EFFICIENCY":"efficacité", "RELIABILITY":"fiabilité",
+		"INNOVATION":"innovation", "COST":"coût", "QUALITY":"qualité", "GROWTH":"croissance"}.get(priority.to_upper(), priority.to_lower()))
+
 func risk_label(level: String) -> String:
 	match level:
 		"CAUTIOUS":
@@ -157,7 +162,7 @@ func set_mandate(sector: String, mandate_update: Dictionary) -> bool:
 	mandate["growth_bias"] = clampf(float(mandate_update.get("growth_bias", mandate.get("growth_bias", 50.0))), 0.0, 100.0)
 	division["mandate"] = mandate
 	division["monthly_budget"] = int(mandate.monthly_budget_ceiling)
-	_log_decision(sector, "MANDATE", "Mandat mis à jour : %s, cible %s, risque %s." % [priority.to_lower(), segment.to_lower(), risk_label(risk).to_lower()])
+	_log_decision(sector, "MANDATE", "Mandat mis à jour : priorité %s, cible %s, risque %s." % [priority_label(priority), MarketManager.segment_label(MarketManager.normalize_segment(segment)).to_lower(), risk_label(risk).to_lower()])
 	divisions_changed.emit()
 	return true
 

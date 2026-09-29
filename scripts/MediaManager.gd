@@ -20,14 +20,47 @@ func reset():
 	news = []
 	add_news("Économie", "Une nouvelle société technologique entre sur le marché.", "Les observateurs attendent de voir sa première stratégie produit.")
 
+## 29/09 : un seul plafond de 60 articles pour tout — les brèves B2B chassaient les tests de
+## produits (« Rien pour l'instant » avec 21 CPU en vente). Tests et business ont chacun leur place.
+const MAX_REVIEWS := 60
+const MAX_BUSINESS := 30
+
 func add_news(category: String, headline: String, body: String, metadata: Dictionary = {}):
 	var item := {"category":category,"headline":headline,"body":body,"month":TimeManager.month,"year":TimeManager.year}
 	for key in metadata:
 		item[key] = metadata[key]
 	news.push_front(item)
-	if news.size() > 60:
-		news.pop_back()
+	_trim_news()
 	news_changed.emit()
+
+func _trim_news() -> void:
+	var reviews := 0
+	var business := 0
+	var kept: Array = []
+	for item_value in news:
+		var item: Dictionary = item_value
+		var is_review := item.has("review_score")
+		if is_review:
+			reviews += 1
+			if reviews > MAX_REVIEWS:
+				continue
+		else:
+			business += 1
+			if business > MAX_BUSINESS:
+				continue
+		kept.append(item)
+	news = kept
+
+## Vrai si une brève sur ce sujet est déjà parue ces derniers mois (évite la même phrase en boucle).
+func recently_covered(topic: String, months: int = 12) -> bool:
+	var now_index := TimeManager.year * 12 + TimeManager.month
+	for item_value in news:
+		var item: Dictionary = item_value
+		if str(item.get("topic", "")) != topic:
+			continue
+		if now_index - (int(item.get("year", 0)) * 12 + int(item.get("month", 0))) <= months:
+			return true
+	return false
 
 func channel_label(channel: String) -> String:
 	return {
@@ -61,6 +94,7 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 			{
 				"source_id":str(outlet.id), "source_name":str(outlet.name), "channel":str(outlet.channel),
 				"product_id":str(product.get("id", "")), "product_name":str(product.get("name", "Produit")),
+				"generation_id":str(product.get("generation_id", "")),
 				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach)
 			}
 		)
@@ -162,19 +196,71 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	for metric in GameData.METRICS:
 		if float(metrics.get(metric, 0.0)) > float(metrics.get(best, 0.0)): best = metric
 		if float(metrics.get(metric, 100.0)) < float(metrics.get(worst, 100.0)): worst = metric
-	var headline := "%s : avis %s sur %s" % [source, tone, product_name]
+	# 29/09 (retour d'Alexandre : « redondant à mort, pas humain ») : chaque média a une plume,
+	# des titres variés selon le ton, une vraie phrase sur la force et la faiblesse, une citation.
+	var pick := absi(hash(product_name + str(outlet.get("id", "")) + str(product.get("id", ""))))
+	var titles: Array = HEADLINES.get(tone, HEADLINES["mitigé"])
+	var headline := str(titles[pick % titles.size()]).replace("{p}", product_name).replace("{c}", CompanyManager.company_name)
 	if channel in ["BENCHMARK", "BENCHMARK_SITE"]:
-		headline = "%s mesure %s : %.0f/100, n°%d/%d" % [source, product_name, score, benchmark_rank, benchmark_total]
-	elif channel == "VIDEO_CREATOR":
-		headline = "%s publie son essai vidéo de %s" % [source, product_name]
-	elif channel == "STREAMER":
-		headline = "%s met %s à l'épreuve en direct" % [source, product_name]
-	elif channel == "GENERAL_PRESS":
-		headline = "%s s'intéresse au lancement de %s" % [source, product_name]
-	var body := "%s retient surtout %s, mais pointe %s comme faiblesse. Note éditoriale %.0f/100 ; l'avis pourra évoluer avec les retours longue durée et les correctifs." % [
-		source, GameData.metric_label(best), GameData.metric_label(worst), score
-	]
-	return {"headline":headline,"body":body}
+		headline = "Banc d'essai — %s (n°%d sur %d)" % [headline, benchmark_rank, benchmark_total]
+	elif channel in ["VIDEO_CREATOR", "STREAMER"]:
+		headline = "[Vidéo] " + headline
+	var openers: Array = OPENERS.get(channel, OPENERS["SPECIALIST_PRESS"])
+	var praise := str(PRAISE.get(best, "sa copie est solide"))
+	var flaw := str(FLAWS.get(worst, "il reste des points à améliorer"))
+	var sentences: Array[String] = []
+	sentences.append("%s, %s." % [str(openers[(pick / 3) % openers.size()]).replace("{p}", product_name), praise])
+	if score >= 68.0:
+		sentences.append("Seul bémol : %s." % flaw)
+	else:
+		sentences.append("Mais %s, et ça se sent." % flaw)
+	if benchmark_total > 1 and channel in ["BENCHMARK", "BENCHMARK_SITE"]:
+		sentences.append("Il %s." % ("prend la tête de notre classement" if benchmark_rank == 1 else "se classe %de sur %d processeurs testés" % [benchmark_rank, benchmark_total]))
+	var quotes: Array = QUOTES.get(tone, QUOTES["mitigé"])
+	sentences.append("« %s » — %s. Note : %.0f/100." % [str(quotes[(pick / 11) % quotes.size()]).replace("{p}", product_name),
+		str(JOURNALISTS.get(str(outlet.get("id", "")), source)), score])
+	return {"headline":headline, "body":" ".join(sentences)}
+
+const JOURNALISTS := {
+	"CIRCUIT_LAB":"Marc Delorme, Circuit Lab", "SYSTEMS_REVIEW":"Hélène Kovac, Systems & Industry Review",
+	"TECH_WIRE":"Paul Ferrand, Technology Wire", "BYTE_FORUM":"la rédaction de Byte Forum",
+	"BENCHGRID":"l'équipe BenchGrid", "SILICON_SCOPE":"Jade Morel, Silicon Scope", "FRAMECAST":"Kev, en direct sur FrameCast"
+}
+const HEADLINES := {
+	"enthousiaste":["{p} : la claque", "{p}, le processeur qu'on attendait", "Coup de maître pour {c} avec {p}", "{p} met tout le monde d'accord", "On a testé {p} : chapeau bas"],
+	"positif":["{p} : un très bon élève", "{p} tient ses promesses", "Belle copie pour {p}", "{p}, du solide avec du caractère", "{c} marque des points avec {p}"],
+	"mitigé":["{p} : peut mieux faire", "{p}, un bilan en demi-teinte", "{p} souffle le chaud et le froid", "{p} : correct, sans plus", "{p} hésite entre deux mondes"],
+	"réservé":["{p} peine à convaincre", "{p} : des doutes persistent", "Rendez-vous manqué pour {p}", "{p}, l'ombre de ses ambitions"],
+	"critique":["{p} : la douche froide", "{p} déçoit", "{p}, difficile à recommander", "Faux départ pour {c} avec {p}"],
+}
+const OPENERS := {
+	"BENCHMARK":["Sur notre banc de test", "Après une batterie de mesures", "Chronomètre en main"],
+	"BENCHMARK_SITE":["Sur notre banc de test", "Après 40 heures de benchmarks", "Chiffres à l'appui"],
+	"SPECIALIST_PRESS":["Après trois semaines en atelier", "Monté dans nos machines de test", "En usage professionnel"],
+	"GENERAL_PRESS":["Pour le grand public", "Côté utilisateurs", "À l'usage de tous les jours"],
+	"COMMUNITY":["Sur les forums, les premiers acheteurs sont unanimes", "Chez les passionnés", "D'après nos lecteurs"],
+	"VIDEO_CREATOR":["Face caméra", "Dans notre essai vidéo", "Démonté et remonté à l'écran"],
+	"STREAMER":["En direct devant le chat", "Pendant six heures de stream", "Poussé dans ses retranchements en live"],
+}
+const PRAISE := {
+	"performance":"il avale les calculs sans broncher", "efficiency":"il chauffe à peine et consomme très peu",
+	"reliability":"pas un seul plantage pendant nos essais", "usability":"sa mise en œuvre est un jeu d'enfant",
+	"innovation":"il ose des choix techniques inédits", "ecosystem":"il s'intègre partout sans effort",
+	"sustainability":"sa sobriété plaira aux clients attentifs à l'environnement",
+}
+const FLAWS := {
+	"performance":"la puissance brute reste en retrait", "efficiency":"la consommation grimpe vite sous charge",
+	"reliability":"quelques plantages ont émaillé nos tests", "usability":"la prise en main demande de la patience",
+	"innovation":"on reste en terrain très connu", "ecosystem":"les cartes et logiciels compatibles se font rares",
+	"sustainability":"son bilan énergétique n'est pas exemplaire",
+}
+const QUOTES := {
+	"enthousiaste":["Je n'avais pas vu ça depuis des années.", "Si vous hésitiez, n'hésitez plus.", "Le nouveau repère de sa catégorie."],
+	"positif":["Un achat qu'on recommande sans se forcer.", "{p} fait le travail, et le fait bien.", "On attend la suite avec impatience."],
+	"mitigé":["Un bon processeur… à condition de savoir pourquoi on l'achète.", "Ni coup de cœur, ni déception.", "Il lui manque une étincelle."],
+	"réservé":["On attendait mieux de cette équipe.", "À réserver aux inconditionnels.", "Attendez la prochaine révision."],
+	"critique":["Difficile de le conseiller à ce prix.", "Une occasion manquée.", "Retour à la planche à dessin."],
+}
 
 func product_media_signal(product_id: String, months: int = 12) -> Dictionary:
 	var now_index := TimeManager.year * 12 + TimeManager.month
@@ -182,9 +268,11 @@ func product_media_signal(product_id: String, months: int = 12) -> Dictionary:
 	var total_weight := 0.0
 	var visibility := 0.0
 	var mentions := 0
+	var generation_id := str(ProductManager.get_product(product_id).get("generation_id", ""))
 	for item_value in news:
 		var item: Dictionary = item_value
-		if str(item.get("product_id", "")) != product_id:
+		var same_generation := generation_id != "" and str(item.get("generation_id", "")) == generation_id
+		if str(item.get("product_id", "")) != product_id and not same_generation:
 			continue
 		var item_index := int(item.get("year", TimeManager.year)) * 12 + int(item.get("month", TimeManager.month))
 		var age := maxi(now_index - item_index, 0)
@@ -205,8 +293,37 @@ func product_media_signal(product_id: String, months: int = 12) -> Dictionary:
 func product_visibility_modifier(product_id: String) -> float:
 	return float(product_media_signal(product_id).get("demand_multiplier", 1.0))
 
-func publish_business_event(headline: String, body: String):
-	add_news("Business", headline, body)
+func publish_business_event(headline: String, body: String, topic: String = ""):
+	add_news("Business", headline, body, {"topic":topic} if topic != "" else {})
+
+## Brève « un client s'intéresse à votre CPU » : une seule par produit et par an, et jamais
+## deux fois la même tournure.
+func publish_b2b_interest(product_name: String, customer: String) -> void:
+	var topic := "B2B_INTEREST:%s" % product_name
+	if recently_covered(topic, 12):
+		return
+	# Et au plus une brève de ce genre par trimestre, tous produits confondus.
+	var now_index := TimeManager.year * 12 + TimeManager.month
+	for item_value in news:
+		var item: Dictionary = item_value
+		if str(item.get("topic", "")).begins_with("B2B_INTEREST") and now_index - (int(item.get("year", 0)) * 12 + int(item.get("month", 0))) < 3:
+			return
+	var headlines := [
+		"%s intéresse les industriels" % product_name,
+		"%s tape dans l'œil de %s" % [product_name, customer],
+		"Les acheteurs professionnels regardent %s de près" % product_name,
+		"%s : un premier client pro se manifeste" % product_name,
+		"%s négocie avec %s" % [CompanyManager.company_name, customer],
+	]
+	var bodies := [
+		"Selon nos informations, %s envisage d'équiper sa prochaine ligne de produits avec %s." % [customer, product_name],
+		"« Les premiers essais sont concluants », confie un ingénieur de %s, qui étudie un contrat d'approvisionnement." % customer,
+		"%s aurait demandé des échantillons de %s. Une commande régulière pourrait suivre." % [customer, product_name],
+		"Chez %s, on ne cache pas son intérêt : %s coche les cases du cahier des charges." % [customer, product_name],
+		"Les discussions entre %s et %s porteraient sur plusieurs centaines d'unités par mois." % [customer, CompanyManager.company_name],
+	]
+	var pick := absi(hash(product_name + customer + str(TimeManager.year)))
+	publish_business_event(str(headlines[pick % headlines.size()]), str(bodies[(pick / 7) % bodies.size()]), topic)
 
 func get_state() -> Dictionary:
 	return {"news":news}

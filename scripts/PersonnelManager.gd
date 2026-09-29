@@ -80,10 +80,21 @@ func hire_candidate() -> bool:
 	if not Economy.can_afford(signing_cost, "Recrutement"):
 		return false
 	Economy.add_expense(signing_cost, "Recrutement")
-	_add_employee(str(candidate.name), str(candidate.role), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary), candidate.get("profile", {}))
+	_add_employee(str(candidate.name), role_for_department(str(candidate.department)), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary), candidate.get("profile", {}))
 	candidate = {}
 	staff_changed.emit()
 	return true
+
+## 29/09 : les recrues gardaient leur étiquette « Candidat R&D » une fois embauchées.
+static func role_for_department(department: String) -> String:
+	match department:
+		"R&D": return "Chercheur R&D"
+		"Développement": return "Ingénieur développement"
+		"Production": return "Technicien de production"
+		"Support": return "Technicien SAV"
+		"Marketing": return "Chargé de marketing"
+		"Finance": return "Analyste financier"
+	return "Collaborateur %s" % department
 
 func _generate_profile(department: String, specialization: String, skill: int, experience: float) -> Dictionary:
 	var base := clampf(float(skill) * 0.72 + minf(experience * 1.8, 18.0), 30.0, 88.0)
@@ -346,6 +357,8 @@ func load_state(state: Dictionary):
 			emp["founding_member"] = str(emp.get("name", "")) in ["Camille Durand", "Samira Lefèvre", "Noah Leroy"]
 		if not emp.has("profile") or typeof(emp.get("profile", {})) != TYPE_DICTIONARY:
 			emp["profile"] = _legacy_profile(emp)
+		if str(emp.get("role", "")).begins_with("Candidat"):
+			emp["role"] = role_for_department(str(emp.get("department", "")))
 		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
 			emp["department"] = "Développement"
 			emp["role"] = "Responsable développement CPU" if str(emp.get("name", "")) == "Samira Lefèvre" else str(emp.get("role", "Ingénieur produit"))

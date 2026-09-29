@@ -144,25 +144,55 @@ static func _specialty_label(key: String) -> String:
 		return "—"
 	return str(labels.get(key.to_lower(), key.capitalize()))
 
+var _member_columns := 3
+
+func set_viewport_width(width: float) -> void:
+	var columns := 1 if width < 760.0 else (2 if width < 1100.0 else 3)
+	if columns != _member_columns:
+		_member_columns = columns
+		refresh()
+
 func _member_card(employee: Dictionary) -> Control:
-	var card := UI.card(UI.APP_PANEL, 12, 10)
+	var card := UI.card(UI.APP_PANEL, 12, 8)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 4)
+	column.add_theme_constant_override("separation", 2)
 	card.add_child(column)
-	var title := UI.label("%s — %s%s" % [str(employee.get("name", "")), str(employee.get("role", "")), _leader_mark(employee)], 15)
+	var title := UI.label("%s%s" % [str(employee.get("name", "")), _leader_mark(employee)], 14)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(title)
-	column.add_child(UI.muted_label("%s • %.0f ans d'expérience • %s €/mois" % [
-		str(employee.get("department", "")), float(employee.get("experience_years", 0.0)), UI.money(int(employee.get("salary", 0)))
-	], 12))
-	var skill := UI.meter_row("Compétence", "Spécialité : %s" % _specialty_label(str(employee.get("specialization", ""))))
+	column.add_child(UI.muted_label("%s • %s • %.0f ans • %s €/mois" % [
+		str(employee.get("role", "")), _specialty_label(str(employee.get("specialization", ""))),
+		float(employee.get("experience_years", 0.0)), UI.money(int(employee.get("salary", 0)))], 11))
+	var skill := UI.meter_row("Compétence")
 	UI.set_meter(skill, float(employee.get("skill", 0)))
 	column.add_child(skill)
-	if employee.has("morale"):
-		var morale := UI.meter_row("Moral", "")
-		UI.set_meter(morale, float(employee.get("morale", 70.0)))
-		column.add_child(morale)
+	# Le moral n'apparaît que s'il faut s'en occuper.
+	if employee.has("morale") and float(employee.get("morale", 70.0)) < 55.0:
+		var warn := UI.label("⚠ Moral bas : %.0f/100" % float(employee.get("morale", 70.0)), 12)
+		warn.add_theme_color_override("font_color", UI.APP_RED)
+		column.add_child(warn)
 	return card
+
+func _department_summary(department: String, members: Array) -> Control:
+	var skill_sum := 0.0
+	var morale_sum := 0.0
+	var payroll := 0
+	for member_value in members:
+		var member: Dictionary = member_value
+		skill_sum += float(member.get("skill", 0))
+		morale_sum += float(member.get("morale", 70.0))
+		payroll += int(member.get("salary", 0))
+	var count := maxi(members.size(), 1)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	box.add_child(UI.eyebrow("%s — %s" % [department.to_upper(), _department_purpose(department)]))
+	box.add_child(UI.label("%d personne(s) • compétence moyenne %.0f • moral moyen %.0f • %s €/mois de salaires" % [
+		members.size(), skill_sum / count, morale_sum / count, UI.money(payroll)], 14))
+	return box
+
+func _toggle_more(button: Button, hidden: Control) -> void:
+	hidden.visible = not hidden.visible
+	button.text = button.text.replace("▾", "▴") if hidden.visible else button.text.replace("▴", "▾")
 
 func refresh() -> void:
 	if staff_label == null or candidate_label == null or team_explainer_label == null:
@@ -207,17 +237,45 @@ func refresh() -> void:
 		lines.append("")
 	staff_label.text = "\n".join(lines)
 	if members_box != null:
+		# 29/09 : 49 grandes fiches = 7 000 px à faire défiler. Maintenant : un résumé par
+		# équipe, puis des fiches compactes en grille ; au-delà de 6, le reste est replié.
 		_clear(members_box)
 		for department in departments:
-			var first := true
+			var members: Array = []
 			for employee_value in PersonnelManager.staff:
-				var employee: Dictionary = employee_value
-				if str(employee.get("department", "")) != department:
-					continue
-				if first:
-					members_box.add_child(UI.eyebrow("%s — %s" % [department.to_upper(), _department_purpose(department)]))
-					first = false
-				members_box.add_child(_member_card(employee))
+				if str((employee_value as Dictionary).get("department", "")) == department:
+					members.append(employee_value)
+			if members.is_empty():
+				continue
+			members.sort_custom(func(a, b): return int(a.get("skill", 0)) > int(b.get("skill", 0)))
+			members_box.add_child(_department_summary(department, members))
+			var grid := GridContainer.new()
+			grid.columns = _member_columns
+			grid.add_theme_constant_override("h_separation", 8)
+			grid.add_theme_constant_override("v_separation", 8)
+			members_box.add_child(grid)
+			var hidden := GridContainer.new()
+			hidden.columns = _member_columns
+			hidden.add_theme_constant_override("h_separation", 8)
+			hidden.add_theme_constant_override("v_separation", 8)
+			hidden.visible = false
+			for i in range(members.size()):
+				var member_card := _member_card(members[i])
+				member_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				if i < 6 or _leader_mark(members[i]) != "":
+					grid.add_child(member_card)
+				else:
+					hidden.add_child(member_card)
+			if hidden.get_child_count() > 0:
+				var more := Button.new()
+				more.flat = true
+				more.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				more.text = "Voir les %d autres membres  ▾" % hidden.get_child_count()
+				more.pressed.connect(_toggle_more.bind(more, hidden))
+				members_box.add_child(more)
+				members_box.add_child(hidden)
+			else:
+				hidden.queue_free()
 		UI.prepare_touch_scroll_children(members_box)
 
 	if candidate_box != null:
