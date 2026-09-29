@@ -796,7 +796,7 @@ func get_ceo_decisions() -> Array:
 			"category":"GAMME",
 			"severity":46.0,
 			"title":"Nora : %d modèles à sortir de la gamme" % old_models.size(),
-			"text":"%s%s vendent peu ou ont plus de 3 ans ; %d modèles sont en vente au total." % [", ".join(names), "…" if old_models.size() > names.size() else "", ProductManager.launched_count()],
+			"text":"%s%s : dépassés, trop anciens ou presque sans ventes. %d modèles sont en vente au total." % [", ".join(names), "…" if old_models.size() > names.size() else "", ProductManager.launched_count()],
 			"recommendation":"Une fin de série (prix -25 %% pendant %d mois) écoule le stock, puis le modèle est retiré. La gamme reste lisible et vos meilleurs CPU récupèrent les clients." % ProductManager.CLEARANCE_MONTHS,
 			"target_tab":4,
 			"can_defer":true

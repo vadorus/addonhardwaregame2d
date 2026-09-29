@@ -41,6 +41,8 @@ const CLEARANCE_PRICE_FACTOR := 0.75
 const CLEARANCE_DEMAND_BONUS := 8.0
 const RETIRE_AGE_MONTHS := 36
 const RETIRE_SHARE_OF_RANGE := 0.05
+const RETIRE_MUSEUM_MONTHS := 96
+const RETIRE_DEAD_SHARE := 0.01
 
 func _ready():
 	pass
@@ -851,32 +853,55 @@ func start_clearance_many(product_ids: Array) -> int:
 			count += 1
 	return count
 
-## Modèles que Nora conseille de sortir : pas la génération la plus récente de leur gamme,
-## et plus de 3 ans sur le marché ou moins de 5 % des ventes de la gamme.
+## Modèles que Nora conseille de sortir, marché par marché :
+## - dépassés : une génération plus récente est en vente sur le même marché, et le modèle a 3 ans
+##   ou fait moins de 5 % des ventes de ce marché ;
+## - pièces de musée : 8 ans et plus sur le marché ;
+## - versions mortes : après un an, moins de 1 % des ventes d'un marché qui vend vraiment.
+## Il reste toujours au moins un modèle en vente.
 func retire_candidates() -> Array:
 	var launched: Array = []
-	var total_units := 0
+	var segment_sales := {}
+	var newest := {}
 	for product_value in products:
 		var product: Dictionary = product_value
-		if str(product.get("status", "")) == "LAUNCHED":
-			launched.append(product)
-			total_units += int(product.get("last_month_sales", 0))
-	var newest := {}
-	for product in launched:
-		var key := _range_key(product)
+		if str(product.get("status", "")) != "LAUNCHED":
+			continue
+		launched.append(product)
+		var key := _market_key(product)
+		segment_sales[key] = int(segment_sales.get(key, 0)) + int(product.get("last_month_sales", 0))
 		if not newest.has(key) or int(product.get("months_on_market", 0)) < int((newest[key] as Dictionary).get("months_on_market", 0)):
 			newest[key] = product
 	var result: Array = []
 	for product in launched:
-		var newest_product: Dictionary = newest[_range_key(product)]
-		if str(product.get("generation_id", product.get("id", ""))) == str(newest_product.get("generation_id", newest_product.get("id", ""))):
+		if is_in_clearance(product) or retire_block_reason(product) != "":
 			continue
-		if is_in_clearance(product) or retire_block_reason(product) != "" or int(product.get("months_on_market", 0)) < 6:
+		var months := int(product.get("months_on_market", 0))
+		if months < 6:
 			continue
-		var share := float(product.get("last_month_sales", 0)) / maxf(float(total_units), 1.0)
-		if int(product.get("months_on_market", 0)) >= RETIRE_AGE_MONTHS or share < RETIRE_SHARE_OF_RANGE:
+		var key := _market_key(product)
+		var market_total := int(segment_sales.get(key, 0))
+		var share := float(product.get("last_month_sales", 0)) / maxf(float(market_total), 1.0)
+		var newest_product: Dictionary = newest[key]
+		var newer_exists := _generation_key(product) != _generation_key(newest_product)
+		if months >= RETIRE_MUSEUM_MONTHS \
+				or (newer_exists and (months >= RETIRE_AGE_MONTHS or share < RETIRE_SHARE_OF_RANGE)) \
+				or (months >= 12 and share < RETIRE_DEAD_SHARE and market_total >= 100):
 			result.append(product)
+	if not result.is_empty() and result.size() >= launched.size():
+		# Ne jamais vider la vitrine : on garde le meilleur vendeur.
+		var best: Dictionary = result[0]
+		for product in result:
+			if int(product.get("last_month_sales", 0)) > int(best.get("last_month_sales", 0)):
+				best = product
+		result.erase(best)
 	return result
+
+func _market_key(product: Dictionary) -> String:
+	return MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment())))
+
+func _generation_key(product: Dictionary) -> String:
+	return str(product.get("generation_id", product.get("id", "")))
 
 func retire_candidate_ids() -> Array:
 	var ids: Array = []
@@ -899,10 +924,6 @@ func launched_count() -> int:
 		if str(product.get("status", "")) == "LAUNCHED":
 			count += 1
 	return count
-
-func _range_key(product: Dictionary) -> String:
-	var line_id := str(product.get("line_id", ""))
-	return line_id if line_id != "" else "SEG:%s" % str(product.get("target_segment", ""))
 
 static func _thousands(value: int) -> String:
 	var digits := str(absi(value))

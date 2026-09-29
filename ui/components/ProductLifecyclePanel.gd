@@ -272,7 +272,7 @@ func _refresh_range_advice() -> void:
 	for product_value in candidates:
 		var product: Dictionary = product_value
 		names.append("%s (%d mois, %s/mois)" % [str(product.get("name", "")), int(product.get("months_on_market", 0)), UI.money(int(product.get("last_month_sales", 0)))])
-	var list := UI.muted_label("Plus de 3 ans ou moins de 5 %% des ventes, et une génération plus récente existe : %s." % ", ".join(names), 12)
+	var list := UI.muted_label("Dépassés par une génération plus récente, trop anciens ou presque sans ventes : %s." % ", ".join(names), 12)
 	list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(list)
 	var button := Button.new()
