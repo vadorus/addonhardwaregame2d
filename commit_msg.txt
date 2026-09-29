@@ -1,0 +1,11 @@
+Lot E2 : équipes de recherche Vitesse / Énergie / Fiabilité
+
+- ResearchTeams : chaque chercheur appartient à un axe (ou libre),
+  chef d'équipe, formation (2 mois, +6 compétence), recrutement d'expert
+- Le niveau d'équipe multiplie les gains de connaissance par axe
+- Anciennes sauvegardes : répartition automatique selon les allocations
+- Labo > Recherche : panneau Équipes (membres, niveau, conseil du chef)
+- Test ResearchTeamsScenario
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HnCWBwmbhWGCMNHAJgipmS

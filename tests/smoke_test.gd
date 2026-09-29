@@ -34,6 +34,7 @@ const PRODUCTION_CAPACITY_SCENARIO := preload("res://tests/scenarios/ProductionC
 const GARAGE_BUSINESS_SCENARIO := preload("res://tests/scenarios/GarageBusinessScenario.gd")
 const OBJECTIVES_SCENARIO := preload("res://tests/scenarios/ObjectivesScenario.gd")
 const TEAM_LESSONS_SCENARIO := preload("res://tests/scenarios/TeamLessonsScenario.gd")
+const RESEARCH_TEAMS_SCENARIO := preload("res://tests/scenarios/ResearchTeamsScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1661,6 +1662,10 @@ func _ready() -> void:
 	var lessons_error := TEAM_LESSONS_SCENARIO.run()
 	if lessons_error != "":
 		_fail(lessons_error)
+		return
+	var teams_error := RESEARCH_TEAMS_SCENARIO.run()
+	if teams_error != "":
+		_fail(teams_error)
 		return
 	var stepper_error := CPU_STEPPER_SCENARIO.run(self)
 	if stepper_error != "":

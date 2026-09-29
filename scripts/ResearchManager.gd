@@ -14,6 +14,7 @@ signal research_changed
 signal research_event_created(event)
 
 const CPU_RESEARCH_DOMAIN_ORDER := ["ARCHITECTURE", "EFFICIENCY", "RELIABILITY"]
+const RESEARCH_TEAMS := preload("res://scripts/ResearchTeams.gd")
 const CPU_RESEARCH_DOMAINS := {
 	"ARCHITECTURE": {"label":"Architecture & performance", "metric":"performance", "initial_knowledge":18.0},
 	"EFFICIENCY": {"label":"Énergie & thermique", "metric":"efficiency", "initial_knowledge":16.0},
@@ -503,6 +504,8 @@ func set_cpu_research_allocations(allocations: Dictionary) -> bool:
 		if not cpu_research_domains.has(key):
 			cpu_research_domains[key] = _default_cpu_research_domains()[key]
 		cpu_research_domains[key]["allocated"] = maxi(int(allocations.get(key, 0)), 0)
+	# Lot E2 : une affectation = des personnes qui changent d'équipe.
+	RESEARCH_TEAMS.apply_allocations(allocations)
 	research_changed.emit()
 	return true
 
@@ -610,6 +613,8 @@ func _create_research_event(domain: String, threshold: float):
 	research_event_created.emit(event.duplicate(true))
 
 func _process_continuous_research():
+	# Lot E2 : formations, affectations des équipes Vitesse / Énergie / Fiabilité.
+	RESEARCH_TEAMS.process_month()
 	var total_allocation := get_total_cpu_research_allocation()
 	if total_allocation <= 0:
 		return
@@ -627,7 +632,8 @@ func _process_continuous_research():
 		var before := float(data.get("knowledge", 0.0))
 		var diminishing := lerpf(1.0, 0.34, clampf(before / 100.0, 0.0, 1.0))
 		var momentum := 1.15 if int(data.get("momentum_months", 0)) > 0 else 1.0
-		var gain := float(allocated) * (0.48 + team / 260.0) * budget_factor * management * diminishing * momentum
+		# Le niveau de l'équipe (compétences, responsable, expert) accélère ou freine son domaine.
+		var gain := float(allocated) * (0.48 + team / 260.0) * budget_factor * management * diminishing * momentum * RESEARCH_TEAMS.level_factor(key)
 		data["knowledge"] = clampf(before + gain, 0.0, 100.0)
 		data["experience"] = clampf(float(data.get("experience", 0.0)) + float(allocated) * 0.16 * management, 0.0, 100.0)
 		data["months"] = int(data.get("months", 0)) + 1
@@ -1400,6 +1406,8 @@ func load_state(state: Dictionary):
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "8282"), 8282)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
+	# Lot E2 : chaque chercheur rejoint l'équipe correspondant aux affectations de la sauvegarde.
+	RESEARCH_TEAMS.ensure_assignments()
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	research_changed.emit()
 	projects_changed.emit()

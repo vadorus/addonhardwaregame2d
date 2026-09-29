@@ -542,9 +542,15 @@ func _build() -> void:
 	research_tree = (load("res://ui/components/ResearchTreePanel.gd") as Script).new() as Control
 	research_tree.connect("action_requested", _on_research_tree_action)
 	research_page.add_child(research_tree)
-	research_page.add_child(_section("Répartir l'équipe Recherche"))
+	# Lot E2 : les chercheurs forment trois équipes (Vitesse, Énergie, Fiabilité) avec de vraies personnes.
+	research_page.add_child(_section("Équipes de recherche"))
+	research_teams_panel = (load("res://ui/components/ResearchTeamsPanel.gd") as Script).new() as Control
+	research_teams_panel.connect("status_message", func(text: String): _emit_action("research_tree_message", text))
+	research_page.add_child(research_teams_panel)
+	# L'ancien tableau de répartition (compteurs) reste pour le mode avancé, replié.
 	var research_card := _card(APP_PANEL, 14, 16)
 	research_card.add_child(research_box)
+	research_card.visible = false
 	research_page.add_child(research_card)
 	research_page.add_child(_section("Savoir-faire de l'entreprise"))
 	var tech_card := _card(APP_SHELL, 12, 12)
@@ -624,6 +630,7 @@ func show_section_for_context(context: String) -> void:
 
 var expert_box: VBoxContainer
 var expert_toggle: Button
+var research_teams_panel: Control
 var patent_file_button: Button
 var patent_license_button: Button
 
@@ -757,6 +764,8 @@ func refresh_research_content() -> void:
 	_refresh_knowhow_meters()
 	if research_tree != null:
 		research_tree.call("refresh")
+	if research_teams_panel != null:
+		research_teams_panel.call("refresh")
 
 	if concept_status_label != null:
 		var concept_lines: Array[String] = []
