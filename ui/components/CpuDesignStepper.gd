@@ -419,12 +419,43 @@ func _build_line_step() -> void:
 
 func _build_architecture_step() -> void:
 	_content.add_child(_step_title("Sur quelle architecture ?"))
+	_content.add_child(_architecture_advice_card())
 	var archs := ArchitectureManager.owned_architectures()
 	for i in range(archs.size() - 1, -1, -1):
 		_content.add_child(_architecture_card(archs[i], true))
 	var locked := ArchitectureManager.locked_architectures()
 	if not locked.is_empty():
 		_content.add_child(_architecture_card(locked[0], false))
+
+## Lot E3/E4 : ce que l'équipe de développement dit du choix d'architecture (tick/tock, signature, usure).
+func _architecture_advice_card() -> Control:
+	var mode := ArchitectureManager.project_mode(selected_line(), arch_id)
+	var first_use := ArchitectureManager.is_first_use(arch_id)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.stylebox(Color("fbe8cc"), 12, 1, AMBER, 12))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	panel.add_child(box)
+	box.add_child(UI.label("%s (développement) — %s" % [_dev_lead(), str(ArchitectureManager.MODE_LABELS.get(mode, ""))], 15))
+	box.add_child(_note(ArchitectureManager.mode_advice(mode, arch_id, first_use)))
+	box.add_child(_note("Signature de vos équipes de recherche : %s" % ArchitectureManager.signature_text(ArchitectureManager.team_signature())))
+	var line := selected_line()
+	if mode == "TICK" and ArchitectureManager.wear_of(arch_id) >= 0.5 and ArchitectureManager.latest_id() != arch_id:
+		var switch_button := Button.new()
+		switch_button.focus_mode = Control.FOCUS_NONE
+		switch_button.text = "Passer sur %s (tock)" % str(CATALOG.get_by_id(ArchitectureManager.latest_id()).short)
+		switch_button.custom_minimum_size.y = 40
+		switch_button.pressed.connect(_switch_to_latest_architecture)
+		box.add_child(switch_button)
+	elif mode == "NEW_LINE" and line.is_empty() and ArchitectureManager.latest_id() != arch_id:
+		box.add_child(_note("Une architecture plus récente est disponible."))
+	return panel
+
+func _switch_to_latest_architecture() -> void:
+	SoundManager.play("click")
+	arch_id = ArchitectureManager.latest_id()
+	_apply_proposal()
+	_changed(false)
 
 func _build_goal_step() -> void:
 	_build_lessons_card()
@@ -664,7 +695,7 @@ func _architecture_card(arch: Dictionary, owned: bool) -> Control:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.custom_minimum_size = Vector2(0, 118)
+	button.custom_minimum_size = Vector2(0, 140 if owned and ArchitectureManager.wear_of(this_id) >= 0.2 else 118)
 	var bg := Color("fbe3c2") if selected else (UI.APP_PANEL if owned else UI.APP_PANEL_ALT)
 	var edge := AMBER if selected else UI.APP_LINE
 	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
@@ -701,6 +732,11 @@ func _architecture_card(arch: Dictionary, owned: bool) -> Control:
 		box.add_child(_note("Jusqu'à %d cœur(s), cache %s, fréquence ×%.1f  •  Maturité : %s (%.0f %%)" % [
 			int(arch.max_cores), _cache_text(int(arch.max_cache_kb)), float(arch.max_freq_factor),
 			ArchitectureManager.maturity_label(this_id), ArchitectureManager.maturity_of(this_id)]))
+		var wear := ArchitectureManager.wear_of(this_id)
+		if wear >= 0.2:
+			var wear_note := _note("Usure : %s (%.0f %%) — performance -%.0f" % [ArchitectureManager.wear_label(this_id), wear * 100.0, wear * ArchitectureManager.WEAR_PERFORMANCE_PENALTY])
+			wear_note.add_theme_color_override("font_color", Color("b0452a") if wear >= 0.5 else Color("8a5a2a"))
+			box.add_child(wear_note)
 	for child in box.get_children():
 		if child is Control:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE

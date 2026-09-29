@@ -8,6 +8,13 @@ const MATURITY_PER_LAUNCH := 10.0
 const MATURITY_PER_MONTH := 0.4
 const PLATEAU := 85.0
 const MAX_YIELD_BONUS := 0.06
+const RESEARCH_TEAMS := preload("res://scripts/ResearchTeams.gd")
+## Lot E3/E4 : tick (même architecture, procédé plus fin) ou tock (nouvelle architecture).
+const MODE_SPEED := {"NEW_LINE":1.0, "TICK":1.15, "TOCK":0.88}
+const MODE_LABELS := {"NEW_LINE":"Nouvelle gamme", "TICK":"Tick", "TOCK":"Tock"}
+const WEAR_YEARS := 6.0
+const WEAR_PERFORMANCE_PENALTY := 8.0
+const WEAR_EFFICIENCY_PENALTY := 4.0
 
 signal architectures_changed
 
@@ -15,6 +22,7 @@ var owned: Array = ["A4"]
 var maturity: Dictionary = {}
 var models_launched: Dictionary = {}
 var plateau_warned: Dictionary = {}
+var wear_warned: Dictionary = {}
 var lines: Array = []
 var _next_line_id := 1
 
@@ -23,6 +31,7 @@ func reset() -> void:
 	maturity = {}
 	models_launched = {}
 	plateau_warned = {}
+	wear_warned = {}
 	lines = []
 	_next_line_id = 1
 	architectures_changed.emit()
@@ -96,6 +105,126 @@ func process_month() -> void:
 	for product in ProductManager.products:
 		if str(product.get("status", "")) == "LAUNCHED" and str(product.get("architecture_id", "")) != "":
 			_add_maturity(str(product.architecture_id), MATURITY_PER_MONTH)
+	_check_wear()
+
+# --- Lot E4 : usure d'une architecture -------------------------------------------------------
+
+## Usure 0..1 : une architecture s'use dès qu'une plus récente est disponible (6 ans pour s'essouffler),
+## un peu plus vite si elle a déjà plafonné.
+func wear_of(arch_id: String) -> float:
+	var archs := owned_architectures()
+	var index := -1
+	for i in range(archs.size()):
+		if str((archs[i] as Dictionary).id) == arch_id:
+			index = i
+	if index < 0 or index >= archs.size() - 1:
+		return 0.0
+	var next_year := int((archs[index + 1] as Dictionary).year)
+	var years := maxf(float(TimeManager.year - next_year) + float(TimeManager.month - 1) / 12.0, 0.0)
+	var wear := years / WEAR_YEARS + (0.10 if maturity_of(arch_id) >= PLATEAU else 0.0)
+	return clampf(wear, 0.0, 1.0)
+
+func wear_label(arch_id: String) -> String:
+	var wear := wear_of(arch_id)
+	if wear >= 0.75:
+		return "À bout de souffle"
+	if wear >= 0.5:
+		return "Fatiguée"
+	if wear >= 0.2:
+		return "Commence à vieillir"
+	return "Fraîche"
+
+## Architectures encore utilisées par un produit en vente ou une gamme.
+func architectures_in_use() -> Array:
+	var used: Array = []
+	for product in ProductManager.products:
+		var arch_id := str(product.get("architecture_id", ""))
+		if str(product.get("status", "")) == "LAUNCHED" and arch_id != "" and not used.has(arch_id):
+			used.append(arch_id)
+	for line in lines:
+		var line_arch := str(line.get("architecture_id", ""))
+		if line_arch != "" and not used.has(line_arch):
+			used.append(line_arch)
+	return used
+
+func _check_wear() -> void:
+	if not CompanyManager.created:
+		return
+	for arch_id_value in architectures_in_use():
+		var arch_id := str(arch_id_value)
+		if wear_of(arch_id) < 0.5 or bool(wear_warned.get(arch_id, false)):
+			continue
+		wear_warned[arch_id] = true
+		CompanyManager.add_alert("Équipe de développement : l'%s s'use. Nos prochaines puces dessus seront moins rapides — passez la prochaine génération sur %s (tock)." % [
+			str(CATALOG.get_by_id(arch_id).name).to_lower(), str(CATALOG.get_by_id(latest_id()).name).to_lower()])
+
+# --- Lot E3 : l'architecture prend la forme de vos équipes -------------------------------------
+
+## Signature des équipes de recherche : bonus / malus par critère selon le niveau de chaque équipe.
+func team_signature() -> Dictionary:
+	var result := {}
+	for axis in RESEARCH_TEAMS.AXES:
+		var metric := str(RESEARCH_TEAMS.AXIS_METRIC[axis])
+		var level := RESEARCH_TEAMS.team_level(axis)
+		# Une équipe d'une seule personne marque moins l'architecture qu'une vraie équipe (3 et plus).
+		var size_factor := clampf(sqrt(float(RESEARCH_TEAMS.members(axis, false).size()) / 3.0), 0.4, 1.0)
+		result[metric] = 0.0 if level <= 0.0 else clampf((level - 45.0) * 0.15 * size_factor, -3.0, 6.0)
+	return result
+
+func signature_text(signature: Dictionary) -> String:
+	var parts: Array = []
+	for axis in RESEARCH_TEAMS.AXES:
+		var value := float(signature.get(str(RESEARCH_TEAMS.AXIS_METRIC[axis]), 0.0))
+		parts.append("%s %s%.0f" % [str(RESEARCH_TEAMS.AXIS_LABELS[axis]), "+" if value >= 0.0 else "", value])
+	return "  •  ".join(parts)
+
+## Tick / tock pour une suite de gamme.
+func project_mode(line: Dictionary, arch_id: String) -> String:
+	if line.is_empty() or int(line.get("generations", 0)) <= 0:
+		return "NEW_LINE"
+	return "TICK" if str(line.get("architecture_id", "")) == arch_id else "TOCK"
+
+func is_first_use(arch_id: String) -> bool:
+	if int(models_launched.get(arch_id, 0)) > 0:
+		return false
+	for project in ResearchManager.projects:
+		if str(project.get("architecture_id", "")) == arch_id:
+			return false
+	return true
+
+## Ajustements appliqués aux mesures finales d'un projet (signature, tick/tock, usure, première puce).
+func metric_adjustments(mode: String, arch_id: String, signature: Dictionary, first_use: bool) -> Dictionary:
+	var result := {"performance":0.0, "efficiency":0.0, "reliability":0.0}
+	var weight := 1.5 if mode == "TOCK" else 1.0
+	for key in result.keys():
+		result[key] = float(result[key]) + float(signature.get(key, 0.0)) * weight
+	if mode == "TICK":
+		result["reliability"] = float(result.reliability) + 3.0
+	elif mode == "TOCK":
+		result["performance"] = float(result.performance) + 4.0
+	if first_use and float(signature.get("reliability", 0.0)) < 2.0:
+		result["reliability"] = float(result.reliability) - 3.0
+	var wear := wear_of(arch_id)
+	result["performance"] = float(result.performance) - wear * WEAR_PERFORMANCE_PENALTY
+	result["efficiency"] = float(result.efficiency) - wear * WEAR_EFFICIENCY_PENALTY
+	return result
+
+## Ce que le développement dit du choix, pour l'étape Architecture.
+func mode_advice(mode: String, arch_id: String, first_use: bool) -> String:
+	var text := ""
+	match mode:
+		"TICK":
+			text = "Tick : on garde la même architecture sur un procédé plus fin. Développement ~15 % plus rapide, fiabilité +3."
+		"TOCK":
+			text = "Tock : nouvelle architecture pour la gamme. Développement ~12 % plus long, performance +4 et la signature des équipes compte davantage."
+		_:
+			text = "Nouvelle gamme : l'équipe part de zéro sur cette architecture."
+	if first_use:
+		text += " Première puce sur cette architecture : risque de défauts de jeunesse (fiabilité -3) sauf si l'équipe Fiabilité est solide."
+	var wear := wear_of(arch_id)
+	if wear >= 0.2:
+		text += " Usure %.0f %% : performance -%.0f." % [wear * 100.0, wear * WEAR_PERFORMANCE_PENALTY]
+	return text
 
 func _add_maturity(arch_id: String, amount: float) -> void:
 	var before := maturity_of(arch_id)
@@ -127,9 +256,14 @@ func next_model_name(line: Dictionary) -> String:
 
 ## Relie un projet qui vient de démarrer à sa gamme et à son architecture.
 func register_project(project_name: String, line_id: String, arch_id: String, tiers: Array) -> void:
+	var mode := project_mode(get_line(line_id), arch_id)
+	var first_use := is_first_use(arch_id)
 	for i in range(ResearchManager.projects.size() - 1, -1, -1):
 		var project: Dictionary = ResearchManager.projects[i]
 		if str(project.get("name", "")) == project_name:
+			project["arch_mode"] = mode
+			project["arch_first_use"] = first_use
+			project["team_signature"] = team_signature()
 			project["architecture_id"] = arch_id
 			project["line_id"] = line_id
 			project["model_tiers"] = tiers.duplicate()
@@ -144,7 +278,8 @@ func register_project(project_name: String, line_id: String, arch_id: String, ti
 
 func get_state() -> Dictionary:
 	return {"owned":owned.duplicate(), "maturity":maturity.duplicate(), "models_launched":models_launched.duplicate(),
-		"plateau_warned":plateau_warned.duplicate(), "lines":lines.duplicate(true), "next_line_id":_next_line_id}
+		"plateau_warned":plateau_warned.duplicate(), "wear_warned":wear_warned.duplicate(),
+		"lines":lines.duplicate(true), "next_line_id":_next_line_id}
 
 func load_state(state: Dictionary) -> void:
 	reset()
@@ -160,6 +295,13 @@ func load_state(state: Dictionary) -> void:
 	if not owned.has("A4"):
 		owned.push_front("A4")
 	sync_unlocks(false)
+	if state.has("wear_warned"):
+		wear_warned = (state.get("wear_warned", {}) as Dictionary).duplicate()
+	else:
+		# Sauvegarde d'avant le lot E4 : on ne déverse pas toutes les alertes d'usure au chargement.
+		for arch_id_value in architectures_in_use():
+			if wear_of(str(arch_id_value)) >= 0.5:
+				wear_warned[str(arch_id_value)] = true
 
 ## Anciennes parties : architectures selon l'année, produits rattachés, gammes déduites des noms de projets.
 func _migrate_from_existing_game() -> void:

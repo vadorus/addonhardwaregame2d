@@ -107,7 +107,7 @@ But : le joueur agit sur le marché au lieu de le regarder.
 Critères : la partie d'Alexandre peut passer de 21 à ≤ 8 modèles en vente en quelques clics ;
 un concurrent réagit visiblement (presse + prix) quand on attaque son segment.
 
-### Lot E — Refonte R&D V09 (gros, 3-4 sessions, déjà décidé le 28/09)
+### Lot E — Refonte R&D V09 (gros, 3-4 sessions, déjà décidé le 28/09) — ✅ fait le 29/09 (`docs/reviews/V09_LOT_E_EQUIPES_ARCHITECTURE.md`)
 
 But : le cœur du jeu devient la gestion d'équipes et d'architectures, comme prévu.
 - Architecture de base + usure (au bout de quelques générations, elle freine) → choix tick-tock.

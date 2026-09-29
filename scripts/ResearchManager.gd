@@ -1078,6 +1078,8 @@ func _process_project_month(project: Dictionary):
 	else:
 		# Lot B : une partie de l'équipe travaille sur un contrat d'études pour un client.
 		progress *= segment_team_factor * GarageBusiness.development_speed_factor()
+		# Lot E3 : un tick (même architecture) avance plus vite qu'un tock (nouvelle architecture).
+		progress *= float(ArchitectureManager.MODE_SPEED.get(str(project.get("arch_mode", "NEW_LINE")), 1.0))
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
@@ -1267,6 +1269,17 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 			var simulated_value := float(metrics.get(design_metric, 50.0))
 			var designed_value := float(design_estimate.get(design_metric, simulated_value))
 			metrics[design_metric] = clampf(simulated_value * 0.62 + designed_value * 0.38, 20.0, 98.0)
+	if str(project.sector) == "CPU" and str(project.get("architecture_id", "")) != "":
+		# Lot E3/E4 : signature des équipes de recherche, tick/tock, usure de l'architecture.
+		var signature_value = project.get("team_signature", {})
+		var adjustments := ArchitectureManager.metric_adjustments(
+			str(project.get("arch_mode", "NEW_LINE")),
+			str(project.architecture_id),
+			signature_value if typeof(signature_value) == TYPE_DICTIONARY else {},
+			bool(project.get("arch_first_use", false)))
+		project["arch_adjustments"] = adjustments
+		for adjusted_metric in adjustments.keys():
+			metrics[adjusted_metric] = clampf(float(metrics.get(adjusted_metric, 50.0)) + float(adjustments[adjusted_metric]), 20.0, 98.0)
 	var internal_ratio := float(sourcing.get("internal_ratio", approach_data.internal_ratio))
 	var integration_skill := float(technologies.get("integration", 10.0))
 	if internal_ratio >= 0.6:
@@ -1304,6 +1317,7 @@ func get_state() -> Dictionary:
 		"cpu_generation_context":cpu_generation_context,
 		"technologies":technologies,
 		"cpu_research_domains":cpu_research_domains,
+		"research_teams":1,
 		"continuous_research_budget":continuous_research_budget,
 		"research_events":research_events,
 		"cpu_capabilities":cpu_capabilities,
@@ -1407,7 +1421,17 @@ func load_state(state: Dictionary):
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "8282"), 8282)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	# Lot E2 : chaque chercheur rejoint l'équipe correspondant aux affectations de la sauvegarde.
+	# (Une interface a pu marquer les chercheurs « libres » pendant le chargement du personnel,
+	# avant que les affectations ne soient relues : on repart des affectations sauvegardées.)
 	RESEARCH_TEAMS.ensure_assignments()
+	if not state.has("research_teams") and not state.is_empty():
+		var saved_allocations := {}
+		for key in CPU_RESEARCH_DOMAIN_ORDER:
+			saved_allocations[key] = int(cpu_research_domains[key].get("allocated", 0))
+		RESEARCH_TEAMS.apply_allocations(saved_allocations)
+		var idle := RESEARCH_TEAMS.free_researchers().size()
+		if idle >= 3:
+			CompanyManager.add_alert("Nouveau : les équipes de recherche. %d chercheurs n'ont pas d'équipe — répartissez-les entre Vitesse, Énergie et Fiabilité (Labo > Recherche)." % idle)
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	research_changed.emit()
 	projects_changed.emit()

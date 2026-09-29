@@ -35,6 +35,9 @@ func show_project(project: Dictionary, detail_lines: Array) -> void:
 	var arch_id := str(project.get("architecture_id", ""))
 	if arch_id != "":
 		tags.append(str(CATALOG.get_by_id(arch_id).name))
+	var arch_mode := str(project.get("arch_mode", ""))
+	if arch_mode == "TICK" or arch_mode == "TOCK":
+		tags.append(str(ArchitectureManager.MODE_LABELS[arch_mode]))
 	var tag_label := UI.muted_label("  •  ".join(tags), 13)
 	tag_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tag_label)

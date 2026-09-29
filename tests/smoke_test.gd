@@ -35,6 +35,7 @@ const GARAGE_BUSINESS_SCENARIO := preload("res://tests/scenarios/GarageBusinessS
 const OBJECTIVES_SCENARIO := preload("res://tests/scenarios/ObjectivesScenario.gd")
 const TEAM_LESSONS_SCENARIO := preload("res://tests/scenarios/TeamLessonsScenario.gd")
 const RESEARCH_TEAMS_SCENARIO := preload("res://tests/scenarios/ResearchTeamsScenario.gd")
+const ARCHITECTURE_TICK_TOCK_SCENARIO := preload("res://tests/scenarios/ArchitectureTickTockScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1666,6 +1667,10 @@ func _ready() -> void:
 	var teams_error := RESEARCH_TEAMS_SCENARIO.run()
 	if teams_error != "":
 		_fail(teams_error)
+		return
+	var tick_tock_error := ARCHITECTURE_TICK_TOCK_SCENARIO.run()
+	if tick_tock_error != "":
+		_fail(tick_tock_error)
 		return
 	var stepper_error := CPU_STEPPER_SCENARIO.run(self)
 	if stepper_error != "":
