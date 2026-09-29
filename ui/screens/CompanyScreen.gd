@@ -39,6 +39,7 @@ var leader_select: OptionButton
 var subsidiary_name: LineEdit
 var subsidiary_sector: OptionButton
 var subsidiary_capital: SpinBox
+var subsidiaries_panel: Control
 
 func _ready() -> void:
 	name = "Entreprise"
@@ -289,6 +290,11 @@ func _build() -> void:
 	box.add_child(delegate_button)
 
 	box.add_child(UI.section("Groupe / filiales"))
+	# Lot F2 : les filiales existantes (rachetées ou créées), avec mandat, capital et revente.
+	subsidiaries_panel = (load("res://ui/components/SubsidiariesPanel.gd") as Script).new() as Control
+	subsidiaries_panel.connect("status_changed", _status)
+	box.add_child(subsidiaries_panel)
+	box.add_child(UI.label("Créer une filiale", 15))
 	var subsidiary_grid := GridContainer.new()
 	subsidiary_grid.columns = 2
 	box.add_child(subsidiary_grid)
@@ -301,7 +307,7 @@ func _build() -> void:
 	_fill_sector_options(subsidiary_sector)
 	subsidiary_grid.add_child(subsidiary_sector)
 	subsidiary_grid.add_child(UI.label("Capital", 14))
-	subsidiary_capital = UI.spin(50000, 5000000, 10000, 100000)
+	subsidiary_capital = UI.spin(50000, 500000000, 50000, 1000000)
 	subsidiary_grid.add_child(subsidiary_capital)
 	var subsidiary_button := Button.new()
 	subsidiary_button.text = "Créer une filiale"
@@ -471,6 +477,8 @@ func show_section_for_context(context: String) -> void:
 			show_section("DIVISIONS")
 		"FINANCE", "Budgets":
 			show_section("BUDGETS")
+		"RACHAT", "FILIALE", "Groupe":
+			show_section("GROUP")
 		"Entreprise":
 			show_section("OVERVIEW")
 
@@ -479,6 +487,8 @@ func refresh() -> void:
 		return
 	_refresh_page_unlocks()
 	_refresh_reputation_bars()
+	if subsidiaries_panel != null:
+		subsidiaries_panel.call("refresh")
 	_refresh_objectives()
 
 	var brief := ExecutiveManager.get_executive_brief()

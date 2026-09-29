@@ -122,6 +122,7 @@ qui investit dans une équipe voit l'effet sur la génération suivante.
 ### Lot F — Après 2010 : la partie continue (moyen-gros, 2-3 sessions)
 
 > 29/09 : **F1 (rivaux et rachats) fait** (`docs/reviews/V09_LOT_F1_RIVAUX_RACHATS.md`). Ordre validé avec Alexandre : F1 rivaux et rachats, F2 filiales, F3 nouveaux marchés, F4 événements et salon, F5 prestige.
+> 30/09 : **F2 (filiales) fait** (`docs/reviews/V09_LOT_F2_FILIALES.md`).
 
 But : une fois le plafond technologique atteint, d'autres systèmes prennent le relais.
 - **Rachats** de concurrents (fragiles ou en difficulté) et **filiales** avec leur propre mandat.

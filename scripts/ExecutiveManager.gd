@@ -826,8 +826,22 @@ func get_ceo_decisions() -> Array:
 			"text":("%s perd de l'argent depuis des mois. Ses actionnaires cèdent la société pour %s € ; l'offre tient encore %d mois." if fragile
 				else "%s est en bonne santé, mais ses actionnaires accepteraient %s €. L'offre tient encore %d mois.") % [
 				str(offer.get("company", "")), _group_digits(int(offer.get("price", 0))), int(offer.get("months_left", 0))],
-			"recommendation":"Vous récupérez ses clients sur le marché %s pendant 2 ans (+25 %% de demande), une partie de son savoir-faire, et un concurrent de moins. Sinon, un rival pourrait le reprendre." % MarketManager.segment_label(str(offer.get("segment", ""))),
-			"target_tab":5,
+			"recommendation":"Elle devient votre filiale sur le marché %s : elle vous verse ses bénéfices, ou vous la faites grandir, ou vous l'intégrez pour récupérer ses clients. Une partie de son savoir-faire rejoint votre R&D, et c'est un concurrent de moins. Sinon, un rival pourrait la reprendre." % MarketManager.segment_label(str(offer.get("segment", ""))),
+			"target_tab":1,
+			"can_defer":true
+		})
+	# Lot F2 : le directeur d'une filiale demande des fonds pour s'agrandir.
+	for sub_value in CompanyManager.SUBSIDIARIES.open_requests():
+		var sub: Dictionary = sub_value
+		var request: Dictionary = sub.get("request", {})
+		decisions.append({
+			"id":"FILIALE:%s" % str(sub.get("id", "")),
+			"category":"FILIALE",
+			"severity":40.0,
+			"title":"%s demande %s €" % [str(sub.get("name", "La filiale")), _group_digits(int(request.get("amount", 0)))],
+			"text":"Son directeur veut agrandir la filiale (chiffre d'affaires actuel : %s € par mois). Réponse attendue sous %d mois." % [_group_digits(int(float(sub.get("revenue", 0.0)))), int(request.get("months_left", 0))],
+			"recommendation":"Son directeur sait où investir : ce projet fait grossir la filiale 1,5 fois plus qu'une injection ordinaire, tant que son marché n'est pas saturé. Refuser, ou ne pas répondre, la freine un peu.",
+			"target_tab":1,
 			"can_defer":true
 		})
 	if GarageBusiness.loan_offer_pending():

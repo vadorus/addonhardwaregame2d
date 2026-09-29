@@ -32,6 +32,7 @@ func _ready() -> void:
 			_retire_old()
 		_handle_threats()
 		_handle_offers()
+		_handle_subsidiaries()
 		var report := SimulationManager.process_month_end()
 		_last_income = int(report.get("income", 0))
 		if SimulationManager.is_game_over:
@@ -46,6 +47,8 @@ func _ready() -> void:
 			if TimeManager.year % 10 == 1:
 				_print_rivals()
 			_print_latest()
+			if not CompanyManager.subsidiaries.is_empty():
+				print("[PROBE]     groupe : %d filiale(s), CA %s EUR/mois, dividendes du mois %s EUR" % [CompanyManager.subsidiaries.size(), _k(CompanyManager.SUBSIDIARIES.group_revenue()), _k(CompanyManager.SUBSIDIARIES.group_dividends())])
 			previous_rivals = rivals
 			_year_news = 0
 			_year_news_business = 0
@@ -53,6 +56,7 @@ func _ready() -> void:
 			_year_threat_spend = 0
 	_summary(rows)
 	_corporate_summary()
+	print("[PROBE] filiales en 2030 : %d, CA %s EUR/mois, dividendes cumules %s EUR, capital injecte par la sonde %s EUR" % [CompanyManager.subsidiaries.size(), _k(CompanyManager.SUBSIDIARIES.group_revenue()), _k(_sub_dividends), _k(_sub_injected)])
 	get_tree().quit(0)
 
 var _last_income := 0
@@ -235,3 +239,15 @@ func _corporate_summary() -> void:
 	print("[PROBE] rachats par le joueur : %d pour %s EUR" % [_acquired, _k(_acquire_spend)])
 	for entry in MarketManager.corporate_log:
 		print("[PROBE]   %d/%d %s %s %s %s" % [int(entry.month), int(entry.year), str(entry.kind), str(entry.company), str(entry.other), _k(int(entry.amount))])
+
+## Lot F2 : la sonde finance les projets des directeurs quand elle en a largement les moyens.
+var _sub_dividends := 0
+var _sub_injected := 0
+
+func _handle_subsidiaries() -> void:
+	_sub_dividends += CompanyManager.SUBSIDIARIES.group_dividends()
+	for sub in CompanyManager.SUBSIDIARIES.open_requests():
+		var amount := int((sub.get("request", {}) as Dictionary).get("amount", 0))
+		var fund := float(Economy.money) >= float(amount) * 3.0
+		if CompanyManager.SUBSIDIARIES.answer_request(str(sub.id), fund) and fund:
+			_sub_injected += amount

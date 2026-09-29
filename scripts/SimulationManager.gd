@@ -57,6 +57,8 @@ func process_month_end() -> Dictionary:
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()
 	GarageBusiness.process_month()
+	# Lot F2 : les filiales vivent et versent leurs dividendes avant la clôture du mois.
+	CompanyManager.SUBSIDIARIES.process_month()
 	Objectives.process_month()
 	var report := Economy.close_month()
 	month_processed.emit(report)

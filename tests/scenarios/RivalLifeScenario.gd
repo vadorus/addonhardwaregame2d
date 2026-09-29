@@ -72,9 +72,9 @@ static func run() -> String:
 		return "Buyout: the rival should leave the market"
 	if ResearchManager.get_cpu_capability("ARCHITECTURE") <= 40.0:
 		return "Buyout: part of the rival's know-how should reach our research"
-	var product := {"target_segment":str(offer.segment)}
-	if RIVAL_LIFE.acquisition_demand_factor(product) <= 1.0:
-		return "Buyout: its customers should boost our demand on its market"
+	# Lot F2 : la société rachetée devient une filiale qui garde son chiffre d'affaires.
+	if CompanyManager.subsidiaries.size() != 1 or str(CompanyManager.subsidiaries[0].get("origin", "")) != "ACQUIRED" or float(CompanyManager.subsidiaries[0].get("revenue", 0.0)) <= 0.0:
+		return "Buyout: the bought company should become a subsidiary with its revenue (%s)" % str(CompanyManager.subsidiaries)
 	if MarketManager.acquisitions.size() != 1 or RIVAL_LIFE.accept_offer(str(offer.id)):
 		return "Buyout: the acquisition should be recorded once"
 	return _run_part_two()

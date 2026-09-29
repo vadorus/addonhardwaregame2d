@@ -38,6 +38,7 @@ const RESEARCH_TEAMS_SCENARIO := preload("res://tests/scenarios/ResearchTeamsSce
 const ARCHITECTURE_TICK_TOCK_SCENARIO := preload("res://tests/scenarios/ArchitectureTickTockScenario.gd")
 const RANGE_AND_RIVAL_SCENARIO := preload("res://tests/scenarios/RangeAndRivalScenario.gd")
 const RIVAL_LIFE_SCENARIO := preload("res://tests/scenarios/RivalLifeScenario.gd")
+const SUBSIDIARIES_SCENARIO := preload("res://tests/scenarios/SubsidiariesScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1751,6 +1752,12 @@ func _ready() -> void:
 	var rival_life_error := RIVAL_LIFE_SCENARIO.run()
 	if rival_life_error != "":
 		_fail(rival_life_error)
+		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
+	var subsidiaries_error := SUBSIDIARIES_SCENARIO.run()
+	if subsidiaries_error != "":
+		_fail(subsidiaries_error)
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame

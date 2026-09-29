@@ -203,9 +203,15 @@ func options_for(value: Dictionary) -> Array:
 			var offer: Dictionary = MarketManager.RIVAL_LIFE.get_offer(sid)
 			if not offer.is_empty():
 				options.append(_paid("Racheter %s" % str(offer.get("company", "")),
-					"Ses clients vous rejoignent pendant 2 ans, une partie de ses ingénieurs aussi, et le rival disparaît.",
+					"Elle devient votre filiale ; une partie de ses ingénieurs rejoint votre R&D et le rival disparaît du marché.",
 					"ACQUIRE", int(offer.get("price", 0)), str(offer.get("kind", "")) == "FRAGILE"))
 				options.append(_free("Laisser passer", "Nora n'en reparlera pas avant 18 mois. Un rival pourrait le reprendre.", "ACQUIRE_DECLINE"))
+		"FILIALE":
+			var sub: Dictionary = CompanyManager.SUBSIDIARIES.get_subsidiary(sid)
+			var request: Dictionary = sub.get("request", {}) if not sub.is_empty() else {}
+			if not request.is_empty():
+				options.append(_paid("Financer le projet", "La filiale grossit 1,5 fois plus qu'avec une injection ordinaire, tant que son marché n'est pas saturé.", "SUB_FUND", int(request.get("amount", 0)), true))
+				options.append(_free("Refuser", "La filiale est un peu freinée ; son directeur s'en remettra.", "SUB_REFUSE"))
 		"CONTRAT":
 			options.append(_free("Préparer une offre", "Choisir le CPU et le prix dans Marché.", "DETAIL", true))
 			options.append(_free("Laisser passer cet appel d'offres", "Nora ne vous en reparlera plus.", "TENDER_IGNORE"))
@@ -287,10 +293,13 @@ func choose(action: String) -> bool:
 		"ACQUIRE":
 			var company := str(MarketManager.RIVAL_LIFE.get_offer(sid).get("company", "la société"))
 			ok = MarketManager.RIVAL_LIFE.accept_offer(sid)
-			message = "Rachat de %s conclu : ses clients et une partie de ses ingénieurs vous rejoignent." % company if ok else "Rachat impossible (trésorerie ou offre expirée)."
+			message = "Rachat de %s conclu : c'est votre filiale (Entreprise › Groupe)." % company if ok else "Rachat impossible (trésorerie ou offre expirée)."
 		"ACQUIRE_DECLINE":
 			ok = MarketManager.RIVAL_LIFE.decline_offer(sid)
 			message = "Offre déclinée : Nora n'en reparlera pas avant 18 mois."
+		"SUB_FUND", "SUB_REFUSE":
+			ok = CompanyManager.SUBSIDIARIES.answer_request(sid, action == "SUB_FUND")
+			message = ("Projet financé : la filiale va grossir." if action == "SUB_FUND" else "Projet refusé.") if ok else "Financement impossible (trésorerie insuffisante)."
 		"RIVAL_LATER":
 			MarketManager.snooze_attack_advice(12)
 			ok = true

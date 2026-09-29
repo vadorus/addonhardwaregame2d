@@ -4,6 +4,8 @@ signal company_changed
 signal reputation_changed
 signal alert_created(text)
 
+const SUBSIDIARIES := preload("res://scripts/Subsidiaries.gd")
+
 var company_name := "Nouvelle entreprise"
 var founded_year := 1971
 var starting_sector := "CPU"
@@ -186,16 +188,11 @@ func department_management_modifier(department: String) -> float:
 		return clampf(0.91 + leader_quality / 800.0, 0.86, 1.07)
 	return clampf(0.78 + leader_quality / 420.0, 0.65, 1.10)
 
+## Lot F2 : la filiale est désormais une vraie entreprise (règles dans Subsidiaries.gd).
 func create_subsidiary(name: String, sector: String, capital: int) -> bool:
 	if not GameData.is_sector_active(sector):
 		return false
-	if capital < 50000 or not Economy.can_afford(capital, "Capital filiale"):
-		return false
-	Economy.add_expense(capital, "Capital filiale")
-	subsidiaries.append({"name":name,"sector":sector,"capital":capital,"reputation":40.0})
-	add_alert("Nouvelle filiale créée : %s (%s)." % [name, GameData.SECTORS.get(sector, {}).get("label", sector)])
-	company_changed.emit()
-	return true
+	return SUBSIDIARIES.found(name, sector, capital)
 
 func add_alert(text: String):
 	alerts.push_front(text)
@@ -231,6 +228,9 @@ func load_state(state: Dictionary):
 	if not departments.has("Développement"):
 		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
+	# Lot F2 : l'ancienne ébauche de filiale devient une vraie filiale.
+	for i in range(subsidiaries.size()):
+		subsidiaries[i] = SUBSIDIARIES.migrate(subsidiaries[i])
 	brands = state.get("brands", []).duplicate(true)
 	alerts = state.get("alerts", []).duplicate(true)
 	# Anciennes sauvegardes : la notoriété repart du niveau que le budget actuel entretient.

@@ -276,23 +276,24 @@ static func accept_offer(offer_id: String) -> bool:
 			ResearchManager.cpu_capabilities[key] = clampf(ours + gained, 0.0, 100.0)
 			knowhow[key] = snappedf(gained, 0.1)
 	var segment := MarketManager.normalize_segment(str(competitor.get("target_segment", "EMBEDDED")))
-	MarketManager.acquisition_boosts.append({"segment":segment, "months":ACQUIRE_BOOST_MONTHS, "company":str(offer.company)})
 	CompanyManager.change_reputation({"innovation":1.5, "value":1.0})
+	# Lot F2 : la société rachetée devient une filiale (dividendes, croissance ou intégration de ses clients).
+	var sub: Dictionary = CompanyManager.SUBSIDIARIES.adopt_acquired(competitor, price)
 	MarketManager.acquisitions.append({
 		"company":str(offer.company), "competitor_id":str(offer.competitor_id), "kind":str(offer.kind),
 		"price":price, "year":TimeManager.year, "month":TimeManager.month, "segment":segment,
 		"brand":float(competitor.get("brand", 50.0)), "units":int(competitor.get("last_month_units", 0)),
 		"revenue":int(competitor.get("last_month_revenue", 0)), "knowhow":knowhow,
-		"skills":_skills_of(competitor)
+		"skills":_skills_of(competitor), "subsidiary_id":str(sub.get("id", ""))
 	})
 	offer["months_left"] = 0
 	offer["result"] = "ACCEPTED"
 	_log("ACQUIRED", str(offer.company), CompanyManager.company_name, price)
 	MarketManager.remove_competitor(str(offer.competitor_id))
 	MediaManager.publish_business_event("%s rachète %s" % [CompanyManager.company_name, str(offer.company)],
-		"Montant de l'opération : %s EUR. Les clients de %s passent chez %s, et une partie de ses ingénieurs aussi." % [_group(price), str(offer.company), CompanyManager.company_name],
+		"Montant de l'opération : %s EUR. %s devient une filiale du groupe %s, et une partie de ses ingénieurs rejoint la maison mère." % [_group(price), str(offer.company), CompanyManager.company_name],
 		"acquisition_%s" % str(offer.competitor_id))
-	CompanyManager.add_alert("Rachat de %s conclu : ses clients sur le marché %s vous rejoignent pendant 2 ans." % [str(offer.company), MarketManager.segment_label(segment)])
+	CompanyManager.add_alert("Rachat de %s conclu : c'est votre filiale. Par défaut elle vous verse ses bénéfices ; vous pouvez la faire grandir ou l'intégrer (Entreprise > Groupe)." % str(offer.company))
 	MarketManager.market_changed.emit()
 	return true
 
