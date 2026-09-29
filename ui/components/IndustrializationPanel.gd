@@ -1,19 +1,44 @@
 extends VBoxContainer
+## V0.9 — Page « Fabriquer » (Produits) : des cartes au lieu du mur de texte (demande d'Alexandre, 29/09).
+## • une carte par CPU en préparation d'usine : avancement, et quand un choix est attendu, trois
+##   questions simples en boutons (où fabriquer ? priorité ? tri des puces ?) + « Lancer la production » ;
+## • votre usine : état, capacité, location de la capacité libre, maintenance, agrandissement ;
+## • les dernières productions terminées : 3 jauges + détails repliés ;
+## • les fonderies partenaires : une jauge par fonderie.
+## Les actions émises sont inchangées (apply_industrialization, build_fab, maintain_fab, toggle_capacity_sales).
 
 signal action_requested(action: String, payload: Dictionary)
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const UI := preload("res://ui/UiKit.gd")
+const AMBER := Color("d9822b")
+const IDLE_BG := Color("efe3d0")
+const IDLE_TEXT := Color("6b5b48")
 
-var production_label: Label
-var production_grid: GridContainer
-var industrialization_select: OptionButton
-var industrialization_strategy: OptionButton
-var industrialization_binning: OptionButton
-var manufacturing_mode_select: OptionButton
-var foundry_select: OptionButton
-var foundry_route_label: Label
-var foundry_overview_label: Label
+const STRATEGY_ORDER := ["ECONOMY", "BALANCED", "QUALITY", "SPEED"]
+const STRATEGY_SHORT := {"ECONOMY":"Économie", "BALANCED":"Équilibré", "QUALITY":"Qualité", "SPEED":"Vitesse"}
+const STRATEGY_HINTS := {
+	"ECONOMY":"Coûte moins cher, prépare plus lentement, un peu plus de défauts.",
+	"BALANCED":"Le bon compromis coût / délai / qualité.",
+	"QUALITY":"Plus cher, mais moins de défauts et de meilleures puces.",
+	"SPEED":"En boutique plus vite et plus de capacité, mais coûte cher.",
+}
+const BINNING_ORDER := ["VOLUME", "BALANCED", "STRICT"]
+const BINNING_SHORT := {"VOLUME":"Volume", "BALANCED":"Équilibré", "STRICT":"Strict"}
+const BINNING_HINTS := {
+	"VOLUME":"Plus de puces classées haut de gamme, avec moins de marge.",
+	"BALANCED":"Répartition normale entre les modèles de la gamme.",
+	"STRICT":"Moins de puces haut de gamme, mais excellentes (overclocking).",
+}
+
+var _team_label: Label
+var _jobs_box: VBoxContainer
+var _fab_box: VBoxContainer
+var _done_box: VBoxContainer
+var _foundries_box: VBoxContainer
+var _choices: Dictionary = {}
+var _signature := ""
+var _narrow := false
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 12)
@@ -21,255 +46,484 @@ func _ready() -> void:
 	refresh()
 
 func _build() -> void:
-	add_child(UI.section("Industrialisation CPU"))
-	production_label = UI.rich_label()
-	add_child(production_label)
-
-	production_grid = GridContainer.new()
-	production_grid.columns = 2
-	add_child(production_grid)
-	production_grid.add_child(UI.label("Projet en industrialisation", 14))
-	industrialization_select = OptionButton.new()
-	industrialization_select.item_selected.connect(func(_index): _refresh_selected_controls())
-	production_grid.add_child(industrialization_select)
-
-	production_grid.add_child(UI.label("Stratégie industrielle", 14))
-	industrialization_strategy = OptionButton.new()
-	for strategy_key in ["ECONOMY", "BALANCED", "QUALITY", "SPEED"]:
-		industrialization_strategy.add_item(ProductionManager.strategy_label(strategy_key))
-		industrialization_strategy.set_item_metadata(industrialization_strategy.item_count - 1, strategy_key)
-	UI.select_meta(industrialization_strategy, "BALANCED")
-	production_grid.add_child(industrialization_strategy)
-
-	production_grid.add_child(UI.label("Sélection du silicium", 14))
-	industrialization_binning = OptionButton.new()
-	for binning_key in ["VOLUME", "BALANCED", "STRICT"]:
-		industrialization_binning.add_item(ProductionManager.binning_strategy_label(binning_key))
-		industrialization_binning.set_item_metadata(industrialization_binning.item_count - 1, binning_key)
-	UI.select_meta(industrialization_binning, "BALANCED")
-	production_grid.add_child(industrialization_binning)
-
-	production_grid.add_child(UI.label("Route de fabrication", 14))
-	manufacturing_mode_select = OptionButton.new()
-	for route_data in [["Sous-traitance / fonderie externe","EXTERNAL"],["Fab interne","INTERNAL"]]:
-		manufacturing_mode_select.add_item(str(route_data[0]))
-		manufacturing_mode_select.set_item_metadata(manufacturing_mode_select.item_count - 1, str(route_data[1]))
-	manufacturing_mode_select.item_selected.connect(func(_i): _refresh_foundry_options())
-	production_grid.add_child(manufacturing_mode_select)
-
-	production_grid.add_child(UI.label("Fonderie", 14))
-	foundry_select = OptionButton.new()
-	foundry_select.item_selected.connect(func(_i): _refresh_foundry_route_summary())
-	production_grid.add_child(foundry_select)
-
-	var apply_button := Button.new()
-	apply_button.text = "Appliquer fabrication + binning + fonderie"
-	apply_button.pressed.connect(_emit_apply)
-	add_child(apply_button)
-
-	foundry_route_label = UI.rich_label()
-	add_child(foundry_route_label)
-
-	add_child(UI.section("Fonderies & capacité"))
-	foundry_overview_label = UI.rich_label()
-	add_child(foundry_overview_label)
-
-	var actions := HFlowContainer.new()
-	actions.add_theme_constant_override("h_separation", 8)
-	actions.add_theme_constant_override("v_separation", 8)
-	add_child(actions)
-
-	var build_fab := Button.new()
-	build_fab.text = "Construire / agrandir la fab interne"
-	build_fab.pressed.connect(func(): action_requested.emit("build_fab", {}))
-	actions.add_child(build_fab)
-
-	var maintain_fab := Button.new()
-	maintain_fab.text = "Maintenance lourde de la fab"
-	maintain_fab.pressed.connect(func(): action_requested.emit("maintain_fab", {}))
-	actions.add_child(maintain_fab)
-
-	var sell_capacity := Button.new()
-	sell_capacity.text = "Activer / couper la vente de capacité libre"
-	sell_capacity.pressed.connect(func(): action_requested.emit("toggle_capacity_sales", {}))
-	actions.add_child(sell_capacity)
+	add_child(UI.section("Fabrication"))
+	_team_label = UI.muted_label("", 13)
+	_team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_team_label)
+	_jobs_box = _vbox(10)
+	add_child(_jobs_box)
+	add_child(UI.section("Votre usine"))
+	_fab_box = _vbox(8)
+	add_child(_fab_box)
+	add_child(UI.section("Dernières productions"))
+	_done_box = _vbox(8)
+	add_child(_done_box)
+	add_child(UI.section("Fonderies partenaires"))
+	_foundries_box = _vbox(4)
+	add_child(_foundries_box)
 
 func set_viewport_width(width: float) -> void:
-	if production_grid != null:
-		production_grid.columns = 1 if width < 760.0 else 2
+	var narrow := width < 760.0
+	if narrow != _narrow:
+		_narrow = narrow
+		_signature = ""
+		refresh()
 
 func refresh() -> void:
-	_refresh_production_overview()
-	_refresh_foundry_overview()
-
-func _refresh_production_overview() -> void:
-	if production_label == null:
+	if _jobs_box == null:
 		return
-	var lines: Array[String] = [
-		"Équipe Production : %d personne(s) • score %.0f/100 • qualité %.1f • maintenance %.1f" % [
-			PersonnelManager.count_department("Production"),
-			ProductionManager.production_team_score(),
-			ProductionManager.quality_knowledge,
-			ProductionManager.maintenance_knowledge
-		]
-	]
-	var visible_nodes := CPU_DESIGN.available_nodes_for_capabilities(
-		float(ResearchManager.technologies.get("manufacturing", 0.0)),
-		ResearchManager.get_cpu_capability("MINIATURIZATION")
-	)
-	for node_value in visible_nodes:
-		var node_nm := int(node_value)
-		lines.append("• Maîtrise %s : %.1f/100" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
+	var signature := _state_signature()
+	if signature == _signature:
+		return
+	_signature = signature
+	_team_label.text = _team_text()
+	_rebuild_jobs()
+	_rebuild_fab()
+	_rebuild_done()
+	_rebuild_foundries()
+	UI.prepare_touch_scroll_children(self)
+
+func _force_refresh() -> void:
+	_signature = ""
+	refresh()
+
+## Ne reconstruit la page que si quelque chose de visible a changé (pas de saut de défilement).
+func _state_signature() -> String:
+	var parts: Array[String] = [str(_narrow), str(ProductionManager.jobs.size())]
 	for job_value in ProductionManager.jobs:
 		var job: Dictionary = job_value
-		var result: Dictionary = job.get("result", {})
-		if str(job.get("status", "")) == "INDUSTRIALIZATION":
-			var route := ProductionManager.manufacturing_route_quote(str(job.get("id", "")))
-			var route_name := str(route.get("provider_name", "route à choisir")) if not route.is_empty() else "route incompatible"
-			var route_error := str(job.get("route_error", ""))
-			var route_status := "engagée" if bool(job.get("route_committed", false)) else ("validée, démarrage au prochain mois" if bool(job.get("route_selected", false)) else "à confirmer par le joueur")
-			lines.append("\n%s — %s — %.0f%% • %d mois • %s • route %s • coût mensuel base %s €%s" % [
-				str(job.get("name", "CPU")), ProductionManager.strategy_label(str(job.get("strategy", "BALANCED"))),
-				float(job.get("progress", 0.0)), int(job.get("months_spent", 0)), route_name, route_status,
-				UI.money(int(job.get("monthly_cost", 0))), ("\n  ⚠ " + route_error) if route_error != "" else ""
-			])
-		else:
-			lines.append("\n%s — industrialisation terminée : qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\n  Gravure/équipement %.0f/100 • conception %.0f/100 • qualité électrique des dies %.0f/100 ± %.1f • prévisibilité %.0f/100\n  OC typique +%.1f%% • undervolt %.1f%% • %s" % [
-				str(job.get("name", "CPU")), float(result.get("quality_score", 0.0)),
-				float(result.get("defect_rate", 0.0)) * 100.0, float(result.get("process_mastery", 0.0)),
-				float(result.get("lithography_precision", 0.0)), float(result.get("design_margin_score", 0.0)),
-				float(result.get("die_quality_mean", result.get("silicon_quality_mean", 0.0))),
-				float(result.get("die_variation", result.get("silicon_variation", 0.0))),
-				float(result.get("process_predictability", result.get("silicon_predictability", 0.0))),
-				float(result.get("oc_headroom_pct", 0.0)), float(result.get("undervolt_headroom_pct", 0.0)),
-				ProductionManager.binning_strategy_label(str(result.get("binning_strategy", "BALANCED")))
-			])
-			lines.append("  Fabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100 • capacité ~%s/mois" % [
-				str(result.get("foundry_name", "non renseignée")), float(result.get("foundry_dependency", 0.0)),
-				float(result.get("foundry_confidentiality", 0.0)), UI.money(int(result.get("foundry_capacity", 0)))
-			])
-	production_label.text = "\n".join(lines)
-
-	var previous_job := UI.option_meta(industrialization_select) if industrialization_select.item_count > 0 else ""
-	industrialization_select.clear()
-	for job_value in ProductionManager.get_active_jobs():
-		var job: Dictionary = job_value
-		industrialization_select.add_item("%s — %.0f%%" % [str(job.get("name", "CPU")), float(job.get("progress", 0.0))])
-		industrialization_select.set_item_metadata(industrialization_select.item_count - 1, str(job.get("id", "")))
-	if previous_job != "":
-		UI.select_meta(industrialization_select, previous_job)
-	if industrialization_select.item_count > 0:
-		if industrialization_select.selected < 0:
-			industrialization_select.select(0)
-		_refresh_selected_controls()
-	else:
-		_refresh_foundry_options()
-
-func _refresh_foundry_overview() -> void:
+		parts.append("%s|%s|%d|%s|%s|%s" % [str(job.get("id", "")), str(job.get("status", "")), int(float(job.get("progress", 0.0))),
+			str(job.get("route_selected", false)), str(job.get("route_committed", false)), str(job.get("route_error", ""))])
 	var fab := FoundryManager.internal_fab_data()
-	var lines: Array[String] = []
-	if bool(fab.get("built", false)):
-		lines.append("Fab interne : %s • état %.0f/100 • précision %.0f/100 • capacité %s/mois • utilisée %s • libre %s" % [
-			str(fab.get("name", "")), float(fab.get("condition", 0.0)), float(fab.get("precision", 0.0)),
-			UI.money(int(fab.get("capacity", 0))), UI.money(int(fab.get("used_capacity", 0))), UI.money(int(fab.get("spare_capacity", 0)))
-		])
-		lines.append("Vente de capacité libre : %s • frais fixes %s €/mois" % [
-			"active" if bool(fab.get("sell_spare_capacity", false)) else "inactive",
-			UI.money(FoundryManager.current_monthly_overhead())
-		])
+	var construction := FoundryManager.active_construction()
+	var upgrade := FoundryManager.next_internal_fab_upgrade()
+	parts.append("%d|%d|%s|%d|%d|%s" % [int(fab.get("tier", 0)), int(float(fab.get("condition", 0.0))), str(fab.get("sell_spare_capacity", false)),
+		int(fab.get("used_capacity", 0)), int(construction.get("months_remaining", -1)),
+		str(Economy.can_afford(int(round(float(upgrade.get("build_cost", 0)) * 0.25)), "Acompte construction fab"))])
+	for foundry_id in FoundryManager.external_foundry_keys():
+		parts.append(str(int(float(FoundryManager.get_external_foundry(str(foundry_id)).get("technology_score", 0.0)))))
+	return ";".join(parts)
+
+func _team_text() -> String:
+	var nodes := CPU_DESIGN.available_nodes_for_capabilities(
+		float(ResearchManager.technologies.get("manufacturing", 0.0)), ResearchManager.get_cpu_capability("MINIATURIZATION"))
+	var mastery: Array[String] = []
+	for i in range(maxi(nodes.size() - 3, 0), nodes.size()):
+		var node_nm := int(nodes[i])
+		mastery.append("%s %.0f" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
+	return "Équipe production : %d personne(s) • savoir-faire qualité %.0f • maintenance %.0f\nMaîtrise de la gravure : %s" % [
+		PersonnelManager.count_department("Production"), ProductionManager.quality_knowledge,
+		ProductionManager.maintenance_knowledge, " • ".join(mastery) if not mastery.is_empty() else "—"]
+
+# --- CPU en préparation d'usine -------------------------------------------------------------
+
+func _rebuild_jobs() -> void:
+	_clear(_jobs_box)
+	var active := ProductionManager.get_active_jobs()
+	if active.is_empty():
+		var empty := UI.muted_label("Aucun CPU en préparation d'usine. Quand un projet du Labo termine son prototype, il arrive ici pour être fabriqué.", 13)
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_jobs_box.add_child(empty)
+		return
+	for job_value in active:
+		_jobs_box.add_child(_job_card(job_value))
+
+func _job_card(job: Dictionary) -> Control:
+	var committed := bool(job.get("route_committed", false))
+	var selected := bool(job.get("route_selected", false))
+	var needs_choice := not selected and not committed
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL, 14, 2 if needs_choice else 1, AMBER if needs_choice else UI.APP_LINE, 12))
+	var box := _vbox(8)
+	card.add_child(box)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	box.add_child(head)
+	head.add_child(UI.label(str(job.get("name", "CPU")), 18))
+	var sub := UI.muted_label("gravure %s" % CPU_DESIGN.node_label(int(job.get("node_nm", 10000))), 13)
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(sub)
+	var chip_text := "Choix à faire"
+	var chip_color := AMBER
+	if committed:
+		chip_text = "En préparation"
+		chip_color = UI.APP_GREEN
+	elif selected:
+		chip_text = "Démarre le mois prochain"
+		chip_color = IDLE_TEXT
+	head.add_child(_chip(chip_text, chip_color))
+	var progress := float(job.get("progress", 0.0))
+	box.add_child(UI.label("Préparation de l'usine : %.0f %%  •  %d mois" % [progress, int(job.get("months_spent", 0))], 14))
+	box.add_child(_bar(progress, UI.APP_GREEN if committed else AMBER))
+	var route_error := str(job.get("route_error", ""))
+	if route_error != "":
+		var warn := UI.label("⚠ " + route_error, 13)
+		warn.add_theme_color_override("font_color", UI.APP_RED)
+		warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(warn)
+	if needs_choice:
+		_add_choices(box, job)
 	else:
-		var construction := FoundryManager.active_construction()
-		if construction.is_empty():
-			var upgrade := FoundryManager.next_internal_fab_upgrade()
-			lines.append("Aucune fab interne. Prochaine étape : %s • %s € • %d mois." % [
-				str(upgrade.get("name", "Petite fab intégrée")), UI.money(int(upgrade.get("build_cost", 0))),
-				int(upgrade.get("build_months", 0))
-			])
-		else:
-			lines.append("Construction : %s • %d mois restants • %s € encore à financer." % [
-				str(construction.get("name", "")), int(construction.get("months_remaining", 0)),
-				UI.money(int(construction.get("remaining_cost", 0)))
-			])
-	lines.append("\nFonderies externes :")
-	for foundry_id_value in FoundryManager.external_foundry_keys():
-		var foundry_id := str(foundry_id_value)
-		var provider := FoundryManager.get_external_foundry(foundry_id)
-		lines.append("• %s — techno %.0f/100 • précision %.0f/100 • fiabilité %.0f • coût x%.2f • dépendance %.0f" % [
-			str(provider.get("name", foundry_id)), float(provider.get("technology_score", 0.0)),
-			float(provider.get("precision", 0.0)), float(provider.get("reliability", 0.0)),
-			float(provider.get("cost_factor", 1.0)), float(provider.get("dependency", 0.0))
-		])
-	foundry_overview_label.text = "\n".join(lines)
+		var summary := UI.muted_label(_route_summary(job), 13)
+		summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(summary)
+	return card
 
-func _refresh_selected_controls() -> void:
-	if industrialization_select.item_count == 0:
-		_refresh_foundry_options()
-		return
-	var job := ProductionManager.get_job(UI.option_meta(industrialization_select))
-	if job.is_empty():
-		return
-	UI.select_meta(industrialization_strategy, str(job.get("strategy", "BALANCED")))
-	UI.select_meta(industrialization_binning, str(job.get("binning_strategy", "BALANCED")))
-	UI.select_meta(manufacturing_mode_select, str(job.get("manufacturing_mode", "EXTERNAL")))
-	_refresh_foundry_options()
-	UI.select_meta(foundry_select, "INTERNAL" if str(job.get("manufacturing_mode", "EXTERNAL")) == "INTERNAL" else str(job.get("foundry_id", "")))
-	_refresh_foundry_route_summary()
+func _route_summary(job: Dictionary) -> String:
+	var quote := ProductionManager.manufacturing_route_quote(str(job.get("id", "")))
+	var strategy := str(job.get("strategy", "BALANCED"))
+	var cost_factor := float(ProductionManager.STRATEGIES.get(strategy, {}).get("cost", 1.0)) * float(quote.get("cost_factor", 1.0))
+	return "Fabriqué chez %s  •  priorité %s  •  tri %s  •  ~%s €/mois pendant la préparation" % [
+		str(quote.get("provider_name", "—")), str(STRATEGY_SHORT.get(strategy, strategy)).to_lower(),
+		str(BINNING_SHORT.get(str(job.get("binning_strategy", "BALANCED")), "")).to_lower(),
+		UI.money(int(round(float(job.get("monthly_cost", 0)) * cost_factor)))]
 
-func _refresh_foundry_options() -> void:
-	var mode := UI.option_meta(manufacturing_mode_select)
-	var node_nm := 10000
-	if industrialization_select.item_count > 0:
-		var job := ProductionManager.get_job(UI.option_meta(industrialization_select))
-		node_nm = int(job.get("node_nm", 10000))
-	var previous := UI.option_meta(foundry_select) if foundry_select.item_count > 0 else ""
-	foundry_select.clear()
-	if mode == "INTERNAL":
-		var fab := FoundryManager.internal_fab_data()
-		if bool(fab.get("built", false)) and FoundryManager.internal_supports_node(node_nm):
-			foundry_select.add_item(str(fab.get("name", "Fab interne")))
-			foundry_select.set_item_metadata(0, "INTERNAL")
-		else:
-			foundry_select.add_item("Fab interne indisponible pour ce procédé")
-			foundry_select.set_item_metadata(0, "")
-	else:
-		for foundry_id_value in FoundryManager.available_external_foundries(node_nm):
-			var foundry_id := str(foundry_id_value)
-			var data := FoundryManager.get_external_foundry(foundry_id)
-			foundry_select.add_item(str(data.get("name", foundry_id)))
-			foundry_select.set_item_metadata(foundry_select.item_count - 1, foundry_id)
-	if previous != "":
-		UI.select_meta(foundry_select, previous)
-	if foundry_select.selected < 0 and foundry_select.item_count > 0:
-		foundry_select.select(0)
-	_refresh_foundry_route_summary()
+func _choice_for(job: Dictionary) -> Dictionary:
+	var job_id := str(job.get("id", ""))
+	if not _choices.has(job_id):
+		var node_nm := int(job.get("node_nm", 10000))
+		var provider := str(job.get("foundry_id", ""))
+		if str(job.get("manufacturing_mode", "EXTERNAL")) == "INTERNAL" or FoundryManager.internal_supports_node(node_nm):
+			provider = "INTERNAL"
+		if provider == "" or (provider != "INTERNAL" and not FoundryManager.provider_supports_node(provider, node_nm)):
+			provider = FoundryManager.recommended_external_foundry(node_nm)
+		_choices[job_id] = {"provider":provider, "strategy":str(job.get("strategy", "BALANCED")), "binning":str(job.get("binning_strategy", "BALANCED"))}
+	return _choices[job_id]
 
-func _refresh_foundry_route_summary() -> void:
-	if industrialization_select.item_count == 0:
-		foundry_route_label.text = "Aucun CPU en industrialisation."
-		return
-	var job := ProductionManager.get_job(UI.option_meta(industrialization_select))
-	var mode := UI.option_meta(manufacturing_mode_select)
-	var provider_id := UI.option_meta(foundry_select) if foundry_select.item_count > 0 else ""
-	var quote := FoundryManager.route_quote(mode, provider_id, int(job.get("node_nm", 10000)))
+func _route_options(node_nm: int) -> Array:
+	var result: Array = []
+	if FoundryManager.internal_supports_node(node_nm):
+		var internal := FoundryManager.route_quote("INTERNAL", "INTERNAL", node_nm)
+		if not internal.is_empty():
+			result.append({"id":"INTERNAL", "quote":internal})
+	for foundry_id in FoundryManager.available_external_foundries(node_nm):
+		var quote := FoundryManager.route_quote("EXTERNAL", str(foundry_id), node_nm)
+		if not quote.is_empty():
+			result.append({"id":str(foundry_id), "quote":quote})
+	return result
+
+func _add_choices(box: VBoxContainer, job: Dictionary) -> void:
+	var job_id := str(job.get("id", ""))
+	var choice := _choice_for(job)
+	var node_nm := int(job.get("node_nm", 10000))
+	var recommended := FoundryManager.recommended_external_foundry(node_nm)
+	# 1. Où fabriquer ?
+	box.add_child(_question("1. Où fabriquer ?"))
+	var routes := HFlowContainer.new()
+	routes.add_theme_constant_override("h_separation", 8)
+	routes.add_theme_constant_override("v_separation", 8)
+	box.add_child(routes)
+	var options := _route_options(node_nm)
+	if options.is_empty():
+		var none := UI.label("Aucune usine ne sait encore graver en %s : il faut attendre que les fonderies progressent ou changer de gravure." % CPU_DESIGN.node_label(node_nm), 13)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(none)
+	for option_value in options:
+		var option: Dictionary = option_value
+		var option_id := str(option.id)
+		var option_quote: Dictionary = option.quote
+		var tag := ""
+		if option_id == "INTERNAL":
+			tag = "  ★ votre usine"
+		elif option_id == recommended:
+			tag = "  ★ conseillé"
+		var text := "%s%s\nPrécision %.0f • fiabilité %.0f • coût x%.2f\nMise en route %s €" % [
+			str(option_quote.get("provider_name", option_id)), tag, float(option_quote.get("precision", 0.0)),
+			float(option_quote.get("reliability", 0.0)), float(option_quote.get("cost_factor", 1.0)), UI.money(int(option_quote.get("setup_fee", 0)))]
+		var tile := _toggle_button(text, str(choice.provider) == option_id, 250 if not _narrow else 0, 78)
+		tile.pressed.connect(func(): _pick(job_id, "provider", option_id))
+		routes.add_child(tile)
+	# 2. Priorité de l'usine.
+	box.add_child(_question("2. Priorité de l'usine"))
+	box.add_child(_segmented(job_id, "strategy", STRATEGY_ORDER, STRATEGY_SHORT, str(choice.strategy)))
+	box.add_child(_hint(str(STRATEGY_HINTS.get(str(choice.strategy), ""))))
+	# 3. Tri des puces (binning).
+	box.add_child(_question("3. Tri des puces"))
+	box.add_child(_segmented(job_id, "binning", BINNING_ORDER, BINNING_SHORT, str(choice.binning)))
+	box.add_child(_hint(str(BINNING_HINTS.get(str(choice.binning), ""))))
+	# Coût et validation.
+	var provider := str(choice.provider)
+	var mode := "INTERNAL" if provider == "INTERNAL" else "EXTERNAL"
+	var quote := FoundryManager.route_quote(mode, provider, node_nm)
+	var go := Button.new()
+	go.custom_minimum_size = Vector2(0, 50)
+	go.add_theme_font_size_override("font_size", 16)
 	if quote.is_empty():
-		foundry_route_label.text = "Cette route ne peut pas fabriquer %s avec les moyens actuels." % CPU_DESIGN.node_label(int(job.get("node_nm", 10000)))
-		return
-	foundry_route_label.text = "%s\nPrécision équipement %.0f/100 • fiabilité %.0f/100 • dépendance %.0f/100 • confidentialité %.0f/100\nCoût x%.2f • vitesse x%.2f • capacité max ~%s unités/mois • frais de mise en production %s €\nApprentissage interne x%.2f" % [
-		str(quote.get("provider_name", "")), float(quote.get("precision", 0.0)),
-		float(quote.get("reliability", 0.0)), float(quote.get("dependency", 0.0)),
-		float(quote.get("confidentiality", 0.0)), float(quote.get("cost_factor", 1.0)),
-		float(quote.get("speed_factor", 1.0)), UI.money(int(quote.get("max_capacity", 0))),
-		UI.money(int(quote.get("setup_fee", 0))), float(quote.get("learning_factor", 1.0))
-	]
+		go.text = "Choisissez où fabriquer"
+		go.disabled = true
+	else:
+		var monthly := int(round(float(job.get("monthly_cost", 0)) * float(ProductionManager.STRATEGIES.get(str(choice.strategy), {}).get("cost", 1.0)) * float(quote.get("cost_factor", 1.0))))
+		box.add_child(UI.muted_label("Coût : ~%s €/mois pendant la préparation + %s € de mise en route." % [UI.money(monthly), UI.money(int(quote.get("setup_fee", 0)))], 13))
+		go.text = "Lancer la production"
+		go.add_theme_color_override("font_color", Color.WHITE)
+		go.add_theme_stylebox_override("normal", UI.stylebox(UI.APP_GREEN, 12, 0, UI.APP_GREEN, 10))
+		go.add_theme_stylebox_override("hover", UI.stylebox(UI.APP_GREEN.darkened(0.1), 12, 0, UI.APP_GREEN, 10))
+		go.add_theme_stylebox_override("pressed", UI.stylebox(UI.APP_GREEN.darkened(0.2), 12, 0, UI.APP_GREEN, 10))
+		go.pressed.connect(func(): _apply(job_id))
+	box.add_child(go)
 
-func _emit_apply() -> void:
-	if industrialization_select.item_count == 0:
-		action_requested.emit("apply_industrialization", {})
-		return
+func _pick(job_id: String, field: String, value: String) -> void:
+	if _choices.has(job_id):
+		(_choices[job_id] as Dictionary)[field] = value
+	# Différé : le bouton touché est reconstruit, on ne le libère pas pendant son propre signal.
+	call_deferred("_force_refresh")
+
+func _apply(job_id: String) -> void:
+	var choice: Dictionary = _choices.get(job_id, {})
+	var provider := str(choice.get("provider", ""))
 	action_requested.emit("apply_industrialization", {
-		"job_id":UI.option_meta(industrialization_select),
-		"strategy":UI.option_meta(industrialization_strategy),
-		"binning":UI.option_meta(industrialization_binning),
-		"mode":UI.option_meta(manufacturing_mode_select),
-		"provider":UI.option_meta(foundry_select) if foundry_select.item_count > 0 else ""
+		"job_id":job_id,
+		"strategy":str(choice.get("strategy", "BALANCED")),
+		"binning":str(choice.get("binning", "BALANCED")),
+		"mode":"INTERNAL" if provider == "INTERNAL" else "EXTERNAL",
+		"provider":provider
 	})
+	_choices.erase(job_id)
+	call_deferred("_force_refresh")
+
+# --- Votre usine ----------------------------------------------------------------------------
+
+func _rebuild_fab() -> void:
+	_clear(_fab_box)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL, 14, 1, UI.APP_LINE, 12))
+	var box := _vbox(8)
+	card.add_child(box)
+	_fab_box.add_child(card)
+	var fab := FoundryManager.internal_fab_data()
+	var construction := FoundryManager.active_construction()
+	var upgrade := FoundryManager.next_internal_fab_upgrade()
+	if bool(fab.get("built", false)):
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 8)
+		var name_label := UI.label(str(fab.get("name", "Fab interne")), 18)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(name_label)
+		head.add_child(_chip("Opérationnelle", UI.APP_GREEN))
+		box.add_child(head)
+		var condition := float(fab.get("condition", 0.0))
+		var state_row := UI.meter_row("État de l'usine", "Sous 60, pensez à la maintenance")
+		UI.set_meter(state_row, condition, "%.0f/100" % condition)
+		box.add_child(state_row)
+		var capacity := maxi(int(fab.get("capacity", 0)), 1)
+		var used := int(fab.get("used_capacity", 0))
+		var use_row := UI.meter_row("Capacité utilisée", "Par vos propres CPU")
+		UI.set_meter(use_row, float(used) / float(capacity) * 100.0, "%s / %s par mois" % [UI.money(used), UI.money(capacity)])
+		box.add_child(use_row)
+		box.add_child(UI.muted_label("Frais fixes : %s €/mois  •  précision %.0f/100" % [UI.money(FoundryManager.current_monthly_overhead()), float(fab.get("precision", 0.0))], 13))
+		var rent := CheckButton.new()
+		rent.text = "Louer la capacité libre à d'autres fabricants"
+		rent.button_pressed = bool(fab.get("sell_spare_capacity", false))
+		rent.toggled.connect(func(_on): action_requested.emit("toggle_capacity_sales", {}))
+		box.add_child(rent)
+		var actions := HFlowContainer.new()
+		actions.add_theme_constant_override("h_separation", 8)
+		actions.add_theme_constant_override("v_separation", 8)
+		box.add_child(actions)
+		var maintain := Button.new()
+		maintain.text = "Maintenance lourde (%s €)" % UI.money(FoundryManager.current_monthly_overhead() * 2)
+		maintain.custom_minimum_size.y = 42
+		maintain.pressed.connect(func(): action_requested.emit("maintain_fab", {}))
+		actions.add_child(maintain)
+		if construction.is_empty() and not upgrade.is_empty():
+			actions.add_child(_build_button(upgrade, "Agrandir"))
+		elif not construction.is_empty():
+			_add_construction(box, construction)
+		return
+	if not construction.is_empty():
+		box.add_child(UI.label("Votre première usine est en chantier", 16))
+		_add_construction(box, construction)
+		return
+	box.add_child(UI.label("Pas encore d'usine à vous", 16))
+	var intro := UI.muted_label("Vos CPU sont fabriqués par des fonderies partenaires. Une usine à vous coûte moins cher par puce, apprend plus vite et loue sa capacité libre.", 13)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(intro)
+	if not upgrade.is_empty():
+		box.add_child(UI.muted_label("%s : capacité %s puces/mois • frais fixes %s €/mois" % [
+			str(upgrade.get("name", "")), UI.money(int(upgrade.get("capacity", 0))), UI.money(int(upgrade.get("monthly_overhead", 0)))], 13))
+		box.add_child(_build_button(upgrade, "Construire"))
+
+func _build_button(upgrade: Dictionary, verb: String) -> Control:
+	var wrap := _vbox(4)
+	var cost := int(upgrade.get("build_cost", 0))
+	var deposit := int(round(float(cost) * 0.25))
+	var button := Button.new()
+	button.custom_minimum_size.y = 42
+	button.text = "%s : %s — %s €, %d mois" % [verb, str(upgrade.get("name", "")), UI.money(cost), int(upgrade.get("build_months", 0))]
+	var needed := float(upgrade.get("required_manufacturing", 0.0))
+	var have := float(ResearchManager.technologies.get("manufacturing", 0.0))
+	var reason := ""
+	if have + 0.001 < needed:
+		reason = "Il faut une maîtrise de fabrication de %.0f (vous : %.0f). Elle progresse en produisant et avec la recherche « miniaturisation »." % [needed, have]
+	elif not Economy.can_afford(deposit, "Acompte construction fab"):
+		reason = "Acompte de %s € à payer au lancement du chantier (25 %%), le reste pendant la construction." % UI.money(deposit)
+	button.disabled = reason != ""
+	button.pressed.connect(func(): action_requested.emit("build_fab", {}))
+	wrap.add_child(button)
+	if reason != "":
+		wrap.add_child(_hint(reason))
+	else:
+		wrap.add_child(_hint("Acompte %s € maintenant, le reste étalé sur le chantier." % UI.money(deposit)))
+	return wrap
+
+func _add_construction(box: VBoxContainer, construction: Dictionary) -> void:
+	var total := maxi(int(construction.get("months_total", 1)), 1)
+	var remaining := int(construction.get("months_remaining", 0))
+	box.add_child(UI.label("Chantier : %s — encore %d mois" % [str(construction.get("name", "")), remaining], 14))
+	box.add_child(_bar(float(total - remaining) / float(total) * 100.0, AMBER))
+	box.add_child(UI.muted_label("Reste à payer : %s €" % UI.money(int(construction.get("remaining_cost", 0))), 13))
+
+# --- Dernières productions ------------------------------------------------------------------
+
+func _rebuild_done() -> void:
+	_clear(_done_box)
+	var shown := 0
+	for i in range(ProductionManager.jobs.size() - 1, -1, -1):
+		var job: Dictionary = ProductionManager.jobs[i]
+		if str(job.get("status", "")) == "INDUSTRIALIZATION":
+			continue
+		var result: Dictionary = job.get("result", {})
+		if result.is_empty():
+			continue
+		_done_box.add_child(_done_card(job, result))
+		shown += 1
+		if shown >= 3:
+			break
+	if shown == 0:
+		_done_box.add_child(UI.muted_label("Aucune production terminée pour l'instant.", 13))
+
+func _done_card(job: Dictionary, result: Dictionary) -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL, 14, 1, UI.APP_LINE, 12))
+	var box := _vbox(6)
+	card.add_child(box)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	var title := UI.label(str(job.get("name", "CPU")), 16)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	head.add_child(_chip("Terminée", UI.APP_GREEN))
+	box.add_child(head)
+	var quality := float(result.get("quality_score", 0.0))
+	var dies := float(result.get("die_quality_mean", result.get("silicon_quality_mean", 0.0)))
+	var defects := float(result.get("defect_rate", 0.0)) * 100.0
+	for row_data in [["Qualité de l'usine", quality, "%.0f/100" % quality],
+			["Qualité des puces", dies, "%.0f/100" % dies],
+			["Puces sans défaut", clampf(100.0 - defects * 6.0, 0.0, 100.0), "%.1f %% de défauts" % defects]]:
+		var row := UI.meter_row(str(row_data[0]))
+		UI.set_meter(row, float(row_data[1]), str(row_data[2]))
+		box.add_child(row)
+	box.add_child(UI.muted_label("Fabriqué chez %s  •  overclocking typique +%.1f %%  •  %s" % [
+		str(result.get("foundry_name", "—")), float(result.get("oc_headroom_pct", 0.0)),
+		ProductionManager.binning_strategy_label(str(result.get("binning_strategy", "BALANCED")))], 13))
+	var details: Array[String] = [
+		"Priorité : %s • %d mois de préparation" % [ProductionManager.strategy_label(str(result.get("strategy", "BALANCED"))), int(result.get("months", 0))],
+		"Maîtrise du procédé %.0f/100 • gravure / équipement %.0f/100 • marges de conception %.0f/100" % [
+			float(result.get("process_mastery", 0.0)), float(result.get("lithography_precision", 0.0)), float(result.get("design_margin_score", 0.0))],
+		"Dispersion des puces ± %.1f • prévisibilité %.0f/100 • undervolt %.1f %%" % [
+			float(result.get("die_variation", result.get("silicon_variation", 0.0))),
+			float(result.get("process_predictability", result.get("silicon_predictability", 0.0))), float(result.get("undervolt_headroom_pct", 0.0))],
+		"Dépendance au fournisseur %.0f/100 • confidentialité %.0f/100 • capacité ~%s/mois" % [
+			float(result.get("foundry_dependency", 0.0)), float(result.get("foundry_confidentiality", 0.0)), UI.money(int(result.get("foundry_capacity", 0)))],
+	]
+	_add_details(box, details)
+	return card
+
+# --- Fonderies partenaires ------------------------------------------------------------------
+
+func _rebuild_foundries() -> void:
+	_clear(_foundries_box)
+	for foundry_id_value in FoundryManager.external_foundry_keys():
+		var provider := FoundryManager.get_external_foundry(str(foundry_id_value))
+		var row := UI.meter_row(str(provider.get("name", foundry_id_value)),
+			"précision %.0f • fiabilité %.0f • coût x%.2f • dépendance %.0f" % [float(provider.get("precision", 0.0)),
+			float(provider.get("reliability", 0.0)), float(provider.get("cost_factor", 1.0)), float(provider.get("dependency", 0.0))])
+		var tech := float(provider.get("technology_score", 0.0))
+		UI.set_meter(row, tech, "techno %.0f" % tech)
+		_foundries_box.add_child(row)
+
+# --- Petits éléments ------------------------------------------------------------------------
+
+func _vbox(separation: int) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", separation)
+	return box
+
+func _clear(box: Control) -> void:
+	for child in box.get_children():
+		box.remove_child(child)
+		child.queue_free()
+
+func _question(text: String) -> Label:
+	var label := UI.label(text, 15)
+	label.add_theme_color_override("font_color", UI.APP_TEXT)
+	return label
+
+func _hint(text: String) -> Label:
+	var label := UI.muted_label(text, 12)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return label
+
+func _chip(text: String, color: Color) -> Control:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.stylebox(color, 12, 0, color, 6))
+	var label := UI.label(text, 12)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	panel.add_child(label)
+	return panel
+
+func _bar(value: float, color: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 10
+	bar.max_value = 100
+	bar.value = clampf(value, 0.0, 100.0)
+	bar.add_theme_stylebox_override("fill", UI.stylebox(color, 5, 0, color, 0))
+	bar.add_theme_stylebox_override("background", UI.stylebox(Color("ead9c0"), 5, 0, UI.APP_LINE, 0))
+	return bar
+
+func _toggle_button(text: String, active: bool, min_width: int, min_height: int) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size = Vector2(min_width, min_height)
+	if min_width <= 0:
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bg := AMBER if active else IDLE_BG
+	var fg := Color.WHITE if active else IDLE_TEXT
+	for state in ["normal", "hover", "pressed", "focus"]:
+		button.add_theme_stylebox_override(state, UI.stylebox(bg.darkened(0.06) if state == "hover" else bg, 10, 2 if active else 1, AMBER if active else UI.APP_LINE, 10))
+	for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(color_name, fg)
+	return button
+
+func _segmented(job_id: String, field: String, order: Array, labels: Dictionary, current: String) -> Control:
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 6)
+	for key_value in order:
+		var key := str(key_value)
+		var button := _toggle_button(str(labels.get(key, key)), key == current, 118, 42)
+		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.pressed.connect(func(): _pick(job_id, field, key))
+		row.add_child(button)
+	return row
+
+func _add_details(box: VBoxContainer, lines: Array[String]) -> void:
+	var toggle := Button.new()
+	toggle.text = "Détails  ▾"
+	toggle.flat = true
+	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	box.add_child(toggle)
+	var details := _vbox(2)
+	details.visible = false
+	for line_text in lines:
+		var label := UI.muted_label(line_text, 12)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		details.add_child(label)
+	box.add_child(details)
+	toggle.pressed.connect(_toggle_details.bind(toggle, details))
+
+func _toggle_details(toggle: Button, details: Control) -> void:
+	details.visible = not details.visible
+	toggle.text = "Masquer les détails  ▴" if details.visible else "Détails  ▾"
