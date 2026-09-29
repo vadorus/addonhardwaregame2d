@@ -76,7 +76,7 @@ const CATEGORY_ZONE := {
 	"PROJET":"Banc de test", "DÉMARRAGE":"Établi CPU", "TECHNIQUE":"Tableau de planification",
 	"LANCEMENT":"Stock & production", "FONDERIE":"Stock & production", "FOURNISSEUR":"Stock & production",
 	"PRODUCTION":"Stock & production", "SAV":"Stock & production", "CONTRAT":"Stock & production",
-	"MARCHÉ":"Stock & production", "CLIENT":"Stock & production",
+	"MARCHÉ":"Stock & production", "CLIENT":"Stock & production", "MENACE":"Bureau du fondateur",
 	"RH":"Bureau du fondateur", "LOCAUX":"Bureau du fondateur", "ARBITRAGE":"Bureau du fondateur",
 	"FINANCE":"Bureau du fondateur", "GUIDE":"Bureau du fondateur"
 }

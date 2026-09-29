@@ -557,7 +557,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var sold_consumer: int = mini(consumer_units, remaining_capacity)
 	var total_units := sold_b2b + sold_consumer
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
-	var production_cost := total_units * int(product.unit_cost)
+	var production_cost := int(round(float(total_units * int(product.unit_cost)) * MarketManager.production_cost_threat_factor()))
 	var capacity_reservation_cost := monthly_capacity_reservation_cost(product, total_units)
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))

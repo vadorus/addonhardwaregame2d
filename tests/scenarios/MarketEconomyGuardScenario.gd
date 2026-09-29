@@ -104,6 +104,92 @@ static func run() -> String:
 		_restore(snapshot)
 		return "M2 large markets do not reward growth enough (%d server vs %d embedded units)" % [server_scale_units, embedded_scale_units]
 
+	# M4: serious market threats must make cash reserves useful after 1975.
+	var m4_market_state := MarketManager.get_state().duplicate(true)
+	var m4_economy_state := Economy.get_state().duplicate(true)
+	var m4_time_state := TimeManager.get_state().duplicate(true)
+	var threat_time := m4_time_state.duplicate(true)
+	threat_time["year"] = 1980
+	TimeManager.load_state(threat_time)
+	Economy.money = 250000
+	MarketManager.market_threats = []
+	MarketManager._next_threat_id = 1
+	var demand_before_threat := MarketManager.segment_market_units("EMBEDDED")
+	var recession := MarketManager._spawn_market_threat("RECESSION")
+	var demand_during_recession := MarketManager.segment_market_units("EMBEDDED")
+	if demand_during_recession >= int(round(float(demand_before_threat) * 0.80)):
+		_restore(snapshot)
+		return "M4 recession does not create a serious demand shock (%d vs %d)" % [demand_during_recession, demand_before_threat]
+	var threat_decision_found := false
+	for decision_value in ExecutiveManager.get_ceo_decisions():
+		if str((decision_value as Dictionary).get("id", "")) == "THREAT:%s" % str(recession.get("id", "")):
+			threat_decision_found = true
+			break
+	if not threat_decision_found:
+		_restore(snapshot)
+		return "M4 open market threat does not reach the CEO decision system"
+	var money_before_response := Economy.money
+	if not MarketManager.resolve_market_threat(str(recession.get("id", "")), true):
+		_restore(snapshot)
+		return "M4 mitigation could not be funded despite sufficient cash"
+	var demand_after_response := MarketManager.segment_market_units("EMBEDDED")
+	if demand_after_response <= demand_during_recession or demand_after_response >= demand_before_threat:
+		_restore(snapshot)
+		return "M4 mitigation does not reduce the recession impact"
+	if Economy.money >= money_before_response:
+		_restore(snapshot)
+		return "M4 mitigation has no real cash cost"
+
+	MarketManager.market_threats = []
+	var shortage := MarketManager._spawn_market_threat("SILICON_SHORTAGE")
+	if MarketManager.production_cost_threat_factor() < 1.30:
+		_restore(snapshot)
+		return "M4 silicon shortage does not increase production cost enough"
+	if not MarketManager.resolve_market_threat(str(shortage.get("id", "")), true):
+		_restore(snapshot)
+		return "M4 silicon shortage mitigation failed"
+	if MarketManager.production_cost_threat_factor() > 1.15:
+		_restore(snapshot)
+		return "M4 silicon shortage mitigation leaves excessive production inflation"
+	MarketManager.market_threats = []
+	var price_war := MarketManager._spawn_market_threat("PRICE_WAR")
+	price_war["age_months"] = int(price_war.get("decision_deadline_months", 3)) - 1
+	var money_before_ignore := Economy.money
+	MarketManager._advance_market_threats()
+	if str(price_war.get("status", "")) != "IGNORED" or Economy.money >= money_before_ignore:
+		_restore(snapshot)
+		return "M4 unanswered threat does not become a costly ignored crisis after its deadline"
+
+	# 48-month cadence = 2-3 serious threats per decade and at least one in every five-year tranche.
+	MarketManager.market_threats = []
+	MarketManager._next_threat_id = 1
+	MarketManager._last_threat_market_age = 0
+	MarketManager.market_age_months = 48
+	threat_time["year"] = 1975
+	TimeManager.load_state(threat_time)
+	MarketManager._maybe_spawn_market_threat()
+	if MarketManager.market_threats.size() != 1:
+		_restore(snapshot)
+		return "M4 first scheduled threat does not appear by the 1975-1979 tranche"
+	MarketManager.market_threats[0]["status"] = "EXPIRED"
+	MarketManager.market_threats[0]["remaining_months"] = 0
+	MarketManager.market_age_months = 95
+	MarketManager._maybe_spawn_market_threat()
+	if MarketManager.market_threats.size() != 1:
+		_restore(snapshot)
+		return "M4 threat cadence is faster than the intended four-year rhythm"
+	MarketManager.market_age_months = 96
+	threat_time["year"] = 1979
+	TimeManager.load_state(threat_time)
+	MarketManager._maybe_spawn_market_threat()
+	if MarketManager.market_threats.size() != 2:
+		_restore(snapshot)
+		return "M4 second scheduled threat does not arrive on the four-year cadence"
+
+	MarketManager.load_state(m4_market_state)
+	Economy.load_state(m4_economy_state)
+	TimeManager.load_state(m4_time_state)
+
 	# A three-bin CPU family must share one market envelope instead of tripling demand.
 	var essential := product.duplicate(true)
 	essential["id"] = "PROD-CI-ESSENTIAL"

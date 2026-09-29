@@ -184,6 +184,11 @@ func options_for(value: Dictionary) -> Array:
 					options.append(_free("Surveiller sans agir", "Gratuit, mais la confiance peut s'éroder si les retours montent.", "SAV_MONITOR"))
 			if not case_data.is_empty() and not product.is_empty():
 				options.append(_paid("Rappel produit", "Solution radicale : coûteuse mais la crise est traitée ouvertement.", "SAV_RECALL", AfterSalesManager.recall_cost(case_data, product)))
+		"MENACE":
+			var threat: Dictionary = MarketManager.get_market_threat(sid)
+			if not threat.is_empty():
+				options.append(_paid("Financer une réponse", "Réduit fortement l'impact pendant le reste de la crise.", "THREAT_MITIGATE", MarketManager.threat_response_cost(sid), true))
+				options.append(_free("Ne pas intervenir", "Les pertes estimées à %s seront comptabilisées et l'impact restera maximal." % eur(MarketManager.threat_ignore_cost(sid)), "THREAT_IGNORE"))
 		"MARCHÉ":
 			options.append(_free("Bien noté, on continue", "Le retour reste consultable dans Marché.", "MARKET_ACK", true))
 		"CONTRAT":
@@ -246,6 +251,9 @@ func choose(action: String) -> bool:
 		"SAV_RECALL":
 			ok = AfterSalesManager.recall_product(sid)
 			message = "SAV : rappel produit lancé."
+		"THREAT_MITIGATE", "THREAT_IGNORE":
+			ok = MarketManager.resolve_market_threat(sid, action == "THREAT_MITIGATE")
+			message = "Plan de réponse financé : l'impact est contenu." if action == "THREAT_MITIGATE" else "Aucune réponse : les pertes sont encaissées et la crise continue."
 		"MARKET_ACK":
 			var product: Dictionary = ProductManager.get_product(sid)
 			ok = not product.is_empty()

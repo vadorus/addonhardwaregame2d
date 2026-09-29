@@ -82,6 +82,15 @@ const SEGMENT_LIFECYCLE := {
 	"DATACENTER":{"growth_years":12.0,"plateau_years":20.0,"decline_years":24.0,"floor":0.78}
 }
 
+const MARKET_THREAT_ORDER := ["PRICE_WAR", "RECESSION", "SILICON_SHORTAGE", "PATENT_LAWSUIT", "NEW_ENTRANT"]
+const MARKET_THREAT_TEMPLATES := {
+	"PRICE_WAR":{"title":"Guerre des prix","text":"Un rival casse ses prix pour prendre des parts de marché.","duration":12,"response":18000,"ignore":42000,"demand":0.80,"mitigated_demand":0.93,"cost":1.00,"mitigated_cost":1.00},
+	"RECESSION":{"title":"Récession technologique","text":"Les clients reportent leurs achats et les volumes se contractent.","duration":15,"response":24000,"ignore":56000,"demand":0.72,"mitigated_demand":0.88,"cost":1.00,"mitigated_cost":1.00},
+	"SILICON_SHORTAGE":{"title":"Pénurie de silicium","text":"Les capacités de fonderie se tendent et chaque puce coûte plus cher.","duration":12,"response":30000,"ignore":68000,"demand":0.96,"mitigated_demand":0.99,"cost":1.40,"mitigated_cost":1.12},
+	"PATENT_LAWSUIT":{"title":"Procès de brevet","text":"Un détenteur de brevets conteste une partie de votre technologie.","duration":10,"response":38000,"ignore":88000,"demand":0.94,"mitigated_demand":0.99,"cost":1.04,"mitigated_cost":1.00},
+	"NEW_ENTRANT":{"title":"Nouvel entrant agressif","text":"Nexus Micro arrive avec des ingénieurs expérimentés et une première gamme ambitieuse.","duration":14,"response":28000,"ignore":62000,"demand":0.84,"mitigated_demand":0.94,"cost":1.00,"mitigated_cost":1.00}
+}
+
 const COMPETITOR_ARCHETYPES := {
 	"ASTER":{
 		"company":"Aster Systems","product_prefix":"Aster",
@@ -193,9 +202,12 @@ var competitors: Dictionary = {}
 var contracts: Array = []
 var tenders: Array = []
 var market_events: Array = []
+var market_threats: Array = []
 var known_segments: Array = []
 var _next_contract_id := 1
 var _next_tender_id := 1
+var _next_threat_id := 1
+var _last_threat_market_age := 0
 var market_age_months := 0
 var rng := RandomNumberGenerator.new()
 
@@ -206,8 +218,11 @@ func reset():
 	contracts = []
 	tenders = []
 	market_events = []
+	market_threats = []
 	_next_contract_id = 1
 	_next_tender_id = 1
+	_next_threat_id = 1
+	_last_threat_market_age = 0
 	market_age_months = 0
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
@@ -401,6 +416,168 @@ func segment_budget_factor(segment: String, monthly_budget: int) -> float:
 	var ratio := maxf(float(maxi(monthly_budget, 0)) / recommended, 0.01)
 	return clampf(pow(ratio, 0.50), 0.55, 1.12)
 
+func active_market_threats() -> Array:
+	var result: Array = []
+	for threat_value in market_threats:
+		var threat: Dictionary = threat_value
+		if int(threat.get("remaining_months", 0)) > 0 and str(threat.get("status", "")) in ["OPEN", "MITIGATED", "IGNORED"]:
+			result.append(threat)
+	return result
+
+func open_market_threats() -> Array:
+	var result: Array = []
+	for threat_value in market_threats:
+		var threat: Dictionary = threat_value
+		if str(threat.get("status", "")) == "OPEN":
+			result.append(threat)
+	return result
+
+func get_market_threat(threat_id: String) -> Dictionary:
+	for threat_value in market_threats:
+		var threat: Dictionary = threat_value
+		if str(threat.get("id", "")) == threat_id:
+			return threat
+	return {}
+
+func market_threat_demand_factor() -> float:
+	var factor := 1.0
+	for threat_value in active_market_threats():
+		var threat: Dictionary = threat_value
+		var mitigated := str(threat.get("status", "")) == "MITIGATED"
+		factor *= float(threat.get("mitigated_demand_factor" if mitigated else "demand_factor", 1.0))
+	return clampf(factor, 0.52, 1.0)
+
+func production_cost_threat_factor() -> float:
+	var factor := 1.0
+	for threat_value in active_market_threats():
+		var threat: Dictionary = threat_value
+		var mitigated := str(threat.get("status", "")) == "MITIGATED"
+		factor *= float(threat.get("mitigated_cost_factor" if mitigated else "cost_factor", 1.0))
+	return clampf(factor, 1.0, 1.65)
+
+func threat_response_cost(threat_id: String) -> int:
+	return int(get_market_threat(threat_id).get("response_cost", 0))
+
+func threat_ignore_cost(threat_id: String) -> int:
+	return int(get_market_threat(threat_id).get("ignore_cost", 0))
+
+## Coût d'une menace : un minimum par époque, mais surtout proportionnel à la taille de l'entreprise.
+## (Claude, 29/09 : à coût fixe, 40 000 € ne comptaient pas face aux 22 M€ d'une partie de 1985.)
+func _scaled_threat_cost(base_cost: int, revenue_months: float = 0.0) -> int:
+	var era_scale := clampf(1.0 + maxf(float(TimeManager.year - 1975), 0.0) * 0.025, 1.0, 2.1)
+	var floor_cost := float(base_cost) * era_scale
+	var revenue_cost := _recent_monthly_revenue() * revenue_months
+	return maxi(1000, int(round(maxf(floor_cost, revenue_cost))))
+
+func _recent_monthly_revenue() -> float:
+	if Economy.history.is_empty():
+		return float(Economy.monthly_income)
+	var total := 0.0
+	var count := 0
+	for i in range(maxi(Economy.history.size() - 3, 0), Economy.history.size()):
+		total += float((Economy.history[i] as Dictionary).get("income", 0))
+		count += 1
+	return total / float(maxi(count, 1))
+
+func _spawn_market_threat(kind: String = "") -> Dictionary:
+	var selected := kind
+	if selected == "" or not MARKET_THREAT_TEMPLATES.has(selected):
+		selected = str(MARKET_THREAT_ORDER[(_next_threat_id - 1) % MARKET_THREAT_ORDER.size()])
+	var template: Dictionary = MARKET_THREAT_TEMPLATES[selected]
+	var threat := {
+		"id":"THREAT-%03d" % _next_threat_id,
+		"kind":selected,
+		"title":str(template.get("title", "Menace marché")),
+		"text":str(template.get("text", "Le marché se tend.")),
+		"status":"OPEN",
+		"year":TimeManager.year,
+		"month":TimeManager.month,
+		"age_months":0,
+		"decision_deadline_months":3,
+		"remaining_months":int(template.get("duration", 12)),
+		"response_cost":_scaled_threat_cost(int(template.get("response", 20000)), 0.45),
+		"ignore_cost":_scaled_threat_cost(int(template.get("ignore", 50000)), 1.2),
+		"demand_factor":float(template.get("demand", 0.90)),
+		"mitigated_demand_factor":float(template.get("mitigated_demand", 0.97)),
+		"cost_factor":float(template.get("cost", 1.0)),
+		"mitigated_cost_factor":float(template.get("mitigated_cost", 1.0)),
+		"penalty_applied":false
+	}
+	_next_threat_id += 1
+	_last_threat_market_age = market_age_months
+	market_threats.push_front(threat)
+	if selected == "NEW_ENTRANT":
+		_add_new_market_entrant()
+	market_events.push_front({"type":"MARKET_THREAT","threat_id":str(threat.id),"year":TimeManager.year,"month":TimeManager.month,"text":str(threat.title)})
+	if market_events.size() > 32:
+		market_events.pop_back()
+	CompanyManager.add_alert("Menace marché : %s. Nora attend votre décision." % str(threat.title))
+	MediaManager.publish_business_event("Marché sous tension", "%s %s" % [str(threat.title), str(threat.text)], "MARKET_THREAT:%s" % selected)
+	market_changed.emit()
+	return threat
+
+func _add_new_market_entrant() -> void:
+	for competitor_value in competitors.get("CPU", []):
+		if str((competitor_value as Dictionary).get("id", "")) == "NEXUS_ENTRANT":
+			return
+	var era := era_technology_ceiling()
+	var entrant := {
+		"id":"NEXUS_ENTRANT","sector":"CPU","company":"Nexus Micro","product_prefix":"Nexus",
+		"strategy":"BALANCED","cash":520000,"architecture_skill":clampf(era + 5.0, 28.0, 99.0),
+		"layout_skill":clampf(era + 3.0, 26.0, 98.0),"miniaturization_skill":clampf(era + 4.0, 25.0, 99.0),
+		"manufacturing_skill":clampf(era + 2.0, 26.0, 98.0),"integration_skill":clampf(era + 4.0, 26.0, 99.0),
+		"brand":46.0,"risk_tolerance":68.0,"ai_price_aggression":68.0,"ai_research_drive":76.0,
+		"ai_financial_prudence":52.0,"ai_adaptability":82.0,"ai_growth_drive":78.0,
+		"generation_index":1,"development_progress":18.0,"months_on_market":0,"node_nm":10000,
+		"capacity":10000,"unit_cost":70,"price":110,"target_segment":"EMBEDDED","metrics":{},"history":[]
+	}
+	entrant = _migrate_competitor(entrant, "CPU")
+	_configure_competitor_product(entrant, true)
+	competitors["CPU"].append(entrant)
+
+func resolve_market_threat(threat_id: String, mitigate: bool) -> bool:
+	var threat := get_market_threat(threat_id)
+	if threat.is_empty() or str(threat.get("status", "")) != "OPEN":
+		return false
+	var cost := int(threat.get("response_cost" if mitigate else "ignore_cost", 0))
+	if mitigate and not Economy.can_afford(cost):
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, ("Réponse crise — " if mitigate else "Impact menace — ") + str(threat.get("title", "Marché")))
+	threat["status"] = "MITIGATED" if mitigate else "IGNORED"
+	threat["penalty_applied"] = not mitigate
+	if not mitigate:
+		CompanyManager.change_reputation({"professional":-1.2,"prestige":-0.5})
+		if str(threat.get("kind", "")) == "PATENT_LAWSUIT":
+			CompanyManager.change_reputation({"innovation":-1.6,"professional":-0.8})
+	var result_text := "Plan de réponse financé" if mitigate else "Menace laissée sans réponse"
+	CompanyManager.add_alert("%s : %s (%d €)." % [str(threat.get("title", "Menace")), result_text, cost])
+	MediaManager.publish_business_event(str(threat.get("title", "Marché")), "%s. L'impact continuera encore %d mois." % [result_text, int(threat.get("remaining_months", 0))], "MARKET_THREAT_RESOLUTION:%s" % str(threat.get("kind", "")))
+	market_changed.emit()
+	return true
+
+func _advance_market_threats() -> void:
+	for threat_value in market_threats:
+		var threat: Dictionary = threat_value
+		if int(threat.get("remaining_months", 0)) <= 0:
+			continue
+		threat["age_months"] = int(threat.get("age_months", 0)) + 1
+		threat["remaining_months"] = maxi(int(threat.get("remaining_months", 0)) - 1, 0)
+		if str(threat.get("status", "")) == "OPEN" and int(threat.get("age_months", 0)) >= int(threat.get("decision_deadline_months", 3)):
+			resolve_market_threat(str(threat.get("id", "")), false)
+		if int(threat.get("remaining_months", 0)) <= 0:
+			threat["status"] = "EXPIRED"
+			CompanyManager.add_alert("Fin de crise : %s ne pèse plus directement sur le marché." % str(threat.get("title", "la menace")))
+
+func _maybe_spawn_market_threat() -> void:
+	if TimeManager.year < 1975 or ProductManager.products.is_empty():
+		return
+	if market_age_months - _last_threat_market_age < 48:
+		return
+	if not open_market_threats().is_empty():
+		return
+	_spawn_market_threat()
+
 func segment_lifecycle_factor(segment: String) -> float:
 	var normalized := normalize_segment(segment)
 	if not MARKET_NEEDS.has(normalized):
@@ -428,7 +605,7 @@ func segment_market_units(segment: String) -> int:
 	var tech_growth := 1.0 + minf(tech_surplus * 0.010, 0.85)
 	var lifecycle := segment_lifecycle_factor(normalized)
 	var project_scale := float(segment_project_scale(normalized).get("market_scale", 1.0))
-	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor())))
+	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor())))
 
 func segment_reference_price(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
@@ -2098,9 +2275,11 @@ func _update_market_opportunities():
 
 func process_month(products: Array):
 	market_age_months += 1
+	_advance_market_threats()
 	_advance_competitors()
 	_update_market_opportunities()
 	_update_tenders()
+	_maybe_spawn_market_threat()
 	for product in products:
 		if str(product.get("status", "")) == "LAUNCHED":
 			maybe_generate_b2b(product)
@@ -2111,9 +2290,12 @@ func get_state() -> Dictionary:
 		"contracts":contracts,
 		"tenders":tenders,
 		"market_events":market_events,
+		"market_threats":market_threats,
 		"known_segments":known_segments,
 		"next_contract_id":_next_contract_id,
 		"next_tender_id":_next_tender_id,
+		"next_threat_id":_next_threat_id,
+		"last_threat_market_age":_last_threat_market_age,
 		"market_age_months":market_age_months,
 		"rng_seed":SaveCodec.int64_to_json(rng.seed),
 		"rng_state":SaveCodec.int64_to_json(rng.state)
@@ -2194,12 +2376,15 @@ func load_state(state: Dictionary):
 	contracts = state.get("contracts", []).duplicate(true)
 	tenders = state.get("tenders", []).duplicate(true)
 	market_events = state.get("market_events", []).duplicate(true)
+	market_threats = state.get("market_threats", []).duplicate(true)
 	known_segments = state.get("known_segments", []).duplicate(true)
 	if known_segments.is_empty():
 		known_segments = available_segment_keys()
 	_next_contract_id = int(state.get("next_contract_id", 1))
 	_next_tender_id = int(state.get("next_tender_id", tenders.size() + 1))
 	market_age_months = int(state.get("market_age_months", 0))
+	_next_threat_id = int(state.get("next_threat_id", market_threats.size() + 1))
+	_last_threat_market_age = int(state.get("last_threat_market_age", maxi(market_age_months - 36, 0)))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "43021"), 43021)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	market_changed.emit()

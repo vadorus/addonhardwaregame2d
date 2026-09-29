@@ -758,6 +758,19 @@ func get_ceo_decisions() -> Array:
 			"can_defer":false
 		})
 
+	for threat_value in MarketManager.open_market_threats():
+		var threat: Dictionary = threat_value
+		var threat_kind := str(threat.get("kind", ""))
+		var threat_severity := 78.0
+		if threat_kind in ["SILICON_SHORTAGE", "PATENT_LAWSUIT"]:
+			threat_severity = 86.0
+		decisions.append({
+			"id":"THREAT:%s" % str(threat.get("id", "")),"category":"MENACE","severity":threat_severity,
+			"title":str(threat.get("title", "Menace marché")),"text":"%s • décision sous %d mois • impact encore %d mois." % [str(threat.get("text", "")), maxi(int(threat.get("decision_deadline_months", 3))-int(threat.get("age_months", 0)),0), int(threat.get("remaining_months", 0))],
+			"recommendation":"Réagir coûte %d € ; laisser courir expose à environ %d € de pertes et à l'impact complet." % [MarketManager.threat_response_cost(str(threat.get("id", ""))), MarketManager.threat_ignore_cost(str(threat.get("id", "")))],
+			"target_tab":5,"can_defer":false
+		})
+
 	for tender_value in MarketManager.open_tenders():
 		var tender: Dictionary = tender_value
 		if str(tender.get("status", "")) != "OPEN" or bool(tender.get("ceo_ignored", false)):
