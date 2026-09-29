@@ -672,6 +672,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	if not DivisionManager.is_operational("CPU"):
 		return []
 	var market_segment := MarketManager.normalize_segment(segment)
+	var project_scale := MarketManager.segment_project_scale(market_segment)
 	if not MarketManager.is_segment_available(market_segment):
 		return []
 	var division := DivisionManager.get_division("CPU")
@@ -697,7 +698,11 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 		"approach":approach,
 		"focus":focus,
 		"monthly_budget":monthly_budget,
-		"base_development_cost":float(GameData.SECTORS.CPU.base_dev_cost),
+		"base_development_cost":maxf(float(GameData.SECTORS.CPU.base_dev_cost), float(project_scale.get("budget", 45000))),
+		"segment_required_team":int(project_scale.get("team", 3)),
+		"segment_recommended_budget":int(project_scale.get("budget", 45000)),
+		"segment_team_factor":MarketManager.segment_team_factor(market_segment, get_development_team_size()),
+		"segment_budget_factor":MarketManager.segment_budget_factor(market_segment, monthly_budget),
 		"approach_speed":float(approach_data.speed),
 		"approach_cost":float(approach_data.cost),
 		"development_cash_factor":development_cash_factor(approach),
@@ -730,7 +735,7 @@ func prepare_cpu_generation_proposals(segment: String, approach: String, focus: 
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	return get_cpu_generation_proposals()
 
-func estimate_cpu_development(design_input: Dictionary, approach: String, monthly_budget: int, sourcing: Dictionary = {}, extra_months: int = 0, upfront_cost: int = 0, evaluation_override: Dictionary = {}) -> Dictionary:
+func estimate_cpu_development(design_input: Dictionary, approach: String, monthly_budget: int, sourcing: Dictionary = {}, extra_months: int = 0, upfront_cost: int = 0, evaluation_override: Dictionary = {}, segment: String = "") -> Dictionary:
 	var design := CPU_DESIGN.normalize(design_input)
 	var evaluation := evaluation_override.duplicate(true) if not evaluation_override.is_empty() else CPU_DESIGN.evaluate(design, cpu_capabilities)
 	var resolved_sourcing := sourcing
@@ -740,8 +745,11 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 	var team := development_team_score() * development_capacity_factor_for_active(get_active_development_project_count() + 1)
 	var management := CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var technology := float(technologies.get("cpu", 18.0))
-	var base_cost := float(GameData.SECTORS.CPU.base_dev_cost)
+	var market_segment := MarketManager.normalize_segment(segment if segment != "" else MarketManager.default_segment())
+	var scale := MarketManager.segment_project_scale(market_segment)
+	var base_cost := maxf(float(GameData.SECTORS.CPU.base_dev_cost), float(scale.get("budget", 45000)))
 	var budget_ratio := clampf(float(monthly_budget) / base_cost, 0.25, 2.2)
+	var segment_team_factor := MarketManager.segment_team_factor(market_segment, get_development_team_size())
 	var months := DEVELOPMENT_ESTIMATOR.estimated_months(
 		team,
 		technology,
@@ -751,7 +759,8 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 		management,
 		float(evaluation.get("complexity", 50.0)),
 		extra_months,
-		GameData.PHASES.size()
+		GameData.PHASES.size(),
+		segment_team_factor
 	)
 	var monthly_raw := development_monthly_base_cost(approach, monthly_budget, resolved_sourcing)
 	var monthly_charged := Economy.quoted_expense(monthly_raw, "Développement — estimation CPU")
@@ -772,8 +781,14 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 			1.0,
 			management,
 			float(evaluation.get("complexity", 50.0))
-		),
-		"complexity":float(evaluation.get("complexity", 50.0))
+		) * segment_team_factor,
+		"complexity":float(evaluation.get("complexity", 50.0)),
+		"segment":market_segment,
+		"segment_required_team":int(scale.get("team", 3)),
+		"segment_recommended_budget":int(scale.get("budget", 45000)),
+		"segment_team_factor":segment_team_factor,
+		"segment_budget_factor":MarketManager.segment_budget_factor(market_segment, monthly_budget),
+		"development_team_size":get_development_team_size()
 	}
 
 func get_cpu_generation_proposals() -> Array:
@@ -941,6 +956,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"remediation_transfer_applied":stored_remediation.is_empty(),
 		"field_experience_snapshot":AfterSalesManager.field_experience.duplicate(true) if sector == "CPU" else {},
 		"estimate_confidence":clampf(research_confidence_for_focus(focus) + float(stored_remediation.get("confidence_gain", 0.0)), 20.0, 96.0) if sector == "CPU" else 50.0,
+		"segment_required_team":MarketManager.segment_required_team(market_segment) if sector == "CPU" else 0,
+		"segment_recommended_budget":MarketManager.segment_recommended_budget(market_segment) if sector == "CPU" else 0,
 		"development_snapshot":{
 			"team_size":get_development_team_size(),
 			"team_score":development_team_score(),
@@ -994,6 +1011,11 @@ func _process_project_month(project: Dictionary):
 		team = development_team_score() * development_capacity_factor()
 		management = CompanyManager.department_management_modifier("Développement") * DivisionManager.management_modifier("CPU")
 	var base_cost := float(sector_data.base_dev_cost)
+	var segment_team_factor := 1.0
+	if str(project.sector) == "CPU":
+		var market_segment := MarketManager.normalize_segment(str(project.get("segment", MarketManager.default_segment())))
+		base_cost = maxf(base_cost, float(MarketManager.segment_recommended_budget(market_segment)))
+		segment_team_factor = MarketManager.segment_team_factor(market_segment, get_development_team_size())
 	var budget_ratio: float = clampf(float(project.monthly_budget) / base_cost, 0.25, 2.2)
 	var expense := development_monthly_base_cost(str(project.approach), int(project.monthly_budget), sourcing)
 	project["monthly_cash_cost"] = expense
@@ -1047,6 +1069,8 @@ func _process_project_month(project: Dictionary):
 	)
 	if str(project.sector) != "CPU":
 		progress = (15.0 + team * 0.34 + budget_ratio * 18.0 + tech * 0.08) * float(approach_data.speed) * float(sourcing.get("speed_factor", 1.0)) * supplier_execution * management
+	else:
+		progress *= segment_team_factor
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))

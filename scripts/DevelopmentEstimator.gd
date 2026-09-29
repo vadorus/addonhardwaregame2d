@@ -52,7 +52,8 @@ static func estimated_months(
 	management: float,
 	complexity: float,
 	extra_months: int = 0,
-	phase_count: int = 6
+	phase_count: int = 6,
+	progress_multiplier: float = 1.0
 ) -> int:
 	var progress := monthly_progress(
 		team,
@@ -64,7 +65,7 @@ static func estimated_months(
 		management,
 		complexity
 	)
-	return estimated_months_from_progress(progress, phase_count) + maxi(extra_months, 0)
+	return estimated_months_from_progress(progress * maxf(progress_multiplier, 0.10), phase_count) + maxi(extra_months, 0)
 
 static func estimated_program_cost(
 	months: int,

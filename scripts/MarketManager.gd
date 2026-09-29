@@ -47,6 +47,23 @@ const MARKET_NEEDS := {
 	"DATACENTER":{"historical_year":2002,"tech_trigger":90.0,"base_units":30000,"price_factor":1.90,"growth":0.055,"description":"Calcul à grande échelle, densité, disponibilité et efficacité énergétique."}
 }
 
+# M2 — échelle économique des marchés. Ce ne sont pas des verrous : le joueur peut
+# tenter un gros marché trop tôt, mais l'équipe et le budget influencent alors le délai.
+const SEGMENT_PROJECT_SCALE := {
+	"CALCULATOR":{"team":2,"budget":30000,"market_scale":1.0},
+	"EMBEDDED":{"team":2,"budget":40000,"market_scale":1.0},
+	"INDUSTRIAL":{"team":5,"budget":55000,"market_scale":1.25},
+	"SCIENTIFIC":{"team":6,"budget":65000,"market_scale":1.40},
+	"HOBBYIST":{"team":5,"budget":55000,"market_scale":1.60},
+	"BUSINESS_PC":{"team":10,"budget":85000,"market_scale":2.60},
+	"HOME_PC":{"team":12,"budget":95000,"market_scale":3.20},
+	"WORKSTATION":{"team":16,"budget":120000,"market_scale":2.80},
+	"SERVER":{"team":25,"budget":160000,"market_scale":5.00},
+	"GAMING":{"team":18,"budget":135000,"market_scale":5.50},
+	"MOBILE_COMPUTING":{"team":24,"budget":175000,"market_scale":7.00},
+	"DATACENTER":{"team":32,"budget":240000,"market_scale":8.00}
+}
+
 # Cycle historique des marchés : croissance, maturité, puis éventuel déclin.
 # Les marchés structurels (embarqué, industriel, serveur...) restent durables ;
 # les premiers marchés grand public peuvent être remplacés par de nouveaux usages.
@@ -364,6 +381,26 @@ func normalize_segment(segment: String) -> String:
 			return default_segment()
 	return default_segment()
 
+func segment_project_scale(segment: String) -> Dictionary:
+	var normalized := normalize_segment(segment)
+	return SEGMENT_PROJECT_SCALE.get(normalized, {"team":3,"budget":45000,"market_scale":1.0}).duplicate(true)
+
+func segment_required_team(segment: String) -> int:
+	return maxi(int(segment_project_scale(segment).get("team", 3)), 1)
+
+func segment_recommended_budget(segment: String) -> int:
+	return maxi(int(segment_project_scale(segment).get("budget", 45000)), 10000)
+
+func segment_team_factor(segment: String, developers: int) -> float:
+	var required := float(segment_required_team(segment))
+	var ratio := maxf(float(maxi(developers, 0)) / required, 0.01)
+	return clampf(pow(ratio, 0.72), 0.35, 1.20)
+
+func segment_budget_factor(segment: String, monthly_budget: int) -> float:
+	var recommended := float(segment_recommended_budget(segment))
+	var ratio := maxf(float(maxi(monthly_budget, 0)) / recommended, 0.01)
+	return clampf(pow(ratio, 0.50), 0.55, 1.12)
+
 func segment_lifecycle_factor(segment: String) -> float:
 	var normalized := normalize_segment(segment)
 	if not MARKET_NEEDS.has(normalized):
@@ -390,7 +427,8 @@ func segment_market_units(segment: String) -> int:
 	var tech_surplus := maxf(market_technology_signal() - float(need.tech_trigger), 0.0)
 	var tech_growth := 1.0 + minf(tech_surplus * 0.010, 0.85)
 	var lifecycle := segment_lifecycle_factor(normalized)
-	return maxi(500, int(round(float(need.base_units) * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor())))
+	var project_scale := float(segment_project_scale(normalized).get("market_scale", 1.0))
+	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor())))
 
 func segment_reference_price(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)

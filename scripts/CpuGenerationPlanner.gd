@@ -209,6 +209,10 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	var monthly_budget := maxi(int(context.get("monthly_budget", 42000)), 10000)
 	var base_development_cost := maxf(float(context.get("base_development_cost", 42000.0)), 10000.0)
 	var budget_ratio := clampf(float(monthly_budget) / base_development_cost, 0.25, 2.2)
+	var segment_team_factor := clampf(float(context.get("segment_team_factor", 1.0)), 0.35, 1.20)
+	var segment_required_team := maxi(int(context.get("segment_required_team", 3)), 1)
+	var segment_recommended_budget := maxi(int(context.get("segment_recommended_budget", 45000)), 10000)
+	var current_team := maxi(int(context.get("development_team_size", 0)), 0)
 	var approach_speed := maxf(float(context.get("approach_speed", 1.0)), 0.25)
 	var approach_cost := maxf(float(context.get("approach_cost", 1.0)), 0.25)
 	var management_modifier := float(context.get("management_modifier", 1.0))
@@ -223,7 +227,10 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		management_modifier,
 		float(evaluation.get("complexity", 50.0))
 	) / maxf(float(profile.duration_factor), 0.25)
+	progress_per_month *= segment_team_factor
 	var estimated_months := DEVELOPMENT_ESTIMATOR.estimated_months_from_progress(progress_per_month, int(context.get("phase_count", 6)))
+	var required_team_months := maxi(int(round(float(estimated_months) * segment_team_factor)), int(context.get("phase_count", 6)))
+	var team_time_delta_months := required_team_months - estimated_months
 	var cash_factor := clampf(float(context.get("development_cash_factor", 1.0)), 0.01, 2.0)
 	var sourcing_monthly_factor := maxf(float(context.get("sourcing_monthly_cost_factor", 1.0)), 0.05)
 	var monthly_program_base := maxi(500, int(round(float(monthly_budget) * approach_cost * cash_factor * sourcing_monthly_factor)))
@@ -233,6 +240,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	var capability_gap := maxf(float(evaluation.complexity) - capability, 0.0)
 	var risk := float(evaluation.risk) + float(profile.risk_delta) + capability_gap * 0.28
 	risk += maxf(1.0 - budget_ratio, 0.0) * 14.0
+	risk += maxf(1.0 - segment_team_factor, 0.0) * 24.0
 	risk = clampf(risk, 5.0, 95.0)
 
 	var confidence := 45.0 + float(context.get("team_score", 20.0)) * 0.30
@@ -248,6 +256,7 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 	if bool(market_learning.get("has_data", false)):
 		confidence += (float(market_learning.get("confidence", 50.0)) - 50.0) * 0.08
 	confidence += (management_modifier - 0.8) * 25.0
+	confidence += (segment_team_factor - 1.0) * 18.0
 	confidence -= float(evaluation.complexity) * 0.10
 	confidence += float(profile.confidence_delta)
 	confidence = clampf(confidence, 28.0, 96.0)
@@ -351,7 +360,13 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		"sav_confidence_delta":sav_confidence_delta,
 		"sav_design_note":sav_design_note,
 		"development_capacity_factor":float(context.get("development_capacity_factor", 1.0)),
-		"development_team_size":int(context.get("development_team_size", 0)),
+		"development_team_size":current_team,
+		"segment_required_team":segment_required_team,
+		"segment_recommended_budget":segment_recommended_budget,
+		"segment_team_factor":segment_team_factor,
+		"segment_budget_factor":float(context.get("segment_budget_factor", 1.0)),
+		"estimated_months_at_required_team":required_team_months,
+		"team_time_delta_months":team_time_delta_months,
 		"development_confidence":float(context.get("development_confidence", 50.0)),
 		"equipment_score":float(context.get("equipment_score", 25.0)),
 		"division_maturity":float(context.get("division_maturity", 0.0)),
@@ -397,7 +412,11 @@ static func _risks_for(archetype: String, design: Dictionary, evaluation: Dictio
 	var research_confidence := float(context.get("research_confidence", 50.0))
 	if research_confidence < 46.0:
 		risks.append("Estimations encore incertaines : l'équipe manque d'expérience sur cette piste")
-	if int(context.get("development_team_size", 0)) <= 1:
+	var current_team := int(context.get("development_team_size", 0))
+	var required_team := maxi(int(context.get("segment_required_team", 1)), 1)
+	if current_team < required_team:
+		risks.append("Équipe sous-dimensionnée pour ce marché : %d/%d ingénieurs recommandés" % [current_team, required_team])
+	elif current_team <= 1:
 		risks.append("Équipe Développement très réduite : validation et intégration fragiles")
 	elif float(context.get("development_capacity_factor", 1.0)) < 0.78:
 		risks.append("Équipe Développement déjà fortement chargée")

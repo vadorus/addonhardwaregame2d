@@ -80,6 +80,30 @@ static func run() -> String:
 		_restore(snapshot)
 		return "M1 historical market lifecycle still only grows (%d late vs %d peak)" % [calculator_late, calculator_peak]
 
+	# M2: growing the company must unlock economically larger ambitions.
+	if MarketManager.segment_required_team("SERVER") < 20 or MarketManager.segment_required_team("SERVER") <= MarketManager.segment_required_team("EMBEDDED"):
+		_restore(snapshot)
+		return "M2 server ambition does not require a meaningfully larger development team"
+	if MarketManager.segment_recommended_budget("SERVER") <= MarketManager.segment_recommended_budget("EMBEDDED") * 2:
+		_restore(snapshot)
+		return "M2 server ambition does not scale the recommended development budget"
+	var small_server_team := MarketManager.segment_team_factor("SERVER", 5)
+	var full_server_team := MarketManager.segment_team_factor("SERVER", 25)
+	if small_server_team >= 0.75 or full_server_team <= small_server_team:
+		_restore(snapshot)
+		return "M2 larger development teams do not create a clear project-speed advantage"
+
+	# A mature large market must offer several times the opportunity of the garage markets.
+	var scale_time := TimeManager.get_state().duplicate(true)
+	scale_time["year"] = 1995
+	TimeManager.load_state(scale_time)
+	var embedded_scale_units := MarketManager.segment_market_units("EMBEDDED")
+	var server_scale_units := MarketManager.segment_market_units("SERVER")
+	TimeManager.load_state(time_before)
+	if server_scale_units < embedded_scale_units * 3:
+		_restore(snapshot)
+		return "M2 large markets do not reward growth enough (%d server vs %d embedded units)" % [server_scale_units, embedded_scale_units]
+
 	# A three-bin CPU family must share one market envelope instead of tripling demand.
 	var essential := product.duplicate(true)
 	essential["id"] = "PROD-CI-ESSENTIAL"

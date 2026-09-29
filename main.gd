@@ -668,6 +668,17 @@ func _refresh_generation_plan_summary():
 		_signed_score(float(deltas.get("performance", 0.0))), _signed_score(float(deltas.get("efficiency", 0.0))), _signed_score(float(deltas.get("reliability", 0.0))),
 		" • ".join(strengths), " • ".join(risks), str(proposal.get("recommendation", ""))
 	]
+	var team_delta := int(proposal.get("team_time_delta_months", 0))
+	var scale_note := "\n\nÉchelle cible : équipe %d/%d • budget %s/%s par mois • effet équipe x%.2f" % [
+		int(proposal.get("development_team_size", 0)), int(proposal.get("segment_required_team", 3)),
+		_money(int(proposal.get("monthly_budget", 0))), _money(int(proposal.get("segment_recommended_budget", 45000))),
+		float(proposal.get("segment_team_factor", 1.0))
+	]
+	if team_delta > 0:
+		scale_note += " • équipe renforcée : ~%d mois gagnés" % team_delta
+	elif team_delta < 0:
+		scale_note += " • sous-effectif : ~%d mois de plus" % absi(team_delta)
+	cpu_generation_summary_label.text += scale_note
 	cpu_generation_summary_label.add_theme_color_override("font_color", APP_GREEN if bool(proposal.get("recommended", false)) else APP_TEXT)
 
 func _signed_score(value: float) -> String:
@@ -772,7 +783,8 @@ func _refresh_cpu_preview():
 		sourcing,
 		extra_months,
 		int(active_cpu_remediation.get("upfront_cost", 0)),
-		evaluation
+		evaluation,
+		segment
 	)
 	var months := int(development_estimate.get("months", 1))
 	var estimated_program_cost := int(development_estimate.get("program_cost", 0))
@@ -792,7 +804,8 @@ func _refresh_cpu_preview():
 		sourcing,
 		0,
 		0,
-		reference_evaluation
+		reference_evaluation,
+		segment
 	)
 	var reference_months := int(reference_estimate.get("months", 1))
 	var reference_axes := CPU_DESIGN.decision_axes(reference_evaluation, reference_months)
@@ -826,6 +839,11 @@ func _refresh_cpu_preview():
 		float(sourcing.get("customization", 100.0)), royalty_text,
 		str(application_assessment.get("label", "Polyvalent")), float(application_assessment.get("fit", 0.0)),
 		str(application_assessment.get("summary", "")), application_gap_text
+	]
+	lab_summary_label.text += "\nÉchelle cible : équipe %d/%d • budget %s/%s par mois • effet équipe x%.2f" % [
+		int(development_estimate.get("development_team_size", 0)), int(development_estimate.get("segment_required_team", 3)),
+		_money(monthly_budget), _money(int(development_estimate.get("segment_recommended_budget", 45000))),
+		float(development_estimate.get("segment_team_factor", 1.0))
 	]
 	var projected_unit_cost := int(round(float(evaluation.unit_cost) * float(sourcing.get("unit_cost_factor", 1.0))))
 	lab_unit_cost_value.text = "%s €" % _money(projected_unit_cost)
