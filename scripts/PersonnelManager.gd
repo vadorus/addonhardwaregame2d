@@ -5,6 +5,8 @@ signal candidate_changed(candidate)
 
 var staff: Array = []
 var candidate: Dictionary = {}
+## Lot D : Nora présente 3 profils (expert, junior prometteur, généraliste).
+var shortlist: Array = []
 var _next_id := 1
 var founding_stage_open := true
 var rng := RandomNumberGenerator.new()
@@ -17,6 +19,7 @@ func _ready():
 
 func reset(starting_sector: String):
 	staff = []
+	shortlist = []
 	_next_id = 1
 	founding_stage_open = true
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
@@ -73,6 +76,46 @@ func generate_candidate(department: String) -> Dictionary:
 	candidate_changed.emit(candidate)
 	return candidate
 
+const SHORTLIST_PROFILES := {
+	"EXPERT":{"label":"Expert confirmé", "pitch":"Opérationnel tout de suite, mais cher."},
+	"JUNIOR":{"label":"Junior prometteur", "pitch":"Bon marché ; progresse d'environ 3 points tous les 6 mois (jusqu'à +18)."},
+	"GENERALIST":{"label":"Généraliste", "pitch":"Solide et polyvalent, au prix du marché."}
+}
+const SHORTLIST_ORDER := ["EXPERT", "JUNIOR", "GENERALIST"]
+const JUNIOR_GROWTH := 18
+
+## Lot D : trois candidats contrastés pour un même métier. Le candidat choisi devient `candidate`.
+func generate_shortlist(department: String) -> Array:
+	shortlist = []
+	for kind in SHORTLIST_ORDER:
+		var profile := generate_candidate(department).duplicate(true)
+		match kind:
+			"EXPERT":
+				profile["skill"] = rng.randi_range(80, 90)
+				profile["experience_years"] = snappedf(rng.randf_range(10.0, 16.0), 0.5)
+				profile["salary"] = int(float(profile.salary) * 1.55)
+			"JUNIOR":
+				profile["skill"] = rng.randi_range(42, 54)
+				profile["experience_years"] = snappedf(rng.randf_range(0.5, 2.0), 0.5)
+				profile["aptitude"] = rng.randi_range(80, 94)
+				profile["salary"] = int(float(profile.salary) * 0.68)
+				profile["growth_left"] = JUNIOR_GROWTH
+			_:
+				profile["skill"] = rng.randi_range(60, 70)
+				profile["salary"] = int(float(profile.salary) * 1.0)
+		profile["shortlist_kind"] = kind
+		shortlist.append(profile)
+	candidate = {}
+	candidate_changed.emit(candidate)
+	return shortlist
+
+func select_shortlist(index: int) -> bool:
+	if index < 0 or index >= shortlist.size():
+		return false
+	candidate = (shortlist[index] as Dictionary).duplicate(true)
+	candidate_changed.emit(candidate)
+	return true
+
 func hire_candidate() -> bool:
 	if candidate.is_empty():
 		return false
@@ -81,7 +124,11 @@ func hire_candidate() -> bool:
 		return false
 	Economy.add_expense(signing_cost, "Recrutement")
 	_add_employee(str(candidate.name), role_for_department(str(candidate.department)), str(candidate.department), int(candidate.skill), float(candidate.experience_years), str(candidate.specialization), int(candidate.leadership), int(candidate.salary), candidate.get("profile", {}))
+	if int(candidate.get("growth_left", 0)) > 0:
+		(staff.back() as Dictionary)["growth_left"] = int(candidate.growth_left)
+		(staff.back() as Dictionary)["growth_months"] = 0
 	candidate = {}
+	shortlist = []
 	staff_changed.emit()
 	return true
 
@@ -193,6 +240,7 @@ func process_month(active_departments: Array):
 			founder_payroll_base += pay
 		else:
 			employee_payroll_base += pay
+		_grow_junior(emp)
 		var dept := str(emp.department)
 		if active_departments.has(dept):
 			emp.experience_years = float(emp.experience_years) + (1.0 / 12.0)
@@ -338,6 +386,20 @@ func get_employee(employee_id: String) -> Dictionary:
 			return emp
 	return {}
 
+## Lot D : un junior prometteur gagne environ 3 points de compétence tous les 6 mois.
+func _grow_junior(emp: Dictionary) -> void:
+	var left := int(emp.get("growth_left", 0))
+	if left <= 0:
+		return
+	emp["growth_months"] = int(emp.get("growth_months", 0)) + 1
+	if int(emp.growth_months) % 6 != 0:
+		return
+	var gain := mini(3, left)
+	emp["skill"] = mini(int(emp.get("skill", 50)) + gain, 95)
+	emp["growth_left"] = left - gain
+	if int(emp.growth_left) <= 0 and CompanyManager.created:
+		CompanyManager.add_alert("%s a fini sa montée en compétence : %d." % [str(emp.get("name", "")), int(emp.skill)])
+
 func move_employee(employee_id: String, department: String):
 	for emp in staff:
 		if str(emp.id) == employee_id:
@@ -346,7 +408,7 @@ func move_employee(employee_id: String, department: String):
 			return
 
 func get_state() -> Dictionary:
-	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
+	return {"staff":staff,"candidate":candidate,"shortlist":shortlist,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
@@ -367,6 +429,7 @@ func load_state(state: Dictionary):
 	if CompanyManager.departments.has("Développement") and str(CompanyManager.departments["Développement"].get("leader_id", "")) == "" and migrated_development_leader != "":
 		CompanyManager.departments["Développement"]["leader_id"] = migrated_development_leader
 	candidate = state.get("candidate", {}).duplicate(true)
+	shortlist = (state.get("shortlist", []) as Array).duplicate(true)
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)

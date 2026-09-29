@@ -77,7 +77,7 @@ const CATEGORY_ZONE := {
 	"LANCEMENT":"Stock & production", "FONDERIE":"Stock & production", "FOURNISSEUR":"Stock & production",
 	"PRODUCTION":"Stock & production", "SAV":"Stock & production", "CONTRAT":"Stock & production",
 	"MARCHÉ":"Stock & production", "CLIENT":"Stock & production", "MENACE":"Bureau du fondateur",
-	"SOUS-TRAITANCE":"Établi CPU", "FINANCEMENT":"Bureau du fondateur", "ÉQUIPE":"Banc de test",
+	"SOUS-TRAITANCE":"Établi CPU", "FINANCEMENT":"Bureau du fondateur", "ÉQUIPE":"Banc de test", "GAMME":"Stock & production", "RIVAL":"Stock & production",
 	"RH":"Bureau du fondateur", "LOCAUX":"Bureau du fondateur", "ARBITRAGE":"Bureau du fondateur",
 	"FINANCE":"Bureau du fondateur", "GUIDE":"Bureau du fondateur"
 }

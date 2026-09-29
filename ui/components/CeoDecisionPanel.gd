@@ -191,6 +191,14 @@ func options_for(value: Dictionary) -> Array:
 				options.append(_free("Ne pas intervenir", "Les pertes estimées à %s seront comptabilisées et l'impact restera maximal." % eur(MarketManager.threat_ignore_cost(sid)), "THREAT_IGNORE"))
 		"MARCHÉ":
 			options.append(_free("Bien noté, on continue", "Le retour reste consultable dans Marché.", "MARKET_ACK", true))
+		"GAMME":
+			options.append(_free("Tout passer en fin de série", "%d modèle(s) : prix -25 %% pendant 3 mois, puis retrait du marché." % ProductManager.retire_candidates().size(), "RANGE_CLEARANCE", true))
+			options.append(_free("Choisir modèle par modèle", "Ouvre Produits › Vendre.", "DETAIL"))
+			options.append(_free("Garder la gamme telle quelle", "Nora n'en reparlera pas avant 6 mois.", "RANGE_KEEP"))
+		"RIVAL":
+			options.append(_paid("Lancer l'offensive", "%d mois de pression commerciale sur le rival." % MarketManager.ATTACK_MONTHS, "RIVAL_ATTACK", MarketManager.attack_cost(), true))
+			options.append(_free("Voir le produit", "Ouvre Produits › Vendre.", "DETAIL"))
+			options.append(_free("Pas maintenant", "Nora n'en reparlera pas avant 12 mois.", "RIVAL_LATER"))
 		"CONTRAT":
 			options.append(_free("Préparer une offre", "Choisir le CPU et le prix dans Marché.", "DETAIL", true))
 			options.append(_free("Laisser passer cet appel d'offres", "Nora ne vous en reparlera plus.", "TENDER_IGNORE"))
@@ -261,6 +269,22 @@ func choose(action: String) -> bool:
 				product["market_feedback_seen"] = true
 				ProductManager.products_changed.emit()
 			message = "Retour marché noté."
+		"RANGE_CLEARANCE":
+			var cleared := ProductManager.start_clearance_many(ProductManager.retire_candidate_ids())
+			ok = cleared > 0
+			message = "%d modèle(s) en fin de série : ils quitteront le marché dans 3 mois." % cleared
+		"RIVAL_ATTACK":
+			var parts := sid.split("|")
+			ok = parts.size() == 2 and MarketManager.attack_rival(parts[0], parts[1])
+			message = "Offensive lancée : le rival va réagir." if ok else "Offensive impossible (trésorerie ou rival introuvable)."
+		"RIVAL_LATER":
+			MarketManager.snooze_attack_advice(12)
+			ok = true
+			message = "Pas d'offensive pour l'instant : Nora refera le point dans 12 mois."
+		"RANGE_KEEP":
+			ProductManager.snooze_range_advice(6)
+			ok = true
+			message = "Gamme conservée : Nora refera le point dans 6 mois."
 		"TENDER_IGNORE":
 			var tender: Dictionary = MarketManager.get_tender(sid)
 			ok = not tender.is_empty()

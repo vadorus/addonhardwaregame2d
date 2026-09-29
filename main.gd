@@ -2383,6 +2383,31 @@ func _on_products_action(action: String, payload: Dictionary):
 				status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."
 			else:
 				status_label.text = "Le prix n'a pas été modifié ou le produit n'est pas encore lancé."
+		"start_clearance":
+			var clearance_product := ProductManager.get_product(str(payload.get("product_id", "")))
+			if ProductManager.start_clearance(str(payload.get("product_id", ""))):
+				status_label.text = "Fin de série : prix baissé, retrait du marché dans %d mois." % ProductManager.CLEARANCE_MONTHS
+				notify("Fin de série lancée", "good")
+			else:
+				status_label.text = ProductManager.retire_block_reason(clearance_product) if ProductManager.retire_block_reason(clearance_product) != "" else "Ce modèle est déjà en fin de série."
+		"retire_product":
+			var retired_product := ProductManager.get_product(str(payload.get("product_id", "")))
+			if ProductManager.retire_product(str(payload.get("product_id", ""))):
+				status_label.text = "Modèle retiré du marché. Le SAV des puces déjà vendues continue."
+				notify("Modèle retiré", "good")
+			else:
+				status_label.text = ProductManager.retire_block_reason(retired_product)
+		"clearance_many":
+			var cleared := ProductManager.start_clearance_many(payload.get("product_ids", []))
+			status_label.text = "%d modèle(s) en fin de série : ils quitteront le marché dans %d mois." % [cleared, ProductManager.CLEARANCE_MONTHS]
+			if cleared > 0:
+				notify("%d modèle(s) en fin de série" % cleared, "good")
+		"attack_rival":
+			if MarketManager.attack_rival(str(payload.get("product_id", "")), str(payload.get("competitor_id", ""))):
+				status_label.text = "Offensive lancée : %d mois de pression commerciale. Le rival va réagir." % MarketManager.ATTACK_MONTHS
+				notify("Offensive lancée", "good")
+			else:
+				status_label.text = "Offensive impossible : trésorerie insuffisante, rival introuvable ou offensive déjà en cours."
 		"update_capacity":
 			if ProductManager.set_production_capacity(str(payload.get("product_id", "")), int(payload.get("capacity", 0))):
 				status_label.text = "Capacité ajustée : effet sur les livraisons dès le mois prochain."
