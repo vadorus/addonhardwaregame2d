@@ -143,7 +143,8 @@ les rivaux ne restent pas figés.
 > **Ajout du 29/09 (audit `docs/reviews/V09_AUDIT_LEAD_TYCOON.md`)** : proposition d'un lot M
 > « marché vivant et croissance qui paie » (courbes de vente, segments qui montent et descendent,
 > projets plus gros pour les grandes équipes, presse qui attend mieux que la génération précédente,
-> menaces) à placer avant ou avec le lot C. En attente de la décision d'Alexandre.
+> menaces) à placer avant ou avec le lot C. ✅ Fait le 29/09 (ChatGPT + Claude) :
+> `docs/reviews/V09_LOT_M_MARCHE_VIVANT.md`. Prochain : lots B + C.
 
 ## 4. Ordre recommandé
 

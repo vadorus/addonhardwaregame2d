@@ -462,6 +462,44 @@ func monthly_capacity_reservation_cost(product: Dictionary, sold_units: int) -> 
 	var idle_reservation := float(unused * unit_cost) * 0.006
 	return maxi(0, int(round(base_reservation + idle_reservation)))
 
+## Lot M (Claude, 29/09) : la capacité était figée au lancement. Dans la partie d'Alexandre,
+## chaque CPU récent vendait exactement sa capacité (226, 232, 101…) : la demande était plus forte,
+## les clients repartaient sans CPU, et rien ne le disait. On peut maintenant l'ajuster en vente.
+const CAPACITY_EXPANSION_STEP := 2.0 # au plus ×2 du maximum actuel par décision
+
+func capacity_change_quote(product_id: String, new_capacity: int) -> Dictionary:
+	var product := get_product(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
+		return {"ok":false, "reason":"Produit non lancé"}
+	var current_max := maxi(int(product.get("max_monthly_capacity", product.get("production_capacity", 1))), 1)
+	var hard_cap := int(round(float(current_max) * CAPACITY_EXPANSION_STEP))
+	var target := clampi(new_capacity, 1, hard_cap)
+	var extra_units := maxi(target - current_max, 0)
+	var cost := 0
+	if extra_units > 0:
+		# Nouvelles tranches de wafers à réserver chez le fondeur (ou dans l'usine) : un engagement ponctuel.
+		cost = BalanceManager.expense_amount(maxi(3000, int(round(4000.0 + float(extra_units * maxi(int(product.get("unit_cost", 1)), 1)) * 0.9))), "Mise en production")
+	return {"ok":true, "capacity":target, "current":int(product.get("production_capacity", 0)), "max":current_max,
+		"hard_cap":hard_cap, "extra_units":extra_units, "cost":cost}
+
+func set_production_capacity(product_id: String, new_capacity: int) -> bool:
+	var quote := capacity_change_quote(product_id, new_capacity)
+	if not bool(quote.get("ok", false)):
+		return false
+	var product := get_product(product_id)
+	var cost := int(quote.get("cost", 0))
+	if cost > 0 and not Economy.can_afford(cost, "Extension de capacité — %s" % str(product.get("name", "Produit"))):
+		return false
+	if cost > 0:
+		Economy.add_expense(cost, "Extension de capacité — %s" % str(product.get("name", "Produit")))
+		product["max_monthly_capacity"] = int(quote.get("capacity", 1))
+	product["production_capacity"] = int(quote.get("capacity", 1))
+	product["lost_sales_alerted"] = false
+	CompanyManager.add_alert("%s : capacité portée à %d puces/mois%s." % [str(product.get("name", "Produit")), int(product.production_capacity),
+		(" (extension %s €)" % str(cost)) if cost > 0 else ""])
+	products_changed.emit()
+	return true
+
 func launch_product(product_id: String, price: int, production_capacity: int) -> bool:
 	for product in products:
 		if str(product.id) == product_id and str(product.status) == "READY":
@@ -580,6 +618,16 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var warranty_cost := int(returns * int(product.unit_cost) * 0.72)
 	Economy.add_expense(warranty_cost, "SAV garanties — %s" % str(product.name))
 	product.last_month_sales = total_units
+	# Demande non servie : visible dans Produits › Vendre, et Nora prévient une fois par rupture.
+	var lost_sales := maxi(consumer_units - sold_consumer, 0)
+	product["last_month_demand"] = consumer_units + b2b_units
+	product["last_month_lost_sales"] = lost_sales
+	if lost_sales >= 20 and float(lost_sales) >= float(consumer_units) * 0.20:
+		if not bool(product.get("lost_sales_alerted", false)):
+			product["lost_sales_alerted"] = true
+			CompanyManager.add_alert("Nora : %s est en rupture — %d clients par mois repartent sans CPU. Augmentez la capacité dans Produits › Vendre." % [str(product.name), lost_sales])
+	elif float(lost_sales) < float(maxi(consumer_units, 1)) * 0.05:
+		product["lost_sales_alerted"] = false
 	product.units_sold_total = int(product.units_sold_total) + total_units
 	if supplier_contract_id != "":
 		SupplierManager.record_product_sales(supplier_contract_id, total_units)

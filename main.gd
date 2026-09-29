@@ -2381,6 +2381,12 @@ func _on_products_action(action: String, payload: Dictionary):
 				status_label.text = "Prix mis à jour. L'effet sera visible sur la demande du prochain mois."
 			else:
 				status_label.text = "Le prix n'a pas été modifié ou le produit n'est pas encore lancé."
+		"update_capacity":
+			if ProductManager.set_production_capacity(str(payload.get("product_id", "")), int(payload.get("capacity", 0))):
+				status_label.text = "Capacité ajustée : effet sur les livraisons dès le mois prochain."
+				notify("Capacité ajustée", "good")
+			else:
+				status_label.text = "Capacité inchangée : trésorerie insuffisante pour l'extension, ou produit pas encore lancé."
 		"start_promotion":
 			if ProductManager.start_promotion(str(payload.get("product_id", "")), str(payload.get("promotion", ""))):
 				status_label.text = "Campagne commerciale lancée."

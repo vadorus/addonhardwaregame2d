@@ -125,6 +125,16 @@ func _build() -> void:
 	lifecycle_grid.add_theme_constant_override("v_separation", 8)
 	post_launch_group.add_child(lifecycle_grid)
 
+	# Lot M : la capacité se règle aussi après le lancement (rupture = clients perdus).
+	lifecycle_grid.add_child(UI.label("Capacité de production", 13))
+	sale_capacity = UI.spin(1, 1000000, 10, 100)
+	sale_capacity.value_changed.connect(_on_sale_capacity_changed)
+	lifecycle_grid.add_child(sale_capacity)
+	_capacity_apply_button = Button.new()
+	_capacity_apply_button.text = "Ajuster la capacité"
+	_capacity_apply_button.pressed.connect(_emit_update_capacity)
+	lifecycle_grid.add_child(_capacity_apply_button)
+
 	lifecycle_grid.add_child(UI.label("Promotion", 13))
 	promotion_select = OptionButton.new()
 	for promotion_key in ["AWARENESS", "VALUE", "CLEARANCE"]:
@@ -353,6 +363,13 @@ func _refresh_model_summary(product: Dictionary) -> void:
 	if status == "LAUNCHED":
 		parts.append("%s vendues au total" % UI.money(int(product.get("units_sold_total", 0))))
 		parts.append("%s (%d mois)" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0))])
+		var target_segment := MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment())))
+		var fit := MarketManager.company_scale_fit(target_segment)
+		if fit < 0.99:
+			parts.append("⚠ équipe trop petite pour ce marché : ventes ×%.2f (%d développeurs conseillés)" % [fit, MarketManager.segment_required_team(target_segment)])
+		var lost := int(product.get("last_month_lost_sales", 0))
+		if lost > 0:
+			parts.append("⚠ rupture : %s clients repartis sans CPU le mois dernier (demande %s)" % [UI.money(lost), UI.money(int(product.get("last_month_demand", 0)))])
 	_model_numbers.text = "  •  ".join(parts)
 	# Lancement : capacité + veille seulement pour un modèle prêt ; prix modifiable en vente.
 	var is_ready := status == "READY"
@@ -399,6 +416,7 @@ func _refresh_product_details() -> void:
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
+	_refresh_sale_capacity(product)
 	_refresh_launch_intel()
 
 func _set_cpu_detail(product: Dictionary, metric_lines: Array[String]) -> void:
@@ -608,6 +626,36 @@ func select_first_ready() -> bool:
 
 func selected_product_id() -> String:
 	return UI.option_meta(product_select) if product_select.item_count > 0 else ""
+
+var sale_capacity: SpinBox
+var _capacity_apply_button: Button
+
+func _refresh_sale_capacity(product: Dictionary) -> void:
+	if sale_capacity == null:
+		return
+	if str(product.get("status", "")) != "LAUNCHED":
+		return
+	var quote := ProductManager.capacity_change_quote(str(product.get("id", "")), int(product.get("production_capacity", 1)))
+	sale_capacity.max_value = float(quote.get("hard_cap", 1000000))
+	sale_capacity.set_value_no_signal(float(product.get("production_capacity", 1)))
+	_on_sale_capacity_changed(sale_capacity.value)
+
+func _on_sale_capacity_changed(_value: float) -> void:
+	if _capacity_apply_button == null or product_select == null or product_select.item_count == 0:
+		return
+	var quote := ProductManager.capacity_change_quote(UI.option_meta(product_select), int(sale_capacity.value))
+	var cost := int(quote.get("cost", 0))
+	var target := int(quote.get("capacity", 0))
+	_capacity_apply_button.disabled = target == int(quote.get("current", 0))
+	if cost > 0:
+		_capacity_apply_button.text = "Passer à %s/mois (extension %s €)" % [UI.money(target), UI.money(cost)]
+	else:
+		_capacity_apply_button.text = "Passer à %s/mois" % UI.money(target)
+
+func _emit_update_capacity() -> void:
+	if product_select.item_count == 0 or sale_capacity == null:
+		return
+	action_requested.emit("update_capacity", {"product_id":UI.option_meta(product_select),"capacity":int(sale_capacity.value)})
 
 func _emit_update_price() -> void:
 	if product_select.item_count == 0:

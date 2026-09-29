@@ -30,6 +30,7 @@ const B2B_REPUTATION_SCENARIO := preload("res://tests/scenarios/B2BReputationSce
 const RESEARCH_TREE_SCENARIO := preload("res://tests/scenarios/ResearchTreeScenario.gd")
 const INVESTMENT_BALANCE_SCENARIO := preload("res://tests/scenarios/InvestmentBalanceScenario.gd")
 const FABRICATION_PAGE_SCENARIO := preload("res://tests/scenarios/FabricationPageScenario.gd")
+const PRODUCTION_CAPACITY_SCENARIO := preload("res://tests/scenarios/ProductionCapacityScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1641,6 +1642,10 @@ func _ready() -> void:
 	var fabrication_error := FABRICATION_PAGE_SCENARIO.run(self)
 	if fabrication_error != "":
 		_fail(fabrication_error)
+		return
+	var capacity_error := PRODUCTION_CAPACITY_SCENARIO.run()
+	if capacity_error != "":
+		_fail(capacity_error)
 		return
 	var stepper_error := CPU_STEPPER_SCENARIO.run(self)
 	if stepper_error != "":

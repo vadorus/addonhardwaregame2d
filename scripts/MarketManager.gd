@@ -52,9 +52,11 @@ const MARKET_NEEDS := {
 const SEGMENT_PROJECT_SCALE := {
 	"CALCULATOR":{"team":2,"budget":30000,"market_scale":1.0},
 	"EMBEDDED":{"team":2,"budget":40000,"market_scale":1.0},
-	"INDUSTRIAL":{"team":5,"budget":55000,"market_scale":1.25},
-	"SCIENTIFIC":{"team":6,"budget":65000,"market_scale":1.40},
-	"HOBBYIST":{"team":5,"budget":55000,"market_scale":1.60},
+	# Claude 29/09 : les marchés du garage (1971-72) restent jouables avec les 2 développeurs du départ ;
+	# à 5 requis, choisir « Industriel » en premier CPU menait à la faillite au mois 19 (sonde 40 ans).
+	"INDUSTRIAL":{"team":2,"budget":45000,"market_scale":1.15},
+	"SCIENTIFIC":{"team":3,"budget":55000,"market_scale":1.35},
+	"HOBBYIST":{"team":4,"budget":55000,"market_scale":1.60},
 	"BUSINESS_PC":{"team":10,"budget":85000,"market_scale":2.60},
 	"HOME_PC":{"team":12,"budget":95000,"market_scale":3.20},
 	"WORKSTATION":{"team":16,"budget":120000,"market_scale":2.80},
@@ -409,7 +411,7 @@ func segment_recommended_budget(segment: String) -> int:
 func segment_team_factor(segment: String, developers: int) -> float:
 	var required := float(segment_required_team(segment))
 	var ratio := maxf(float(maxi(developers, 0)) / required, 0.01)
-	return clampf(pow(ratio, 0.72), 0.35, 1.20)
+	return clampf(pow(ratio, 0.60), 0.40, 1.20)
 
 func segment_budget_factor(segment: String, monthly_budget: int) -> float:
 	var recommended := float(segment_recommended_budget(segment))
@@ -939,7 +941,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var lifecycle_multiplier := product_lifecycle_factor(product)
 	var rival_pressure := _rival_pressure(product, target, score)
 	var rival_multiplier := float(rival_pressure.get("multiplier", 1.0))
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier)))
+	var scale_fit := company_scale_fit(target) if str(product.get("company", "")) == CompanyManager.company_name else 1.0
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -952,8 +955,18 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"best_rival_name":str(rival_pressure.get("name", "")),"best_rival_company":str(rival_pressure.get("company", "")),
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
-		"segment":target,"market_units":market_units
+		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit
 	}
+
+## Lot M (Claude, 29/09) : sonde 40 ans — une entreprise de 8 à 10 personnes atteignait 1 milliard d'euros
+## en visant les grands marchés (datacenter ×8) sans jamais embaucher. Les grands clients jugent aussi la
+## taille de l'équipe qui conçoit et suit leurs CPU : en sous-effectif, une partie des ventes ne se fait pas.
+func company_scale_fit(segment: String) -> float:
+	var required := float(segment_required_team(segment))
+	var team := float(maxi(ResearchManager.get_development_team_size(), 1))
+	if team >= required:
+		return 1.0
+	return clampf(pow(team / required, 0.6), 0.30, 1.0)
 
 func _player_portfolio_share_cap() -> float:
 	var awareness := CompanyManager.get_awareness_bonus()
