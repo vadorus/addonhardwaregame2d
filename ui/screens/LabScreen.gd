@@ -521,12 +521,21 @@ func _build() -> void:
 	stepper_button.add_theme_stylebox_override("pressed", UI.stylebox(Color("0b6634"), 14, 0, Color("0b6634"), 12))
 	stepper_button.pressed.connect(func(): action_requested.emit("open_stepper", null))
 	new_page.add_child(stepper_button)
-	var expert_hint := _muted_label("Ou réglez tout vous-même dans le formulaire complet ci-dessous (partenaires, contrats, plans de génération).", 12)
-	expert_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	new_page.add_child(expert_hint)
+	# 29/09 : le formulaire complet (≈ 2 écrans) s'affichait sous le parcours en étapes.
+	# Il est maintenant replié derrière « Réglages avancés ».
+	expert_toggle = Button.new()
+	expert_toggle.flat = true
+	expert_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	expert_toggle.custom_minimum_size.y = 44
+	expert_toggle.pressed.connect(func(): set_expert_form_open(not expert_box.visible))
+	new_page.add_child(expert_toggle)
+	expert_box = VBoxContainer.new()
+	expert_box.add_theme_constant_override("separation", 12)
+	new_page.add_child(expert_box)
 	for node in [depth_card, lab_layout_grid]:
 		box.remove_child(node)
-		new_page.add_child(node)
+		expert_box.add_child(node)
+	set_expert_form_open(false)
 
 	var research_page: VBoxContainer = pager.call("add_page", "RESEARCH", "Recherche")
 	research_page.add_child(_section("Arbre de recherche"))
@@ -609,6 +618,17 @@ func show_section_for_context(context: String) -> void:
 			show_section("PATENTS")
 		"Établi CPU", "Réglages avancés":
 			show_section("NEW")
+			set_expert_form_open(true)
+
+var expert_box: VBoxContainer
+var expert_toggle: Button
+
+func set_expert_form_open(open: bool) -> void:
+	if expert_box == null:
+		return
+	expert_box.visible = open
+	expert_toggle.text = ("▴  Masquer les réglages avancés" if open else
+		"▾  Réglages avancés : tout régler soi-même (partenaires, contrats, plans de génération)")
 
 ## Bouton « progresser » de l'arbre : un chercheur de plus, ou le programme Concept de la branche.
 func _on_research_tree_action(action: Dictionary) -> void:

@@ -1790,6 +1790,10 @@ func maybe_generate_b2b(product: Dictionary):
 	# vous pouvez livrer (35 à 60 % de la capacité, le reste reste au grand public).
 	var capacity := maxi(int(product.get("production_capacity", 0)), 1)
 	units = clampi(mini(units, int(float(capacity) * rng.randf_range(0.35, 0.60))), mini(20, capacity), capacity)
+	# 29/09 : des contrats à 1 unité/mois apparaissaient sur les modèles haut de gamme
+	# à très petite capacité. En dessous de 20 unités, aucun industriel ne signe.
+	if units < 20:
+		return
 	var months := rng.randi_range(6, 24)
 	var unit_price := int(float(product.get("price", 1)) * rng.randf_range(0.76, 0.92))
 	var customers_by_segment := {
