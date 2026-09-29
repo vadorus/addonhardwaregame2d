@@ -34,6 +34,52 @@ static func run() -> String:
 		_restore(snapshot)
 		return "A CPU priced at 5x market reference still keeps implausible demand (%d vs %d normal)" % [premium_units, normal_units]
 
+	# M1: a launch must have a visible curve and old products must really leave the market.
+	var quarter_probe := product.duplicate(true)
+	quarter_probe["months_on_market"] = 3
+	var quarter_units := int(MarketManager.estimate_consumer_demand(quarter_probe).get("units", 0))
+	if quarter_units > int(round(float(normal_units) * 0.92)):
+		_restore(snapshot)
+		return "M1 launch curve is too flat during the first quarter (%d vs %d launch)" % [quarter_units, normal_units]
+	var mature_probe := product.duplicate(true)
+	mature_probe["months_on_market"] = 48
+	var mature_units := int(MarketManager.estimate_consumer_demand(mature_probe).get("units", 0))
+	var retired_probe := product.duplicate(true)
+	retired_probe["months_on_market"] = 97
+	var retired_units := int(MarketManager.estimate_consumer_demand(retired_probe).get("units", 0))
+	if mature_units >= quarter_units or retired_units != 0:
+		_restore(snapshot)
+		return "M1 product lifecycle does not decline to a real end of sales (%d mature, %d retired)" % [mature_units, retired_units]
+
+	# A freshly launched superior rival must steal attention immediately.
+	var rivals_before := MarketManager.competitors.duplicate(true)
+	var strong_rival := {"id":"RIVAL-M1","company":"M1 Rival","name":"M1 Rival G2","sector":"CPU","target_segment":"EMBEDDED",
+		"price":reference,"brand":66.0,"months_on_market":24,"metrics":{"performance":88.0,"efficiency":86.0,"reliability":89.0,"usability":78.0,"innovation":84.0,"ecosystem":76.0,"sustainability":78.0}}
+	MarketManager.competitors["CPU"] = [strong_rival]
+	var established_rival_units := int(MarketManager.estimate_consumer_demand(product).get("units", 0))
+	strong_rival["months_on_market"] = 0
+	MarketManager.competitors["CPU"] = [strong_rival]
+	var fresh_rival_units := int(MarketManager.estimate_consumer_demand(product).get("units", 0))
+	MarketManager.competitors = rivals_before
+	if fresh_rival_units >= established_rival_units:
+		_restore(snapshot)
+		return "M1 fresh superior rival does not create a visible next-month sales shock (%d vs %d)" % [fresh_rival_units, established_rival_units]
+
+	# Historical segments may mature and decline instead of growing forever.
+	var time_before := TimeManager.get_state().duplicate(true)
+	var peak_time := time_before.duplicate(true)
+	peak_time["year"] = 1977
+	TimeManager.load_state(peak_time)
+	var calculator_peak := MarketManager.segment_market_units("CALCULATOR")
+	var late_time := time_before.duplicate(true)
+	late_time["year"] = 1994
+	TimeManager.load_state(late_time)
+	var calculator_late := MarketManager.segment_market_units("CALCULATOR")
+	TimeManager.load_state(time_before)
+	if calculator_late >= calculator_peak:
+		_restore(snapshot)
+		return "M1 historical market lifecycle still only grows (%d late vs %d peak)" % [calculator_late, calculator_peak]
+
 	# A three-bin CPU family must share one market envelope instead of tripling demand.
 	var essential := product.duplicate(true)
 	essential["id"] = "PROD-CI-ESSENTIAL"

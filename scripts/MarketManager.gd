@@ -47,6 +47,24 @@ const MARKET_NEEDS := {
 	"DATACENTER":{"historical_year":2002,"tech_trigger":90.0,"base_units":30000,"price_factor":1.90,"growth":0.055,"description":"Calcul à grande échelle, densité, disponibilité et efficacité énergétique."}
 }
 
+# Cycle historique des marchés : croissance, maturité, puis éventuel déclin.
+# Les marchés structurels (embarqué, industriel, serveur...) restent durables ;
+# les premiers marchés grand public peuvent être remplacés par de nouveaux usages.
+const SEGMENT_LIFECYCLE := {
+	"CALCULATOR":{"growth_years":6.0,"plateau_years":5.0,"decline_years":12.0,"floor":0.18},
+	"EMBEDDED":{"growth_years":18.0,"plateau_years":20.0,"decline_years":30.0,"floor":0.82},
+	"INDUSTRIAL":{"growth_years":15.0,"plateau_years":20.0,"decline_years":30.0,"floor":0.76},
+	"SCIENTIFIC":{"growth_years":14.0,"plateau_years":18.0,"decline_years":24.0,"floor":0.62},
+	"HOBBYIST":{"growth_years":7.0,"plateau_years":6.0,"decline_years":12.0,"floor":0.24},
+	"BUSINESS_PC":{"growth_years":10.0,"plateau_years":9.0,"decline_years":12.0,"floor":0.32},
+	"HOME_PC":{"growth_years":12.0,"plateau_years":15.0,"decline_years":15.0,"floor":0.45},
+	"WORKSTATION":{"growth_years":12.0,"plateau_years":16.0,"decline_years":18.0,"floor":0.58},
+	"SERVER":{"growth_years":15.0,"plateau_years":20.0,"decline_years":24.0,"floor":0.72},
+	"GAMING":{"growth_years":12.0,"plateau_years":20.0,"decline_years":20.0,"floor":0.68},
+	"MOBILE_COMPUTING":{"growth_years":13.0,"plateau_years":18.0,"decline_years":20.0,"floor":0.72},
+	"DATACENTER":{"growth_years":12.0,"plateau_years":20.0,"decline_years":24.0,"floor":0.78}
+}
+
 const COMPETITOR_ARCHETYPES := {
 	"ASTER":{
 		"company":"Aster Systems","product_prefix":"Aster",
@@ -346,16 +364,33 @@ func normalize_segment(segment: String) -> String:
 			return default_segment()
 	return default_segment()
 
+func segment_lifecycle_factor(segment: String) -> float:
+	var normalized := normalize_segment(segment)
+	if not MARKET_NEEDS.has(normalized):
+		return 0.0
+	var need: Dictionary = MARKET_NEEDS[normalized]
+	var profile: Dictionary = SEGMENT_LIFECYCLE.get(normalized, {"growth_years":12.0,"plateau_years":18.0,"decline_years":24.0,"floor":0.65})
+	var age_years := maxf(float(TimeManager.year - int(need.historical_year)), 0.0)
+	var decline_start := float(profile.get("growth_years", 12.0)) + float(profile.get("plateau_years", 18.0))
+	if age_years <= decline_start:
+		return 1.0
+	var decline_span := maxf(float(profile.get("decline_years", 24.0)), 1.0)
+	var decline_t := clampf((age_years - decline_start) / decline_span, 0.0, 1.0)
+	return lerpf(1.0, float(profile.get("floor", 0.65)), decline_t)
+
 func segment_market_units(segment: String) -> int:
 	var normalized := normalize_segment(segment)
 	if not MARKET_NEEDS.has(normalized) or not is_segment_available(normalized):
 		return 0
 	var need: Dictionary = MARKET_NEEDS[normalized]
+	var profile: Dictionary = SEGMENT_LIFECYCLE.get(normalized, {"growth_years":12.0})
 	var years_since_anchor := maxi(TimeManager.year - int(need.historical_year), 0)
-	var maturity_growth := 1.0 + minf(float(years_since_anchor) * float(need.growth), 2.25)
+	var growth_years := minf(float(years_since_anchor), float(profile.get("growth_years", 12.0)))
+	var maturity_growth := 1.0 + minf(growth_years * float(need.growth), 2.25)
 	var tech_surplus := maxf(market_technology_signal() - float(need.tech_trigger), 0.0)
 	var tech_growth := 1.0 + minf(tech_surplus * 0.010, 0.85)
-	return maxi(500, int(round(float(need.base_units) * maturity_growth * tech_growth * BalanceManager.market_demand_factor())))
+	var lifecycle := segment_lifecycle_factor(normalized)
+	return maxi(500, int(round(float(need.base_units) * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor())))
 
 func segment_reference_price(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
@@ -534,23 +569,79 @@ func product_age_penalty(product: Dictionary) -> float:
 			monthly_penalty = 0.44
 	return minf(float(age_months - 12) * monthly_penalty, 24.0)
 
-## Équilibrage (28/09) : un CPU de 1972 se vendait encore 120 fois par mois en 1986.
-## Après 3 ans, la clientèle passe aux nouvelles générations : ventes divisées par ~20 à 8 ans.
-func obsolescence_factor(product: Dictionary) -> float:
+## Cycle commercial M1 : lancement fort, plateau, maturité, déclin puis fin réelle.
+## À huit ans, un produit grand public n'alimente plus les ventes courantes ; les
+## contrats B2B déjà signés restent gérés séparément par leur propre durée.
+func product_lifecycle_factor(product: Dictionary) -> float:
 	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
+	if age_months <= 2:
+		return lerpf(1.25, 1.15, float(age_months) / 2.0)
+	if age_months <= 12:
+		return lerpf(1.12, 1.0, float(age_months - 3) / 9.0)
+	if age_months <= 24:
+		return lerpf(1.0, 0.90, float(age_months - 12) / 12.0)
 	if age_months <= 36:
-		return 1.0
-	return maxf(0.05, 1.0 - float(age_months - 36) / 60.0)
+		return lerpf(0.90, 0.72, float(age_months - 24) / 12.0)
+	if age_months <= 60:
+		return lerpf(0.72, 0.32, float(age_months - 36) / 24.0)
+	if age_months <= 84:
+		return lerpf(0.32, 0.08, float(age_months - 60) / 24.0)
+	if age_months <= 96:
+		return lerpf(0.08, 0.0, float(age_months - 84) / 12.0)
+	return 0.0
+
+func obsolescence_factor(product: Dictionary) -> float:
+	return product_lifecycle_factor(product)
 
 func product_lifecycle_label(product: Dictionary) -> String:
 	var age_months := maxi(int(product.get("months_on_market", 0)), 0)
-	if age_months <= 6:
-		return "Nouveau"
+	if age_months <= 3:
+		return "Lancement"
 	if age_months <= 18:
+		return "En rythme"
+	if age_months <= 36:
 		return "Mature"
-	if age_months <= 30:
-		return "Vieillissant"
-	return "Ancienne génération"
+	if age_months <= 60:
+		return "En déclin"
+	if age_months <= 96:
+		return "Fin de série"
+	return "Retiré du marché"
+
+func _rival_pressure(product: Dictionary, segment: String, player_score: float) -> Dictionary:
+	var sector := str(product.get("sector", "CPU"))
+	var best_score := -1.0
+	var best_age := 999
+	var best_name := ""
+	var best_company := ""
+	var same_segment_found := false
+	for comp_value in competitors.get(sector, []):
+		var comp: Dictionary = comp_value
+		var comp_segment := normalize_segment(str(comp.get("target_segment", segment)))
+		if comp_segment == segment:
+			same_segment_found = true
+	for comp_value in competitors.get(sector, []):
+		var comp: Dictionary = comp_value
+		var comp_segment := normalize_segment(str(comp.get("target_segment", segment)))
+		if same_segment_found and comp_segment != segment:
+			continue
+		var rival_score := _evaluate_competitor(comp, segment)
+		if rival_score > best_score:
+			best_score = rival_score
+			best_age = maxi(int(comp.get("months_on_market", 0)), 0)
+			best_name = str(comp.get("name", "CPU concurrent"))
+			best_company = str(comp.get("company", "Concurrent"))
+	var gap := maxf(best_score - player_score, 0.0)
+	var recency := 1.0
+	if best_age <= 2:
+		recency = 1.35
+	elif best_age <= 8:
+		recency = 1.20
+	elif best_age <= 18:
+		recency = 1.08
+	var multiplier := 1.0
+	if best_score >= 0.0:
+		multiplier = clampf(1.0 - gap * 0.018 * recency, 0.48, 1.0)
+	return {"score":best_score,"age_months":best_age,"multiplier":multiplier,"name":best_name,"company":best_company}
 
 func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var target := normalize_segment(str(product.get("target_segment", default_segment())))
@@ -578,7 +669,10 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		raw_share = minf(raw_share, _player_portfolio_share_cap())
 	var price_multiplier := price_demand_multiplier(product, target)
 	var media_multiplier := MediaManager.product_visibility_modifier(str(product.get("id", "")))
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * obsolescence_factor(product))))
+	var lifecycle_multiplier := product_lifecycle_factor(product)
+	var rival_pressure := _rival_pressure(product, target, score)
+	var rival_multiplier := float(rival_pressure.get("multiplier", 1.0))
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -586,6 +680,9 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,
 		"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,
 		"raw_share":raw_share,"price_demand_multiplier":price_multiplier,"media_demand_multiplier":media_multiplier,
+		"lifecycle_multiplier":lifecycle_multiplier,"rival_pressure_multiplier":rival_multiplier,
+		"best_rival_score":float(rival_pressure.get("score", -1.0)),"best_rival_age_months":int(rival_pressure.get("age_months", 999)),
+		"best_rival_name":str(rival_pressure.get("name", "")),"best_rival_company":str(rival_pressure.get("company", "")),
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units
