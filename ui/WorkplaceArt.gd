@@ -58,10 +58,10 @@ static func crew_layout(tier: int) -> Dictionary:
 static func character_path(look: int, pose: String) -> String:
 	return "res://assets/art/v010/J2_personnages/perso_%02d_%s.png" % [clampi(look, 1, CHARACTER_COUNT), pose]
 
-## Looks des salariés : tout sauf Nora et les visiteurs. Les planches contiennent trois variantes
-## de la même jeune femme (1, 5, 9) : on prend d'abord les visages bien distincts.
-const DISTINCT_STAFF_LOOKS := [1, 2, 6, 7, 8, 10, 11]
-const EXTRA_STAFF_LOOKS := [5, 9]
+## Looks des salariés : tout sauf Nora et les visiteurs. Les numéros 5 et 9 étaient deux variantes du
+## numéro 1 ; Astra les a remplacés le 30/09 (jeune barbu à casquette, femme aux cheveux gris).
+const DISTINCT_STAFF_LOOKS := [1, 2, 5, 6, 7, 8, 9, 10, 11]
+const EXTRA_STAFF_LOOKS := []
 
 static func staff_looks() -> Array[int]:
 	var looks: Array[int] = []
