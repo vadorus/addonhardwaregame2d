@@ -3109,6 +3109,9 @@ func _on_dialogue_choice(key: String, choice_id: String) -> void:
 		SoundManager.play("error")
 		return
 	close_dialogue()
+	if str(result.get("open", "")) == "CPU_STEPPER":
+		call_deferred("open_cpu_stepper")
+		return
 	var message := str(result.get("message", ""))
 	if message != "":
 		status_label.text = "✓ " + message

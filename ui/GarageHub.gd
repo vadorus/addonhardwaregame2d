@@ -14,6 +14,7 @@ const MUTED := Color("7a6a58")
 const BLUE := Color("d9822b")
 ## V0.10 K1 : un décor par palier de locaux (garage, atelier, siège, campus), dessinés par ChatGPT.
 const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const WORKPLACE_ART := WORKPLACE.ART
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
@@ -916,6 +917,9 @@ func _nora_message() -> String:
 		if str(product_value.get("status", "")) == "READY":
 			return "Étape 3/3 • %s est prêt. Ouvrez Produits et choisissez son prix pour le lancer." % str(product_value.get("name", "Votre CPU"))
 		if str(product_value.get("status", "")) == "LAUNCHED":
+			var next: Dictionary = NEXT_GENERATION.advice()
+			if not next.is_empty():
+				return "Préparez la suite : %s est en vente depuis %d mois et vieillit. Un nouveau CPU prend ~%d mois : touchez l'établi ou parlez-moi." % [str(next.product), int(next.age), int(next.ready_in)]
 			return "%s se vend : %s unités ce mois. Le tutoriel est terminé : les objectifs Produit, Croissance et Marché prennent le relais." % [str(product_value.get("name", "Votre CPU")), str(product_value.get("last_month_sales", 0))]
 	return "Touchez un élément du décor pour gérer l'entreprise."
 

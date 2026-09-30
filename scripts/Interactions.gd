@@ -6,6 +6,7 @@ extends RefCounted
 ## Clés : « HR:<id> », « RND:<id> », « CLIENT:<id> ».
 
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
+const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 
 ## Toutes les conversations en attente, avec qui parle.
 static func pending() -> Array:
@@ -24,6 +25,9 @@ static func pending() -> Array:
 		result.append({"key":"HIRE:DEV", "speaker":"NORA"})
 	if tech_final_pending():
 		result.append({"key":"MILESTONE:TECH_FINAL", "speaker":"NORA"})
+	# V0.10 / H4 : l'équipe n'a plus rien en chantier et le dernier CPU vieillit.
+	if not NEXT_GENERATION.advice().is_empty():
+		result.append({"key":"NEXT:GEN", "speaker":"NORA"})
 	# Lot B : clients avec une petite puce à concevoir, prêt bancaire, grands moments du premier CPU.
 	for study_value in GarageBusiness.open_offers():
 		var study: Dictionary = study_value
@@ -228,6 +232,17 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"HIRE2", "label":"Recrute-en deux.", "hint":"Encore plus vite, deux salaires de plus"},
 				{"id":"LATER", "label":"On reste comme ça pour l'instant.", "hint":"Nora n'en reparle pas avant 6 mois"},
 			]}
+	elif key == "NEXT:GEN":
+		var next := NEXT_GENERATION.advice()
+		if next.is_empty():
+			return {}
+		return {"key":key, "person":_person("NORA"), "mood":"WORRIED" if str(next.urgency) == "LATE" else "NEUTRAL", "kicker":"PRÉPAREZ LA SUITE",
+			"text":NEXT_GENERATION.dialogue_text(next),
+			"note":"%s : %d ventes le mois dernier. Les ventes baissent nettement après 2 ans sur le marché." % [str(next.product), int(next.sales)],
+			"choices":[
+				{"id":"START", "label":"On lance la suite !", "hint":"Ouvre l'atelier CPU (suite de la gamme ou nouvelle gamme)", "primary":true},
+				{"id":"LATER", "label":"Pas tout de suite.", "hint":"Nora en reparle dans %d mois" % NEXT_GENERATION.LATER_MONTHS},
+			]}
 	elif key == "MILESTONE:TECH_FINAL":
 		if not tech_final_pending():
 			return {}
@@ -357,6 +372,11 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 			if PersonnelManager.hire_candidate():
 				hired += 1
 		return {"ok":hired > 0, "message":("%d développeur(s) rejoignent l'équipe !" % hired) if hired > 0 else "Trésorerie insuffisante pour recruter."}
+	if key == "NEXT:GEN":
+		if choice_id == "START":
+			return {"ok":true, "message":"", "open":"CPU_STEPPER"}
+		NEXT_GENERATION.later()
+		return {"ok":true, "message":"", "later":true}
 	if key == "MILESTONE:TECH_FINAL":
 		ExecutiveManager.workplace["tech_final_announced"] = true
 		CompanyManager.add_alert("Sommet technologique atteint : la partie continue en mode libre. De nouvelles technologies arriveront avec les mises à jour.")

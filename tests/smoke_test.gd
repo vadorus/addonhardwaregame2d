@@ -14,6 +14,7 @@ const PRODUCT_COCKPIT_SCENARIO := preload("res://tests/scenarios/ProductCockpitS
 const LAB_DEPTH_SCENARIO := preload("res://tests/scenarios/LabDepthScenario.gd")
 const TEAM_DEPTH_SCENARIO := preload("res://tests/scenarios/TeamDepthScenario.gd")
 const MOMENTS_SCENARIO := preload("res://tests/scenarios/MomentsScenario.gd")
+const NEXT_GENERATION_SCENARIO := preload("res://tests/scenarios/NextGenerationScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -242,6 +243,10 @@ func _ready() -> void:
 	var moments_error := MOMENTS_SCENARIO.run(self)
 	if moments_error != "":
 		_fail(moments_error)
+		return
+	var next_generation_error := NEXT_GENERATION_SCENARIO.run()
+	if next_generation_error != "":
+		_fail(next_generation_error)
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
