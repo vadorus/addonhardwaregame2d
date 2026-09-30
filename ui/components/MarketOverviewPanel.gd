@@ -121,6 +121,14 @@ func _refresh_cards() -> void:
 			var line := UI.muted_label(str(line_value), 12)
 			line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			needs_box.add_child(line)
+	# Lot F4 : événements macro et salon annuel, visibles sans ouvrir une fenêtre dédiée.
+	var late_lines: Array = MarketManager.LATE_GAME.summary_lines()
+	if not late_lines.is_empty():
+		needs_box.add_child(UI.eyebrow("ACTUALITÉ DU MARCHÉ"))
+		for line_value in late_lines:
+			var late_line := UI.muted_label(str(line_value), 12)
+			late_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			needs_box.add_child(late_line)
 
 	_clear(competitors_box)
 	for competitor_value in MarketManager.cpu_competitor_public_profiles():

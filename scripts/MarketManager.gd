@@ -7,6 +7,7 @@ signal market_need_unlocked(need)
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const RIVAL_LIFE := preload("res://scripts/RivalLife.gd")
 const STRATEGIC := preload("res://scripts/StrategicMarkets.gd")
+const LATE_GAME := preload("res://scripts/LateGameEvents.gd")
 
 # Les dates sont des repères historiques, pas des verrous rigides :
 # une partie technologiquement en avance peut faire émerger un besoin plus tôt.
@@ -229,6 +230,8 @@ var last_healthy_offer_age := 0
 var last_entrant_age := 0
 # Lot F3 : accréditations défense / aérospatial (règles dans StrategicMarkets.gd).
 var strategic: Dictionary = {}
+# Lot F4 : événements macro après 2010 + salon annuel interactif.
+var late_game: Dictionary = {}
 const ATTACK_MONTHS := 4
 const ATTACK_PLAYER_BOOST := 1.20
 const ATTACK_RIVAL_SHARE_FACTOR := 0.75
@@ -260,6 +263,7 @@ func reset():
 	last_healthy_offer_age = 0
 	last_entrant_age = 0
 	strategic = {}
+	late_game = {}
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
@@ -489,7 +493,8 @@ func production_cost_threat_factor() -> float:
 		var threat: Dictionary = threat_value
 		var mitigated := str(threat.get("status", "")) == "MITIGATED"
 		factor *= float(threat.get("mitigated_cost_factor" if mitigated else "cost_factor", 1.0))
-	return clampf(factor, 1.0, 1.65)
+	factor *= LATE_GAME.production_cost_factor()
+	return clampf(factor, 0.82, 1.65)
 
 func threat_response_cost(threat_id: String) -> int:
 	return int(get_market_threat(threat_id).get("response_cost", 0))
@@ -646,7 +651,7 @@ func segment_market_units(segment: String) -> int:
 	var tech_growth := 1.0 + minf(tech_surplus * 0.010, 0.85)
 	var lifecycle := segment_lifecycle_factor(normalized)
 	var project_scale := float(segment_project_scale(normalized).get("market_scale", 1.0))
-	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor())))
+	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor() * LATE_GAME.segment_demand_factor(normalized))))
 
 func segment_reference_price(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
@@ -982,7 +987,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var rival_multiplier := float(rival_pressure.get("multiplier", 1.0))
 	var scale_fit := company_scale_fit(target) if str(product.get("company", "")) == CompanyManager.company_name else 1.0
 	var attack_multiplier := attack_demand_factor(product) * RIVAL_LIFE.acquisition_demand_factor(product) * CompanyManager.SUBSIDIARIES.captive_demand_factor(product)
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier)))
+	var late_game_multiplier := LATE_GAME.player_demand_factor(product)
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier * late_game_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -995,7 +1001,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"best_rival_name":str(rival_pressure.get("name", "")),"best_rival_company":str(rival_pressure.get("company", "")),
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
-		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit,"attack_multiplier":attack_multiplier
+		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit,"attack_multiplier":attack_multiplier,
+		"late_game_multiplier":late_game_multiplier
 	}
 
 ## Lot M (Claude, 29/09) : sonde 40 ans — une entreprise de 8 à 10 personnes atteignait 1 milliard d'euros
@@ -2553,6 +2560,7 @@ func process_month(products: Array):
 	_update_market_opportunities()
 	_update_tenders()
 	STRATEGIC.process_month()
+	LATE_GAME.process_month()
 	_maybe_spawn_market_threat()
 	for product in products:
 		if str(product.get("status", "")) == "LAUNCHED":
@@ -2583,6 +2591,7 @@ func get_state() -> Dictionary:
 		"last_healthy_offer_age":last_healthy_offer_age,
 		"last_entrant_age":last_entrant_age,
 		"strategic":strategic,
+		"late_game":late_game,
 		"rng_seed":SaveCodec.int64_to_json(rng.seed),
 		"rng_state":SaveCodec.int64_to_json(rng.state)
 	}
@@ -2682,6 +2691,7 @@ func load_state(state: Dictionary):
 	last_healthy_offer_age = int(state.get("last_healthy_offer_age", market_age_months))
 	last_entrant_age = int(state.get("last_entrant_age", market_age_months))
 	strategic = (state.get("strategic", {}) as Dictionary).duplicate(true)
+	late_game = (state.get("late_game", {}) as Dictionary).duplicate(true)
 	_next_threat_id = int(state.get("next_threat_id", market_threats.size() + 1))
 	_last_threat_market_age = int(state.get("last_threat_market_age", maxi(market_age_months - 36, 0)))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "43021"), 43021)

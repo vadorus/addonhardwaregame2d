@@ -217,6 +217,10 @@ func options_for(value: Dictionary) -> Array:
 				options.append(_paid("Lancer l'accréditation", "Audit de %d mois ; ensuite les appels d'offres arrivent. Conformité : %s par mois." % [MarketManager.STRATEGIC.ACCREDITATION_MONTHS, eur(MarketManager.STRATEGIC.compliance_cost(sid))],
 					"STRATEGIC_START", MarketManager.STRATEGIC.accreditation_cost(sid), true))
 				options.append(_free("Pas maintenant", "Nora n'en reparlera pas avant 3 ans.", "STRATEGIC_LATER"))
+		"SALON":
+			options.append(_paid("Présentation officielle", "Crédibilité forte, +10 % de demande pendant 6 mois.", "EXPO_PRESENT", MarketManager.LATE_GAME.expo_cost("PRESENT"), true))
+			options.append(_paid("Fuite contrôlée", "Plus de buzz : +14 % de demande pendant 4 mois, mais image professionnelle légèrement entamée.", "EXPO_LEAK", MarketManager.LATE_GAME.expo_cost("LEAK")))
+			options.append(_free("Démentir la rumeur", "Pas de grosse dépense ; protège le calendrier et la réputation professionnelle.", "EXPO_DENY"))
 		"CONTRAT":
 			options.append(_free("Préparer une offre", "Choisir le CPU et le prix dans Marché.", "DETAIL", true))
 			options.append(_free("Laisser passer cet appel d'offres", "Nora ne vous en reparlera plus.", "TENDER_IGNORE"))
@@ -311,6 +315,10 @@ func choose(action: String) -> bool:
 		"STRATEGIC_LATER":
 			ok = MarketManager.STRATEGIC.snooze(sid)
 			message = "Pas pour l'instant : Nora en reparlera dans 3 ans."
+		"EXPO_PRESENT", "EXPO_LEAK", "EXPO_DENY":
+			var expo_choice := "PRESENT" if action == "EXPO_PRESENT" else ("LEAK" if action == "EXPO_LEAK" else "DENY")
+			ok = MarketManager.LATE_GAME.resolve_expo(expo_choice)
+			message = "Salon : %s." % MarketManager.LATE_GAME.expo_choice_label(expo_choice)
 		"RIVAL_LATER":
 			MarketManager.snooze_attack_advice(12)
 			ok = true

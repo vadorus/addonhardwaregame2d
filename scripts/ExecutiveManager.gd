@@ -858,6 +858,18 @@ func get_ceo_decisions() -> Array:
 			"target_tab":5,
 			"can_defer":true
 		})
+	# Lot F4 : salon annuel interactif. La décision ne bloque pas le jeu, mais expire vite.
+	var expo: Dictionary = MarketManager.LATE_GAME.open_expo()
+	if not expo.is_empty():
+		decisions.append({
+			"id":"SALON:%d" % int(expo.get("year", TimeManager.year)),
+			"category":"SALON","severity":52.0,
+			"title":str(expo.get("title", "Salon annuel")),
+			"text":"La presse attend votre stratégie. Décision sous %d mois." % int(expo.get("months_left", 0)),
+			"recommendation":"Présentation officielle : crédibilité et visibilité durable. Fuite contrôlée : plus de buzz mais image moins professionnelle. Démenti : protège le calendrier sans grosse dépense.",
+			"target_tab":5,"can_defer":false
+		})
+
 	if GarageBusiness.loan_offer_pending():
 		decisions.append({
 			"id":"FINANCE:LOAN",

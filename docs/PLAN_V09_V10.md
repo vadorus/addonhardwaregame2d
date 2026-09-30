@@ -123,7 +123,8 @@ qui investit dans une équipe voit l'effet sur la génération suivante.
 
 > 29/09 : **F1 (rivaux et rachats) fait** (`docs/reviews/V09_LOT_F1_RIVAUX_RACHATS.md`). Ordre validé avec Alexandre : F1 rivaux et rachats, F2 filiales, F3 nouveaux marchés, F4 événements et salon, F5 prestige.
 > 30/09 : **F2 (filiales) fait** (`docs/reviews/V09_LOT_F2_FILIALES.md`).
-> 30/09 : **F3 (marchés stratégiques + diversification) fait côté code/tests** (`docs/reviews/V09_LOT_F3_MARCHES_STRATEGIQUES.md`). Export Android réussi ; installation Pixel en attente d'une migration de signature pour préserver la sauvegarde.
+> 30/09 : **F3 (marchés stratégiques + diversification) fait** (`docs/reviews/V09_LOT_F3_MARCHES_STRATEGIQUES.md`).
+> 30/09 : **F4 (événements annuels + salon interactif) fait** (`docs/reviews/V09_LOT_F4_EVENEMENTS_SALON.md`).
 
 But : une fois le plafond technologique atteint, d'autres systèmes prennent le relais.
 - **Rachats** de concurrents (fragiles ou en difficulté) et **filiales** avec leur propre mandat.
