@@ -5,6 +5,7 @@ signal status_changed(message: String)
 const UI := preload("res://ui/UiKit.gd")
 
 var company_rep_label: Label
+var empire_box: VBoxContainer
 var division_label: Label
 var division_delegation_group: VBoxContainer
 var division_director_select: OptionButton
@@ -66,6 +67,14 @@ func _build() -> void:
 	reputation_box = VBoxContainer.new()
 	reputation_box.add_theme_constant_override("separation", 8)
 	box.add_child(reputation_box)
+
+	# Lot F5 : bilan d'empire, classement mondial et trophées de carrière.
+	box.add_child(UI.section("Empire & carrière"))
+	var empire_card := UI.card(UI.APP_SHELL, 12, 12)
+	empire_box = VBoxContainer.new()
+	empire_box.add_theme_constant_override("separation", 8)
+	empire_card.add_child(empire_box)
+	box.add_child(empire_card)
 
 	# Lot C : le parcours complet des objectifs de Nora (le QG n'affiche que les trois en cours).
 	box.add_child(UI.section("Objectifs de Nora"))
@@ -368,6 +377,39 @@ func _refresh_reputation_bars() -> void:
 		(parts.number as Label).text = "%.0f" % value
 	UI.prepare_touch_scroll_children(reputation_box)
 
+func _refresh_empire() -> void:
+	if empire_box == null:
+		return
+	for child in empire_box.get_children():
+		empire_box.remove_child(child)
+		child.queue_free()
+	var data: Dictionary = CompanyManager.CAREER.summary()
+	var meter := UI.meter_row(str(data.get("title", "Carrière")), "Marque, technologie, marché, finances et groupe")
+	UI.set_meter(meter, float(data.get("score", 0.0)), "%.1f/100" % float(data.get("score", 0.0)))
+	empire_box.add_child(meter)
+	for line_value in CompanyManager.CAREER.empire_lines():
+		var line := UI.muted_label(str(line_value), 12)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empire_box.add_child(line)
+
+	empire_box.add_child(UI.eyebrow("CLASSEMENT MONDIAL"))
+	var ranking: Array = CompanyManager.CAREER.global_ranking()
+	for i in range(mini(ranking.size(), 5)):
+		var entry: Dictionary = ranking[i]
+		var rank_row := UI.meter_row("%d. %s%s" % [int(entry.get("rank", i + 1)), str(entry.get("company", "")), "  ← vous" if bool(entry.get("player", false)) else ""], str(entry.get("detail", "")))
+		UI.set_meter(rank_row, float(entry.get("score", 0.0)), "%.1f pts" % float(entry.get("score", 0.0)))
+		empire_box.add_child(rank_row)
+
+	empire_box.add_child(UI.eyebrow("TROPHÉES DE CARRIÈRE"))
+	for trophy_value in CompanyManager.CAREER.trophy_rows():
+		var trophy: Dictionary = trophy_value
+		var prefix := "✓" if bool(trophy.get("unlocked", false)) else "○"
+		var suffix := " — %d" % int(trophy.get("year", 0)) if bool(trophy.get("unlocked", false)) else " — %s" % str(trophy.get("text", ""))
+		var trophy_line := UI.muted_label("%s %s%s" % [prefix, str(trophy.get("label", "")), suffix], 12)
+		trophy_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empire_box.add_child(trophy_line)
+	UI.prepare_touch_scroll_children(empire_box)
+
 func _child_with_text(box: Node, text: String) -> Node:
 	for child in box.get_children():
 		if child is Label and (child as Label).text == text:
@@ -487,6 +529,7 @@ func refresh() -> void:
 		return
 	_refresh_page_unlocks()
 	_refresh_reputation_bars()
+	_refresh_empire()
 	if subsidiaries_panel != null:
 		subsidiaries_panel.call("refresh")
 	_fill_subsidiary_sectors()

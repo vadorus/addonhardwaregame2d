@@ -41,6 +41,7 @@ const RIVAL_LIFE_SCENARIO := preload("res://tests/scenarios/RivalLifeScenario.gd
 const SUBSIDIARIES_SCENARIO := preload("res://tests/scenarios/SubsidiariesScenario.gd")
 const STRATEGIC_MARKETS_SCENARIO := preload("res://tests/scenarios/StrategicMarketsScenario.gd")
 const LATE_GAME_EVENTS_SCENARIO := preload("res://tests/scenarios/LateGameEventsScenario.gd")
+const CAREER_PRESTIGE_SCENARIO := preload("res://tests/scenarios/CareerPrestigeScenario.gd")
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
@@ -1772,6 +1773,12 @@ func _ready() -> void:
 	var late_game_error := LATE_GAME_EVENTS_SCENARIO.run()
 	if late_game_error != "":
 		_fail(late_game_error)
+		return
+	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
+	await get_tree().process_frame
+	var career_error := CAREER_PRESTIGE_SCENARIO.run()
+	if career_error != "":
+		_fail(career_error)
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame

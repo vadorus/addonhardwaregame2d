@@ -5,6 +5,7 @@ signal reputation_changed
 signal alert_created(text)
 
 const SUBSIDIARIES := preload("res://scripts/Subsidiaries.gd")
+const CAREER := preload("res://scripts/CareerPrestige.gd")
 
 var company_name := "Nouvelle entreprise"
 var founded_year := 1971
@@ -38,6 +39,8 @@ var departments := {
 }
 
 var subsidiaries: Array = []
+# Lot F5 : trophées, records et snapshots de carrière.
+var career: Dictionary = {}
 var brands: Array = []
 var alerts: Array = []
 
@@ -61,6 +64,7 @@ func reset(name: String, sector: String, capital: int = 100_000):
 		"Finance":{"leader_id":"","autonomy":"AUTONOMOUS","cohesion":30.0}
 	}
 	subsidiaries = []
+	career = {}
 	brands = [{"name":company_name, "sector":"GROUP", "reputation":45.0}]
 	alerts = []
 	Economy.reset(capital)
@@ -109,6 +113,7 @@ func process_month():
 		Economy.add_expense(environment, "Environnement")
 		var env_gain: float = clampf(float(environment) / 12000.0, 0.0, 1.5)
 		change_reputation({"sustainability": env_gain * 0.7})
+	CAREER.process_month()
 
 func change_reputation(changes: Dictionary):
 	for key in changes:
@@ -205,7 +210,7 @@ func get_state() -> Dictionary:
 	return {
 		"company_name":company_name,"founded_year":founded_year,"starting_sector":starting_sector,
 		"created":created,"reputation":reputation,"policies":policies,"departments":departments,
-		"subsidiaries":subsidiaries,"brands":brands,"alerts":alerts,
+		"subsidiaries":subsidiaries,"career":career,"brands":brands,"alerts":alerts,
 		"brand_awareness":brand_awareness
 	}
 
@@ -229,6 +234,7 @@ func load_state(state: Dictionary):
 	if not departments.has("Développement"):
 		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)
+	career = state.get("career", {}).duplicate(true)
 	# Lot F2 : l'ancienne ébauche de filiale devient une vraie filiale.
 	for i in range(subsidiaries.size()):
 		subsidiaries[i] = SUBSIDIARIES.migrate(subsidiaries[i])

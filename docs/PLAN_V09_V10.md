@@ -125,6 +125,7 @@ qui investit dans une équipe voit l'effet sur la génération suivante.
 > 30/09 : **F2 (filiales) fait** (`docs/reviews/V09_LOT_F2_FILIALES.md`).
 > 30/09 : **F3 (marchés stratégiques + diversification) fait** (`docs/reviews/V09_LOT_F3_MARCHES_STRATEGIQUES.md`).
 > 30/09 : **F4 (événements annuels + salon interactif) fait** (`docs/reviews/V09_LOT_F4_EVENEMENTS_SALON.md`).
+> 30/09 : **F5 (prestige, classement mondial, trophées et bilan d'empire) fait** (`docs/reviews/V09_LOT_F5_PRESTIGE_CARRIERE.md`). **Lot F complet.**
 
 But : une fois le plafond technologique atteint, d'autres systèmes prennent le relais.
 - **Rachats** de concurrents (fragiles ou en difficulté) et **filiales** avec leur propre mandat.

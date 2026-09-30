@@ -237,6 +237,14 @@ func _corporate_summary() -> void:
 		counts[str(entry.kind)] = int(counts.get(str(entry.kind), 0)) + 1
 	print("[PROBE] vie des rivaux 1971-2030 : %s" % str(counts))
 	print("[PROBE] rachats par le joueur : %d pour %s EUR" % [_acquired, _k(_acquire_spend)])
+	for career_line in CompanyManager.CAREER.empire_lines():
+		print("[PROBE] carrière : %s" % str(career_line))
+	var unlocked_labels: Array[String] = []
+	for trophy_value in CompanyManager.CAREER.trophy_rows():
+		var trophy: Dictionary = trophy_value
+		if bool(trophy.get("unlocked", false)):
+			unlocked_labels.append(str(trophy.get("label", "")))
+	print("[PROBE] trophées : %s" % ", ".join(unlocked_labels))
 	for entry in MarketManager.corporate_log:
 		print("[PROBE]   %d/%d %s %s %s %s" % [int(entry.month), int(entry.year), str(entry.kind), str(entry.company), str(entry.other), _k(int(entry.amount))])
 
