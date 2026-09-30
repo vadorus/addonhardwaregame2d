@@ -12,16 +12,8 @@ const MEMBER := preload("res://ui/CrewMember.gd")
 const TREE := preload("res://scripts/ResearchTree.gd")
 const UI := preload("res://ui/UiKit.gd")
 
-## Postes du décor (coordonnées relatives à l'image du garage).
-const SEATS := [
-	{"at":Vector2(0.335, 0.455), "facing":-1.0, "pose":"SIT", "place":"établi"},
-	{"at":Vector2(0.585, 0.800), "facing":1.0, "pose":"SIT", "place":"banc de test"},
-	{"at":Vector2(0.435, 0.725), "facing":-1.0, "pose":"SIT", "place":"bureau"},
-	{"at":Vector2(0.300, 0.620), "facing":1.0, "pose":"SIT", "place":"établi"},
-	{"at":Vector2(0.760, 0.690), "facing":-1.0, "pose":"SIT", "place":"stock"},
-]
-const NORA_SPOT := {"at":Vector2(0.690, 0.560), "facing":-1.0, "pose":"STAND"}
-const VISITOR_SPOT := Vector2(0.790, 0.640)   # devant la porte du fond
+## Postes du décor : un jeu de postes par palier de locaux (V0.10 K1, ui/WorkplaceArt.gd).
+const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
 const INTERACTIONS := preload("res://scripts/Interactions.gd")
 const POINT_KINDS := [["Perf", Color("d9822b")], ["Énergie", Color("2f9e6a")], ["Fiabilité", Color("7a57c2")]]
 
@@ -37,6 +29,9 @@ var _point_timer := 0.0
 var _card: PanelContainer
 var _card_box: VBoxContainer
 var _last_staff_key := ""
+var _tier := 0
+var _celebrate_time := 0.0
+var _last_launch_count := -1
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,6 +53,41 @@ func _ready() -> void:
 	_card_box.add_theme_constant_override("separation", 4)
 	_card.add_child(_card_box)
 	add_child(_card)
+
+## Changement de locaux : chacun rejoint son poste dans le nouveau décor.
+func set_workplace_tier(tier: int) -> void:
+	var t := WORKPLACE.tier_of(tier)
+	if t == _tier:
+		return
+	_tier = t
+	_last_staff_key = ""
+	for member in _members.duplicate():
+		var id := str(member.get("member_id"))
+		if id.begins_with("CLIENT:") or id.begins_with("PRESS:"):
+			member.set_meta("at", WORKPLACE.crew_layout(_tier).visitor)
+	if CompanyManager.created:
+		refresh()
+	_place_members()
+
+func workplace_tier() -> int:
+	return _tier
+
+func seat_count() -> int:
+	return (WORKPLACE.crew_layout(_tier).seats as Array).size()
+
+## Tout le monde saute de joie quelques secondes (lancement d'un CPU…).
+func celebrate(duration: float = 5.0) -> void:
+	_celebrate_time = duration
+	_apply_moods()
+
+func _apply_moods() -> void:
+	var mood := "normal"
+	if _celebrate_time > 0.0:
+		mood = "joie"
+	elif CompanyManager.created and Economy.money < 0:
+		mood = "inquiet"
+	for member in _members:
+		member.set("mood", mood)
 
 func set_art_rect(rect: Rect2) -> void:
 	art_rect = rect
@@ -88,6 +118,12 @@ func refresh() -> void:
 	for member in _members:
 		(member as Control).set("working", active and str(member.get("pose")) == "SIT")
 		(member as Control).set("alert", talkers.has(str(member.get("member_id"))))
+	# Un nouveau CPU lancé : toute l'équipe fait la fête.
+	var launches := ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "LAUNCHED").size()
+	if _last_launch_count >= 0 and launches > _last_launch_count:
+		_celebrate_time = 5.0
+	_last_launch_count = launches
+	_apply_moods()
 
 func _sync_visitor(visitor_key: String) -> void:
 	var current: Control = null
@@ -102,7 +138,7 @@ func _sync_visitor(visitor_key: String) -> void:
 	if current == null and visitor_key != "":
 		var is_press := visitor_key.begins_with("PRESS:")
 		_add_member({"id":visitor_key, "name":visitor_key.substr(6 if is_press else 7), "role":"Journaliste" if is_press else "Client en visite", "department":"Visiteur",
-			"pose":"STAND", "facing":-1.0, "at":VISITOR_SPOT})
+			"pose":"STAND", "facing":-1.0, "at":WORKPLACE.crew_layout(_tier).visitor, "look":WORKPLACE.VISITOR_LOOKS[absi(hash(visitor_key)) % WORKPLACE.VISITOR_LOOKS.size()]})
 		_place_members()
 		if is_visible_in_tree():
 			SoundManager.play("notify")
@@ -122,14 +158,28 @@ func _rebuild_members() -> void:
 	var order := {"R&D":0, "Développement":1, "Production":2, "Support":3, "Marketing":4, "Finance":5}
 	var staff: Array = PersonnelManager.staff.duplicate()
 	staff.sort_custom(func(a, b): return int(order.get(str(a.get("department", "")), 9)) < int(order.get(str(b.get("department", "")), 9)))
-	for i in range(mini(staff.size(), SEATS.size())):
+	var layout := WORKPLACE.crew_layout(_tier)
+	var seats: Array = layout.seats
+	var looks := WORKPLACE.staff_looks()
+	var used := {}
+	for i in range(mini(staff.size(), seats.size())):
 		var employee: Dictionary = staff[i]
-		var seat: Dictionary = SEATS[i]
-		_add_member({"id":str(employee.get("id", "")), "name":str(employee.get("name", "")), "role":str(employee.get("role", "")),
-			"department":str(employee.get("department", "")), "pose":seat.pose, "facing":seat.facing, "at":seat.at})
+		var seat: Vector3 = seats[i]
+		var id := str(employee.get("id", ""))
+		# Chaque salarié garde le même visage ; deux personnes à l'écran ne se ressemblent pas.
+		# D'abord parmi les visages bien distincts, puis les variantes.
+		var distinct := WORKPLACE.DISTINCT_STAFF_LOOKS.size()
+		var pick := absi(hash(id)) % distinct
+		for _probe in range(looks.size()):
+			if not used.has(looks[pick]):
+				break
+			pick = (pick + 1) % looks.size()
+		used[looks[pick]] = true
+		_add_member({"id":id, "name":str(employee.get("name", "")), "role":str(employee.get("role", "")),
+			"department":str(employee.get("department", "")), "pose":"SIT", "facing":seat.z, "at":Vector2(seat.x, seat.y), "look":looks[pick]})
 	var nora := ExecutiveManager.get_right_hand()
 	_add_member({"id":"NORA", "name":str(nora.get("name", "Nora Bernard")), "role":"Bras droit", "department":"Direction",
-		"pose":"STAND", "facing":-1.0, "at":NORA_SPOT.at, "hair":Color("5a3a2a"), "shirt":Color("3f7f8c")})
+		"pose":"STAND", "facing":-1.0, "at":layout.nora, "hair":Color("5a3a2a"), "shirt":Color("3f7f8c"), "look":WORKPLACE.NORA_LOOK})
 	_place_members()
 
 func _add_member(data: Dictionary) -> void:
@@ -144,13 +194,19 @@ func _add_member(data: Dictionary) -> void:
 func _place_members() -> void:
 	if art_rect.size.x <= 0.0:
 		return
-	var px := art_rect.size.y * 0.135
+	var px := art_rect.size.y * float(WORKPLACE.crew_layout(_tier).scale)
 	for member_value in _members:
 		var member: Control = member_value
-		member.call("set_scale_px", px * (1.15 if str(member.get("pose")) == "STAND" else 1.0))
+		member.call("set_scale_px", px * (1.05 if str(member.get("pose")) == "STAND" else 1.0))
 		var at: Vector2 = member.get_meta("at")
 		var foot := art_rect.position + Vector2(at.x * art_rect.size.x, at.y * art_rect.size.y)
 		member.position = foot - Vector2(member.size.x * 0.5, member.size.y)
+		member.z_index = 0
+	# Profondeur : celui qui est devant (plus bas à l'écran) est dessiné par-dessus.
+	var ordered := _members.duplicate()
+	ordered.sort_custom(func(a, b): return float((a.get_meta("at") as Vector2).y) < float((b.get_meta("at") as Vector2).y))
+	for i in range(ordered.size()):
+		move_child(ordered[i], i)
 
 func _has_active_work() -> bool:
 	for project_value in ResearchManager.projects:
@@ -159,6 +215,10 @@ func _has_active_work() -> bool:
 	return not ProductionManager.get_active_jobs().is_empty()
 
 func _process(delta: float) -> void:
+	if _celebrate_time > 0.0:
+		_celebrate_time -= delta
+		if _celebrate_time <= 0.0:
+			_apply_moods()
 	if _bubble.visible:
 		_bubble_time -= delta
 		if _bubble_owner != null and is_instance_valid(_bubble_owner):

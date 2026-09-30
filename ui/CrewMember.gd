@@ -1,5 +1,7 @@
 extends Control
-## Un membre de l'équipe dessiné dans le garage (en attendant les sprites d'Astra).
+## Un membre de l'équipe dans le décor. V0.10 J2 : dessiné avec les personnages de ChatGPT
+## (au poste = « bureau », debout = « réflexion », fête = « joie », coup dur = « inquiet ») ;
+## le dessin vectoriel d'origine reste en secours si les images manquent.
 ## Assis de dos à son poste (vu en 3/4 arrière) ou debout (Nora), avec une petite
 ## animation : il tape, bouge la tête, respire. Toucher le personnage émet `tapped`.
 
@@ -17,7 +19,11 @@ var scale_px := 90.0     # hauteur du personnage en pixels
 var hair := Color("3b2a1e")
 var shirt := Color("c8743a")
 var skin := Color("e7b48f")
+var look := 0            # personnage de ChatGPT (1..12), 0 = dessin vectoriel
+var mood := "normal"     # normal, joie, inquiet
 var _t := 0.0
+var _textures := {}
+const ART := preload("res://ui/WorkplaceArt.gd")
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -35,6 +41,8 @@ func setup(data: Dictionary) -> void:
 	hair = data.get("hair", colors.hair)
 	shirt = data.get("shirt", colors.shirt)
 	skin = colors.skin
+	look = int(data.get("look", 0))
+	_textures.clear()
 	queue_redraw()
 
 ## Mêmes couleurs partout (garage, portrait de dialogue) pour une même personne.
@@ -49,8 +57,32 @@ static func palette_for(key: String) -> Dictionary:
 		shirts = [Color("2f3a4a"), Color("3a3a3a"), Color("4a3a2f")]
 	return {"hair":hairs[pick % hairs.size()], "shirt":shirts[(pick / 7) % shirts.size()], "skin":skins[(pick / 13) % skins.size()]}
 
+## Pose affichée selon la situation.
+func sprite_pose() -> String:
+	if mood == "joie":
+		return "joie"
+	if mood == "inquiet":
+		return "inquiet"
+	return "bureau" if pose == "SIT" else "reflexion"
+
+func sprite_texture() -> Texture2D:
+	if look <= 0:
+		return null
+	var wanted := sprite_pose()
+	if not _textures.has(wanted):
+		var path := ART.character_path(look, wanted)
+		_textures[wanted] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	return _textures[wanted]
+
 func set_scale_px(value: float) -> void:
 	scale_px = value
+	var texture := sprite_texture()
+	if texture != null:
+		# Taille calée sur la pose « bureau » (poste complet) ; les autres poses gardent la même hauteur.
+		size = Vector2(value * 1.0, value)
+		pivot_offset = Vector2(size.x * 0.5, size.y)
+		queue_redraw()
+		return
 	size = Vector2(value * 0.8, value * 1.05)
 	pivot_offset = Vector2(size.x * 0.5, size.y)
 	queue_redraw()
@@ -67,18 +99,27 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 func head_position() -> Vector2:
+	if sprite_texture() != null:
+		var hx := 0.5
+		if sprite_pose() == "bureau":
+			hx = 0.62 if facing <= 0.0 else 0.38
+		return position + Vector2(size.x * hx, size.y - scale_px * 0.92)
 	return position + Vector2(size.x * 0.5, size.y - scale_px * (1.02 if pose == "STAND" else 0.86))
 
 func _draw() -> void:
 	var s := scale_px
 	var base := Vector2(size.x * 0.5, size.y)   # sol / assise
 	draw_set_transform(Vector2.ZERO)
-	# Ombre au sol.
-	_draw_ellipse(base + Vector2(0, -s * 0.02), Vector2(s * 0.30, s * 0.07), Color(0, 0, 0, 0.22))
-	if pose == "STAND":
-		_draw_standing(base, s)
+	var texture := sprite_texture()
+	if texture != null:
+		_draw_sprite(texture, base, s)
 	else:
-		_draw_seated(base, s)
+		# Ombre au sol.
+		_draw_ellipse(base + Vector2(0, -s * 0.02), Vector2(s * 0.30, s * 0.07), Color(0, 0, 0, 0.22))
+		if pose == "STAND":
+			_draw_standing(base, s)
+		else:
+			_draw_seated(base, s)
 	if alert:
 		# « ! » qui rebondit au-dessus de la tête : cette personne veut vous parler.
 		var head_local := head_position() - position
@@ -88,6 +129,27 @@ func _draw() -> void:
 		draw_arc(center, s * 0.13, 0, TAU, 24, Color.WHITE, 2.0, true)
 		draw_line(center + Vector2(0, -s * 0.07), center + Vector2(0, s * 0.02), Color.WHITE, s * 0.035)
 		draw_circle(center + Vector2(0, s * 0.065), s * 0.02, Color.WHITE)
+
+func _draw_sprite(texture: Texture2D, base: Vector2, s: float) -> void:
+	var tex := texture.get_size()
+	var current := sprite_pose()
+	# Hauteur : le poste « bureau » occupe toute la hauteur ; debout, un peu plus grand que la tête assise.
+	var h := s * (1.0 if current == "bureau" else 0.95)
+	var w := tex.x * h / tex.y
+	var bob := 0.0
+	if current == "joie":
+		bob = -absf(sin(_t * 6.0)) * s * 0.06
+	elif working and current == "bureau":
+		bob = sin(_t * 9.0) * s * 0.004
+	else:
+		bob = sin(_t * 1.6) * s * 0.006
+	_draw_ellipse(base + Vector2(0, -s * 0.015), Vector2(w * 0.42, s * 0.05), Color(0, 0, 0, 0.20))
+	var rect := Rect2(base + Vector2(-w * 0.5, -h + bob), Vector2(w, h))
+	if facing > 0.0:
+		# Regarde vers la droite : image retournée.
+		draw_set_transform(Vector2(base.x * 2.0, 0), 0.0, Vector2(-1, 1))
+	draw_texture_rect(texture, rect, false)
+	draw_set_transform(Vector2.ZERO)
 
 func _draw_seated(base: Vector2, s: float) -> void:
 	var breathe := sin(_t * 1.6) * s * 0.008

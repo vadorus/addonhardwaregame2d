@@ -12,12 +12,9 @@ const LOOK := preload("res://ui/WorkshopStyle.gd")
 const INK := Color("2e2418")
 const MUTED := Color("7a6a58")
 const BLUE := Color("d9822b")
-const WORKPLACE_ART := {
-	0:ROOM_ART_PATH,
-	1:ROOM_ART_PATH,
-	2:ROOM_ART_PATH,
-	3:ROOM_ART_PATH
-}
+## V0.10 K1 : un décor par palier de locaux (garage, atelier, siège, campus), dessinés par ChatGPT.
+const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const WORKPLACE_ART := WORKPLACE.ART
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
 const SIDE_ACTIONS := [
@@ -28,13 +25,14 @@ const SIDE_ACTIONS := [
 	{"label":"Marché","tab":5,"feature":"MARKET","icon":"chart"}
 ]
 
-# Targets on the reference-derived room; transformed with the artwork on resize.
+# Repères du décor. `rect` = position historique (ancien garage) ; la position réelle vient de
+# WorkplaceArt.ZONE_SPOTS, propre à chaque palier de locaux.
 const ZONES := [
-	{"name":"Établi CPU","subtitle":"Conception processeur","tab":3,"feature":"LAB","icon":"chip","color":Color("17ba70"),"rect":Rect2(0.24,0.28,0.06,0.10)},
-	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","icon":"flask","color":Color("af51de"),"rect":Rect2(0.60,0.54,0.06,0.10)},
-	{"name":"Tableau de planification","subtitle":"R&D, pistes et équipe","tab":3,"feature":"LAB","icon":"chart","color":Color("e4a225"),"rect":Rect2(0.61,0.33,0.06,0.10)},
-	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","icon":"screen","color":Color("3a8fd6"),"rect":Rect2(0.39,0.51,0.06,0.10)},
-	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","icon":"box","color":Color("ed9440"),"rect":Rect2(0.84,0.60,0.06,0.10)}
+	{"name":"Établi CPU","subtitle":"Conception processeur","tab":3,"feature":"LAB","icon":"zone_etabli_cpu","color":Color("17ba70"),"rect":Rect2(0.24,0.28,0.06,0.10)},
+	{"name":"Banc de test","subtitle":"Prototype & validation","tab":3,"feature":"LAB","icon":"zone_banc_test","color":Color("af51de"),"rect":Rect2(0.60,0.54,0.06,0.10)},
+	{"name":"Tableau de planification","subtitle":"R&D, pistes et équipe","tab":3,"feature":"LAB","icon":"zone_planification","color":Color("e4a225"),"rect":Rect2(0.61,0.33,0.06,0.10)},
+	{"name":"Bureau du fondateur","subtitle":"Direction de l'entreprise","tab":1,"feature":"COMPANY","icon":"zone_bureau_fondateur","color":Color("3a8fd6"),"rect":Rect2(0.39,0.51,0.06,0.10)},
+	{"name":"Stock & production","subtitle":"Industrialisation","tab":4,"feature":"PRODUCTS","icon":"zone_stock","color":Color("ed9440"),"rect":Rect2(0.84,0.60,0.06,0.10)}
 ]
 
 var _ambient_background: TextureRect
@@ -47,6 +45,10 @@ var _last_unlocks: Dictionary = {}
 var _onboarding_stage := "NORMAL"
 var _workplace_tier := 0
 var _workplace_condition := 62.0
+var _workplace_known := false
+var _move_overlay: Control
+var _pending_move: Dictionary = {}
+var _move_target_tier := 0
 
 var _context_panel: PanelContainer
 var _context_title: Label
@@ -97,6 +99,7 @@ func _ready() -> void:
 	_build_background()
 	_build_overlay()
 	resized.connect(_layout_zones)
+	visibility_changed.connect(_on_visibility_changed)
 	for panel in [_project_panel, _tasks_panel, _feedback_panel, _context_panel]:
 		panel.minimum_size_changed.connect(func(): call_deferred("_layout_zones"))
 	call_deferred("_layout_zones")
@@ -572,7 +575,8 @@ func _layout_zones() -> void:
 		hud_rects.append(Rect2(side_button.position, side_button.size).grow(4.0))
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
-		var target := art_rect.position + r.get_center() * art_rect.size
+		var spot := WORKPLACE.zone_spot(_workplace_tier, str(button.get_meta("zone_name")), r.get_center())
+		var target := art_rect.position + spot * art_rect.size
 		button.size = Vector2(58, 58)
 		button.position = _free_marker_position(target - button.size * 0.5, button.size, hud_rects)
 
@@ -1136,11 +1140,135 @@ func _refresh_zone_visibility() -> void:
 			button.tooltip_text = "%s — %s" % [zone_name, str(zone.get("subtitle", ""))]
 
 func set_workplace(data: Dictionary) -> void:
-	_workplace_tier = clampi(int(data.get("tier", 0)), 0, 3)
+	var new_tier := clampi(int(data.get("tier", 0)), 0, 3)
+	# Déménagement : seulement quand on monte de palier en cours de partie (pas au chargement).
+	var moved := _workplace_known and new_tier > _workplace_tier and bool(data.get("just_moved", _just_moved_this_month(new_tier)))
+	_workplace_known = true
 	_workplace_condition = float(data.get("condition", 62.0))
-	_apply_workplace_art()
+	if moved and is_visible_in_tree():
+		_play_move_moment(new_tier, data)
+	elif moved:
+		# Le QG n'est pas à l'écran (déménagement décidé depuis Entreprise) : on garde le moment
+		# pour le retour au QG.
+		_pending_move = {"tier":new_tier, "data":data.duplicate()}
+	else:
+		_workplace_tier = new_tier
+		_apply_workplace_art()
 	if _room_title != null and _onboarding_stage != "FIRST_IDEA":
 		_room_title.text = str(data.get("name", "Garage aménagé"))
+
+func _on_visibility_changed() -> void:
+	if not _pending_move.is_empty() and is_visible_in_tree():
+		var pending := _pending_move
+		_pending_move = {}
+		_play_move_moment(int(pending.tier), pending.data)
+
+func _just_moved_this_month(tier: int) -> bool:
+	var wp: Dictionary = ExecutiveManager.workplace
+	return int(wp.get("tier", 0)) == tier and CompanyManager.created and int(wp.get("last_renovation_year", -1)) == TimeManager.year and int(wp.get("last_renovation_month", -1)) == TimeManager.month
+
+## V0.10 K1 — le « moment déménagement » : le décor s'assombrit, on change de locaux,
+## puis une carte annonce ce que ça change (place pour l'équipe, production possible).
+func _play_move_moment(new_tier: int, data: Dictionary) -> void:
+	_move_target_tier = new_tier
+	if _move_overlay != null and is_instance_valid(_move_overlay):
+		_move_overlay.queue_free()
+	_move_overlay = Control.new()
+	_move_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_move_overlay.z_index = 40
+	_move_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_move_overlay)
+	var veil := ColorRect.new()
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.color = Color(0.03, 0.02, 0.01, 0.0)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_move_overlay.add_child(veil)
+
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _panel_style(Color("fffaf1"), BLUE, 16, 18))
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.visible = false
+	_move_overlay.add_child(card)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	card.add_child(box)
+	var kicker := Label.new()
+	kicker.text = "DÉMÉNAGEMENT"
+	kicker.add_theme_font_size_override("font_size", 13)
+	kicker.add_theme_color_override("font_color", BLUE)
+	box.add_child(kicker)
+	var title := Label.new()
+	title.text = "Bienvenue dans « %s » !" % str(data.get("name", "vos nouveaux locaux"))
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", INK)
+	box.add_child(title)
+	for line in move_moment_lines(new_tier):
+		var label := Label.new()
+		label.text = "•  " + line
+		label.add_theme_font_size_override("font_size", 15)
+		label.add_theme_color_override("font_color", INK)
+		box.add_child(label)
+	var hint := Label.new()
+	hint.text = "Touchez pour découvrir vos nouveaux locaux"
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_color_override("font_color", MUTED)
+	box.add_child(hint)
+
+	var overlay := _move_overlay
+	var tween := create_tween()
+	tween.tween_property(veil, "color:a", 0.92, 0.35)
+	tween.tween_callback(func():
+		_workplace_tier = new_tier
+		_apply_workplace_art()
+		_layout_zones()
+		if _crew != null and _crew.has_method("celebrate"):
+			_crew.call("celebrate", 6.0)
+		card.visible = true
+		card.reset_size()
+		card.position = (size - card.get_combined_minimum_size()) * 0.5
+		JUICE.pop_in(card, 0.25))
+	tween.tween_property(veil, "color:a", 0.45, 0.6)
+	SoundManager.play("unlock")
+	var close := func():
+		if is_instance_valid(overlay):
+			var out := overlay.create_tween()
+			out.tween_property(overlay, "modulate:a", 0.0, 0.3)
+			out.tween_callback(overlay.queue_free)
+	overlay.gui_input.connect(func(event: InputEvent):
+		if (event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+			close.call())
+	get_tree().create_timer(6.0).timeout.connect(close)
+
+## Ce que le nouveau palier change, en clair (utilisé par la carte et par les tests).
+func move_moment_lines(tier: int) -> Array[String]:
+	var lines: Array[String] = []
+	var tier_data: Dictionary = ExecutiveManager.WORKPLACE_TIERS.get(clampi(tier, 0, 3), {})
+	var capacity := int(tier_data.get("capacity", 0))
+	if capacity > 0:
+		lines.append("De la place pour %d personnes dans l'équipe" % capacity)
+	var cap: int = ProductManager.PREMISES_PRODUCTION_CAP[clampi(tier, 0, ProductManager.PREMISES_PRODUCTION_CAP.size() - 1)]
+	if cap <= 0:
+		lines.append("Production sans limite : vos usines suivent la demande")
+	else:
+		lines.append("Jusqu'à %s puces par mois en production" % ExecutiveManager._thousands(cap))
+	var monthly := int(tier_data.get("monthly_cost", 0))
+	if monthly > 0:
+		lines.append("Loyer et charges : %s € par mois" % ExecutiveManager._thousands(monthly))
+	return lines
+
+## Termine tout de suite le déménagement en cours (tests, changement d'écran).
+func finish_move_moment() -> void:
+	if not _pending_move.is_empty():
+		_workplace_tier = int(_pending_move.tier)
+		_pending_move = {}
+	if move_moment_visible():
+		_move_overlay.queue_free()
+		_move_overlay = null
+		_workplace_tier = _move_target_tier
+	_apply_workplace_art()
+
+func move_moment_visible() -> bool:
+	return _move_overlay != null and is_instance_valid(_move_overlay) and not _move_overlay.is_queued_for_deletion()
 
 func _art_path_for_tier(tier: int) -> String:
 	var normalized_tier := clampi(tier, 0, 3)
@@ -1170,6 +1298,8 @@ func _apply_workplace_art() -> void:
 		if _ambient_background != null:
 			_ambient_background.texture = texture
 		call_deferred("_layout_zones")
+	if _crew != null and _crew.has_method("set_workplace_tier"):
+		_crew.call("set_workplace_tier", _workplace_tier)
 
 func zone_count() -> int:
 	return _zone_buttons.size()

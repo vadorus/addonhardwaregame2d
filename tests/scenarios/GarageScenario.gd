@@ -12,15 +12,17 @@ static func run(host: Node) -> String:
 	if not garage_hub.has_method("zone_count") or int(garage_hub.call("zone_count")) != 5:
 		garage_hub.queue_free()
 		return "Interactive garage HQ did not expose the expected five management zones"
-	if not garage_hub.has_method("background_resource_path") or str(garage_hub.call("background_resource_path")) != "res://assets/ui/garage_reference_v09.png":
+	if not garage_hub.has_method("background_resource_path") or str(garage_hub.call("background_resource_path")) != "res://assets/art/v010/J1_decors/decor_0_garage.webp":
 		garage_hub.queue_free()
-		return "Room-first garage did not load the reference-derived landscape artwork"
+		return "K1: the HQ does not start in ChatGPT's garage artwork"
+	# V0.10 K1 : un décor par palier de locaux.
 	var expected_workplace_art := [
-		"res://assets/ui/garage_reference_v09.png",
-		"res://assets/ui/garage_reference_v09.png",
-		"res://assets/ui/garage_reference_v09.png",
-		"res://assets/ui/garage_reference_v09.png"
+		"res://assets/art/v010/J1_decors/decor_0_garage.webp",
+		"res://assets/art/v010/J1_decors/decor_1_atelier.webp",
+		"res://assets/art/v010/J1_decors/decor_2_siege.webp",
+		"res://assets/art/v010/J1_decors/decor_3_campus.webp"
 	]
+	var previous_seats := 0
 	for visual_tier in range(4):
 		garage_hub.call("set_workplace", {"tier":visual_tier,"condition":80.0,"name":"Test tier %d" % visual_tier})
 		if str(garage_hub.call("background_resource_path")) != expected_workplace_art[visual_tier]:
@@ -29,6 +31,65 @@ static func run(host: Node) -> String:
 		if not garage_hub.has_method("workplace_visual_tier") or int(garage_hub.call("workplace_visual_tier")) != visual_tier:
 			garage_hub.queue_free()
 			return "Garage HQ visual tier did not track the simulated workplace tier"
+		var loaded: Texture2D = load(expected_workplace_art[visual_tier])
+		if loaded == null or loaded.get_width() < 1600 or absf(float(loaded.get_width()) / float(loaded.get_height()) - 2.0) > 0.05:
+			garage_hub.queue_free()
+			return "K1: workplace artwork %d is missing or not a 2:1 landscape" % visual_tier
+		if bool(garage_hub.call("move_moment_visible")):
+			garage_hub.queue_free()
+			return "K1: the moving moment must not play when a test/load sets the tier directly"
+		var crew: Control = garage_hub.call("crew")
+		if int(crew.call("workplace_tier")) != visual_tier:
+			garage_hub.queue_free()
+			return "K1: the team did not follow the move to tier %d" % visual_tier
+		var seats := int(crew.call("seat_count"))
+		if seats < previous_seats or seats < 5:
+			garage_hub.queue_free()
+			return "K1: bigger premises must show at least as many workstations (tier %d: %d)" % [visual_tier, seats]
+		previous_seats = seats
+		# Les 5 repères restent dans le décor affiché.
+		garage_hub.size = Vector2(1616, 560)
+		garage_hub.call("_layout_zones")
+		for button_value in garage_hub.get("_zone_buttons"):
+			var zone_button: Button = button_value
+			var zr := Rect2(zone_button.position, zone_button.size)
+			if not Rect2(Vector2.ZERO, garage_hub.size).encloses(zr):
+				garage_hub.queue_free()
+				return "K1: zone %s leaves the screen at tier %d" % [str(zone_button.get_meta("zone_name")), visual_tier]
+	# Un vrai déménagement en cours de partie joue le moment « déménagement ».
+	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
+	garage_hub.call("set_workplace", {"tier":1,"condition":92.0,"name":"Atelier + bureaux","just_moved":true})
+	if garage_hub.is_visible_in_tree() and not bool(garage_hub.call("move_moment_visible")):
+		garage_hub.queue_free()
+		return "K1: moving to a bigger workplace did not play the moving moment"
+	garage_hub.call("finish_move_moment")
+	if int(garage_hub.call("workplace_visual_tier")) != 1 or str(garage_hub.call("background_resource_path")) != expected_workplace_art[1]:
+		garage_hub.queue_free()
+		return "K1: after the moving moment the HQ must show the workshop"
+	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
+	if bool(garage_hub.call("move_moment_visible")):
+		garage_hub.queue_free()
+		return "K1: going back to a smaller tier (new game) must not play the moving moment"
+	# Le moment « déménagement » explique ce qui change, en clair.
+	var move_lines: Array = garage_hub.call("move_moment_lines", 1)
+	if move_lines.size() < 2 or not str(move_lines[0]).contains("16") or not str(move_lines[1]).contains("1 200"):
+		garage_hub.queue_free()
+		return "K1: moving card should announce team room (16) and production cap (1 200): %s" % str(move_lines)
+	var last_lines: Array = garage_hub.call("move_moment_lines", 3)
+	if not str(last_lines[1]).contains("sans limite"):
+		garage_hub.queue_free()
+		return "K1: the campus moving card must say production is unlimited"
+	# Icônes dessinées (J4) présentes pour le dock et les repères.
+	for icon_kind in ["home", "chip", "people", "box", "chart", "news", "building", "lock", "zone_etabli_cpu", "zone_stock"]:
+		if load("res://ui/GarageBadge.gd").call("art_texture", icon_kind) == null:
+			garage_hub.queue_free()
+			return "J4: icon art missing for %s" % icon_kind
+	# Personnages (J2) : 12 personnes × 4 poses.
+	for look in range(1, 13):
+		for pose_name in ["bureau", "reflexion", "joie", "inquiet"]:
+			if not ResourceLoader.exists("res://assets/art/v010/J2_personnages/perso_%02d_%s.png" % [look, pose_name]):
+				garage_hub.queue_free()
+				return "J2: character %d pose %s missing" % [look, pose_name]
 	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
 
 	# Phone landscape: large touch stage, centered artwork.

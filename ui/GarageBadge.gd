@@ -4,6 +4,27 @@ var kind := "chip"
 var tint := Color("17ba70")
 var filled := true
 
+## V0.10 J4 — icônes dessinées par ChatGPT. Si l'image existe, elle remplace le dessin vectoriel.
+const ICON_DIR := "res://assets/art/v010/J4_icones/"
+const ART := {
+	"home":"dock_qg", "chip":"dock_labo", "people":"dock_equipe", "box":"dock_produits",
+	"chart":"dock_marche", "news":"dock_presse", "building":"dock_entreprise", "lock":"cadenas",
+	"zone_etabli_cpu":"zone_etabli_cpu", "zone_banc_test":"zone_banc_test", "zone_planification":"zone_planification",
+	"zone_bureau_fondateur":"zone_bureau_fondateur", "zone_stock":"zone_stock"
+}
+static var _cache := {}
+
+static func art_texture(icon_kind: String) -> Texture2D:
+	if not ART.has(icon_kind):
+		return null
+	if not _cache.has(icon_kind):
+		var path := ICON_DIR + str(ART[icon_kind]) + ".png"
+		_cache[icon_kind] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	return _cache[icon_kind]
+
+func uses_art() -> bool:
+	return art_texture(kind) != null
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
@@ -14,7 +35,14 @@ func _draw() -> void:
 	if filled:
 		draw_circle(center + Vector2(0, 3), s * 0.46, Color(0.02, 0.08, 0.14, 0.25))
 		draw_circle(center, s * 0.44, Color.WHITE)
-		draw_circle(center, s * 0.38, tint)
+		# Avec une icône dessinée : fond crème cerclé de la couleur du repère.
+		draw_circle(center, s * 0.38, Color("fff4e2") if uses_art() else tint)
+		if uses_art():
+			draw_arc(center, s * 0.41, 0, TAU, 32, tint, s * 0.06, true)
+	var art := art_texture(kind)
+	if art != null:
+		_draw_art(art, center, s)
+		return
 	var ink := Color.WHITE if filled else tint
 	var unit := s / 52.0
 	draw_set_transform(center, 0.0, Vector2.ONE * unit)
@@ -69,6 +97,13 @@ func _draw() -> void:
 				draw_line(Vector2(-14,i),Vector2(-9,i),ink,2)
 				draw_line(Vector2(9,i),Vector2(14,i),ink,2)
 	draw_set_transform(Vector2.ZERO)
+
+func _draw_art(art: Texture2D, center: Vector2, s: float) -> void:
+	var box := s * (0.62 if filled else 1.0)
+	var tex_size := art.get_size()
+	var fit := minf(box / tex_size.x, box / tex_size.y)
+	var draw_size := tex_size * fit
+	draw_texture_rect(art, Rect2(center - draw_size * 0.5, draw_size), false)
 
 func _round_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
