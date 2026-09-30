@@ -90,6 +90,11 @@ static func run(host: Node) -> String:
 			if not ResourceLoader.exists("res://assets/art/v010/J2_personnages/perso_%02d_%s.png" % [look, pose_name]):
 				garage_hub.queue_free()
 				return "J2: character %d pose %s missing" % [look, pose_name]
+	for visitor_look in [13, 14]:
+		for pose_name in ["reflexion", "parle"]:
+			if not ResourceLoader.exists("res://assets/art/v010/J2_personnages/perso_%02d_%s.png" % [visitor_look, pose_name]):
+				garage_hub.queue_free()
+				return "J2: visitor %d pose %s missing" % [visitor_look, pose_name]
 	garage_hub.call("set_workplace", {"tier":0,"condition":62.0,"name":"Garage aménagé"})
 
 	# Phone landscape: large touch stage, centered artwork.

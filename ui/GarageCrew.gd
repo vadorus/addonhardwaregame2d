@@ -138,7 +138,7 @@ func _sync_visitor(visitor_key: String) -> void:
 	if current == null and visitor_key != "":
 		var is_press := visitor_key.begins_with("PRESS:")
 		_add_member({"id":visitor_key, "name":visitor_key.substr(6 if is_press else 7), "role":"Journaliste" if is_press else "Client en visite", "department":"Visiteur",
-			"pose":"STAND", "facing":-1.0, "at":WORKPLACE.crew_layout(_tier).visitor, "look":WORKPLACE.VISITOR_LOOKS[absi(hash(visitor_key)) % WORKPLACE.VISITOR_LOOKS.size()]})
+			"pose":"STAND", "facing":-1.0, "at":WORKPLACE.crew_layout(_tier).visitor, "look":WORKPLACE.PRESS_LOOK if is_press else WORKPLACE.CLIENT_LOOK})
 		_place_members()
 		if is_visible_in_tree():
 			SoundManager.play("notify")

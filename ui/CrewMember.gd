@@ -59,6 +59,9 @@ static func palette_for(key: String) -> Dictionary:
 
 ## Pose affichée selon la situation.
 func sprite_pose() -> String:
+	# Client ou journaliste : il est venu vous parler, il fait le geste.
+	if department == "Visiteur":
+		return "parle"
 	if mood == "joie":
 		return "joie"
 	if mood == "inquiet":
@@ -71,6 +74,8 @@ func sprite_texture() -> Texture2D:
 	var wanted := sprite_pose()
 	if not _textures.has(wanted):
 		var path := ART.character_path(look, wanted)
+		if not ResourceLoader.exists(path):
+			path = ART.character_path(look, "reflexion")
 		_textures[wanted] = load(path) as Texture2D if ResourceLoader.exists(path) else null
 	return _textures[wanted]
 

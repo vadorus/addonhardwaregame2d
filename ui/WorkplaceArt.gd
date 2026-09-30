@@ -36,10 +36,14 @@ const CREW := {
 		"seats":[Vector3(0.28, 0.47, -1), Vector3(0.47, 0.58, 1), Vector3(0.72, 0.62, -1), Vector3(0.64, 0.56, -1), Vector3(0.83, 0.47, -1), Vector3(0.52, 0.80, 1), Vector3(0.44, 0.47, 1), Vector3(0.93, 0.70, -1)]}
 }
 
-## Personnages de ChatGPT : 12 personnes × 4 poses (bureau, réflexion, joie, inquiet).
-const CHARACTER_COUNT := 12
+## Personnages : 12 salariés × 4 poses (bureau, réflexion, joie, inquiet) de ChatGPT et Astra,
+## plus le client et la journaliste d'Astra (réflexion = debout, parle).
+const CHARACTER_COUNT := 14
 const NORA_LOOK := 4
-const VISITOR_LOOKS := [3, 12]
+## Visiteurs dessinés par Astra (2 poses : debout, en train de parler).
+const CLIENT_LOOK := 13
+const PRESS_LOOK := 14
+const VISITOR_LOOKS := [13, 14]
 const POSES := ["bureau", "reflexion", "joie", "inquiet"]
 
 static func tier_of(tier: int) -> int:
@@ -60,7 +64,7 @@ static func character_path(look: int, pose: String) -> String:
 
 ## Looks des salariés : tout sauf Nora et les visiteurs. Les numéros 5 et 9 étaient deux variantes du
 ## numéro 1 ; Astra les a remplacés le 30/09 (jeune barbu à casquette, femme aux cheveux gris).
-const DISTINCT_STAFF_LOOKS := [1, 2, 5, 6, 7, 8, 9, 10, 11]
+const DISTINCT_STAFF_LOOKS := [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]
 const EXTRA_STAFF_LOOKS := []
 
 static func staff_looks() -> Array[int]:
