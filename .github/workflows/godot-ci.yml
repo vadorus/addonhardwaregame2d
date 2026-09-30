@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          for scene in garage_layout_test workshop_layout_test; do
+          for scene in garage_layout_test workshop_layout_test balance_ceiling_test; do
             timeout 120s godot --headless --path . "res://tests/${scene}.tscn" 2>&1 | tee "/tmp/${scene}.log"
             if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/${scene}.log"; then exit 1; fi
             grep -q '\[CI\].*passed' "/tmp/${scene}.log"

@@ -14,8 +14,10 @@ const LIMITS := {
 	"STANDARD_ACTIF":{"max":1500000, "min":150000, "target":[300000, 900000]},
 	"SIMULATION_ACTIF":{"max":1200000, "min":0, "target":[150000, 700000]}
 }
-## Un euro investi en capacité ne doit pas rapporter plus que ça en 24 mois (remboursement de quelques mois, pas de quelques jours).
-const MAX_EXPANSION_RETURN := 6.0
+## Réagir aux ruptures doit payer, sans faire exploser l'économie (joueur actif / joueur passif à 24 mois).
+const MAX_ACTIVE_OVER_PASSIVE := 1.6
+## Une extension de capacité payante se rembourse en plusieurs mois (pas en quelques jours).
+const MIN_EXPANSION_PAYBACK_MONTHS := 4.0
 
 var _failures: Array[String] = []
 
@@ -40,14 +42,13 @@ func _ready() -> void:
 	var passive: Dictionary = results.get("STANDARD_PASSIF", {})
 	var active: Dictionary = results.get("STANDARD_ACTIF", {})
 	if bool(passive.get("ok", false)) and bool(active.get("ok", false)):
-		if int(active.cash_end) < int(float(passive.cash_end) * 0.95):
-			_fail("Réagir aux ruptures rapporte moins que ne rien faire (%d € contre %d €)" % [int(active.cash_end), int(passive.cash_end)])
-		if int(active.expansion_cost) > 0:
-			var gain := float(int(active.cash_end) - int(passive.cash_end))
-			var ratio := gain / float(int(active.expansion_cost))
-			print("[BALANCE] extensions de capacité : +%d € pour %d € investis (×%.1f, plafond ×%.1f)" % [int(gain), int(active.expansion_cost), ratio, MAX_EXPANSION_RETURN])
-			if ratio > MAX_EXPANSION_RETURN:
-				_fail("Extension de capacité trop rentable : ×%.1f en 24 mois (plafond ×%.1f)" % [ratio, MAX_EXPANSION_RETURN])
+		var ratio := float(int(active.cash_end)) / maxf(float(int(passive.cash_end)), 1.0)
+		print("[BALANCE] réagir aux ruptures : %d € contre %d € sans rien faire (×%.2f, visé ×1,0 à ×%.1f)" % [int(active.cash_end), int(passive.cash_end), ratio, MAX_ACTIVE_OVER_PASSIVE])
+		if ratio < 0.95:
+			_fail("Réagir aux ruptures rapporte moins que ne rien faire (×%.2f)" % ratio)
+		if ratio > MAX_ACTIVE_OVER_PASSIVE:
+			_fail("Réagir aux ruptures rapporte trop (×%.2f, plafond ×%.1f)" % [ratio, MAX_ACTIVE_OVER_PASSIVE])
+	_check_capacity_rules()
 	if _failures.is_empty():
 		print("[CI] Balance ceilings passed")
 		get_tree().quit(0)
@@ -56,6 +57,33 @@ func _ready() -> void:
 			push_error("[BALANCE] " + f)
 		print("[CI] Balance ceilings FAILED (%d)" % _failures.size())
 		get_tree().quit(1)
+
+## H2 : une extension payante se rembourse en plusieurs mois, et le plafond ne grandit pas d'extension en extension.
+func _check_capacity_rules() -> void:
+	SCENARIO.run("STANDARD_PASSIF", 1)
+	var product: Dictionary = {}
+	for p in ProductManager.products:
+		if str(p.get("status", "")) == "LAUNCHED":
+			product = p
+			break
+	if product.is_empty():
+		_fail("Règles de capacité : aucun produit lancé pour le test")
+		return
+	var pid := str(product.id)
+	Economy.money = 10000000
+	var first := ProductManager.capacity_change_quote(pid, int(product.production_capacity) * 10)
+	var ceiling := int(first.get("ceiling", 0))
+	var extra := int(first.get("extra_units", 0))
+	var payback := float(int(first.get("cost", 0))) / maxf(float(extra * ProductManager.net_margin_per_unit(product)), 1.0)
+	print("[BALANCE] extension au plafond : +%d puces/mois pour %d € (remboursée en %.1f mois), plafond %d" % [extra, int(first.get("cost", 0)), payback, ceiling])
+	if extra > 0 and payback < MIN_EXPANSION_PAYBACK_MONTHS:
+		_fail("Extension de capacité remboursée en %.1f mois (minimum %.0f)" % [payback, MIN_EXPANSION_PAYBACK_MONTHS])
+	ProductManager.set_production_capacity(pid, int(first.get("capacity", 0)))
+	var second := ProductManager.capacity_change_quote(pid, int(product.production_capacity) * 10)
+	if int(second.get("capacity", 0)) > ceiling:
+		_fail("Le plafond de capacité grandit d'extension en extension (%d puis %d)" % [ceiling, int(second.get("capacity", 0))])
+	if not bool(second.get("limited", false)) or str(second.get("limit_reason", "")) == "":
+		_fail("Au plafond, le devis doit expliquer la limite au joueur")
 
 func _fail(message: String) -> void:
 	_failures.append(message)

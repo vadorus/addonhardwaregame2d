@@ -479,22 +479,48 @@ func monthly_capacity_reservation_cost(product: Dictionary, sold_units: int) -> 
 ## Lot M (Claude, 29/09) : la capacité était figée au lancement. Dans la partie d'Alexandre,
 ## chaque CPU récent vendait exactement sa capacité (226, 232, 101…) : la demande était plus forte,
 ## les clients repartaient sans CPU, et rien ne le disait. On peut maintenant l'ajuster en vente.
-const CAPACITY_EXPANSION_STEP := 2.0 # au plus ×2 du maximum actuel par décision
+const CAPACITY_EXPANSION_STEP := 2.0 # conservé pour compatibilité (anciens écrans / tests)
+## V0.10 / H2 (Claude, 30/09) : l'extension coûtait ~le prix de fabrication des puces ajoutées (≈ 30 €/puce)
+## alors que chaque puce rapportait ~100 €/mois, et chaque extension relevait le plafond (doublements en chaîne).
+## Mesure : +364 k€ en 24 mois pour 8,9 k€ investis (×41). Désormais :
+## - le prix d'une extension ≈ EXPANSION_MARGIN_MONTHS mois de la marge nette que rapporteront les puces ajoutées ;
+## - le plafond est fixé par le fondeur et les locaux, et ne grandit plus avec les extensions.
+const EXPANSION_MARGIN_MONTHS := 5.0
+const CEILING_BASE_FACTOR := 2.0 # ×2 de la capacité maximale prévue au lancement
+const CEILING_PER_WORKPLACE_TIER := 0.5 # chaque palier de locaux ajoute ×0,5
+
+func capacity_ceiling(product: Dictionary) -> int:
+	if not product.has("launch_max_capacity"):
+		product["launch_max_capacity"] = maxi(int(product.get("max_monthly_capacity", product.get("production_capacity", 1))), 1)
+	var tier := float(int(ExecutiveManager.workplace.get("tier", 0)))
+	return maxi(1, int(round(float(int(product.launch_max_capacity)) * (CEILING_BASE_FACTOR + tier * CEILING_PER_WORKPLACE_TIER))))
+
+## Marge nette par puce vendue en boutique : prix - part des distributeurs - coût de fabrication réel.
+func net_margin_per_unit(product: Dictionary) -> int:
+	var price := float(maxi(int(product.get("price", 1)), 1))
+	var cost := float(maxi(int(product.get("unit_cost", 1)), 1)) * experience_cost_factor()
+	return maxi(5, int(round(price * (1.0 - MarketManager.distributor_share()) - cost)))
 
 func capacity_change_quote(product_id: String, new_capacity: int) -> Dictionary:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
 		return {"ok":false, "reason":"Produit non lancé"}
 	var current_max := maxi(int(product.get("max_monthly_capacity", product.get("production_capacity", 1))), 1)
-	var hard_cap := int(round(float(current_max) * CAPACITY_EXPANSION_STEP))
+	var ceiling := capacity_ceiling(product)
+	var hard_cap := maxi(ceiling, current_max)
 	var target := clampi(new_capacity, 1, hard_cap)
 	var extra_units := maxi(target - current_max, 0)
 	var cost := 0
 	if extra_units > 0:
-		# Nouvelles tranches de wafers à réserver chez le fondeur (ou dans l'usine) : un engagement ponctuel.
-		cost = BalanceManager.expense_amount(maxi(3000, int(round(4000.0 + float(extra_units * maxi(int(product.get("unit_cost", 1)), 1)) * 0.9))), "Mise en production")
+		# Nouvelles tranches de wafers à réserver chez le fondeur : payées d'avance, remboursées en quelques mois.
+		var raw := 4000.0 + float(extra_units * net_margin_per_unit(product)) * EXPANSION_MARGIN_MONTHS
+		cost = BalanceManager.expense_amount(maxi(3000, int(round(raw))), "Mise en production")
+	var limited := new_capacity > hard_cap
 	return {"ok":true, "capacity":target, "current":int(product.get("production_capacity", 0)), "max":current_max,
-		"hard_cap":hard_cap, "extra_units":extra_units, "cost":cost}
+		"hard_cap":hard_cap, "ceiling":ceiling, "extra_units":extra_units, "cost":cost,
+		"payback_months":EXPANSION_MARGIN_MONTHS if extra_units > 0 else 0.0,
+		"limited":limited,
+		"limit_reason":"Limite du fondeur : pour produire davantage, il faut des locaux plus grands ou votre propre usine." if limited else ""}
 
 func set_production_capacity(product_id: String, new_capacity: int) -> bool:
 	var quote := capacity_change_quote(product_id, new_capacity)
@@ -525,6 +551,7 @@ func launch_product(product_id: String, price: int, production_capacity: int) ->
 				return false
 			product.price = maxi(price, 1)
 			product.production_capacity = chosen_capacity
+			product["launch_max_capacity"] = max_capacity # V0.10 / H2 : base du plafond fixé par le fondeur
 			Economy.add_expense(commitment_cost, "Mise en production — %s" % str(product.get("name", "Produit")))
 			var launch_forecast := MarketManager.forecast_cpu_launch(product, int(product.price)) if str(product.get("sector", "")) == "CPU" else {}
 			var royalty_per_unit := int(round(float(product.price) * float(product.get("royalty_rate", 0.0))))

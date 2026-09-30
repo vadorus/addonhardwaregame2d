@@ -58,7 +58,7 @@ Write-Host "1/4 Import du projet"
 
 if (-not $SkipTests) {
   Write-Host "2/4 Tests"
-  foreach ($scene in @("tests/smoke_test.tscn", "tests/garage_layout_test.tscn", "tests/workshop_layout_test.tscn")) {
+  foreach ($scene in @("tests/smoke_test.tscn", "tests/garage_layout_test.tscn", "tests/workshop_layout_test.tscn", "tests/balance_ceiling_test.tscn")) {
     $log = & $Godot --headless --path . "res://$scene" 2>&1 | Out-String
     if ($log -match 'SCRIPT ERROR|Parse Error' -or $log -notmatch '\[CI\].*passed') {
       Write-Host $log

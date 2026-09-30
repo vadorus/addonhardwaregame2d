@@ -765,11 +765,17 @@ func _on_sale_capacity_changed(_value: float) -> void:
 	var quote := ProductManager.capacity_change_quote(UI.option_meta(product_select), int(sale_capacity.value))
 	var cost := int(quote.get("cost", 0))
 	var target := int(quote.get("capacity", 0))
-	_capacity_apply_button.disabled = target == int(quote.get("current", 0))
-	if cost > 0:
-		_capacity_apply_button.text = "Passer à %s/mois (extension %s €)" % [UI.money(target), UI.money(cost)]
+	var at_current := target == int(quote.get("current", 0))
+	_capacity_apply_button.disabled = at_current
+	# V0.10 / H2 : le joueur voit le prix, le délai de remboursement et la limite du fondeur.
+	var at_ceiling := target >= int(quote.get("hard_cap", 0)) and target > int(quote.get("current", 0))
+	_capacity_apply_button.tooltip_text = "Limite du fondeur : pour produire davantage, il faut des locaux plus grands ou votre propre usine." if at_ceiling else ""
+	if at_current:
+		_capacity_apply_button.text = "Capacité actuelle : %s/mois (plafond %s)" % [UI.money(target), UI.money(int(quote.get("hard_cap", target)))]
+	elif cost > 0:
+		_capacity_apply_button.text = "Passer à %s/mois — %s €, remboursé en ~%d mois%s" % [UI.money(target), UI.money(cost), int(round(float(quote.get("payback_months", 5.0)))), " (plafond du fondeur)" if at_ceiling else ""]
 	else:
-		_capacity_apply_button.text = "Passer à %s/mois" % UI.money(target)
+		_capacity_apply_button.text = "Passer à %s/mois (déjà prévu au lancement)" % UI.money(target)
 
 func _emit_update_capacity() -> void:
 	if product_select.item_count == 0 or sale_capacity == null:
