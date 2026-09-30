@@ -84,13 +84,13 @@ func _build() -> void:
 	root.add_child(actions)
 
 	_action_button = Button.new()
-	_action_button.custom_minimum_size.y = 42
+	_action_button.custom_minimum_size.y = 44
 	_action_button.pressed.connect(func(): action_requested.emit(_target_tab, _target_context))
 	actions.add_child(_action_button)
 
 	_team_button = Button.new()
 	_team_button.text = "Voir l'équipe"
-	_team_button.custom_minimum_size.y = 42
+	_team_button.custom_minimum_size.y = 44
 	_team_button.pressed.connect(func(): team_requested.emit())
 	actions.add_child(_team_button)
 

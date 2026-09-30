@@ -160,7 +160,7 @@ static func spin(min_value: float, max_value: float, step_value: float, initial_
 	node.step = step_value
 	node.value = initial_value
 	node.allow_greater = true
-	node.custom_minimum_size.y = 42
+	node.custom_minimum_size.y = 44
 	return node
 
 static func option_meta(option: OptionButton) -> String:

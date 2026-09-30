@@ -322,7 +322,7 @@ func _rebuild_fab() -> void:
 		box.add_child(actions)
 		var maintain := Button.new()
 		maintain.text = "Maintenance lourde (%s €)" % UI.money(FoundryManager.current_monthly_overhead() * 2)
-		maintain.custom_minimum_size.y = 42
+		maintain.custom_minimum_size.y = 44
 		maintain.pressed.connect(func(): action_requested.emit("maintain_fab", {}))
 		actions.add_child(maintain)
 		if construction.is_empty() and not upgrade.is_empty():
@@ -348,7 +348,7 @@ func _build_button(upgrade: Dictionary, verb: String) -> Control:
 	var cost := int(upgrade.get("build_cost", 0))
 	var deposit := int(round(float(cost) * 0.25))
 	var button := Button.new()
-	button.custom_minimum_size.y = 42
+	button.custom_minimum_size.y = 44
 	button.text = "%s : %s — %s €, %d mois" % [verb, str(upgrade.get("name", "")), UI.money(cost), int(upgrade.get("build_months", 0))]
 	var needed := float(upgrade.get("required_manufacturing", 0.0))
 	var have := float(ResearchManager.technologies.get("manufacturing", 0.0))

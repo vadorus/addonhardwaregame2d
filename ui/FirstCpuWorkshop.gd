@@ -362,7 +362,7 @@ func _build() -> void:
 	_budget.max_value = 150000
 	_budget.step = 2500
 	_budget.value = 45000
-	_budget.custom_minimum_size.y = 42
+	_budget.custom_minimum_size.y = 44
 	_budget.value_changed.connect(func(_v): _refresh_preview())
 	var budget_field := _field("Intensité R&D mensuelle (référence)", _budget)
 	_budget_field_root = budget_field

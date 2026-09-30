@@ -103,7 +103,7 @@ func _add_option(index: int, decision: Dictionary, option: Dictionary) -> void:
 
 	var choose := Button.new()
 	choose.text = "Choisir"
-	choose.custom_minimum_size.y = 42
+	choose.custom_minimum_size.y = 44
 	choose.disabled = not bool(finance.get("can_afford", true))
 	choose.tooltip_text = "Trésorerie insuffisante." if choose.disabled else str(option.get("description", ""))
 	choose.pressed.connect(_emit_option.bind(index))

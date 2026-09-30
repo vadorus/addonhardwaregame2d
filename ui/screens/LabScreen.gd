@@ -297,7 +297,7 @@ func _build() -> void:
 	_add_labeled_control(research_box, "Budget mensuel recherche fondamentale", research_budget)
 	var apply_research := Button.new()
 	apply_research.text = "Appliquer cette répartition de recherche"
-	apply_research.custom_minimum_size.y = 42
+	apply_research.custom_minimum_size.y = 44
 	apply_research.pressed.connect(func(): _emit_action("apply_research_plan"))
 	research_box.add_child(apply_research)
 
@@ -322,7 +322,7 @@ func _build() -> void:
 	_add_labeled_control(research_box, "Ambition", concept_ambition)
 	var concept_start := Button.new()
 	concept_start.text = "Lancer un programme Concept"
-	concept_start.custom_minimum_size.y = 42
+	concept_start.custom_minimum_size.y = 44
 	concept_start.pressed.connect(func(): _emit_action("start_concept"))
 	research_box.add_child(concept_start)
 	concept_status_label = _muted_label("Aucun programme Concept actif.", 12)
@@ -424,7 +424,7 @@ func _build() -> void:
 	_register_depth_node(remediation_panel, "DETAILED")
 	lab_remediation_accept_button = Button.new()
 	lab_remediation_accept_button.text = "Intégrer cette solution au projet"
-	lab_remediation_accept_button.custom_minimum_size.y = 42
+	lab_remediation_accept_button.custom_minimum_size.y = 44
 	lab_remediation_accept_button.pressed.connect(func(): _emit_action("accept_remediation"))
 	configuration_box.add_child(lab_remediation_accept_button)
 	_register_depth_node(lab_remediation_accept_button, "DETAILED")

@@ -277,7 +277,7 @@ func _refresh_range_advice() -> void:
 	box.add_child(list)
 	var button := Button.new()
 	button.text = "Passer ces %d modèle(s) en fin de série" % candidates.size()
-	button.custom_minimum_size.y = 40
+	button.custom_minimum_size.y = 44
 	button.pressed.connect(_emit_clearance_many)
 	box.add_child(button)
 	_range_advice_box.add_child(card)

@@ -42,7 +42,7 @@ func _build() -> void:
 
 	tender_submit_button = Button.new()
 	tender_submit_button.text = "Soumettre l'offre"
-	tender_submit_button.custom_minimum_size.y = 42
+	tender_submit_button.custom_minimum_size.y = 44
 	tender_submit_button.pressed.connect(_emit_submit)
 	add_child(tender_submit_button)
 

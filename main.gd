@@ -1245,7 +1245,7 @@ func _build_setup_layer():
 
 	var back := Button.new()
 	back.text = "Retour"
-	back.custom_minimum_size.y = 42
+	back.custom_minimum_size.y = 44
 	back.pressed.connect(_show_title_screen)
 	setup_creation_box.add_child(back)
 
@@ -1502,7 +1502,7 @@ func _build_game_over_layer():
 	box.add_child(retry)
 	var load := Button.new()
 	load.text = "Charger une sauvegarde"
-	load.custom_minimum_size.y = 42
+	load.custom_minimum_size.y = 44
 	load.pressed.connect(_load_game)
 	box.add_child(load)
 
@@ -1535,7 +1535,7 @@ func _build_research_event_layer():
 	box.add_child(pursue)
 	var archive := Button.new()
 	archive.text = "Archiver pour plus tard"
-	archive.custom_minimum_size.y = 42
+	archive.custom_minimum_size.y = 44
 	archive.pressed.connect(func(): _resolve_research_event(false))
 	box.add_child(archive)
 
@@ -1618,7 +1618,7 @@ func _spin(minv: float, maxv: float, stepv: float, valuev: float) -> SpinBox:
 	spin.step = stepv
 	spin.value = valuev
 	spin.allow_greater = true
-	spin.custom_minimum_size.y = 42
+	spin.custom_minimum_size.y = 44
 	return spin
 
 func _stylebox(bg: Color, radius: int = 10, border: int = 0, border_color: Color = APP_LINE, padding: int = 10) -> StyleBoxFlat:
@@ -2659,7 +2659,7 @@ func _menu_button(text: String, action: Callable, primary: bool = false) -> Butt
 	var button := Button.new()
 	button.text = text
 	LOOK.button_style(button, primary)
-	button.custom_minimum_size.y = 42 # le menu doit tenir sur un téléphone 16:9 à 120 %
+	button.custom_minimum_size.y = 44 # le menu doit tenir sur un téléphone 16:9 à 120 %
 	button.pressed.connect(action)
 	return button
 

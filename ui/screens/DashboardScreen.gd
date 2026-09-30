@@ -142,12 +142,12 @@ func _build() -> void:
 	priority_box.add_child(priority_actions)
 	dashboard_priority_action = Button.new()
 	dashboard_priority_action.text = "Traiter cette décision"
-	dashboard_priority_action.custom_minimum_size.y = 42
+	dashboard_priority_action.custom_minimum_size.y = 44
 	dashboard_priority_action.pressed.connect(_dashboard_priority_pressed)
 	priority_actions.add_child(dashboard_priority_action)
 	dashboard_priority_defer = Button.new()
 	dashboard_priority_defer.text = "Reporter 3 mois"
-	dashboard_priority_defer.custom_minimum_size.y = 42
+	dashboard_priority_defer.custom_minimum_size.y = 44
 	dashboard_priority_defer.visible = false
 	dashboard_priority_defer.pressed.connect(_dashboard_priority_defer_pressed)
 	priority_actions.add_child(dashboard_priority_defer)

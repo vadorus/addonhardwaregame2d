@@ -82,7 +82,7 @@ func _build() -> void:
 	recruit_row.add_child(recruit_department)
 	var search_button := Button.new()
 	search_button.text = "Nora cherche 3 profils"
-	search_button.custom_minimum_size.y = 42
+	search_button.custom_minimum_size.y = 44
 	search_button.pressed.connect(_generate_candidate)
 	recruit_row.add_child(search_button)
 

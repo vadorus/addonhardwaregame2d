@@ -444,7 +444,7 @@ func _architecture_advice_card() -> Control:
 		var switch_button := Button.new()
 		switch_button.focus_mode = Control.FOCUS_NONE
 		switch_button.text = "Passer sur %s (tock)" % str(CATALOG.get_by_id(ArchitectureManager.latest_id()).short)
-		switch_button.custom_minimum_size.y = 40
+		switch_button.custom_minimum_size.y = 44
 		switch_button.pressed.connect(_switch_to_latest_architecture)
 		box.add_child(switch_button)
 	elif mode == "NEW_LINE" and line.is_empty() and ArchitectureManager.latest_id() != arch_id:
@@ -486,7 +486,7 @@ func _build_goal_step() -> void:
 	var toggle := Button.new()
 	toggle.focus_mode = Control.FOCUS_NONE
 	toggle.text = "Masquer les réglages" if adjust else "Ajuster moi-même  ▾"
-	toggle.custom_minimum_size.y = 40
+	toggle.custom_minimum_size.y = 44
 	toggle.pressed.connect(func():
 		adjust = not adjust
 		_changed(false)
@@ -540,7 +540,7 @@ func _build_lessons_card() -> void:
 	if suggested != "" and PROFILES.has(suggested):
 		var follow := Button.new()
 		follow.focus_mode = Control.FOCUS_NONE
-		follow.custom_minimum_size.y = 40
+		follow.custom_minimum_size.y = 44
 		var already := profile == suggested
 		follow.text = ("✓ Conseil suivi : %s" if already else "Suivre le conseil de l'équipe : %s") % str(PROFILES[suggested].label)
 		follow.disabled = already
@@ -597,7 +597,7 @@ func _build_budget_step() -> void:
 	var advanced := Button.new()
 	advanced.focus_mode = Control.FOCUS_NONE
 	advanced.text = "Mode avancé : partenaires, contrats, tous les réglages"
-	advanced.custom_minimum_size.y = 40
+	advanced.custom_minimum_size.y = 44
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	_content.add_child(advanced)
 

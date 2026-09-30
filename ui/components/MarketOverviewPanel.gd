@@ -25,7 +25,7 @@ var competitors_box: VBoxContainer
 func _build() -> void:
 	add_child(UI.section("Votre produit"))
 	market_product_select = OptionButton.new()
-	market_product_select.custom_minimum_size.y = 42
+	market_product_select.custom_minimum_size.y = 44
 	market_product_select.item_selected.connect(func(_i): refresh())
 	add_child(market_product_select)
 	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")

@@ -1012,26 +1012,20 @@ var _objectives_box: VBoxContainer
 func _refresh_objectives() -> void:
 	if _objectives_box == null:
 		return
-	var show := CompanyManager.created
+	var tutorial_step := _tutorial_step()
+	# Pendant le mini-tutoriel, Nora porte seule la prochaine action : aucun doublon d'objectif.
+	var show := CompanyManager.created and tutorial_step == 0
 	_objectives_title.visible = show
 	_objectives_box.visible = show
 	if _tasks_label != null:
-		_tasks_label.max_lines_visible = 3 if show else 4
+		_tasks_label.max_lines_visible = 4 if tutorial_step > 0 else (3 if show else 4)
 	for child in _objectives_box.get_children():
 		_objectives_box.remove_child(child)
 		child.queue_free()
 	if not show:
 		return
-	var tutorial_step := _tutorial_step()
-	var visible_objectives: Array = []
-	if tutorial_step > 0:
-		var first_objective: Dictionary = (Objectives.TRACKS["PRODUIT"][0] as Dictionary).duplicate(true)
-		first_objective["track"] = "PRODUIT"
-		visible_objectives.append(first_objective)
-		_objectives_title.text = "PREMIER OBJECTIF  •  ÉTAPE %d/3" % tutorial_step
-	else:
-		visible_objectives = Objectives.active_objectives()
-		_objectives_title.text = "OBJECTIFS  •  %d/%d atteints" % [Objectives.completed_count(), Objectives.total_count()]
+	var visible_objectives: Array = Objectives.active_objectives()
+	_objectives_title.text = "OBJECTIFS  •  %d/%d atteints" % [Objectives.completed_count(), Objectives.total_count()]
 	for objective_value in visible_objectives:
 		var objective: Dictionary = objective_value
 		var row := HBoxContainer.new()
