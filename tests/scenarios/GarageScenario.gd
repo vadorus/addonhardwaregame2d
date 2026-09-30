@@ -100,5 +100,42 @@ static func run(host: Node) -> String:
 	if int(garage_hub.call("available_side_action_count")) != 0:
 		garage_hub.queue_free()
 		return "V0.9: the garage's old left rail must stay hidden, navigation is the bottom dock"
+
+	# G2 : le tutoriel du premier CPU doit dériver de l'état réel et disparaître au lancement.
+	var saved_created := CompanyManager.created
+	var saved_projects := ResearchManager.projects.duplicate(true)
+	var saved_jobs := ProductionManager.jobs.duplicate(true)
+	var saved_products := ProductManager.products.duplicate(true)
+	CompanyManager.created = true
+	ResearchManager.projects = []
+	ProductionManager.jobs = []
+	ProductManager.products = []
+	garage_hub.call("set_onboarding_stage", "FIRST_IDEA")
+	if int(garage_hub.call("_tutorial_step")) != 1 or not str(garage_hub.call("nora_message")).begins_with("Étape 1/3"):
+		garage_hub.queue_free()
+		return "G2: Nora does not start the first-CPU tutorial at step 1/3"
+	ResearchManager.projects = [{"id":"G2-CI","name":"CPU tutoriel","status":"DEVELOPMENT","phase_index":0,"phase_progress":10.0}]
+	garage_hub.call("set_onboarding_stage", "NORMAL")
+	if int(garage_hub.call("_tutorial_step")) != 2:
+		garage_hub.queue_free()
+		return "G2: active development does not advance the tutorial to step 2/3"
+	ResearchManager.projects = []
+	ProductionManager.jobs = [{"id":"G2-JOB","name":"CPU tutoriel","status":"INDUSTRIALIZATION","progress":30.0}]
+	garage_hub.call("set_onboarding_stage", "NORMAL")
+	if int(garage_hub.call("_tutorial_step")) != 3:
+		garage_hub.queue_free()
+		return "G2: industrialization does not advance the tutorial to step 3/3"
+	ProductionManager.jobs = []
+	ProductManager.products = [{"id":"G2-PROD","name":"CPU tutoriel","status":"LAUNCHED","months_on_market":1,"last_month_sales":10}]
+	garage_hub.call("set_onboarding_stage", "NORMAL")
+	if int(garage_hub.call("_tutorial_step")) != 0:
+		garage_hub.queue_free()
+		return "G2: tutorial does not end after the first CPU launch"
+	CompanyManager.created = saved_created
+	ResearchManager.projects = saved_projects
+	ProductionManager.jobs = saved_jobs
+	ProductManager.products = saved_products
+	garage_hub.call("set_onboarding_stage", "NORMAL")
+
 	garage_hub.queue_free()
 	return ""

@@ -870,11 +870,32 @@ func _focus_where() -> String:
 		return "le bouton « %s » à gauche" % side
 	return "le bouton vert"
 
+func _first_cpu_launched() -> bool:
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED" or int(product.get("months_on_market", 0)) > 0:
+			return true
+	return false
+
+## G2 : mini-tutoriel dérivé de l'état réel du premier CPU, sans sauvegarde ni script parallèle.
+## 1 = idée, 2 = développement, 3 = industrialisation/lancement, 0 = terminé.
+func _tutorial_step() -> int:
+	if not CompanyManager.created or _first_cpu_launched():
+		return 0
+	if not ProductionManager.get_active_jobs().is_empty():
+		return 3
+	for product_value in ProductManager.products:
+		if str((product_value as Dictionary).get("status", "")) == "READY":
+			return 3
+	if not ResearchManager.projects.is_empty():
+		return 2
+	return 1
+
 func _nora_message() -> String:
 	if not CompanyManager.created and decision_source.is_null():
 		return "Créez votre entreprise pour commencer."
 	if _onboarding_stage == "FIRST_IDEA":
-		return "Bienvenue au garage ! Touchez l'établi (repère vert) pour imaginer notre premier processeur."
+		return "Étape 1/3 • Premier CPU : touchez l'établi (repère vert), choisissez un marché et lancez votre projet."
 	if not _focus.is_empty():
 		var message := "%s : passez par %s." % [str(_focus.get("title", "")), _focus_where()]
 		var advice := str(_focus.get("advice", ""))
@@ -884,12 +905,14 @@ func _nora_message() -> String:
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":
 			var phase_index := clampi(int(value.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
-			return "L'équipe avance sur %s (%s). Accélérez le temps ▶▶ : je vous préviens dès qu'une décision arrive." % [str(value.get("name", "le projet")), str(GameData.PHASES[phase_index]).to_lower()]
+			return "Étape 2/3 • Développement : %s est en phase %s. Lancez le temps ▶▶ ; je vous préviens quand une vraie décision arrive." % [str(value.get("name", "le projet")), str(GameData.PHASES[phase_index]).to_lower()]
 	for job_value in ProductionManager.get_active_jobs():
-		return "La fabrication de %s avance (%.0f %%). Je vous préviens quand il sera prêt à lancer." % [str(job_value.get("name", "votre CPU")), float(job_value.get("progress", 0.0))]
+		return "Étape 3/3 • Industrialisation : %s avance (%.0f %%). Ensuite, il ne restera qu'à le lancer sur le marché." % [str(job_value.get("name", "votre CPU")), float(job_value.get("progress", 0.0))]
 	for product_value in ProductManager.products:
+		if str(product_value.get("status", "")) == "READY":
+			return "Étape 3/3 • %s est prêt. Ouvrez Produits et choisissez son prix pour le lancer." % str(product_value.get("name", "Votre CPU"))
 		if str(product_value.get("status", "")) == "LAUNCHED":
-			return "%s se vend : %s unités ce mois. Quand vous voulez, lancez la génération suivante depuis l'établi." % [str(product_value.get("name", "Votre CPU")), str(product_value.get("last_month_sales", 0))]
+			return "%s se vend : %s unités ce mois. Le tutoriel est terminé : les objectifs Produit, Croissance et Marché prennent le relais." % [str(product_value.get("name", "Votre CPU")), str(product_value.get("last_month_sales", 0))]
 	return "Touchez un élément du décor pour gérer l'entreprise."
 
 func nora_message() -> String:
@@ -984,11 +1007,12 @@ func _refresh_gameplay_overlays() -> void:
 var _objectives_title: Label
 var _objectives_box: VBoxContainer
 
-## Objectifs visibles dès que le premier projet existe (la toute première minute reste « une seule action »).
+## G2 : pendant le premier CPU, une seule cible est montrée. Après le lancement, les trois pistes
+## du lot C prennent le relais. Pas de second système d'objectifs, donc pas de désynchronisation.
 func _refresh_objectives() -> void:
 	if _objectives_box == null:
 		return
-	var show := CompanyManager.created and not ResearchManager.projects.is_empty()
+	var show := CompanyManager.created
 	_objectives_title.visible = show
 	_objectives_box.visible = show
 	if _tasks_label != null:
@@ -998,8 +1022,17 @@ func _refresh_objectives() -> void:
 		child.queue_free()
 	if not show:
 		return
-	_objectives_title.text = "OBJECTIFS  •  %d/%d atteints" % [Objectives.completed_count(), Objectives.total_count()]
-	for objective_value in Objectives.active_objectives():
+	var tutorial_step := _tutorial_step()
+	var visible_objectives: Array = []
+	if tutorial_step > 0:
+		var first_objective: Dictionary = (Objectives.TRACKS["PRODUIT"][0] as Dictionary).duplicate(true)
+		first_objective["track"] = "PRODUIT"
+		visible_objectives.append(first_objective)
+		_objectives_title.text = "PREMIER OBJECTIF  •  ÉTAPE %d/3" % tutorial_step
+	else:
+		visible_objectives = Objectives.active_objectives()
+		_objectives_title.text = "OBJECTIFS  •  %d/%d atteints" % [Objectives.completed_count(), Objectives.total_count()]
+	for objective_value in visible_objectives:
 		var objective: Dictionary = objective_value
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)

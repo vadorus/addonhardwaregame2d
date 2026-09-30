@@ -142,9 +142,10 @@ les rivaux ne restent pas figés.
 ### Lot G — Finition (en continu)
 
 > 30/09 : **G1 (modes Accessible / Standard / Simulation) fait** (`docs/reviews/V09_LOT_G1_MODES_JEU.md`).
+> 30/09 : **G2 (tutoriel court Nora, 3 étapes, basé sur les objectifs) fait** (`docs/reviews/V09_LOT_G2_TUTORIEL_NORA.md`).
 
 - ✅ Délégation / accompagnement : préréglages Accessible / Standard / Simulation.
-- Tutoriel court guidé par Nora (repose sur les objectifs du lot C).
+- ✅ Tutoriel court guidé par Nora (repose sur les objectifs du lot C).
 - Passe Android : tailles de texte, zones de toucher, performances sur le Pixel 10.
 - Relecture de tous les textes (français naturel, pas de jargon interne).
 
