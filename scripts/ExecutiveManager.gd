@@ -56,6 +56,10 @@ var workplace := {
 	"upgrade_reminder_at":-1
 }
 var hr_issues: Array = []
+## V0.10 / J3 : moments clés illustrés déjà montrés (une fois par partie).
+var moments_seen: Dictionary = {}
+## Ancienne sauvegarde sans moments : ce qui est déjà vrai au chargement ne sera pas rejoué.
+var moments_migration_pending := false
 var _next_hr_issue_id := 1
 var months_operated := 0
 var interface_unlocks := {
@@ -75,6 +79,8 @@ var interface_unlocks := {
 var unlock_history: Array = []
 
 func reset():
+	moments_seen = {}
+	moments_migration_pending = false
 	benefit_policy = {"HEALTH":"NONE","MEALS":"NONE","TRAINING":"NONE","REST":"NONE"}
 	workplace = {"tier":0,"condition":62.0,"last_renovation_year":TimeManager.year,"last_renovation_month":TimeManager.month,"upgrade_reminder_at":-1}
 	hr_issues = []
@@ -1068,6 +1074,12 @@ func get_executive_brief() -> Dictionary:
 		"finance_role":"DAF interne recommandé" if PersonnelManager.staff.size() >= 12 else "Conseil financier assuré avec le bras droit"
 	}
 
+func moment_seen(moment_id: String) -> bool:
+	return bool(moments_seen.get(moment_id, false))
+
+func mark_moment_seen(moment_id: String) -> void:
+	moments_seen[moment_id] = true
+
 func get_state() -> Dictionary:
 	return {
 		"right_hand":right_hand,
@@ -1077,7 +1089,8 @@ func get_state() -> Dictionary:
 		"next_hr_issue_id":_next_hr_issue_id,
 		"months_operated":months_operated,
 		"interface_unlocks":interface_unlocks,
-		"unlock_history":unlock_history
+		"unlock_history":unlock_history,
+		"moments_seen":moments_seen
 	}
 
 func load_state(state: Dictionary):
@@ -1098,6 +1111,9 @@ func load_state(state: Dictionary):
 	hr_issues = state.get("hr_issues", []).duplicate(true)
 	_next_hr_issue_id = int(state.get("next_hr_issue_id", hr_issues.size() + 1))
 	months_operated = int(state.get("months_operated", 0))
+	var saved_moments = state.get("moments_seen", null)
+	moments_seen = saved_moments.duplicate(true) if typeof(saved_moments) == TYPE_DICTIONARY else {}
+	moments_migration_pending = typeof(saved_moments) != TYPE_DICTIONARY
 	interface_unlocks = {
 		"QG":true,
 		"LAB":true,

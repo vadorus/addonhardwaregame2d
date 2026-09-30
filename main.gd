@@ -151,6 +151,10 @@ var setup_continue_button: Button
 const JUICE := preload("res://ui/Juice.gd")
 var notification_feed: Control
 var review_layer: ColorRect
+## V0.10 / J3 : moments clés illustrés (une fois par partie).
+const MOMENTS := preload("res://scripts/Moments.gd")
+var moment_layer: ColorRect
+var _moment_flags := {}
 var review_panel: Control
 var _pending_reviews: Array = []
 var _money_shown := 0.0
@@ -180,6 +184,9 @@ func _ready():
 	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()
+	moment_layer = (load("res://ui/components/MomentCard.gd") as Script).new() as ColorRect
+	add_child(moment_layer)
+	moment_layer.connect("closed", _on_moment_closed)
 	_build_ceo_layer()
 	_build_dialogue_layer()
 	_connect_signals()
@@ -1141,6 +1148,22 @@ func _build_setup_layer():
 	setup_layer.color = Color(0.10, 0.065, 0.04, 0.985) # fond d'accueil brun chaud, pas noir bleuté
 	setup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(setup_layer)
+	# V0.10 / J3 : le garage de 1971 au crépuscule, peint par Astra, derrière le menu.
+	var title_art_path := "res://assets/art/v010/titre/ecran_titre.webp"
+	if ResourceLoader.exists(title_art_path):
+		setup_layer.color = Color(0.10, 0.065, 0.04, 1.0)
+		var title_art := TextureRect.new()
+		title_art.texture = load(title_art_path)
+		title_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		title_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		title_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		title_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		setup_layer.add_child(title_art)
+		var title_veil := ColorRect.new()
+		title_veil.color = Color(0.05, 0.03, 0.02, 0.28)
+		title_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		title_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		setup_layer.add_child(title_veil)
 
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -2023,6 +2046,7 @@ func _apply_game_mode_presentation() -> void:
 		lab_screen.call("set_depth_mode", BalanceManager.default_lab_depth())
 
 func _start_new_game():
+	_moment_flags = {}
 	SimulationManager.reset_all(setup_name.text, _meta(setup_sector), _meta(setup_difficulty))
 	_apply_game_mode_presentation()
 	TimeManager.time_scale = 0.0
@@ -2218,6 +2242,7 @@ func _refresh_all():
 		personnel_screen.call("refresh")
 	if media_screen != null:
 		media_screen.call("refresh")
+	call_deferred("_check_moments")
 
 func _refresh_navigation_progression():
 	if tabs == null:
@@ -2906,6 +2931,8 @@ func _build_review_layer() -> void:
 	center.add_child(review_panel)
 
 func _on_reviews_published(product_name: String, reviews: Array) -> void:
+	if MOMENTS.is_good_press(reviews):
+		_moment_flags["GOOD_PRESS"] = true
 	_pending_reviews.append({"name":product_name, "reviews":reviews})
 	# Une gamme publie ses tests modèle par modèle dans la même clôture de mois :
 	# on attend la fin de la vague pour n'afficher qu'un seul écran.
@@ -2938,6 +2965,28 @@ func _close_review_reveal() -> void:
 		TimeManager.time_scale = _review_resume_scale
 	_show_pending_reviews()
 	_flush_unlock_notice()
+	call_deferred("_check_moments")
+
+## V0.10 / J3 : un moment clé à la fois, jamais par-dessus un autre grand moment ou un choix.
+func _check_moments() -> void:
+	if moment_layer == null or moment_layer.visible or not CompanyManager.created or SimulationManager.is_game_over:
+		return
+	if _big_moment_active():
+		return
+	for other in [game_over_layer, ceo_layer]:
+		if other != null and other.visible:
+			return
+	var moment_id := MOMENTS.next_unseen(_moment_flags)
+	if moment_id == "":
+		return
+	ExecutiveManager.mark_moment_seen(moment_id)
+	moment_layer.call("show_moment", moment_id)
+
+func _on_moment_closed(_moment_id: String) -> void:
+	call_deferred("_check_moments")
+
+func moment_visible() -> bool:
+	return moment_layer != null and moment_layer.visible
 
 # --- Décision du PDG traitée sur place (correctif trouvé sur Pixel) ------------------
 # « Traiter : Décider des locaux » ouvrait l'onglet Entreprise tout en haut : la décision

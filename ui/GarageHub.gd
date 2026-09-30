@@ -1192,6 +1192,17 @@ func _play_move_moment(new_tier: int, data: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
+	# V0.10 / J3 : l'illustration d'Astra (camion et cartons devant les nouveaux locaux).
+	var move_art_path := "res://assets/art/v010/J3_moments/moment_demenagement.webp"
+	if ResourceLoader.exists(move_art_path):
+		var art := TextureRect.new()
+		art.texture = load(move_art_path)
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		var art_w := clampf(size.x * 0.45, 300.0, 620.0)
+		art.custom_minimum_size = Vector2(art_w, minf(art_w * 0.5, size.y * 0.42))
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(art)
 	var kicker := Label.new()
 	kicker.text = "DÉMÉNAGEMENT"
 	kicker.add_theme_font_size_override("font_size", 13)
