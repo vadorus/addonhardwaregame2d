@@ -26,7 +26,7 @@ const ZONE_SPOTS := {
 ## Plus les locaux sont grands, plus il y a de postes visibles — et plus les gens sont dessinés petits,
 ## à l'échelle du décor.
 const CREW := {
-	0:{"scale":0.17, "nora":Vector2(0.70, 0.72), "visitor":Vector2(0.28, 0.66),
+	0:{"scale":0.17, "nora":Vector2(0.64, 0.68), "visitor":Vector2(0.28, 0.66),
 		"seats":[Vector3(0.36, 0.66, -1), Vector3(0.58, 0.86, -1), Vector3(0.45, 0.88, 1), Vector3(0.26, 0.55, 1), Vector3(0.80, 0.90, -1)]},
 	1:{"scale":0.15, "nora":Vector2(0.50, 0.45), "visitor":Vector2(0.765, 0.50),
 		"seats":[Vector3(0.30, 0.62, -1), Vector3(0.62, 0.80, -1), Vector3(0.47, 0.87, 1), Vector3(0.20, 0.72, 1), Vector3(0.86, 0.72, -1), Vector3(0.70, 0.66, -1)]},

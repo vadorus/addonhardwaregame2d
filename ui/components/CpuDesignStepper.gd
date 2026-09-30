@@ -576,7 +576,8 @@ func _build_budget_step() -> void:
 	_content.add_child(_stepper_row("Effort mensuel", "%s €" % UI.money(budget), float(index + 1) / float(BUDGET_STEPS.size()) * 0.99,
 		func(): _shift_budget(-1), func(): _shift_budget(1), true))
 	var monthly := ResearchManager.quoted_development_monthly_cost("INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
-	var estimate := ResearchManager.estimate_cpu_development(current_design(), "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
+	var spec_segment := str(current_spec().get("segment", segment))
+	var estimate := ResearchManager.estimate_cpu_development(current_design(), "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"), 0, 0, {}, spec_segment)
 	var evaluation := CPU_DESIGN.evaluate(current_design(), ResearchManager.get_cpu_capabilities())
 	var facts := GridContainer.new()
 	facts.columns = 2
@@ -587,6 +588,7 @@ func _build_budget_step() -> void:
 		["Modèles", _tiers_text()],
 		["Sortie de caisse", "~%s € / mois" % UI.money(monthly)],
 		["Durée estimée", "~%d mois" % int(estimate.get("months", 0))],
+		["Votre équipe", team_line(estimate)],
 		["Coût total du programme", "~%s €" % UI.money(int(estimate.get("program_cost", 0)))],
 		["Coût de fabrication", "~%s € / unité" % UI.money(int(evaluation.get("unit_cost", 0)))],
 		["Trésorerie actuelle", "%s €" % UI.money(int(Economy.money))]
@@ -600,6 +602,19 @@ func _build_budget_step() -> void:
 	advanced.custom_minimum_size.y = 44
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	_content.add_child(advanced)
+
+## V0.10 / H3 : ce que la taille de l'équipe change, en une ligne.
+static func team_line(estimate: Dictionary) -> String:
+	var devs := int(estimate.get("development_team_size", 0))
+	var required := maxi(int(estimate.get("segment_required_team", 1)), 1)
+	var speed := float(estimate.get("team_speed", 1.0))
+	var bonus := float(estimate.get("team_quality_bonus", 0.0))
+	var head := "%d développeur%s (%d conseillé%s)" % [devs, "s" if devs > 1 else "", required, "s" if required > 1 else ""]
+	if devs < required:
+		return "%s : %d %% plus lent — recrutez dans Équipe" % [head, int(round((1.0 - speed) * 100.0))]
+	if speed >= 1.05 or bonus >= 0.5:
+		return "%s : %d %% plus rapide, finition +%d" % [head, int(round((speed - 1.0) * 100.0)), int(round(bonus))]
+	return "%s : juste ce qu'il faut" % head
 
 func _tiers_text() -> String:
 	var names: Array = []
@@ -848,7 +863,8 @@ func _closest_at_most(values: Array, wanted: int) -> int:
 func _refresh_live() -> void:
 	var design := current_design()
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
-	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
+	# H3 : l'estimation tient compte du marché choisi (effectif conseillé), plus du marché par défaut.
+	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"), 0, 0, {}, str(current_spec().get("segment", segment)))
 	if _chip != null:
 		_chip.call("set_design", design)
 	_name_label.text = project_name()

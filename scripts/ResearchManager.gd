@@ -484,6 +484,38 @@ func development_capacity_factor_for_active(active_projects: int) -> float:
 	var workload := float(active) / float(capacity)
 	return clampf(1.04 - workload * 0.24, 0.55, 1.02)
 
+## V0.10 / H3 (Claude, 30/09) : une équipe plus grande que le minimum conseillé ne fait pas que
+## gagner du temps (DevelopmentEstimator.staffing_factor + MarketManager.segment_team_factor) :
+## elle a le temps de relire, tester et polir. « Profondeur d'équipe » de 0 (juste l'effectif conseillé)
+## à 1 (2,5 × l'effectif conseillé) ; au-delà, plus rien (trop de monde tue le projet).
+const TEAM_DEPTH_FULL_RATIO := 2.5
+const TEAM_DEPTH_QUALITY := 5.0
+const TEAM_DEPTH_RELIABILITY_EXTRA := 2.0
+
+func team_depth(segment: String, developers: int = -1) -> float:
+	var devs := get_development_team_size() if developers < 0 else developers
+	var required := float(MarketManager.segment_required_team(MarketManager.normalize_segment(segment)))
+	var ratio := float(devs) / maxf(required, 1.0)
+	return clampf((ratio - 1.0) / (TEAM_DEPTH_FULL_RATIO - 1.0), 0.0, 1.0)
+
+## Points de finition apportés par l'équipe (ajoutés aux notes finales du CPU).
+func team_quality_bonus(segment: String, developers: int = -1) -> Dictionary:
+	var depth := team_depth(segment, developers)
+	var bonus := depth * TEAM_DEPTH_QUALITY
+	# Deux validateurs ou plus : les tests de fiabilité sont vraiment faits.
+	var validators := 0
+	for emp in PersonnelManager.staff:
+		if str(emp.get("department", "")) == "Développement" and str(emp.get("specialization", "")) == "validation":
+			validators += 1
+	var reliability := bonus + (TEAM_DEPTH_RELIABILITY_EXTRA * depth if validators >= 2 else 0.0)
+	return {"depth":depth, "all":bonus, "reliability":reliability, "validators":validators}
+
+## Vitesse de l'équipe comparée à l'effectif conseillé (1.0 = effectif conseillé), pour l'affichage.
+func team_speed_multiplier(segment: String, complexity: float, developers: int = -1) -> float:
+	var devs := get_development_team_size() if developers < 0 else developers
+	var market_segment := MarketManager.normalize_segment(segment)
+	return MarketManager.segment_team_factor(market_segment, devs) * DEVELOPMENT_ESTIMATOR.staffing_factor(devs, complexity)
+
 func development_team_score() -> float:
 	var product_score := PersonnelManager.team_score("Développement", "product")
 	var validation_score := PersonnelManager.team_score("Développement", "validation")
@@ -794,7 +826,9 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 		"segment_recommended_budget":int(scale.get("budget", 45000)),
 		"segment_team_factor":segment_team_factor,
 		"segment_budget_factor":MarketManager.segment_budget_factor(market_segment, monthly_budget),
-		"development_team_size":get_development_team_size()
+		"development_team_size":get_development_team_size(),
+		"team_speed":team_speed_multiplier(market_segment, float(evaluation.get("complexity", 50.0))),
+		"team_quality_bonus":float(team_quality_bonus(market_segment).all)
 	}
 
 func get_cpu_generation_proposals() -> Array:
@@ -1280,6 +1314,12 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 		project["arch_adjustments"] = adjustments
 		for adjusted_metric in adjustments.keys():
 			metrics[adjusted_metric] = clampf(float(metrics.get(adjusted_metric, 50.0)) + float(adjustments[adjusted_metric]), 20.0, 98.0)
+	if str(project.sector) == "CPU":
+		var depth_bonus := team_quality_bonus(str(project.get("segment", MarketManager.default_segment())))
+		project["team_quality_bonus"] = depth_bonus
+		for metric_key in metrics.keys():
+			var extra := float(depth_bonus.reliability) if metric_key == "reliability" else float(depth_bonus.all)
+			metrics[metric_key] = clampf(float(metrics[metric_key]) + extra, 20.0, 98.0)
 	var internal_ratio := float(sourcing.get("internal_ratio", approach_data.internal_ratio))
 	var integration_skill := float(technologies.get("integration", 10.0))
 	if internal_ratio >= 0.6:
