@@ -169,3 +169,6 @@ les rivaux ne restent pas figés.
 
 Alternative si Alexandre préfère attaquer le cœur tout de suite : A → E → B/C → D → F
 (plus risqué : on refait la R&D avant d'avoir corrigé le rythme du début).
+
+> **30/09 : tous les lots de ce plan sont faits.** La suite est dans `docs/ROADMAP_V010.md`
+> (lots Q, H, I, J, K, L), établie après les audits `V09_BETA_INTERNAL_AUDIT.md` et `V09_AUDIT_CLAUDE_CHEF.md`.
