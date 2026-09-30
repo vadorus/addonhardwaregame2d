@@ -144,11 +144,12 @@ les rivaux ne restent pas figés.
 > 30/09 : **G1 (modes Accessible / Standard / Simulation) fait** (`docs/reviews/V09_LOT_G1_MODES_JEU.md`).
 > 30/09 : **G2 (tutoriel court Nora, 3 étapes, basé sur les objectifs) fait** (`docs/reviews/V09_LOT_G2_TUTORIEL_NORA.md`).
 > 30/09 : **G3 (passe Android / Pixel 10) fait** (`docs/reviews/V09_LOT_G3_ANDROID.md`).
+> 30/09 : **G4 (textes joueur + finition V0.9) fait** (`docs/reviews/V09_LOT_G4_TEXTES_POLISH.md`). **Lot G complet.**
 
 - ✅ Délégation / accompagnement : préréglages Accessible / Standard / Simulation.
 - ✅ Tutoriel court guidé par Nora (repose sur les objectifs du lot C).
 - ✅ Passe Android : tailles de texte, zones de toucher, performances sur le Pixel 10.
-- Relecture de tous les textes (français naturel, pas de jargon interne).
+- ✅ Relecture des textes joueur : français naturel, anglicismes internes retirés, vocabulaire matériel conservé.
 
 > **Ajout du 29/09 (audit `docs/reviews/V09_AUDIT_LEAD_TYCOON.md`)** : proposition d'un lot M
 > « marché vivant et croissance qui paie » (courbes de vente, segments qui montent et descendent,

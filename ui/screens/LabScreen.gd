@@ -850,7 +850,7 @@ func refresh_research_content() -> void:
 		var supplier_contract_id := str(project.get("supplier_contract_id", ""))
 		if supplier_contract_id != "":
 			var supplier_contract := SupplierManager.get_contract(supplier_contract_id)
-			project_lines.append("  Contrat %s • %s • %s • %s • royalty %.1f%% • IP %.0f%%" % [
+			project_lines.append("  Contrat %s • %s • %s • %s • redevance %.1f%% • propriété intellectuelle %.0f%%" % [
 				supplier_contract_id,
 				str(supplier_contract.get("supplier_name", project.get("supplier_name", "Partenaire"))),
 				str(supplier_contract.get("contract_term_label", "")),

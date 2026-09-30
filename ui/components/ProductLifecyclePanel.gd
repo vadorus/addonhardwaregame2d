@@ -487,7 +487,7 @@ func _refresh_product_details() -> void:
 		_set_cpu_detail(product, metric_lines)
 	else:
 		var sourcing: Dictionary = product.get("sourcing", GameData.sourcing_profile(str(product.get("approach", "INTERNAL"))))
-		product_details_label.text = "%s\nApproche : %s | interne %.0f%% | dépendance %.0f/100 | IP %.0f/100\n%s" % [
+		product_details_label.text = "%s\nApproche : %s | interne %.0f%% | dépendance %.0f/100 | propriété intellectuelle %.0f/100\n%s" % [
 			str(product.name), str(sourcing.get("label", "Interne")), float(product.internal_ratio) * 100.0,
 			float(sourcing.get("dependency", 0.0)), float(sourcing.get("ip_ownership", 100.0)), " • ".join(metric_lines)
 		]
@@ -514,7 +514,7 @@ func _set_cpu_detail(product: Dictionary, metric_lines: Array[String]) -> void:
 			MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0)),
 			float(product.get("last_month_age_penalty", MarketManager.product_age_penalty(product)))
 		]
-	product_details_label.text = "G%d • %s — %s\n%s • cible %s • usage %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nGravure/équipement %.0f/100 • marge conception %.0f/100\nDie sélectionné : qualité électrique %.0f/100 • constance %.0f/100 • dispersion ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\nSourcing : %s • dépendance fournisseur %.0f/100 • IP %.0f/100 • personnalisation %.0f/100 • royalty %.1f%%\nFabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100\n%s" % [
+	product_details_label.text = "G%d • %s — %s\n%s • cible %s • usage %s\n%d cœur(s) • %s • %s • %s • %d W\nRendement génération %.0f%% • qualité usine %.0f/100 • défauts %.1f%% • maîtrise procédé %.0f/100\nBin qualité %d/100 • allocation %.0f%% • %s • stratégie %s (%d mois)\nGravure/équipement %.0f/100 • marge conception %.0f/100\nDie sélectionné : qualité électrique %.0f/100 • constance %.0f/100 • dispersion ±%.1f • marge OC typique +%.1f%% (≈ %s) • undervolt %.1f%%\nCapacité conseillée %s/mois • maximum %s/mois • marge cible %s €/unité%s\nApprovisionnement : %s • dépendance fournisseur %.0f/100 • propriété intellectuelle %.0f/100 • personnalisation %.0f/100 • redevance %.1f%%\nFabrication : %s • dépendance %.0f/100 • confidentialité %.0f/100\n%s" % [
 		int(product.get("generation_index", 1)), str(product.get("sku_label", "Modèle")), str(product.get("name", "CPU")),
 		str(product.get("range_role", "")), target_label, application_label,
 		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design),
@@ -646,7 +646,7 @@ func _refresh_launch_intel() -> void:
 	var gross_margin_pct := 0.0 if planned_price <= 0 else float(gross_margin) / float(planned_price) * 100.0
 	var lines: Array[String] = [
 		"Cible : %s • repère marché ~%s €" % [MarketManager.segment_label(target), UI.money(int(round(MarketManager.segment_reference_price(target))))],
-		"Coût unitaire %s € • royalty %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
+		"Coût unitaire %s € • redevance %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
 			UI.money(unit_cost), UI.money(royalty_per_unit), UI.money(planned_price), UI.money(gross_margin), gross_margin_pct
 		]
 	]

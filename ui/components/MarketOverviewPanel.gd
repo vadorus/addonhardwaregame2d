@@ -138,7 +138,7 @@ func _refresh_cards() -> void:
 		var health := str(competitor.get("health", ""))
 		if health != "":
 			extra.append("État : %s" % health)
-		for key_label in [["technology_partner", "Partenaire"], ["public_b2b_customer", "Client B2B"], ["recent_public_action", "Récemment"]]:
+		for key_label in [["technology_partner", "Partenaire"], ["public_b2b_customer", "Client professionnel"], ["recent_public_action", "Récemment"]]:
 			var value := str(competitor.get(str(key_label[0]), ""))
 			if value != "":
 				extra.append("%s : %s" % [str(key_label[1]), value])
@@ -258,7 +258,7 @@ func _refresh_overview() -> void:
 			lines.append("  Partenariat technologique public : %s" % technology_partner)
 		var public_b2b_customer := str(competitor.get("public_b2b_customer", ""))
 		if public_b2b_customer != "":
-			lines.append("  Contrat B2B public : %s" % public_b2b_customer)
+			lines.append("  Contrat professionnel public : %s" % public_b2b_customer)
 		var public_action := str(competitor.get("recent_public_action", ""))
 		if public_action != "":
 			lines.append("  Mouvement observé : %s" % public_action)

@@ -302,7 +302,7 @@ func refresh() -> void:
 		UI.prepare_touch_scroll_children(candidate_box)
 	var candidate: Dictionary = PersonnelManager.candidate
 	var profile: Dictionary = candidate.get("profile", {})
-	candidate_label.text = "%s — %s\nCompétence %d • aptitude %d • expérience %.1f ans • leadership %d\nSpécialisation : %s\nRigueur %.0f • résolution %.0f • travail d'équipe %.0f • stress %.0f • process %.0f\nSalaire : %s €/mois • prime d'embauche : %s €" % [
+	candidate_label.text = "%s — %s\nCompétence %d • aptitude %d • expérience %.1f ans • leadership %d\nSpécialisation : %s\nRigueur %.0f • résolution %.0f • travail d'équipe %.0f • stress %.0f • méthodes %.0f\nSalaire : %s €/mois • prime d'embauche : %s €" % [
 		str(candidate.get("name", "")), str(candidate.get("department", "")), int(candidate.get("skill", 0)), int(candidate.get("aptitude", 0)),
 		float(candidate.get("experience_years", 0.0)), int(candidate.get("leadership", 0)), str(candidate.get("specialization", "")),
 		float(profile.get("rigor", 50.0)), float(profile.get("problem_solving", 50.0)),

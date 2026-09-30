@@ -57,7 +57,7 @@ func _build() -> void:
 	add_child(box)
 
 	box.add_child(UI.eyebrow("ENTREPRISE"))
-	box.add_child(UI.label("Piloter l'organisation sans perdre la vision CEO", 24))
+	box.add_child(UI.label("Piloter l'organisation sans perdre la vision du dirigeant", 24))
 	var intro := UI.muted_label("Réputation, divisions, délégation, RH, finances et locaux sont regroupés ici.", 12)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(intro)
@@ -94,7 +94,7 @@ func _build() -> void:
 	division_delegation_group.add_theme_constant_override("separation", 10)
 	box.add_child(division_delegation_group)
 	division_delegation_group.add_child(UI.section("Direction de division CPU"))
-	var delegation_intro := UI.muted_label("Quand l'entreprise grandit, vous pouvez garder la main, superviser un directeur ou lui déléguer les décisions courantes. Les choix structurants remontent toujours au CEO.", 12)
+	var delegation_intro := UI.muted_label("Quand l'entreprise grandit, vous pouvez garder la main, superviser un directeur ou lui déléguer les décisions courantes. Les choix structurants reviennent toujours à vous.", 12)
 	delegation_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	division_delegation_group.add_child(delegation_intro)
 
@@ -148,7 +148,7 @@ func _build() -> void:
 
 	division_mandate_label = UI.rich_label()
 	division_delegation_group.add_child(division_mandate_label)
-	division_delegation_group.add_child(UI.eyebrow("ARBITRAGES REMONTÉS AU CEO"))
+	division_delegation_group.add_child(UI.eyebrow("ARBITRAGES REMONTÉS À LA DIRECTION"))
 
 	division_escalation_select = OptionButton.new()
 	division_escalation_select.item_selected.connect(func(_index): _refresh_division_escalation())
@@ -336,7 +336,7 @@ const REPUTATION_ROWS := [
 	["support", "Service client", "Le SAV répond bien"],
 	["sustainability", "Responsabilité", "Consommation, environnement"],
 	["prestige", "Prestige", "La marque fait envie"],
-	["professional", "Clientèle pro", "Les entreprises vous font confiance (contrats B2B)"],
+	["professional", "Clientèle pro", "Les entreprises vous font confiance (contrats professionnels)"],
 ]
 
 ## Une barre par critère au lieu d'une liste « • Innovation : 48/100 ».

@@ -20,7 +20,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	add_child(UI.section("Appels d'offres & partenariats"))
-	var intro := UI.muted_label("Les clients B2B publient un cahier des charges. Vous pouvez proposer un CPU prêt ou déjà lancé. Une offre acceptée avant lancement réserve le contrat jusqu'à la commercialisation.", 12)
+	var intro := UI.muted_label("Les clients professionnels publient un cahier des charges. Vous pouvez proposer un CPU prêt ou déjà lancé. Une offre acceptée avant lancement réserve le contrat jusqu'à la commercialisation.", 12)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(intro)
 
@@ -46,12 +46,12 @@ func _build() -> void:
 	tender_submit_button.pressed.connect(_emit_submit)
 	add_child(tender_submit_button)
 
-	add_child(UI.section("Contrats B2B"))
+	add_child(UI.section("Contrats professionnels"))
 	contract_label = UI.rich_label()
 	add_child(contract_label)
 
 	_accept_button = Button.new()
-	_accept_button.text = "Accepter la première proposition B2B"
+	_accept_button.text = "Accepter la première proposition professionnelle"
 	_accept_button.pressed.connect(func(): action_requested.emit("accept_pending_contract", {}))
 	add_child(_accept_button)
 
@@ -113,7 +113,7 @@ func _refresh_detail() -> void:
 			int(tender.get("deadline_months", 0)), float(tender.get("confidentiality", 0.0)),
 			"oui" if bool(tender.get("exclusivity", false)) else "non"
 		],
-		"Cahier des charges : perf ≥ %.0f • efficacité ≥ %.0f • fiabilité ≥ %.0f" % [
+		"Cahier des charges : performance ≥ %.0f • efficacité ≥ %.0f • fiabilité ≥ %.0f" % [
 			float(requirements.get("performance", 0.0)), float(requirements.get("efficiency", 0.0)),
 			float(requirements.get("reliability", 0.0))
 		],

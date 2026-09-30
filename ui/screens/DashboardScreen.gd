@@ -551,7 +551,7 @@ func refresh() -> void:
 				"CORRECTION VALIDATION" if int(active_project.get("phase_index", 0)) >= GameData.PHASES.size() else "CORRECTION PROTOTYPE",
 				decision_delay
 			]
-			dashboard_cto_label.text = "« L'équipe applique votre décision. La progression normale est suspendue pendant cette passe de correction. »"
+			dashboard_cto_label.text = "« L'équipe applique votre décision. La progression normale est suspendue pendant cette phase de correction. »"
 		elif remediation_remaining > 0:
 			var remediation: Dictionary = active_project.get("technical_remediation", {})
 			dashboard_project_phase_label.text = "MISE AU POINT TECHNIQUE • %d MOIS RESTANTS" % remediation_remaining

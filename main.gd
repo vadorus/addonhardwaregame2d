@@ -830,10 +830,10 @@ func _refresh_cpu_preview():
 	var application_gap_text := ""
 	if not application_gaps.is_empty():
 		application_gap_text = " • à améliorer : %s" % ", ".join(application_gaps)
-	var royalty_text := "aucune royalty"
+	var royalty_text := "aucune redevance"
 	if float(sourcing.get("royalty_rate", 0.0)) > 0.0:
-		royalty_text = "%.1f%% du CA" % (float(sourcing.get("royalty_rate", 0.0)) * 100.0)
-	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s\nSourcing : %s • dépendance %.0f/100 • IP %.0f/100 • personnalisation %.0f/100 • %s\nUsage %s : %.0f/100 — %s%s" % [
+		royalty_text = "%.1f%% du chiffre d'affaires" % (float(sourcing.get("royalty_rate", 0.0)) * 100.0)
+	lab_summary_label.text = "%d cœur(s) • %s • %s • %s • %d W\nProgramme estimé : %s € • risque %s (%.0f/100)%s\nApprovisionnement : %s • dépendance %.0f/100 • propriété intellectuelle %.0f/100 • personnalisation %.0f/100 • %s\nUsage %s : %.0f/100 — %s%s" % [
 		int(design.cores), CPU_DESIGN.format_frequency(design), CPU_DESIGN.format_cache(design), CPU_DESIGN.node_label(int(design.node_nm)), int(design.tdp_w),
 		_money(estimated_program_cost), risk_label, risk, remediation_tag,
 		str(sourcing.get("label", "Interne")), float(sourcing.get("dependency", 0.0)), float(sourcing.get("ip_ownership", 100.0)),
@@ -850,7 +850,7 @@ func _refresh_cpu_preview():
 	lab_unit_cost_value.text = "%s €" % _money(projected_unit_cost)
 	if rd_supplier_label != null:
 		if approach_key == "INTERNAL":
-			rd_supplier_label.text = "Équipe interne : aucune dépendance fournisseur, IP et personnalisation maximales."
+			rd_supplier_label.text = "Équipe interne : aucune dépendance fournisseur, propriété intellectuelle et personnalisation maximales."
 		else:
 			var acceptance_text := "OFFRE ACCEPTABLE"
 			if not bool(sourcing.get("accepted", false)):
@@ -863,7 +863,7 @@ func _refresh_cpu_preview():
 			var rivalry_text := "%d projet(s) concurrent(s) identifié(s)" % rival_load
 			if not public_rivals.is_empty():
 				rivalry_text += " — %s" % ", ".join(public_rivals)
-			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100\nCapacité : %d/%d créneau(x) libre(s) • %d charge client anonyme • %s\nContrat : %s • %s • %s • %s\nAccès %s € • royalty %.1f%% • coût unitaire x%.2f • rupture %s €\nMouvement partenaire : %s\n%s — score d'acceptation %.0f/100" % [
+			rd_supplier_label.text = "%s • %s\nQualité %.0f/100 • fiabilité %.0f/100 • confiance %.0f/100 • relation %.0f/100\nCapacité : %d/%d créneau(x) libre(s) • %d charge client anonyme • %s\nContrat : %s • %s • %s • %s\nAccès %s € • redevance %.1f%% • coût unitaire x%.2f • rupture %s €\nMouvement partenaire : %s\n%s — score d'acceptation %.0f/100" % [
 				str(sourcing.get("supplier_name", "Partenaire")), str(sourcing.get("specialty", "Technologie")),
 				float(sourcing.get("supplier_quality", 0.0)), float(sourcing.get("supplier_reliability", 0.0)),
 				float(sourcing.get("supplier_trust", 0.0)), float(sourcing.get("supplier_relationship", 0.0)),
@@ -1106,9 +1106,9 @@ func _on_market_action(action: String, payload: Dictionary):
 					str(payload.get("product_id", "")),
 					int(payload.get("price", 0))
 				)
-				status_label.text = "Offre B2B envoyée. Le client rendra sa décision au prochain cycle mensuel." if ok else "Impossible d'envoyer cette offre : vérifiez le statut du CPU, du contrat et de l'appel d'offres."
+				status_label.text = "Offre professionnelle envoyée. Le client rendra sa décision au prochain cycle mensuel." if ok else "Impossible d'envoyer cette offre : vérifiez le statut du CPU, du contrat et de l'appel d'offres."
 		"accept_pending_contract":
-			status_label.text = "Contrat B2B accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."
+			status_label.text = "Contrat professionnel accepté." if MarketManager.accept_first_pending_contract() else "Aucune proposition en attente."
 		"investigate_case":
 			var case_id := str(payload.get("case_id", ""))
 			status_label.text = "Enquête SAV lancée." if case_id != "" and AfterSalesManager.start_investigation(case_id) else "Impossible de lancer l'enquête : dossier absent ou trésorerie insuffisante."
@@ -1162,7 +1162,7 @@ func _build_setup_layer():
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	brand.add_theme_color_override("font_color", APP_CYAN)
 	setup_title_box.add_child(brand)
-	var version := _eyebrow("V0.8.1 - GARAGE FIRST")
+	var version := _eyebrow("SIMULATION D'ENTREPRISE • 1971")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
 	var title := _label("Du garage à l'empire technologique", 22)
@@ -1950,7 +1950,7 @@ func _refresh_selected_supplier_contract():
 	var volume_text := "aucun volume garanti"
 	if guaranteed > 0:
 		volume_text = "%s / %s unités réalisées" % [_money(int(contract.get("units_delivered", 0))), _money(guaranteed)]
-	supplier_contract_label.text = "%s • %s\n%s • %s • %s • %s\nRoyalty %.1f%% • IP entreprise %.0f%% • %s • rupture %s €" % [
+	supplier_contract_label.text = "%s • %s\n%s • %s • %s • %s\nRedevance %.1f%% • propriété intellectuelle entreprise %.0f%% • %s • rupture %s €" % [
 		str(contract.get("supplier_name", "Partenaire")), status_text,
 		str(contract.get("contract_term_label", "")), str(contract.get("exclusivity_label", "")),
 		str(contract.get("ip_term_label", "")), str(contract.get("volume_term_label", "")),
