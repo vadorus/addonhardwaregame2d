@@ -601,6 +601,24 @@ func _tick_post_launch_state(product: Dictionary):
 			product["promotion_bonus"] = 0.0
 			CompanyManager.add_alert("%s : la campagne %s est terminée." % [str(product.get("name", "Produit")), promotion_label(ended)])
 
+## V0.10 / H1 : courbe d'expérience. Les premières séries coûtent ~55 % de plus à fabriquer (rendement faible,
+## tests à la main) ; chaque doublement des puces vendues par l'entreprise fait gagner ~8 points, jusqu'au coût nominal.
+## 0 puce : ×1,55 • 4 000 : ×1,30 • 16 000 : ×1,14 • 64 000 et plus : ×1,00.
+func experience_cost_factor() -> float:
+	var units := 0
+	for p in products:
+		units += int(p.get("units_sold_total", 0))
+	return clampf(1.55 - 0.08 * (log(1.0 + float(units) / 500.0) / log(2.0)), 1.0, 1.55)
+
+## Nora explique une seule fois, au premier mois de ventes, pourquoi la marge est plus basse qu'affichée.
+func _explain_distributors_once(distributor_rate: float, learning: float) -> void:
+	for p in products:
+		if bool(p.get("distributor_explained", false)):
+			return
+	if not products.is_empty():
+		products[0]["distributor_explained"] = true
+	CompanyManager.add_alert("Nora : les distributeurs gardent %d %% du prix de nos ventes en boutique, et nos premières séries coûtent %d %% de plus à fabriquer. Les deux baissent quand la marque grandit et que l'équipe prend de l'expérience." % [int(round(distributor_rate * 100.0)), int(round((learning - 1.0) * 100.0))])
+
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
 	var consumer_units := int(demand.get("units", 0))
@@ -616,10 +634,20 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var sold_consumer: int = mini(consumer_units, remaining_capacity)
 	var total_units := sold_b2b + sold_consumer
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
-	var production_cost := int(round(float(total_units * int(product.unit_cost)) * MarketManager.production_cost_threat_factor()))
+	# V0.10 / H1 : courbe d'expérience (les premières séries coûtent plus cher à fabriquer)
+	# et part des distributeurs sur les ventes grand public (pas sur les contrats B2B directs).
+	var learning := experience_cost_factor()
+	var production_cost := int(round(float(total_units * int(product.unit_cost)) * MarketManager.production_cost_threat_factor() * learning))
+	var distributor_rate := MarketManager.distributor_share()
+	var distributor_cost := int(round(float(sold_consumer * int(product.price)) * distributor_rate))
+	product["experience_cost_factor"] = learning
+	product["distributor_share"] = distributor_rate
 	var capacity_reservation_cost := monthly_capacity_reservation_cost(product, total_units)
 	Economy.add_income(revenue, "Ventes — %s" % str(product.name))
 	Economy.add_expense(production_cost, "Production — %s" % str(product.name))
+	if distributor_cost > 0:
+		Economy.add_expense(distributor_cost, "Distributeurs — %s" % str(product.name))
+		_explain_distributors_once(distributor_rate, learning)
 	if capacity_reservation_cost > 0:
 		Economy.add_expense(capacity_reservation_cost, "Réservation capacité — %s" % str(product.name))
 	var supplier_contract_id := str(product.get("supplier_contract_id", ""))

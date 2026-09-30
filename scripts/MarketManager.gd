@@ -1015,6 +1015,20 @@ func company_scale_fit(segment: String) -> float:
 		return 1.0
 	return clampf(pow(team / required, 0.6), 0.30, 1.0)
 
+## V0.10 / H1 (Claude, 30/09) : une jeune marque ne vend pas en direct. Les distributeurs gardent une part
+## du prix des ventes grand public (pas des contrats B2B, négociés en direct). Cette part baisse quand la marque
+## grandit : réputation, notoriété, locaux plus grands (vraie équipe commerciale). Diagnostic : sans elle,
+## une gamme de garage gardait 75-83 % de marge brute et rapportait ~60 k€/mois dès le premier mois.
+const DISTRIBUTOR_BASE_SHARE := {"ACCESSIBLE":0.28, "STANDARD":0.35, "SIMULATION":0.38}
+const DISTRIBUTOR_MIN_SHARE := 0.12
+
+func distributor_share() -> float:
+	var base := float(DISTRIBUTOR_BASE_SHARE.get(BalanceManager.active_profile, 0.35))
+	var relief := maxf(CompanyManager.get_brand_score() - 45.0, 0.0) * 0.004
+	relief += CompanyManager.get_awareness_bonus() * 0.25
+	relief += float(int(ExecutiveManager.workplace.get("tier", 0))) * 0.025
+	return clampf(base - relief, DISTRIBUTOR_MIN_SHARE, base)
+
 func _player_portfolio_share_cap() -> float:
 	var awareness := CompanyManager.get_awareness_bonus()
 	var brand_score := CompanyManager.get_brand_score()
