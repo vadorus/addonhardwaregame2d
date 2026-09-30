@@ -44,8 +44,13 @@ Le problème n'est pas le réalisme : c'est qu'**il n'y a plus de défi ni d'obj
 **P0-1. L'argent cesse d'être une contrainte dès la première gamme.**
 - Pixel, novice passif : 75 209 € au lancement → 122 026 € un mois plus tard → 655 630 € onze mois après, **sans aucune action**.
 - Sonde 10 ans : novice passif **10,9 M€** en 1981 avec **3 personnes dans le garage**, et **n°1 du classement dès 1975**.
-- Cause principale mesurée : la **gamme de 3 modèles additionne les parts de marché**. Même CPU en modèle unique : ~295 k€ à 24 mois ;
-  en gamme de 3 : ~1,49 M€ (×5). Déjà relevé dans mon analyse économique du 25/09 (cause « addition des parts par SKU »).
+- ~~Cause principale mesurée : la gamme de 3 modèles additionne les parts de marché.~~ **Corrigé le 30/09 à 14 h (diagnostic H1)** :
+  c'est faux, `MarketManager.estimate_portfolio_demand` partage déjà la demande de la famille (plafond de marque ~3 % du segment).
+  Mesure mois par mois (Standard passif, gamme de 3) : demande ~650 puces/mois (3 % de 19 445), capacité conseillée 222 + 199 + 96 = 517,
+  prix 125/185/285 € pour un coût de 31/39/47 € (**marge brute 75-83 %**), recettes ~90 k€/mois, dépenses ~29,5 k€/mois
+  (salaires 9,2 k€, fabrication ~19 k€) → **~60 k€ de bénéfice par mois dès le 1er mois**.
+  La gamme rapporte ~5× un modèle seul surtout parce que chaque modèle ajoute **sa propre capacité** (222 → 517 puces) et des prix plus hauts,
+  pas parce que les parts s'additionnent. Le vrai levier est **la marge unitaire** d'une jeune marque (et le vieillissement, H4).
 
 **P0-2. Grandir ne rapporte rien : il fait perdre.**
 - Sonde 10 ans : l'intermédiaire qui embauche (12 personnes) et déménage (locaux niveau 3) finit à **4,3 M€**, soit **moins que le novice

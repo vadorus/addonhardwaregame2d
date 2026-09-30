@@ -42,7 +42,7 @@ rien ne pousse à la génération suivante, décisions et offres B2B qui s'empil
 
 | Lot | Contenu | Responsable | Fichiers | Terminé quand |
 |---|---|---|---|---|
-| H1 | **Une gamme partage une seule part de marché** entre ses modèles (au lieu de l'additionner) | Claude | `MarketManager.gd`, `CpuProductLine.gd` | Standard passif : 250-600 k€ à 24 mois |
+| H1 | **Marge d'une jeune marque** (corrigé après diagnostic : la demande est déjà partagée dans une gamme ; le problème est une marge brute de 75-83 % dès le 1er mois). Pistes : part des distributeurs qui baisse quand la marque grandit, coût de fabrication qui baisse avec l'expérience | Claude | `MarketManager.gd`, `CpuProductLine.gd`, `ProductManager.gd` | Standard passif : 250-600 k€ à 24 mois |
 | H2 | **Capacité payante** : coût ≈ plusieurs mois de marge, plafond lié au fondeur / à l'usine, plus de doublement en chaîne | Claude | `ProductManager.gd` | Une extension se rembourse en 4-8 mois, pas en 2 semaines |
 | H3 | **Grandir paie** : équipe plus grande = projets plus rapides et meilleurs ; locaux plus grands = plus de capacité et de marchés | ChatGPT | `ResearchManager.gd`, `ExecutiveManager.gd` | Sur 10 ans, l'intermédiaire qui grandit finit ≥ 2× plus riche que le novice passif |
 | H4 | **Les produits vieillissent** : demande et prix baissent après ~18-24 mois, rivaux qui sortent mieux ; Nora dit « préparez la suite » | ChatGPT | `MarketManager.gd` (après H1), `Interactions.gd` | Aucun joueur passif ne reste n°1 mondial avec 3 personnes ; un 2e projet est proposé ≤ 6 mois après le 1er lancement |
