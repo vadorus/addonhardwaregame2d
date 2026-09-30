@@ -1065,7 +1065,8 @@ func _ready() -> void:
 		if gross_margin + 0.015 < BalanceManager.gross_margin_target(str(family_model.get("target_segment", "EMBEDDED"))):
 			_fail("Suggested CPU price fell below the market-specific gross margin guard")
 			return
-	var target_family_capacity := maxi(220, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.028))
+	# V0.10 / H2b : la capacité conseillée de la famille tient aussi dans ce que les locaux peuvent sortir.
+	var target_family_capacity := mini(maxi(220, int(float(MarketManager.segment_market_units("EMBEDDED")) * 0.028)), ProductManager.premises_production_cap())
 	if absi(family_recommended_capacity - target_family_capacity) > 6:
 		_fail("CPU launch family capacity no longer matches the shared garage-scale market sizing")
 		return

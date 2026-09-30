@@ -80,7 +80,8 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 		generation_index,
 		_base_unit_cost(project),
 		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
-		maxi(220, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.028)),
+		# V0.10 / H2b : la capacité conseillée tient dans ce que les locaux peuvent sortir.
+		mini(maxi(220, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.028)), premises_production_cap()),
 		float(division.get("maturity", 0.0)),
 		industrialization
 	)
@@ -486,6 +487,26 @@ const CAPACITY_EXPANSION_STEP := 2.0 # conservé pour compatibilité (anciens é
 ## - le prix d'une extension ≈ EXPANSION_MARGIN_MONTHS mois de la marge nette que rapporteront les puces ajoutées ;
 ## - le plafond est fixé par le fondeur et les locaux, et ne grandit plus avec les extensions.
 const EXPANSION_MARGIN_MONTHS := 5.0
+## V0.10 / H2b (idée d'Alexandre, 30/09) : ce sont les locaux qui limitent la production totale de l'entreprise
+## (tests, emballage, expédition), tous produits et contrats B2B confondus. Un garage ne peut pas inonder le
+## marché mondial : pour vendre plus, il faut déménager. Paliers = ExecutiveManager.WORKPLACE_TIERS.
+const PREMISES_PRODUCTION_CAP := [350, 1200, 5000, 20000]
+var _premises_alert_tier := -1
+
+func premises_production_cap() -> int:
+	var tier := clampi(int(ExecutiveManager.workplace.get("tier", 0)), 0, PREMISES_PRODUCTION_CAP.size() - 1)
+	return int(PREMISES_PRODUCTION_CAP[tier])
+
+func premises_name() -> String:
+	return str(ExecutiveManager.workplace_data().get("name", "Garage"))
+
+## Capacité déjà réservée par les autres produits en vente (pour savoir ce qu'il reste dans les locaux).
+func premises_capacity_used(except_product_id: String = "") -> int:
+	var used := 0
+	for p in products:
+		if str(p.get("status", "")) == "LAUNCHED" and str(p.get("id", "")) != except_product_id:
+			used += int(p.get("production_capacity", 0))
+	return used
 const CEILING_BASE_FACTOR := 2.0 # ×2 de la capacité maximale prévue au lancement
 const CEILING_PER_WORKPLACE_TIER := 0.5 # chaque palier de locaux ajoute ×0,5
 
@@ -507,8 +528,12 @@ func capacity_change_quote(product_id: String, new_capacity: int) -> Dictionary:
 		return {"ok":false, "reason":"Produit non lancé"}
 	var current_max := maxi(int(product.get("max_monthly_capacity", product.get("production_capacity", 1))), 1)
 	var ceiling := capacity_ceiling(product)
-	var hard_cap := maxi(ceiling, current_max)
-	var target := clampi(new_capacity, 1, hard_cap)
+	# Place restante dans les locaux, une fois les autres produits servis.
+	var premises_room := maxi(premises_production_cap() - premises_capacity_used(product_id), 0)
+	var current_capacity := int(product.get("production_capacity", 0))
+	var hard_cap := maxi(mini(maxi(ceiling, current_max), premises_room), current_capacity)
+	var premises_binding := premises_room < maxi(ceiling, current_max)
+	var target := clampi(new_capacity, 1, maxi(hard_cap, 1))
 	var extra_units := maxi(target - current_max, 0)
 	var cost := 0
 	if extra_units > 0:
@@ -516,11 +541,17 @@ func capacity_change_quote(product_id: String, new_capacity: int) -> Dictionary:
 		var raw := 4000.0 + float(extra_units * net_margin_per_unit(product)) * EXPANSION_MARGIN_MONTHS
 		cost = BalanceManager.expense_amount(maxi(3000, int(round(raw))), "Mise en production")
 	var limited := new_capacity > hard_cap
+	var reason := ""
+	if limited and premises_binding:
+		reason = "%s : %d puces par mois au maximum, tous produits confondus. Pour produire davantage, il faut des locaux plus grands." % [premises_name(), premises_production_cap()]
+	elif limited:
+		reason = "Limite du fondeur : pour produire davantage, il faut des locaux plus grands ou votre propre usine."
 	return {"ok":true, "capacity":target, "current":int(product.get("production_capacity", 0)), "max":current_max,
 		"hard_cap":hard_cap, "ceiling":ceiling, "extra_units":extra_units, "cost":cost,
 		"payback_months":EXPANSION_MARGIN_MONTHS if extra_units > 0 else 0.0,
+		"premises_cap":premises_production_cap(), "premises_room":premises_room, "premises_binding":premises_binding,
 		"limited":limited,
-		"limit_reason":"Limite du fondeur : pour produire davantage, il faut des locaux plus grands ou votre propre usine." if limited else ""}
+		"limit_reason":reason}
 
 func set_production_capacity(product_id: String, new_capacity: int) -> bool:
 	var quote := capacity_change_quote(product_id, new_capacity)
@@ -604,10 +635,27 @@ func process_month():
 		if str(product.status) == "LAUNCHED":
 			launched.append(product)
 	var portfolio_demand := MarketManager.estimate_portfolio_demand(launched)
+	_apply_premises_limit(launched)
 	for product in launched:
 		_sell_product_month(product, portfolio_demand.get(str(product.id), {}))
 		_tick_post_launch_state(product)
 	products_changed.emit()
+
+## V0.10 / H2b : si les produits en vente réservent plus que ce que les locaux peuvent sortir,
+## chacun est réduit dans la même proportion ce mois-ci, et Nora prévient une fois par palier de locaux.
+func _apply_premises_limit(launched: Array) -> void:
+	var total := 0
+	for product in launched:
+		total += int(product.get("production_capacity", 0))
+	var cap := premises_production_cap()
+	var scale := 1.0 if total <= cap else float(cap) / float(maxi(total, 1))
+	for product in launched:
+		product["effective_capacity"] = int(floor(float(int(product.get("production_capacity", 0))) * scale))
+		product["premises_limited"] = scale < 1.0
+	var tier := int(ExecutiveManager.workplace.get("tier", 0))
+	if scale < 1.0 and _premises_alert_tier != tier:
+		_premises_alert_tier = tier
+		CompanyManager.add_alert("Nora : %s tourne à plein, %d puces par mois au maximum. Pour vendre plus, il nous faut des locaux plus grands (Entreprise › Locaux)." % [premises_name(), cap])
 
 func _tick_post_launch_state(product: Dictionary):
 	_ensure_lifecycle_fields(product)
@@ -655,7 +703,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	if not contract.is_empty():
 		b2b_units = int(contract.units_per_month)
 		b2b_price = int(contract.unit_price)
-	var capacity := int(product.production_capacity)
+	var capacity := int(product.get("effective_capacity", product.production_capacity))
 	var sold_b2b: int = mini(b2b_units, capacity)
 	var remaining_capacity: int = maxi(capacity - sold_b2b, 0)
 	var sold_consumer: int = mini(consumer_units, remaining_capacity)
