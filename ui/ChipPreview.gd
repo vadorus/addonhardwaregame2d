@@ -16,6 +16,26 @@ const CHIP_GOLD := Color(1.000, 0.741, 0.353, 1.0)
 const CHIP_CYAN := Color(0.306, 0.843, 0.910, 1.0)
 const CHIP_TRACK := Color(0.149, 0.212, 0.290, 1.0)
 
+## V0.10 / J3 : puces peintes par Astra, une par époque (déduite de la finesse de gravure).
+const ART_DIR := "res://assets/art/v010/puces/"
+## Finesse de gravure minimale de chaque époque : 10–6 µm (1971), 3–1,5 µm (1978), 1 µm–800 nm (1985),
+## 600–350 nm (1993), 250–180 nm (1999), 130 nm et moins (2004).
+const ERAS := [[6000, "puce_1971"], [1500, "puce_1978"], [800, "puce_1985"], [350, "puce_1993"], [180, "puce_1999"], [0, "puce_2004"]]
+static var _art_cache := {}
+
+static func era_art_name(node_nm: int) -> String:
+	for era in ERAS:
+		if node_nm >= int(era[0]):
+			return str(era[1])
+	return "puce_2004"
+
+static func era_texture(node_nm: int) -> Texture2D:
+	var art_name := era_art_name(node_nm)
+	if not _art_cache.has(art_name):
+		var path := ART_DIR + art_name + ".png"
+		_art_cache[art_name] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	return _art_cache[art_name]
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(175, 175)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -33,6 +53,10 @@ func set_design(design: Dictionary, progress: float = 0.0, launched: bool = fals
 	set_progress(progress, launched)
 
 func _draw() -> void:
+	var art := era_texture(_node_nm)
+	if art != null:
+		_draw_art(art)
+		return
 	var side: float = minf(size.x, size.y) * 0.58
 	var origin := (size - Vector2(side, side)) * 0.5
 	var chip_rect := Rect2(origin, Vector2(side, side))
@@ -76,3 +100,20 @@ func _draw() -> void:
 	draw_arc(center, ring_radius, -PI * 0.5, PI * 1.5, 64, CHIP_TRACK, 4.0, true)
 	var end_angle: float = -PI * 0.5 + TAU * _progress / 100.0
 	draw_arc(center, ring_radius, -PI * 0.5, end_angle, 64, CHIP_GOLD if _launched else CHIP_CYAN, 4.0, true)
+
+func _draw_art(art: Texture2D) -> void:
+	var box := minf(size.x, size.y)
+	var center := size * 0.5
+	var fit := minf(box * 0.86 / art.get_width(), box * 0.86 / art.get_height())
+	var draw_size := art.get_size() * fit
+	# Pendant le développement, la puce « se révèle » ; lancée, elle est pleinement dorée.
+	var alpha := 1.0 if _launched or _progress <= 0.0 else lerpf(0.55, 1.0, _progress / 100.0)
+	draw_texture_rect(art, Rect2(center - draw_size * 0.5, draw_size), false, Color(1, 1, 1, alpha))
+	if _cores > 1:
+		var badge := Vector2(size.x - 30.0, 22.0)
+		draw_circle(badge, 17.0, Color("d9822b"))
+		draw_string(ThemeDB.fallback_font, badge + Vector2(-13.0, 5.0), "×%d" % _cores, HORIZONTAL_ALIGNMENT_CENTER, 26.0, 13, Color.WHITE)
+	if _progress > 0.0 and not _launched:
+		var ring_radius := box * 0.47
+		draw_arc(center, ring_radius, -PI * 0.5, PI * 1.5, 64, Color(0.149, 0.212, 0.290, 0.35), 4.0, true)
+		draw_arc(center, ring_radius, -PI * 0.5, -PI * 0.5 + TAU * _progress / 100.0, 64, CHIP_CYAN, 4.0, true)

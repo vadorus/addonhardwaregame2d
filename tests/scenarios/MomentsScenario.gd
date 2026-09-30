@@ -22,6 +22,11 @@ static func _check(host: Node) -> String:
 	for moment_id in MOMENTS.MOMENTS.keys():
 		if not ResourceLoader.exists(MOMENTS.image_path(moment_id)):
 			return "J3: missing illustration for moment %s" % moment_id
+	var chip: Script = load("res://ui/ChipPreview.gd")
+	var expected := {10000:"puce_1971", 3000:"puce_1978", 1000:"puce_1985", 600:"puce_1993", 180:"puce_1999", 90:"puce_2004", 3:"puce_2004"}
+	for node in expected.keys():
+		if str(chip.call("era_art_name", node)) != str(expected[node]) or chip.call("era_texture", node) == null:
+			return "J3: chip art for %d nm should be %s" % [node, expected[node]]
 	if not ResourceLoader.exists("res://assets/art/v010/titre/ecran_titre.webp"):
 		return "J3: missing title screen art"
 	ExecutiveManager.moments_seen = {}
