@@ -490,12 +490,18 @@ const EXPANSION_MARGIN_MONTHS := 5.0
 ## V0.10 / H2b (idée d'Alexandre, 30/09) : ce sont les locaux qui limitent la production totale de l'entreprise
 ## (tests, emballage, expédition), tous produits et contrats B2B confondus. Un garage ne peut pas inonder le
 ## marché mondial : pour vendre plus, il faut déménager. Paliers = ExecutiveManager.WORKPLACE_TIERS.
-const PREMISES_PRODUCTION_CAP := [350, 1200, 5000, 20000]
+## Alexandre (30/09) : « ce plafond doit sauter à la fin » → au dernier palier de locaux, plus de limite (0 = illimité).
+const PREMISES_PRODUCTION_CAP := [350, 1200, 5000, 0]
+const PREMISES_UNLIMITED := 100000000
 var _premises_alert_tier := -1
 
 func premises_production_cap() -> int:
 	var tier := clampi(int(ExecutiveManager.workplace.get("tier", 0)), 0, PREMISES_PRODUCTION_CAP.size() - 1)
-	return int(PREMISES_PRODUCTION_CAP[tier])
+	var cap := int(PREMISES_PRODUCTION_CAP[tier])
+	return cap if cap > 0 else PREMISES_UNLIMITED
+
+func premises_unlimited() -> bool:
+	return premises_production_cap() >= PREMISES_UNLIMITED
 
 func premises_name() -> String:
 	return str(ExecutiveManager.workplace_data().get("name", "Garage"))
