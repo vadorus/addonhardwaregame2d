@@ -572,6 +572,41 @@ func estimated_structural_monthly_cost() -> int:
 		+ FoundryManager.current_monthly_overhead()
 	)
 
+## V0.10 / H5 (Claude, 30/09) : « il vous restera X € au lancement ». Résultat mensuel récent (moyenne des
+## 3 derniers mois clos, ventes et charges comprises) ; sans historique, les charges fixes seules.
+func recent_monthly_result() -> int:
+	if Economy.history.is_empty():
+		return -estimated_structural_monthly_cost()
+	var count := mini(Economy.history.size(), 3)
+	var total := 0.0
+	for i in range(Economy.history.size() - count, Economy.history.size()):
+		total += float((Economy.history[i] as Dictionary).get("result", 0))
+	return int(round(total / float(count)))
+
+## Trésorerie mois par mois si l'on s'engage : coût mensuel en plus, pendant `months` mois.
+func launch_cash_projection(months: int, monthly_cost: int, upfront: int = 0) -> Dictionary:
+	var base := recent_monthly_result()
+	var cash := Economy.money - maxi(upfront, 0)
+	var lowest := cash
+	var negative_month := 0 if cash < 0 else -1
+	for m in range(1, maxi(months, 0) + 1):
+		cash += base - maxi(monthly_cost, 0)
+		if cash < lowest:
+			lowest = cash
+		if cash < 0 and negative_month < 0:
+			negative_month = m
+	return {"cash_end":cash, "lowest":lowest, "negative_month":negative_month, "months":maxi(months, 0), "base_result":base,
+		"monthly_outflow":maxi(maxi(monthly_cost, 0) - base, 0)}
+
+static func launch_cash_text(projection: Dictionary) -> String:
+	var cash_end := int(projection.get("cash_end", 0))
+	if int(projection.get("negative_month", -1)) >= 0:
+		return "⚠ Trésorerie à zéro vers le mois %d : baissez le budget, attendez des ventes ou cherchez un financement." % maxi(int(projection.negative_month), 1)
+	var outflow := int(projection.get("monthly_outflow", 0))
+	if outflow > 0 and cash_end < outflow * 3:
+		return "Serré : il ne restera que ~%s € au lancement (dans ~%d mois), à peine %d mois de charges. Les premières ventes devront vite arriver." % [_thousands(cash_end), int(projection.get("months", 0)), int(floor(float(cash_end) / float(outflow)))]
+	return "Il vous restera ~%s € au lancement (dans ~%d mois)." % [_thousands(cash_end), int(projection.get("months", 0))]
+
 func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Dictionary:
 	var cash_after := Economy.money - maxi(proposed_cost, 0)
 	var monthly_burn := estimated_structural_monthly_cost() + maxi(extra_monthly_cost, 0)

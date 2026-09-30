@@ -596,12 +596,23 @@ func _build_budget_step() -> void:
 		facts.add_child(UI.muted_label(str(pair[0]), 13))
 		facts.add_child(UI.label(str(pair[1]), 14))
 	_content.add_child(facts)
+	# V0.10 / H5 : ce qu'il restera au lancement, en clair, avant de s'engager.
+	var projection := launch_projection(estimate, monthly)
+	var cash_note := _note(ExecutiveManager.launch_cash_text(projection))
+	if int(projection.get("negative_month", -1)) >= 0:
+		cash_note.add_theme_color_override("font_color", Color("b3261e"))
+	_content.add_child(cash_note)
 	var advanced := Button.new()
 	advanced.focus_mode = Control.FOCUS_NONE
 	advanced.text = "Mode avancé : partenaires, contrats, tous les réglages"
 	advanced.custom_minimum_size.y = 44
 	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
 	_content.add_child(advanced)
+
+## V0.10 / H5 : trésorerie projetée jusqu'au lancement (développement + ~4 mois de fabrication).
+static func launch_projection(estimate: Dictionary, monthly_cost: int) -> Dictionary:
+	var dev_months := int(estimate.get("months", 8))
+	return ExecutiveManager.launch_cash_projection(dev_months + 4, monthly_cost)
 
 ## V0.10 / H3 : ce que la taille de l'équipe change, en une ligne.
 static func team_line(estimate: Dictionary) -> String:

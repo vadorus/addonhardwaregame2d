@@ -534,6 +534,7 @@ func _refresh_preview() -> void:
 		)
 		_budget_cost_label.text = "Sortie de caisse estimée au garage : ~%s €/mois pour prototypes, composants et essais (hors rémunération de l'équipe et local)." % UI.money(garage_cash_cost)
 
+
 	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("focus", "BALANCED")))
 	var detail_level := int(advice.get("level", 0))
 	if _cache_field_root != null:
@@ -613,6 +614,10 @@ func _refresh_preview() -> void:
 			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
 			str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
 		]
+	# V0.10 / H5 : ce qu'il restera au lancement, salaires et loyer compris.
+	var launch_cash := ExecutiveManager.launch_cash_projection(int(estimate.get("months", 8)) + 4,
+		ResearchManager.quoted_development_monthly_cost("INTERNAL", int(_budget.value), GameData.sourcing_profile("INTERNAL")))
+	_preview_label.text += "\n" + ExecutiveManager.launch_cash_text(launch_cash)
 	_update_slider_labels()
 
 func _qualitative_metric(value: float) -> String:

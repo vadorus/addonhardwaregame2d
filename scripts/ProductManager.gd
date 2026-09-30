@@ -700,9 +700,23 @@ func _explain_distributors_once(distributor_rate: float, learning: float) -> voi
 		products[0]["distributor_explained"] = true
 	CompanyManager.add_alert("Nora : les distributeurs gardent %d %% du prix de nos ventes en boutique, et nos premières séries coûtent %d %% de plus à fabriquer. Les deux baissent quand la marque grandit et que l'équipe prend de l'expérience." % [int(round(distributor_rate * 100.0)), int(round((learning - 1.0) * 100.0))])
 
+## V0.10 / H5 (Claude, 30/09) : une rupture n'est plus gratuite. Les clients qui repartent les mains vides
+## s'en souviennent : une part de la demande part chez les rivaux et la satisfaction baisse ; la
+## « frustration » retombe quand on sert de nouveau tout le monde.
+const STOCKOUT_DEMAND_LOSS := 0.25
+const STOCKOUT_SATISFACTION_LOSS := 18.0
+const STOCKOUT_TRIGGER := 0.10
+
+static func next_stockout_frustration(current: float, lost_ratio: float) -> float:
+	if lost_ratio >= STOCKOUT_TRIGGER:
+		return clampf(current + lost_ratio * 0.5, 0.0, 1.0)
+	return clampf(current * 0.7 - 0.02, 0.0, 1.0)
+
 func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
-	var consumer_units := int(demand.get("units", 0))
+	var frustration := float(product.get("stockout_frustration", 0.0))
+	# Clients déçus par les ruptures précédentes : une partie est allée voir les rivaux.
+	var consumer_units := int(round(float(demand.get("units", 0)) * (1.0 - STOCKOUT_DEMAND_LOSS * frustration)))
 	var contract := MarketManager.active_contract_for(str(product.id))
 	var b2b_units := 0
 	var b2b_price := 0
@@ -752,10 +766,12 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var lost_sales := maxi(consumer_units - sold_consumer, 0)
 	product["last_month_demand"] = consumer_units + b2b_units
 	product["last_month_lost_sales"] = lost_sales
+	frustration = next_stockout_frustration(frustration, float(lost_sales) / maxf(float(consumer_units), 1.0))
+	product["stockout_frustration"] = frustration
 	if lost_sales >= 20 and float(lost_sales) >= float(consumer_units) * 0.20:
 		if not bool(product.get("lost_sales_alerted", false)):
 			product["lost_sales_alerted"] = true
-			CompanyManager.add_alert("Nora : %s est en rupture — %d clients par mois repartent sans CPU. Augmentez la capacité dans Produits › Vendre." % [str(product.name), lost_sales])
+			CompanyManager.add_alert("Nora : %s est en rupture — %d clients par mois repartent sans CPU. Déçus, certains iront chez les rivaux et la satisfaction baisse. Augmentez la capacité dans Produits › Vendre." % [str(product.name), lost_sales])
 	elif float(lost_sales) < float(maxi(consumer_units, 1)) * 0.05:
 		product["lost_sales_alerted"] = false
 	product.units_sold_total = int(product.units_sold_total) + total_units
@@ -767,7 +783,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	product.market_lifecycle = str(demand.get("lifecycle", MarketManager.product_lifecycle_label(product)))
 	product.last_month_share = float(demand.get("share", 0.0))
 	product.last_month_returns = returns
-	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0, 0.0, 100.0)
+	var satisfaction: float = clampf(float(demand.get("score", 50.0)) + float(demand.get("expectation_gap", 0.0)) * 0.22 + (CompanyManager.get_support_modifier() - 1.0) * 18.0 - return_rate * 35.0 - frustration * STOCKOUT_SATISFACTION_LOSS, 0.0, 100.0)
 	product.customer_satisfaction = satisfaction
 	# 29/09 : chaque modèle en vente pesait autant sur la réputation, même un vieux CPU à 30 ventes/mois.
 	# Avec 21 modèles, la fiabilité de la partie d'Alexandre était tombée à 0/100. Le poids d'un

@@ -37,7 +37,9 @@ static func run() -> String:
 	if int(product.get("production_capacity", 0)) != 280 or Economy.money >= money_before:
 		return "Capacity: extension did not apply or was free"
 	ProductManager._sell_product_month(product, {"units":400, "score":70.0})
-	if int(product.get("last_month_sales", 0)) != 280 or int(product.get("last_month_lost_sales", 0)) != 120:
+	# V0.10 / H5 : après la grosse rupture du premier mois, une partie des clients déçus est partie chez
+	# les rivaux : la demande servie n'est plus 400 mais un peu moins, donc moins de 120 ventes perdues.
+	if int(product.get("last_month_sales", 0)) != 280 or int(product.get("last_month_lost_sales", 0)) >= 120 or int(product.get("last_month_lost_sales", 0)) <= 0:
 		return "Capacity: extended capacity should serve more demand (sold %d, lost %d)" % [int(product.get("last_month_sales", 0)), int(product.get("last_month_lost_sales", 0))]
 	# Un produit pas encore lancé ne se règle pas ici.
 	product["status"] = "READY"

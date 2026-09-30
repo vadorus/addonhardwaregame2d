@@ -443,6 +443,9 @@ func _refresh_model_summary(product: Dictionary) -> void:
 		var lost := int(product.get("last_month_lost_sales", 0))
 		if lost > 0:
 			parts.append("⚠ rupture : %s clients repartis sans CPU le mois dernier (demande %s)" % [UI.money(lost), UI.money(int(product.get("last_month_demand", 0)))])
+		var frustration := float(product.get("stockout_frustration", 0.0))
+		if frustration >= 0.10:
+			parts.append("clients déçus : −%d %% de demande, satisfaction −%d" % [int(round(frustration * ProductManager.STOCKOUT_DEMAND_LOSS * 100.0)), int(round(frustration * ProductManager.STOCKOUT_SATISFACTION_LOSS))])
 	_model_numbers.text = "  •  ".join(parts)
 	if _voices_label != null:
 		_voices_label.visible = status == "LAUNCHED"
