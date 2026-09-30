@@ -38,10 +38,26 @@ Le dossier `build/` n'est pas versionné (voir `.gitignore`) : on régénère le
    - ces chemins sont renseignés dans *Éditeur → Paramètres de l'éditeur → Export → Android*.
 4. **Téléphone** : options développeur + débogage USB activés, autoriser le PC au premier branchement.
 
-### Deuxième PC (PC du travail) — attention à la clé de signature
+### Clé de signature commune (V0.10 / Q0) — plus jamais de partie effacée
 
-Le PC du travail (compte `Admin`) a ses outils dans `C:\Users\Admin\Tools` (`Godot\…console.exe`, `Android\Sdk\platform-tools\adb.exe`, `Java`, `PortableGit`) et **seulement les modèles d'export Android** (pas d'export Windows depuis ce PC).
-Chaque PC signe l'APK de debug avec **sa propre clé**. Android refuse alors la mise à jour (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) quand on passe d'un PC à l'autre, et `adb uninstall` **efface les sauvegardes**. Procédure sûre :
+Depuis le 30/09, **tous les APK de test sont signés avec la même clé**, rangée dans le projet :
+`tools/android/techempire-debug.keystore` (alias `androiddebugkey`, mot de passe `android`,
+empreinte SHA-256 `997747a4…49a4bb`). C'est la clé qui a signé la version installée sur le Pixel le 30/09.
+Une mise à jour depuis n'importe quel PC passe donc par-dessus l'ancienne version **sans désinstaller** : les parties restent.
+
+- `tools\build_all.ps1` l'utilise toujours (variables `GODOT_ANDROID_KEYSTORE_DEBUG_*`), **vérifie la signature** de l'APK
+  avant d'installer, **copie les parties du téléphone** dans `build\pixel_saves\<date>` avant chaque installation,
+  et s'arrête au lieu de désinstaller si le téléphone porte une autre clé.
+- Pour que les exports faits **depuis l'éditeur Godot** (ou par une autre IA en ligne de commande) l'utilisent aussi,
+  lancer une fois par PC, Godot fermé : `powershell -ExecutionPolicy Bypass -File tools\setup_debug_keystore.ps1`
+  (fait sur le PC du travail le 30/09 ; **à faire sur le PC maison**).
+- Cette clé ne sert **qu'aux versions de test**. Une version publiée sur le Play Store aura sa propre clé, jamais dans le dépôt.
+
+### Deuxième PC (PC du travail)
+
+Le PC du travail (compte `Admin`) a ses outils dans `C:\Users\Admin\Tools` (`Godot\…console.exe`, `Android\Sdk\platform-tools\adb.exe`, `Java`, `PortableGit`) et **seulement les modèles d'export Android** : `build_all.ps1` y saute automatiquement la version PC.
+
+Si un jour le téléphone porte encore une ancienne clé (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), `adb uninstall` **effacerait les sauvegardes**. Procédure sûre (une seule fois, ensuite la clé commune suffit) :
 
 ```powershell
 $adb = "C:\Users\Admin\Tools\Android\Sdk\platform-tools\adb.exe"   # ou le chemin du PC maison
