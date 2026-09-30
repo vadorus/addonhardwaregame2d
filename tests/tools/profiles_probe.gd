@@ -18,11 +18,14 @@ const PROFILES := {
 const RETIRE_AFTER_MONTHS := 60
 
 var _log: Array[String] = []
+var _mode_override := ""
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var years := int(args[0]) if args.size() > 0 else 10
 	var names: Array = (args[1].split(",") as Array) if args.size() > 1 else PROFILES.keys()
+	# 3e argument (H6) : forcer un mode de difficulté pour tous les profils (ACCESSIBLE, STANDARD, SIMULATION).
+	_mode_override = str(args[2]) if args.size() > 2 else ""
 	var results := {}
 	for profile_name in names:
 		results[profile_name] = _play(str(profile_name), years)
@@ -39,7 +42,7 @@ func _ready() -> void:
 
 func _play(profile_name: String, years: int) -> Dictionary:
 	var p: Dictionary = PROFILES[profile_name]
-	SimulationManager.reset_all("Sonde %s" % profile_name, "CPU", str(p.mode))
+	SimulationManager.reset_all("Sonde %s" % profile_name, "CPU", _mode_override if _mode_override != "" else str(p.mode))
 	var end_year := TimeManager.year + years
 	var month_count := 0
 	var launches := 0
@@ -50,7 +53,9 @@ func _play(profile_name: String, years: int) -> Dictionary:
 	while TimeManager.year < end_year:
 		month_count += 1
 		# 1) Recrutement (développeurs d'abord, un producteur tous les 4).
-		if int(p.hire_every) > 0 and month_count % int(p.hire_every) == 0 and Economy.money > int(p.hire_cash):
+		# Un joueur raisonnable garde au moins 12 mois de réserve (H5 : il voit sa trésorerie projetée).
+		var runway_ok := ExecutiveManager.recent_monthly_result() >= 0 or Economy.money > -ExecutiveManager.recent_monthly_result() * 24
+		if int(p.hire_every) > 0 and month_count % int(p.hire_every) == 0 and Economy.money > int(p.hire_cash) and runway_ok:
 			var room := int(ExecutiveManager.workplace_data().capacity) - PersonnelManager.staff.size()
 			if room > 0:
 				# Surtout des développeurs ; un producteur pour trois développeurs.
@@ -65,7 +70,8 @@ func _play(profile_name: String, years: int) -> Dictionary:
 					and Economy.money > int(next.get("upgrade_cost", 0)) * 3:
 				ExecutiveManager.renovate_workplace()
 		# 3) Nouveau projet quand l'équipe est libre.
-		var can_parallel := _active_projects() == 0 or (_all_projects_past_prototype() and Economy.money > 400000)
+		var can_parallel := _active_projects() == 0 or (_all_projects_past_prototype() and Economy.money > 400000 \
+			and int(ExecutiveManager.launch_cash_projection(14, MarketManager.segment_recommended_budget(_pick_segment(float(p.reach)))).negative_month) < 0)
 		if _active_projects() < int(p.max_projects) and can_parallel:
 			gen += 1
 			var segment := _pick_segment(float(p.reach))
@@ -89,8 +95,21 @@ func _play(profile_name: String, years: int) -> Dictionary:
 					launches += 1
 			elif str(product.get("status", "")) == "LAUNCHED" and int(product.get("months_on_market", 0)) >= RETIRE_AFTER_MONTHS:
 				ProductManager.retire_product(str(product.id), true)
+		# 4b) Menaces du marché : on se défend si on en a les moyens (comme la sonde de campagne).
+		for threat in MarketManager.open_market_threats():
+			var threat_id := str(threat.get("id", ""))
+			MarketManager.resolve_market_threat(threat_id, Economy.money > MarketManager.threat_response_cost(threat_id) * 3)
 		# 5) Le mois passe.
-		last_income = int(SimulationManager.process_month_end().get("income", 0))
+		var rep: Dictionary = SimulationManager.process_month_end()
+		last_income = int(rep.get("income", 0))
+		if OS.get_environment("PROBE_DEBUG") != "" and TimeManager.year >= 1974:
+			var eb: Dictionary = Economy.history.back().get("expense_breakdown", {}) if not Economy.history.is_empty() else {}
+			var top := eb.keys()
+			top.sort_custom(func(a, b): return int(eb[a]) > int(eb[b]))
+			var parts := []
+			for k in top.slice(0, 6):
+				parts.append("%s=%d" % [k, int(eb[k])])
+			print("[DBG] %02d/%d money %d inc %d exp %d | %s" % [TimeManager.month, TimeManager.year, Economy.money, int(rep.get("income", 0)), int(rep.get("expenses", 0)), ", ".join(parts)])
 		for product_value in ProductManager.products:
 			var product: Dictionary = product_value
 			if str(product.get("status", "")) != "LAUNCHED":

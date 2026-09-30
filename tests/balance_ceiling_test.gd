@@ -14,6 +14,9 @@ const LIMITS := {
 	"STANDARD_ACTIF":{"max":1500000, "min":150000, "target":[300000, 900000]},
 	"SIMULATION_ACTIF":{"max":1200000, "min":0, "target":[150000, 700000]}
 }
+## V0.10 / H6 : même joueur, trois modes — chaque mode doit se sentir (au moins 15 % d'écart à 24 mois).
+const MODE_CASES := ["ACCESSIBLE_PASSIF", "STANDARD_PASSIF", "SIMULATION_PASSIF"]
+const MIN_MODE_GAP := 1.15
 ## Réagir aux ruptures doit payer, sans faire exploser l'économie (joueur actif / joueur passif à 24 mois).
 const MAX_ACTIVE_OVER_PASSIVE := 1.6
 ## Une extension de capacité payante se rembourse en plusieurs mois (pas en quelques jours).
@@ -48,6 +51,7 @@ func _ready() -> void:
 			_fail("Réagir aux ruptures rapporte moins que ne rien faire (×%.2f)" % ratio)
 		if ratio > MAX_ACTIVE_OVER_PASSIVE:
 			_fail("Réagir aux ruptures rapporte trop (×%.2f, plafond ×%.1f)" % [ratio, MAX_ACTIVE_OVER_PASSIVE])
+	_check_mode_gaps(results)
 	_check_capacity_rules()
 	if _failures.is_empty():
 		print("[CI] Balance ceilings passed")
@@ -84,6 +88,22 @@ func _check_capacity_rules() -> void:
 		_fail("Le plafond de capacité grandit d'extension en extension (%d puis %d)" % [ceiling, int(second.get("capacity", 0))])
 	if not bool(second.get("limited", false)) or str(second.get("limit_reason", "")) == "":
 		_fail("Au plafond, le devis doit expliquer la limite au joueur")
+
+func _check_mode_gaps(results: Dictionary) -> void:
+	var cash := []
+	for case_name in MODE_CASES:
+		var r: Dictionary = results.get(case_name, {})
+		if r.is_empty():
+			r = SCENARIO.run(case_name)
+		if not bool(r.get("ok", false)):
+			_fail("%s : partie interrompue (%s)" % [case_name, str(r.get("failure", ""))])
+			return
+		cash.append(int(r.cash_end))
+	print("[BALANCE] même joueur passif à 24 mois : Accessible %d € | Standard %d € | Simulation %d €" % [cash[0], cash[1], cash[2]])
+	if float(cash[0]) < float(cash[1]) * MIN_MODE_GAP:
+		_fail("Accessible ne se distingue pas assez de Standard (%d € contre %d €)" % [cash[0], cash[1]])
+	if float(cash[1]) < float(cash[2]) * MIN_MODE_GAP:
+		_fail("Simulation ne se distingue pas assez de Standard (%d € contre %d €)" % [cash[2], cash[1]])
 
 func _fail(message: String) -> void:
 	_failures.append(message)

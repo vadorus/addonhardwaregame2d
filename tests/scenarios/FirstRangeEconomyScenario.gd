@@ -10,6 +10,9 @@ const CASES := {
 	"NOVICE_PASSIF":{"mode":"ACCESSIBLE", "segment":"CALCULATOR", "focus":"EFFICIENCY", "preset":"EFFICIENT", "budget":35000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"ECONOMY", "binning":"VOLUME", "price_ratio":0.95, "react_after":999},
 	"STANDARD_PASSIF":{"mode":"STANDARD", "segment":"EMBEDDED", "focus":"BALANCED", "preset":"BALANCED", "budget":45000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"BALANCED", "binning":"BALANCED", "price_ratio":1.00, "react_after":999},
 	"STANDARD_ACTIF":{"mode":"STANDARD", "segment":"EMBEDDED", "focus":"BALANCED", "preset":"BALANCED", "budget":45000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"BALANCED", "binning":"BALANCED", "price_ratio":1.00, "react_after":1},
+	# V0.10 / H6 : le même joueur passif que STANDARD_PASSIF, dans les deux autres modes.
+	"ACCESSIBLE_PASSIF":{"mode":"ACCESSIBLE", "segment":"EMBEDDED", "focus":"BALANCED", "preset":"BALANCED", "budget":45000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"BALANCED", "binning":"BALANCED", "price_ratio":1.00, "react_after":999},
+	"SIMULATION_PASSIF":{"mode":"SIMULATION", "segment":"EMBEDDED", "focus":"BALANCED", "preset":"BALANCED", "budget":45000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"BALANCED", "binning":"BALANCED", "price_ratio":1.00, "react_after":999},
 	"SIMULATION_ACTIF":{"mode":"SIMULATION", "segment":"EMBEDDED", "focus":"BALANCED", "preset":"BALANCED", "budget":45000, "prototype":"BALANCE", "validation":"APPROVE", "industrial":"ECONOMY", "binning":"BALANCED", "price_ratio":1.03, "react_after":0}
 }
 
