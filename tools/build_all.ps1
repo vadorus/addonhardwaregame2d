@@ -103,6 +103,9 @@ if ($apksigner) {
 if ($Install) {
   $adb = if ($sdk) { Join-Path $sdk "platform-tools\adb.exe" } else { $null }
   if (-not $adb -or -not (Test-Path $adb)) { throw "adb introuvable (Android SDK non trouvé)" }
+  # Démarre le serveur adb AVANT les copies : né dans un « cmd /c ... > fichier », il gardait la sortie
+  # ouverte et le script restait bloqué (30/09, PC maison, deux fois).
+  & $adb start-server 2>&1 | Out-Null
   # Copie de sécurité de la partie du téléphone avant toute installation.
   $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
   $backup = Join-Path $root "build\pixel_saves\$stamp"
