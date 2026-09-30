@@ -114,7 +114,9 @@ if ($Install) {
   }
   Write-Host "   Parties du téléphone copiées dans $backup"
   Write-Host "Installation sur le téléphone (mise à jour, parties conservées)"
-  $result = & $adb install -r $apkPath 2>&1 | Out-String
+  # --no-incremental : l'installation « incrémentale » laisse adb servir les fichiers en arrière-plan,
+  # ce qui bloquait le script indéfiniment (30/09, PC maison).
+  $result = & $adb install --no-incremental -r $apkPath 2>&1 | Out-String
   Write-Host $result
   if ($result -match "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
     throw "Le jeu du téléphone a été signé avec une autre clé. Ne pas désinstaller sans copier les parties : voir docs/BUILD_PC_ANDROID.md, section « Clé de signature commune »."
