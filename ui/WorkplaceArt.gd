@@ -37,10 +37,10 @@ const CREW := {
 }
 
 ## Personnages : 12 salariés × 4 poses (bureau, réflexion, joie, inquiet) de ChatGPT et Astra,
-## plus le client et la journaliste d'Astra (réflexion = debout, parle).
+## plus le client (13) et la journaliste (14) d'Astra, eux aussi en 4 poses.
 const CHARACTER_COUNT := 14
 const NORA_LOOK := 4
-## Visiteurs dessinés par Astra (2 poses : debout, en train de parler).
+## Visiteurs dessinés par Astra.
 const CLIENT_LOOK := 13
 const PRESS_LOOK := 14
 const VISITOR_LOOKS := [13, 14]

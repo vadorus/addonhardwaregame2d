@@ -59,9 +59,9 @@ static func palette_for(key: String) -> Dictionary:
 
 ## Pose affichée selon la situation.
 func sprite_pose() -> String:
-	# Client ou journaliste : il est venu vous parler, il fait le geste.
+	# Client ou journaliste : debout à la porte, il attend de vous parler (le « ! » le signale).
 	if department == "Visiteur":
-		return "parle"
+		return "reflexion"
 	if mood == "joie":
 		return "joie"
 	if mood == "inquiet":
