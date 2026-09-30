@@ -4,18 +4,29 @@ static func run() -> String:
 	if BalanceManager.active_profile != "STANDARD":
 		return "Default CI game did not start on Standard economic balance"
 	var balance_state := BalanceManager.get_state().duplicate(true)
+	var keys := BalanceManager.profile_keys()
+	if keys != ["ACCESSIBLE", "STANDARD", "SIMULATION"]:
+		return "G1: setup profiles must be Accessible / Standard / Simulation"
+	if BalanceManager.guidance_level() != "CONTEXTUAL" or BalanceManager.default_lab_depth() != "ESSENTIAL":
+		return "G1: Standard should use contextual Nora guidance and progressive lab depth"
 	var standard_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
 	var standard_market_units := MarketManager.segment_market_units("EMBEDDED")
 	var standard_capital := BalanceManager.starting_capital()
 	var standard_runway := BalanceManager.starting_runway_months()
 
 	BalanceManager.reset("ACCESSIBLE")
+	if BalanceManager.guidance_level() != "GUIDED" or BalanceManager.default_lab_depth() != "ESSENTIAL" or BalanceManager.delegation_preset() != "ASSISTED":
+		BalanceManager.load_state(balance_state)
+		return "G1: Accessible preset does not enable guided assistance"
 	var accessible_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
 	var accessible_market_units := MarketManager.segment_market_units("EMBEDDED")
 	var accessible_capital := BalanceManager.starting_capital()
 	var accessible_runway := BalanceManager.starting_runway_months()
 
-	BalanceManager.reset("REALISTIC")
+	BalanceManager.reset("SIMULATION")
+	if BalanceManager.guidance_level() != "MINIMAL" or BalanceManager.default_lab_depth() != "EXPERT" or BalanceManager.delegation_preset() != "DIRECT":
+		BalanceManager.load_state(balance_state)
+		return "G1: Simulation preset does not expose the full simulation by default"
 	var realistic_salary_cost := BalanceManager.expense_amount(10000, "Salaires")
 	var realistic_market_units := MarketManager.segment_market_units("EMBEDDED")
 	var realistic_capital := BalanceManager.starting_capital()
@@ -52,7 +63,7 @@ static func run() -> String:
 		BalanceManager.load_state(balance_state)
 		return "Difficulty does not scale competitor reaction cadence progressively"
 
-	BalanceManager.reset("REALISTIC")
+	BalanceManager.reset("SIMULATION")
 	if absf(BalanceManager.competitor_pressure_factor() - 1.0) > 0.001:
 		BalanceManager.load_state(balance_state)
 		return "Realistic difficulty still gives competitors a hidden market/stat multiplier"
@@ -62,6 +73,12 @@ static func run() -> String:
 	if BalanceManager.expense_amount(10000, "SAV garanties — test CPU") != 10000:
 		BalanceManager.load_state(balance_state)
 		return "Difficulty changed literal warranty unit economics"
+
+	# Migration G1 : les anciennes sauvegardes REALISTIC deviennent Simulation sans perte.
+	BalanceManager.load_state({"active_profile":"REALISTIC"})
+	if BalanceManager.active_profile != "SIMULATION":
+		BalanceManager.load_state(balance_state)
+		return "G1: legacy REALISTIC save did not migrate to SIMULATION"
 
 	BalanceManager.load_state(balance_state)
 	if BalanceManager.active_profile != "STANDARD":

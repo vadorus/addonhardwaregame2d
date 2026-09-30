@@ -2,12 +2,15 @@ extends Node
 
 signal balance_changed(profile_key)
 
-const PROFILE_ORDER := ["ACCESSIBLE", "STANDARD", "REALISTIC"]
+const PROFILE_ORDER := ["ACCESSIBLE", "STANDARD", "SIMULATION"]
 
 const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
-		"description":"Simulation complète, avec davantage de marge financière et des entreprises concurrentes moins réactives et plus imparfaites.",
+		"description":"Toutes les mécaniques restent actives, mais Nora explique davantage les choix, le laboratoire s'ouvre en mode Essentiel et l'économie laisse plus de marge.",
+		"guidance_level":"GUIDED",
+		"lab_depth":"ESSENTIAL",
+		"delegation_preset":"ASSISTED",
 		"starting_capital":150000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
@@ -24,7 +27,10 @@ const PROFILES := {
 	},
 	"STANDARD":{
 		"label":"Standard",
-		"description":"Équilibre de référence : entreprises autonomes cohérentes, réactives sans être omniscientes.",
+		"description":"Expérience de référence : Nora intervient quand c'est utile, l'interface reste progressive et les concurrents réagissent sans être omniscients.",
+		"guidance_level":"CONTEXTUAL",
+		"lab_depth":"ESSENTIAL",
+		"delegation_preset":"SUPERVISED",
 		"starting_capital":100000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
@@ -39,9 +45,12 @@ const PROFILES := {
 		"ai_commercial_aggression":1.00,
 		"first_generation_runway_target":15.0
 	},
-	"REALISTIC":{
-		"label":"Réaliste",
-		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
+	"SIMULATION":{
+		"label":"Simulation",
+		"description":"Toutes les informations et responsabilités sont exposées d'emblée : Nora conseille peu, le laboratoire s'ouvre en Expert et les concurrents sont plus réactifs et précis.",
+		"guidance_level":"MINIMAL",
+		"lab_depth":"EXPERT",
+		"delegation_preset":"DIRECT",
 		"starting_capital":95000,
 		"operating_cost":1.04,
 		"salary_cost":1.03,
@@ -60,16 +69,31 @@ const PROFILES := {
 
 var active_profile := "STANDARD"
 
+func normalize_profile_key(profile_key: String) -> String:
+	# Compatibilité avec les sauvegardes créées avant le renommage Réaliste -> Simulation.
+	if profile_key == "REALISTIC":
+		return "SIMULATION"
+	return profile_key if PROFILES.has(profile_key) else "STANDARD"
+
 func reset(profile_key: String = "STANDARD") -> void:
-	active_profile = profile_key if PROFILES.has(profile_key) else "STANDARD"
+	active_profile = normalize_profile_key(profile_key)
 	balance_changed.emit(active_profile)
 
 func profile_keys() -> Array:
 	return PROFILE_ORDER.duplicate()
 
 func profile_data(profile_key: String = "") -> Dictionary:
-	var key := profile_key if profile_key != "" else active_profile
+	var key := normalize_profile_key(profile_key) if profile_key != "" else active_profile
 	return PROFILES.get(key, PROFILES.STANDARD).duplicate(true)
+
+func guidance_level(profile_key: String = "") -> String:
+	return str(profile_data(profile_key).get("guidance_level", "CONTEXTUAL"))
+
+func default_lab_depth(profile_key: String = "") -> String:
+	return str(profile_data(profile_key).get("lab_depth", "ESSENTIAL"))
+
+func delegation_preset(profile_key: String = "") -> String:
+	return str(profile_data(profile_key).get("delegation_preset", "SUPERVISED"))
 
 func profile_label(profile_key: String = "") -> String:
 	return str(profile_data(profile_key).get("label", "Standard"))
@@ -172,5 +196,5 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary) -> void:
 	var key := str(state.get("active_profile", "STANDARD"))
-	active_profile = key if PROFILES.has(key) else "STANDARD"
+	active_profile = normalize_profile_key(key)
 	balance_changed.emit(active_profile)

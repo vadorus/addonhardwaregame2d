@@ -81,6 +81,13 @@ func show_decision(value: Dictionary) -> void:
 	_text.text = str(decision.get("text", ""))
 	_text.visible = _text.text != ""
 	var advice := str(decision.get("recommendation", ""))
+	var guidance := BalanceManager.guidance_level()
+	# Accessible : Nora explicite son conseil. Standard : conseil contextuel. Simulation :
+	# elle n'intervient que sur les dossiers critiques, sans retirer aucune option au joueur.
+	if guidance == "MINIMAL" and float(decision.get("severity", 0.0)) < 80.0:
+		advice = ""
+	elif guidance == "GUIDED" and advice != "":
+		advice = "Je vous conseille : %s" % advice
 	_advice.text = "Nora : %s" % advice if advice != "" else ""
 	_advice.visible = advice != ""
 	_feedback.visible = false

@@ -1205,7 +1205,7 @@ func _build_setup_layer():
 	var create_title := _label("Tout commence dans le garage", 22)
 	create_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_creation_box.add_child(create_title)
-	var create_desc := _muted_label("Choisissez simplement un nom et le niveau de difficulté. Nora vous guidera ensuite vers votre première vraie décision.", 13)
+	var create_desc := _muted_label("Choisissez un nom et votre mode de jeu. Il règle l'accompagnement de Nora et la complexité affichée au départ, jamais les possibilités offertes.", 13)
 	create_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	create_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_creation_box.add_child(create_desc)
@@ -2008,19 +2008,35 @@ func _refresh_setup_difficulty():
 	var key := _meta(setup_difficulty)
 	var data := BalanceManager.profile_data(key)
 	var capital := int(data.get("starting_capital", 100000))
-	setup_difficulty_label.text = "%s\nCapital de lancement : %s €. Les règles économiques restent identiques ; seule la marge d'erreur change." % [
-		BalanceManager.profile_description(key),
-		_money(capital)
+	var guidance_labels := {"GUIDED":"Nora très présente", "CONTEXTUAL":"Nora contextuelle", "MINIMAL":"Nora discrète"}
+	var depth_labels := {"ESSENTIAL":"Essentiel au départ", "DETAILED":"Détaillé au départ", "EXPERT":"Expert au départ"}
+	var delegation_labels := {"ASSISTED":"délégation conseillée", "SUPERVISED":"délégation supervisée", "DIRECT":"direction directe"}
+	setup_difficulty_label.text = "%s\nCapital : %s € • %s • labo : %s • %s. Toutes les mécaniques restent accessibles." % [
+		BalanceManager.profile_description(key), _money(capital),
+		str(guidance_labels.get(BalanceManager.guidance_level(key), "Nora contextuelle")),
+		str(depth_labels.get(BalanceManager.default_lab_depth(key), "Essentiel au départ")),
+		str(delegation_labels.get(BalanceManager.delegation_preset(key), "délégation supervisée"))
 	]
+
+func _apply_game_mode_presentation() -> void:
+	if lab_screen != null and lab_screen.has_method("set_depth_mode"):
+		lab_screen.call("set_depth_mode", BalanceManager.default_lab_depth())
 
 func _start_new_game():
 	SimulationManager.reset_all(setup_name.text, _meta(setup_sector), _meta(setup_difficulty))
+	_apply_game_mode_presentation()
 	TimeManager.time_scale = 0.0
 	setup_layer.visible = false
 	game_over_layer.visible = false
 	if tabs != null:
 		tabs.current_tab = 0
-	status_label.text = "Nora : touchez l'établi ou « Nouveau projet CPU » pour commencer."
+	match BalanceManager.guidance_level():
+		"GUIDED":
+			status_label.text = "Nora : je reste avec vous. Commencez par toucher l'établi ; je vous expliquerai chaque décision importante."
+		"MINIMAL":
+			status_label.text = "Garage prêt. L'établi ouvre la conception CPU ; tous les réglages sont disponibles."
+		_:
+			status_label.text = "Nora : touchez l'établi ou « Nouveau projet CPU » pour commencer."
 	_refresh_all()
 	_start_music_for_current_year()
 
@@ -2030,6 +2046,7 @@ func _load_game():
 
 func _load_game_slot(slot: int) -> void:
 	if SaveManager.load_from_slot(slot):
+		_apply_game_mode_presentation()
 		setup_layer.visible=false
 		SimulationManager.is_game_over = Economy.money <= 0
 		game_over_layer.visible=false
