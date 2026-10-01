@@ -809,7 +809,7 @@ func _ceo_decisions() -> Array:
 		return decision_source.call()
 	if not CompanyManager.created:
 		return []
-	return ExecutiveManager.get_ceo_decisions()
+	return ExecutiveManager.visible_ceo_decisions()
 
 func _short(text: String, max_chars: int) -> String:
 	return text if text.length() <= max_chars else text.substr(0, max_chars - 1).strip_edges() + "…"

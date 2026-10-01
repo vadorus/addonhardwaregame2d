@@ -2911,7 +2911,7 @@ func _on_news_changed() -> void:
 
 func _on_decision_raised(title: String, tab: int) -> void:
 	# Lot A : une seule carte « À faire (n) », n = décisions réellement en attente.
-	var pending := ExecutiveManager.get_ceo_decisions().size() if CompanyManager.created else 0
+	var pending := ExecutiveManager.visible_ceo_decisions().size() if CompanyManager.created else 0
 	if pending > 1:
 		notify("À faire (%d) — dernière : %s" % [pending, title], "alert", tab)
 	else:

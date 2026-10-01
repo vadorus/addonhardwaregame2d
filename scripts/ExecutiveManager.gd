@@ -60,6 +60,9 @@ var hr_issues: Array = []
 var moments_seen: Dictionary = {}
 ## Ancienne sauvegarde sans moments : ce qui est déjà vrai au chargement ne sera pas rejoué.
 var moments_migration_pending := false
+## V0.10 / I3 : mois où chaque décision est apparue (pour savoir depuis quand elle attend).
+var decision_seen_at: Dictionary = {}
+const CEO_DEFAULTS := preload("res://scripts/CeoDefaults.gd")
 var _next_hr_issue_id := 1
 var months_operated := 0
 var interface_unlocks := {
@@ -79,6 +82,7 @@ var interface_unlocks := {
 var unlock_history: Array = []
 
 func reset():
+	decision_seen_at = {}
 	moments_seen = {}
 	moments_migration_pending = false
 	benefit_policy = {"HEALTH":"NONE","MEALS":"NONE","TRAINING":"NONE","REST":"NONE"}
@@ -433,6 +437,7 @@ func process_month():
 		morale_delta -= minf(0.18 * float(overflow), 1.2)
 	PersonnelManager.apply_company_environment(morale_delta, benefits_training_gain())
 	_detect_hr_issues()
+	settle_overflowing_decisions()
 	sync_interface_unlocks()
 	executive_changed.emit()
 
@@ -644,6 +649,40 @@ func financial_advice(proposed_cost: int = 0, extra_monthly_cost: int = 0) -> Di
 		"can_afford":cash_after > 0,
 		"recommendation":recommendation
 	}
+
+## V0.10 / I3 : les décisions que le joueur voit (au plus 3, les plus importantes d'abord).
+func visible_ceo_decisions() -> Array:
+	var all := get_ceo_decisions()
+	return all.slice(0, mini(all.size(), CEO_DEFAULTS.MAX_VISIBLE))
+
+func hidden_ceo_decision_count() -> int:
+	return maxi(get_ceo_decisions().size() - CEO_DEFAULTS.MAX_VISIBLE, 0)
+
+## Chaque mois : Nora tranche avec le choix prudent ce qui attend depuis trop longtemps, et le dit.
+## Renvoie les titres tranchés.
+func settle_overflowing_decisions() -> Array:
+	var settled: Array = []
+	var decisions := get_ceo_decisions()
+	var alive := {}
+	for index in range(decisions.size()):
+		var decision: Dictionary = decisions[index]
+		var id := str(decision.get("id", ""))
+		alive[id] = true
+		if not decision_seen_at.has(id):
+			decision_seen_at[id] = months_operated
+			continue
+		var waited := months_operated - int(decision_seen_at[id])
+		var overflow := index >= CEO_DEFAULTS.MAX_VISIBLE and waited >= CEO_DEFAULTS.OVERFLOW_PATIENCE
+		if not (overflow or waited >= CEO_DEFAULTS.MAX_PATIENCE) or not CEO_DEFAULTS.can_settle(decision):
+			continue
+		if CEO_DEFAULTS.settle(decision):
+			settled.append(str(decision.get("title", "")))
+			decision_seen_at.erase(id)
+			CompanyManager.add_alert("Nora a tranché pendant que vous gériez le reste : « %s » → %s." % [str(decision.get("title", "Décision")), str(CEO_DEFAULTS.DEFAULT_LABELS.get(str(decision.get("category", "")), "choix prudent"))])
+	for id in decision_seen_at.keys():
+		if not alive.has(id):
+			decision_seen_at.erase(id)
+	return settled
 
 func get_ceo_decisions() -> Array:
 	var decisions: Array = []
@@ -1125,7 +1164,8 @@ func get_state() -> Dictionary:
 		"months_operated":months_operated,
 		"interface_unlocks":interface_unlocks,
 		"unlock_history":unlock_history,
-		"moments_seen":moments_seen
+		"moments_seen":moments_seen,
+		"decision_seen_at":decision_seen_at
 	}
 
 func load_state(state: Dictionary):
@@ -1146,6 +1186,8 @@ func load_state(state: Dictionary):
 	hr_issues = state.get("hr_issues", []).duplicate(true)
 	_next_hr_issue_id = int(state.get("next_hr_issue_id", hr_issues.size() + 1))
 	months_operated = int(state.get("months_operated", 0))
+	var saved_seen_at = state.get("decision_seen_at", {})
+	decision_seen_at = saved_seen_at.duplicate(true) if typeof(saved_seen_at) == TYPE_DICTIONARY else {}
 	var saved_moments = state.get("moments_seen", null)
 	moments_seen = saved_moments.duplicate(true) if typeof(saved_moments) == TYPE_DICTIONARY else {}
 	moments_migration_pending = typeof(saved_moments) != TYPE_DICTIONARY

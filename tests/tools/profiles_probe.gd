@@ -47,6 +47,9 @@ func _play(profile_name: String, years: int) -> Dictionary:
 	var month_count := 0
 	var launches := 0
 	var last_income := 0
+	var max_decisions := 0
+	var max_total_decisions := 0
+	var decision_kinds := {}
 	var units := 0
 	var bankrupt := ""
 	var gen := 0
@@ -122,6 +125,14 @@ func _play(profile_name: String, years: int) -> Dictionary:
 					var quote := ProductManager.capacity_change_quote(str(product.id), demand)
 					if int(quote.get("capacity", 0)) > int(product.get("production_capacity", 0)) and Economy.money > int(quote.get("cost", 0)) * 2:
 						ProductManager.set_production_capacity(str(product.id), demand)
+		var pending_decisions: Array = ExecutiveManager.get_ceo_decisions()
+		if ExecutiveManager.visible_ceo_decisions().size() > max_decisions:
+			max_decisions = ExecutiveManager.visible_ceo_decisions().size()
+		if pending_decisions.size() > max_total_decisions:
+			max_total_decisions = pending_decisions.size()
+		for d in pending_decisions:
+			var cat := str((d as Dictionary).get("category", "?"))
+			decision_kinds[cat] = int(decision_kinds.get(cat, 0)) + 1
 		_advance_month()
 		if SimulationManager.is_game_over:
 			bankrupt = "%02d/%d" % [TimeManager.month, TimeManager.year]
@@ -143,6 +154,8 @@ func _play(profile_name: String, years: int) -> Dictionary:
 				total += float(value)
 			quality += total / maxf(float(fm.size()), 1.0)
 			done += 1
+	var nora_settled := CompanyManager.alerts.filter(func(a): return str(a).begins_with("Nora a tranché")).size()
+	print("[PROFILES] %s décisions visibles : max %d (en tout max %d) | tranchées par Nora (alertes récentes) %d | mois-décisions %s" % [profile_name, max_decisions, max_total_decisions, nora_settled, str(decision_kinds)])
 	return {"avg_dev_months":dev_months / maxf(done, 1.0), "avg_quality":quality / maxf(done, 1.0), "money":Economy.money, "income":last_income, "units":units, "staff":PersonnelManager.staff.size(),
 		"devs":PersonnelManager.count_department("Développement"), "tier":int(ExecutiveManager.workplace.get("tier", 0)),
 		"launches":launches, "rank":int(CAREER.player_rank()), "bankrupt":bankrupt}

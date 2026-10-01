@@ -317,7 +317,7 @@ func _add_inline_metric(parent: GridContainer, title: String, value: String) -> 
 func _refresh_dashboard_priority(brief: Dictionary):
 	if dashboard_priority_text == null or dashboard_priority_category == null or dashboard_priority_action == null:
 		return
-	dashboard_priority_decisions = ExecutiveManager.get_ceo_decisions()
+	dashboard_priority_decisions = ExecutiveManager.visible_ceo_decisions()
 	if not dashboard_priority_decisions.is_empty():
 		if dashboard_priority_select != null:
 			var previous_id := dashboard_priority_selected_id
