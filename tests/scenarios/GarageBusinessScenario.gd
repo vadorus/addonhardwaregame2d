@@ -6,9 +6,20 @@ const INTERACTIONS := preload("res://scripts/Interactions.gd")
 static func run() -> String:
 	SimulationManager.reset_all("CI Garage Business", "CPU", "STANDARD")
 	ExecutiveManager.months_operated = 3
-	# 1. Un client arrive après quelques mois.
+	# V0.10 / I2 : personne ne vient avant le premier CPU en vente (le novice a son premier projet à mener).
+	for _i in range(4):
+		GarageBusiness.process_month()
+	if not GarageBusiness.open_offers().is_empty():
+		return "I2: no client offer before the first CPU is on sale"
+	var first_cpu := {"id":"I2-CPU", "name":"Garage 1", "sector":"CPU", "status":"LAUNCHED", "company":CompanyManager.company_name,
+		"price":120, "unit_cost":40, "production_capacity":300, "months_on_market":3, "target_segment":"EMBEDDED",
+		"metrics":{"performance":80.0, "efficiency":80.0, "reliability":85.0, "usability":70.0, "innovation":70.0, "ecosystem":60.0, "sustainability":60.0}}
+	ProductManager.products.append(first_cpu)
+	# 1. Une fois le premier CPU en vente, un client arrive vite.
 	for _i in range(3):
 		GarageBusiness.process_month()
+		if not GarageBusiness.open_offers().is_empty():
+			break
 	var offers := GarageBusiness.open_offers()
 	if offers.size() != 1:
 		return "Garage business: a design contract offer should appear after a few months (got %d)" % offers.size()
@@ -22,6 +33,19 @@ static func run() -> String:
 		return "Garage business: the client offer should be a visitor waiting at the garage"
 	if INTERACTIONS.dialogue(key).is_empty():
 		return "Garage business: the client offer has no conversation"
+	# I2 : une seule offre à la fois — tant que ce client attend, aucun contrat ni appel d'offres de plus.
+	for _i in range(40):
+		MarketManager.maybe_generate_b2b(first_cpu)
+	for contract_value in MarketManager.contracts:
+		if str((contract_value as Dictionary).get("status", "")) == "PENDING":
+			return "I2: a second client offer appeared while the first one was still waiting"
+	# I2 : jamais sur le bouton vert ni dans « prochaine étape ».
+	var hub: Control = (load("res://ui/GarageHub.gd") as Script).new() as Control
+	hub.set("decision_source", func(): return ExecutiveManager.get_ceo_decisions())
+	var focus: Dictionary = hub.call("_compute_focus")
+	hub.free()
+	if str(focus.get("category", "")) in ["CLIENT", "SOUS-TRAITANCE", "CONTRAT"]:
+		return "I2: a client offer must never take the green button (%s)" % str(focus.get("title", ""))
 	var decision_found := false
 	for decision in ExecutiveManager.get_ceo_decisions():
 		if str((decision as Dictionary).get("id", "")) == key:

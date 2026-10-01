@@ -2202,6 +2202,9 @@ func _update_tenders():
 			active_open += 1
 	if active_open >= 2:
 		return
+	# I2 : pas d'appel d'offres avant le premier CPU en vente, ni par-dessus une autre offre en attente.
+	if not b2b_offers_open() or b2b_offer_waiting():
+		return
 	var eligible_templates: Array[String] = []
 	for template_id_value in TENDER_TEMPLATES.keys():
 		var template_id := str(template_id_value)
@@ -2228,8 +2231,29 @@ func activate_reserved_contracts(product_id: String):
 			CompanyManager.add_alert("Le contrat avec %s démarre avec le lancement de %s." % [str(contract.get("customer", "")), str(contract.get("product_name", ""))])
 	market_changed.emit()
 
+## V0.10 / I2 (Claude, 01/10) : les clients pros, calmement. Avant le premier CPU en vente, personne ne
+## vient (le novice a assez à faire avec son premier projet) ; ensuite une seule offre à la fois
+## (contrat, appel d'offres ou contrat d'études) : la suivante attend qu'on ait répondu à la première.
+func b2b_offers_open() -> bool:
+	for product_value in ProductManager.products:
+		var status := str((product_value as Dictionary).get("status", ""))
+		if status in ["LAUNCHED", "RETIRED", "CLEARANCE"]:
+			return true
+	return false
+
+func b2b_offer_waiting() -> bool:
+	for contract_value in contracts:
+		if str((contract_value as Dictionary).get("status", "")) == "PENDING":
+			return true
+	for tender_value in tenders:
+		if str((tender_value as Dictionary).get("status", "")) == "OPEN" and not bool((tender_value as Dictionary).get("ceo_ignored", false)):
+			return true
+	return not GarageBusiness.open_offers().is_empty()
+
 func maybe_generate_b2b(product: Dictionary):
 	if str(product.get("status", "")) != "LAUNCHED":
+		return
+	if b2b_offer_waiting():
 		return
 	# Personne ne signe un contrat de 2 ans sur un CPU en fin de vie.
 	if obsolescence_factor(product) < 0.6:

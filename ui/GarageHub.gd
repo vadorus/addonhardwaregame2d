@@ -828,6 +828,10 @@ func _compute_focus() -> Dictionary:
 		var decision: Dictionary = value
 		if str(decision.get("id", "")).begins_with("PROJECT:"):
 			continue
+		# V0.10 / I2 : les offres des clients pros ne prennent jamais le bouton vert ni « prochaine étape » :
+		# le client attend à la porte du garage (« ! ») et dans Marché.
+		if str(decision.get("category", "")) in ["CLIENT", "SOUS-TRAITANCE", "CONTRAT"]:
+			continue
 		if best.is_empty() or float(decision.get("severity", 0.0)) > float(best.get("severity", 0.0)):
 			best = decision
 	if best.is_empty():
