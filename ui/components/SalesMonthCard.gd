@@ -137,7 +137,7 @@ func refresh() -> void:
 	_top = top
 	if top.is_empty():
 		_signal_title.text = str(summary.calm)
-		_signal_text.text = "Vos CPU sont listés plus bas. Tous les réglages restent dans « Gérer ce modèle »." if measured else "Le premier bilan de ventes arrive à la fin du mois."
+		_signal_text.text = str(summary.get("calm_detail", ""))
 		_actions.visible = false
 	else:
 		_signal_title.text = "⚠ " + str(top.title)

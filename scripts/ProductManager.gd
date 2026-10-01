@@ -895,6 +895,8 @@ func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
 		lesson = "Chaque puce vendue fait perdre de l'argent : revoyez prix, coût, royalties ou qualité avant d'augmenter les volumes."
 	elif utilization >= 0.95 and demand_units > capacity:
 		lesson = "La capacité limite les ventes : augmenter la capacité peut convertir une partie de la demande non servie."
+		if premises_production_cap() - premises_capacity_used(str(product.get("id", ""))) <= capacity:
+			lesson = "La capacité limite les ventes, et vos locaux tournent à plein : pour vendre plus, il faudra des locaux plus grands."
 	elif int(report.get("net_contribution", 0)) <= 0:
 		lesson = "Le mois détruit de la marge : revoyez prix, coût, royalties ou qualité avant d'augmenter les volumes."
 	elif not forecast.is_empty() and actual_units < min_units:

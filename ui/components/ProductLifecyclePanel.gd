@@ -474,7 +474,7 @@ func _refresh_range() -> void:
 		products_label.text = "Aucun produit. Terminez d'abord un projet du Labo."
 		return
 	products_label.text = "%d modèle(s) en vente • %d prêt(s) à lancer • %s puces vendues le mois dernier%s" % [
-		launched, ready_count, UI.money(monthly_units), (" • meilleure vente : %s (%s/mois)" % [best_name, UI.money(best_units)]) if best_name != "" else ""]
+		launched, ready_count, UI.money(monthly_units), (" • meilleure vente : %s (%s/mois)" % [best_name, UI.money(best_units)]) if best_name != "" and best_units > 0 else ""]
 	var generations: Array = ProductManager.cpu_generations.duplicate()
 	generations.reverse()
 	var older := VBoxContainer.new()
@@ -593,9 +593,12 @@ func _refresh_model_summary(product: Dictionary) -> void:
 		var row := UI.meter_row(str(row_data[0]))
 		UI.set_meter(row, float(row_data[1]), "%.0f/100" % float(row_data[1]))
 		_model_meters.add_child(row)
-	var margin := int(product.get("price", 0)) - int(product.get("unit_cost", 0)) - int(round(float(product.get("price", 0)) * float(product.get("royalty_rate", 0.0))))
+	# Retour Pixel (01/10) : « marge 146 €/puce » oubliait distributeurs et premières séries plus chères ;
+	# le lancement annonçait ~59 € gagnés par puce. Même calcul partout maintenant.
+	var price_value := float(product.get("price", 0))
+	var margin := int(round(price_value * (1.0 - MarketManager.distributor_share() - float(product.get("royalty_rate", 0.0))) - float(product.get("unit_cost", 0)) * ProductManager.experience_cost_factor()))
 	var parts: Array[String] = ["coût %s €" % UI.money(int(product.get("unit_cost", 0))), "prix %s €" % UI.money(int(product.get("price", 0))),
-		"marge %s €/puce" % UI.money(margin), "capacité %s/mois" % UI.money(int(product.get("production_capacity", 0)))]
+		"gagné ~%s €/puce (après distributeurs)" % UI.money(margin), "capacité %s/mois" % UI.money(int(product.get("production_capacity", 0)))]
 	if status == "LAUNCHED":
 		parts.append("%s vendues au total" % UI.money(int(product.get("units_sold_total", 0))))
 		parts.append("%s (%d mois)" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0))])
@@ -930,7 +933,8 @@ func _on_sale_capacity_changed(_value: float) -> void:
 	var at_ceiling := target >= int(quote.get("hard_cap", 0)) and target > int(quote.get("current", 0))
 	_capacity_apply_button.tooltip_text = "Limite du fondeur : pour produire davantage, il faut des locaux plus grands ou votre propre usine." if at_ceiling else ""
 	if at_current:
-		_capacity_apply_button.text = "Capacité actuelle : %s/mois (plafond %s)" % [UI.money(target), UI.money(int(quote.get("hard_cap", target)))]
+		var premises_full := bool(quote.get("premises_binding", false)) and target >= int(quote.get("hard_cap", target))
+		_capacity_apply_button.text = ("Capacité actuelle : %s/mois (locaux pleins)" % UI.money(target)) if premises_full else "Capacité actuelle : %s/mois (plafond %s)" % [UI.money(target), UI.money(int(quote.get("hard_cap", target)))]
 	elif cost > 0:
 		_capacity_apply_button.text = "Passer à %s/mois — %s €, remboursé en ~%d mois%s" % [UI.money(target), UI.money(cost), int(round(float(quote.get("payback_months", 5.0)))), " (plafond du fondeur)" if at_ceiling else ""]
 	elif target < int(quote.get("current", 0)):

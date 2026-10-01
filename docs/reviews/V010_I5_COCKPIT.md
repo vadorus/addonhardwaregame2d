@@ -84,6 +84,26 @@ Les bots ne touchent jamais « Plus tard » : le nombre de mois avec un conseil 
 - smoke, garage_layout, workshop_layout et balance_ceiling : OK.
 - Captures dans `I5_captures/` : 1er mois, devis, 21 CPU, « Gérer ce modèle », Marché.
 
+## Test sur le Pixel par Claude (01/10, 14h15)
+
+Le test a été fait sur la partie d'Alexandre (avril 1972), sauvegardée avant et remise à l'identique après (même empreinte MD5). Parcours suivi :
+1. fin de l'industrialisation, puis « Lancer les 3 modèles » ;
+2. « Premières ventes en cours » ;
+3. après un mois : carte de Nora avec la rupture de l'Essentiel ;
+4. « Examiner », devis, puis « Confirmer » : capacité 144 → 161, 0 € ;
+5. liste des CPU, toucher une ligne pour ouvrir sa fiche ;
+6. « Gérer ce modèle » : le second toucher demandé sur une campagne, sans rien dépenser ;
+7. Marché : la carte « Offensive commerciale ».
+
+Ce que le test a fait corriger :
+- **« Tout va bien, laissez vendre »** s'affichait juste après avoir monté la capacité, alors que la liste montrait encore deux ruptures (locaux pleins). La carte dit maintenant : « Rien à acheter ce mois-ci : vos locaux tournent à plein », avec le plafond et la solution (des locaux plus grands).
+- **La fiche** annonçait « marge 146 €/puce », alors que le lancement disait ~59 € gagnés par puce. Elle affiche maintenant « gagné ~X €/puce (après distributeurs) », avec le même calcul.
+- **La leçon du terrain** conseillait d'augmenter la capacité alors que les locaux étaient pleins. Elle le dit maintenant.
+- **Le bouton capacité** affiche « (locaux pleins) » au lieu d'un plafond égal à la capacité actuelle.
+- **« meilleure vente : nv1 E (0/mois) »** s'affichait avant les premières ventes. Supprimé.
+
+Vu mais pas changé ici : après le premier mois de ventes, trois cartes s'enchaînent (notes de presse, « À la une », « Les étagères sont vides »). À regrouper plus tard.
+
 ## Reste à valider au doigt (Pixel)
 
 - Un novice trouve quoi faire en moins de 15 secondes.

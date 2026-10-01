@@ -209,6 +209,7 @@ static func month_summary() -> Dictionary:
 	var measured := false
 	var active: Array = []
 	var clearance_ids: Array = []
+	var capped := 0
 	for product_value in launched:
 		var product: Dictionary = product_value
 		if int(product.get("months_on_market", 0)) >= 1:
@@ -224,7 +225,9 @@ static func month_summary() -> Dictionary:
 			if str(advice.kind) == "CLEARANCE":
 				clearance_ids.append(str(advice.product_id))
 				continue
-			if not is_snoozed(product, str(advice.kind)) and not bool(advice.get("portfolio_only", false)):
+			if bool(advice.get("portfolio_only", false)):
+				capped += 1
+			elif not is_snoozed(product, str(advice.kind)):
 				active.append(advice)
 	# Plusieurs modèles dépassés : un seul conseil pour toute la gamme.
 	if not clearance_ids.is_empty() and month_index() >= ProductManager.range_advice_snooze_until:
@@ -237,6 +240,13 @@ static func month_summary() -> Dictionary:
 			"text":"Une fin de série (−25 %% pendant %d mois) écoule le stock, puis le modèle est retiré. Vos CPU récents récupèrent les clients." % ProductManager.CLEARANCE_MONTHS}
 		active.append(entry)
 	active.sort_custom(func(a, b): return int(a.priority) < int(b.priority))
+	# Retour Pixel (01/10) : après avoir monté la capacité jusqu'au plafond des locaux, la carte disait
+	# « Tout va bien » alors que la liste montrait encore deux ruptures.
+	var calm := "Tout va bien, laissez vendre." if measured else "Laissez le marché découvrir votre CPU."
+	var calm_detail := "Vos CPU sont listés plus bas. Tous les réglages restent dans « Gérer ce modèle »." if measured else "Le premier bilan de ventes arrive à la fin du mois."
+	if capped > 0:
+		calm = "Rien à acheter ce mois-ci : vos locaux tournent à plein."
+		calm_detail = "%s produit au maximum %s puces par mois, tous CPU confondus. Pour vendre plus, il faudra des locaux plus grands (objectifs de Nora, Entreprise › Locaux)." % [ProductManager.premises_name(), _money(ProductManager.premises_production_cap())]
 	var headline := "Premières ventes en cours : le bilan arrive à la fin du mois."
 	if measured:
 		headline = "%s puces vendues le mois dernier, %s%s € de bénéfice des ventes." % [_money(sales), "+" if contribution >= 0 else "", _money(contribution)]
@@ -245,4 +255,4 @@ static func month_summary() -> Dictionary:
 		"served":float(sales) / maxf(float(sales + lost), 1.0),
 		"headline":headline, "top":active[0] if not active.is_empty() else {},
 		"second":active[1] if active.size() > 1 else {}, "count":active.size(),
-		"calm":"Tout va bien, laissez vendre." if measured else "Laissez le marché découvrir votre CPU."}
+		"calm":calm, "calm_detail":calm_detail}

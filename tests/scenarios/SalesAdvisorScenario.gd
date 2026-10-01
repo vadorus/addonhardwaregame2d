@@ -162,6 +162,18 @@ static func _check(host: Node) -> String:
 		return "I5: the healthy CPU must be « En vente »"
 	_calm(a)
 
+	# --- Retour Pixel : rupture au plafond des locaux → pas de bouton, et surtout pas « Tout va bien ».
+	a["production_capacity"] = 250
+	a["last_month_consumer_demand"] = 400
+	a["last_month_lost_sales"] = 150
+	summary = ADVISOR.month_summary()
+	if not (summary.top as Dictionary).is_empty() or str(summary.calm).find("locaux") < 0:
+		return "I5: a stockout at the premises ceiling must say the premises are full, with no button (%s)" % str(summary.calm)
+	if (ADVISOR.portfolio().EXAMINE as Array).size() != 1:
+		return "I5: a stockout at the premises ceiling must stay « À examiner »"
+	a["production_capacity"] = 100
+	_calm(a)
+
 	# --- Usine sous-utilisée : campagne si la demande déçoit, sinon moins de capacité.
 	var low := {"units":30, "net_contribution":1500, "capacity_reservation_cost":150, "capacity_utilization":0.3, "verdict":"Dans la prévision"}
 	b["last_month_sales"] = 30
