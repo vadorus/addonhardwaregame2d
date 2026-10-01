@@ -15,9 +15,13 @@ const OUTLETS := [
 ]
 
 var news: Array = []
+## V0.10 / K2 : triomphes dans la presse (moyenne ≥ 78), encadrés dans la vitrine du QG.
+var front_pages := 0
+const MOMENTS := preload("res://scripts/Moments.gd")
 
 func reset():
 	news = []
+	front_pages = 0
 	add_news("Économie", "Une nouvelle société technologique entre sur le marché.", "Les observateurs attendent de voir sa première stratégie produit.")
 
 ## 29/09 : un seul plafond de 60 articles pour tout — les brèves B2B chassaient les tests de
@@ -106,6 +110,8 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 			}
 		)
 	if not published.is_empty():
+		if MOMENTS.is_good_press(published):
+			front_pages += 1
 		reviews_published.emit(str(product.get("name", "Produit")), published)
 
 ## Effet de l'interview donnée au lancement (conversation avec le journaliste).
@@ -371,8 +377,9 @@ func publish_b2b_interest(product_name: String, customer: String) -> void:
 	publish_business_event(str(headlines[pick % headlines.size()]), str(bodies[(pick / 7) % bodies.size()]), topic)
 
 func get_state() -> Dictionary:
-	return {"news":news}
+	return {"news":news, "front_pages":front_pages}
 
 func load_state(state: Dictionary):
 	news = state.get("news", []).duplicate(true)
+	front_pages = int(state.get("front_pages", 0))
 	news_changed.emit()

@@ -90,6 +90,10 @@ var _focus: Dictionary = {}
 var _last_focus_key := ""
 var _phase_row: HBoxContainer
 var _crew: Control
+var _life: Control
+
+func life() -> Control:
+	return _life
 
 func crew() -> Control:
 	return _crew
@@ -141,6 +145,10 @@ func _build_background() -> void:
 	_crew = (load("res://ui/GarageCrew.gd") as Script).new() as Control
 	_crew.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_crew)
+	# V0.10 / K2 : vitrine, trophées, saisons et événements, par-dessus l'équipe mais sous les cartes.
+	_life = (load("res://ui/GarageLife.gd") as Script).new() as Control
+	_life.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_life)
 
 func _build_overlay() -> void:
 	_room_badge = PanelContainer.new()
@@ -522,6 +530,8 @@ func _layout_zones() -> void:
 			_crew.set("project_target", _project_panel.position + Vector2(project_w * 0.35, 70.0))
 	if _crew != null:
 		_crew.call("set_art_rect", art_rect)
+	if _life != null:
+		_life.call("set_art_rect", art_rect)
 	if _tasks_panel != null:
 		var tasks_w := clampf(size.x * 0.25, 250.0, 330.0)
 		_tasks_panel.size = Vector2(tasks_w, 0.0)
@@ -574,6 +584,8 @@ func _layout_zones() -> void:
 			hud_rects.append(Rect2(panel.position, panel.size).grow(4.0))
 	for side_button in visible_side:
 		hud_rects.append(Rect2(side_button.position, side_button.size).grow(4.0))
+	if _life != null and bool(_life.call("shelf_visible")):
+		hud_rects.append((_life.call("shelf_rect") as Rect2).grow(4.0))
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
 		var spot := WORKPLACE.zone_spot(_workplace_tier, str(button.get_meta("zone_name")), r.get_center())
@@ -947,6 +959,8 @@ func _refresh_gameplay_overlays() -> void:
 	_update_focus()
 	if _crew != null:
 		_crew.call("refresh")
+	if _life != null:
+		_life.call("refresh")
 	var active_project: Dictionary = {}
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":

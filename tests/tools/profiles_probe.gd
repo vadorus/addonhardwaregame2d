@@ -10,6 +10,7 @@ extends Node
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CAREER := preload("res://scripts/CareerPrestige.gd")
 const SALES_ADVISOR := preload("res://scripts/SalesAdvisor.gd")
+const GARAGE_LIFE := preload("res://ui/GarageLife.gd")
 
 const PROFILES := {
 	"NOVICE":{"mode":"ACCESSIBLE", "hire_every":0, "hire_cash":0, "max_projects":1, "budget_ratio":0.85, "move":false, "expand":false, "reach":1.0},
@@ -55,6 +56,8 @@ func _play(profile_name: String, years: int) -> Dictionary:
 	var advice_months := 0
 	var first_year_advice := 0
 	var advice_kinds := {}
+	var hq_changes := {}
+	var last_scene: Dictionary = {}
 	var advice_episodes := 0
 	var first_year_kinds := {}
 	var last_advice_key := ""
@@ -147,6 +150,13 @@ func _play(profile_name: String, years: int) -> Dictionary:
 				if sales_months <= 12:
 					first_year_advice += 1
 					first_year_kinds[str(advice.kind)] = int(first_year_kinds.get(str(advice.kind), 0)) + 1
+		# K2 : ce qui change à l'écran du QG (hors saisons, qui changent tous les 3 mois).
+		var scene: Dictionary = GARAGE_LIFE.scene_signature()
+		if not last_scene.is_empty():
+			for key in ["tier", "crew", "chips", "trophies", "front_pages", "event"]:
+				if str(scene[key]) != str(last_scene[key]) and not (key == "event" and str(scene[key]) == ""):
+					hq_changes[key] = int(hq_changes.get(key, 0)) + 1
+		last_scene = scene
 		var pending_decisions: Array = ExecutiveManager.get_ceo_decisions()
 		if ExecutiveManager.visible_ceo_decisions().size() > max_decisions:
 			max_decisions = ExecutiveManager.visible_ceo_decisions().size()
@@ -177,6 +187,10 @@ func _play(profile_name: String, years: int) -> Dictionary:
 			quality += total / maxf(float(fm.size()), 1.0)
 			done += 1
 	var nora_settled := CompanyManager.alerts.filter(func(a): return str(a).begins_with("Nora a tranché")).size()
+	var hq_total := 0
+	for value in hq_changes.values():
+		hq_total += int(value)
+	print("[PROFILES] %s QG : %d changements visibles (hors saisons) %s" % [profile_name, hq_total, str(hq_changes)])
 	print("[PROFILES] %s conseils Vendre : %d nouveaux conseils, %d mois sur %d avec un conseil affiché (12 premiers mois de vente : %d %s) | %s" % [profile_name, advice_episodes, advice_months, sales_months, first_year_advice, str(first_year_kinds), str(advice_kinds)])
 	print("[PROFILES] %s décisions visibles : max %d (en tout max %d) | tranchées par Nora (alertes récentes) %d | mois-décisions %s" % [profile_name, max_decisions, max_total_decisions, nora_settled, str(decision_kinds)])
 	return {"avg_dev_months":dev_months / maxf(done, 1.0), "avg_quality":quality / maxf(done, 1.0), "money":Economy.money, "income":last_income, "units":units, "staff":PersonnelManager.staff.size(),
