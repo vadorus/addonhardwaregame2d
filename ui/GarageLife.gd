@@ -211,6 +211,10 @@ static func current_event() -> String:
 		var event: Dictionary = event_value
 		if str(event.get("status", "ACTIVE")) == "ACTIVE":
 			return str(event.get("title", "Événement"))
+	# K4 : la période commerciale du moment (rentrée, fêtes…).
+	var period: Dictionary = (load("res://scripts/SeasonalCalendar.gd") as Script).call("period", TimeManager.month)
+	if not period.is_empty():
+		return str(period.title)
 	return ""
 
 ## Largeur des objets posés sur l'étagère (l'étagère s'adapte à son contenu).

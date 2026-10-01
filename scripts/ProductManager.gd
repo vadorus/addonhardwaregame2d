@@ -1,4 +1,5 @@
 extends Node
+const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
@@ -745,7 +746,9 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var demand: Dictionary = prepared_demand if not prepared_demand.is_empty() else MarketManager.estimate_consumer_demand(product)
 	var frustration := float(product.get("stockout_frustration", 0.0))
 	# Clients déçus par les ruptures précédentes : une partie est allée voir les rivaux.
-	var consumer_units := int(round(float(demand.get("units", 0)) * (1.0 - STOCKOUT_DEMAND_LOSS * frustration)))
+	# K4 : rythme de l'année (rentrée, fêtes, vacances…). Les prévisions restent la moyenne annuelle.
+	var seasonal := SEASONAL.demand_factor(MarketManager.normalize_segment(str(product.get("target_segment", MarketManager.default_segment()))), TimeManager.month)
+	var consumer_units := int(round(float(demand.get("units", 0)) * seasonal * (1.0 - STOCKOUT_DEMAND_LOSS * frustration)))
 	var contract := MarketManager.active_contract_for(str(product.id))
 	var b2b_units := 0
 	var b2b_price := 0

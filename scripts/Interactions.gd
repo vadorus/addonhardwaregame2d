@@ -7,6 +7,7 @@ extends RefCounted
 
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
+const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
 
 ## Toutes les conversations en attente, avec qui parle.
 static func pending() -> Array:
@@ -23,6 +24,9 @@ static func pending() -> Array:
 			result.append({"key":"CLIENT:%s" % str(contract.get("id", "")), "speaker":"CLIENT:%s" % str(contract.get("customer", ""))})
 	if not hiring_need().is_empty():
 		result.append({"key":"HIRE:DEV", "speaker":"NORA"})
+	# K4 : en décembre, Nora propose la fête de fin d'année de l'équipe.
+	if SEASONAL.party_pending():
+		result.append({"key":"PARTY:%d" % TimeManager.year, "speaker":"NORA"})
 	if tech_final_pending():
 		result.append({"key":"MILESTONE:TECH_FINAL", "speaker":"NORA"})
 	# V0.10 / H4 : l'équipe n'a plus rien en chantier et le dernier CPU vieillit.
@@ -232,6 +236,18 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"HIRE2", "label":"Recrute-en deux.", "hint":"Encore plus vite, deux salaires de plus"},
 				{"id":"LATER", "label":"On reste comme ça pour l'instant.", "hint":"Nora n'en reparle pas avant 6 mois"},
 			]}
+	elif key.begins_with("PARTY:"):
+		if not SEASONAL.party_pending():
+			return {}
+		var people := PersonnelManager.staff.size() + 1
+		return {"key":key, "person":_person("NORA"), "mood":"HAPPY", "kicker":"FÊTE DE FIN D'ANNÉE",
+			"text":"Patron, c'est bientôt Noël ! L'équipe a bien travaillé cette année. On organise quelque chose ?",
+			"note":"%d personnes. Le moral joue un peu sur la qualité du travail de chacun." % people,
+			"choices":[
+				{"id":"BIG", "label":str(SEASONAL.PARTY.BIG.label), "hint":"%s € • moral +8" % _money(SEASONAL.party_cost("BIG")), "primary":true},
+				{"id":"SMALL", "label":str(SEASONAL.PARTY.SMALL.label), "hint":"%s € • moral +3" % _money(SEASONAL.party_cost("SMALL"))},
+				{"id":"SKIP", "label":str(SEASONAL.PARTY.SKIP.label), "hint":"0 € • moral −2"},
+			]}
 	elif key == "NEXT:GEN":
 		var next := NEXT_GENERATION.advice()
 		if next.is_empty():
@@ -372,6 +388,8 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 			if PersonnelManager.hire_candidate():
 				hired += 1
 		return {"ok":hired > 0, "message":("%d développeur(s) rejoignent l'équipe !" % hired) if hired > 0 else "Trésorerie insuffisante pour recruter."}
+	if key.begins_with("PARTY:"):
+		return SEASONAL.hold_party(choice_id)
 	if key == "NEXT:GEN":
 		if choice_id == "START":
 			return {"ok":true, "message":"", "open":"CPU_STEPPER"}

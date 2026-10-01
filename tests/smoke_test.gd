@@ -20,6 +20,7 @@ const CEO_INBOX_SCENARIO := preload("res://tests/scenarios/CeoInboxScenario.gd")
 const SMALL_DEFECTS_SCENARIO := preload("res://tests/scenarios/SmallDefectsScenario.gd")
 const SALES_ADVISOR_SCENARIO := preload("res://tests/scenarios/SalesAdvisorScenario.gd")
 const GARAGE_LIFE_SCENARIO := preload("res://tests/scenarios/GarageLifeScenario.gd")
+const SEASONAL_CALENDAR_SCENARIO := preload("res://tests/scenarios/SeasonalCalendarScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -272,6 +273,10 @@ func _ready() -> void:
 	var garage_life_error := GARAGE_LIFE_SCENARIO.run(self)
 	if garage_life_error != "":
 		_fail(garage_life_error)
+		return
+	var seasonal_error := SEASONAL_CALENDAR_SCENARIO.run(self)
+	if seasonal_error != "":
+		_fail(seasonal_error)
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame

@@ -4,6 +4,8 @@ extends RefCounted
 
 static func run() -> String:
 	SimulationManager.reset_all("CI Capacité", "CPU", "STANDARD")
+	# K4 : avril est un mois « neutre » du calendrier commercial (demande ×1).
+	TimeManager.month = 4
 	Economy.money = 2000000
 	var product := {
 		"id":"PROD-CI-CAP", "name":"Capa 1", "sector":"CPU", "company":CompanyManager.company_name,

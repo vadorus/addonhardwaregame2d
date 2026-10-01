@@ -1,4 +1,5 @@
 extends Node
+const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
 
 signal month_processed(report)
 signal game_over(reason, report)
@@ -57,6 +58,8 @@ func process_month_end() -> Dictionary:
 	MarketManager.process_month(ProductManager.products)
 	PatentManager.process_month()
 	GarageBusiness.process_month()
+	# K4 : Nora annonce la période qui commence (rentrée, fêtes, vacances…).
+	SEASONAL.process_month()
 	# Lot F2 : les filiales vivent et versent leurs dividendes avant la clôture du mois.
 	CompanyManager.SUBSIDIARIES.process_month()
 	Objectives.process_month()
