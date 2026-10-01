@@ -53,3 +53,17 @@ L'objectif de 5 changements visibles est atteint pour les trois profils, et les 
   - les effets en code (neige, pétales, feuilles, guirlande de décembre) restent par-dessus pour le mouvement ;
   - les locaux dont les saisons ne sont pas encore livrées gardent leur décor de base.
 - Test ajouté à `GarageLifeScenario`. Capture des 4 saisons dans le jeu : `K2_captures/garage_4_saisons_astra.jpg`.
+
+## J6 — Les fêtes, prêtes à recevoir les objets d'Astra
+
+- **Calendrier** :
+  - Noël : décembre ;
+  - Nouvel An : janvier ;
+  - anniversaire de l'entreprise : janvier, à partir de la 2e année ;
+  - Halloween : à partir du 15 octobre ;
+  - Pâques : avril ;
+  - vacances d'été : juillet et août.
+- **Les objets** (`assets/art/v010/J6_fetes/*.png`) apparaissent dans le décor dès qu'ils sont livrés. Sans fichier, rien n'est dessiné. Leur position (pied de l'objet, devant l'entrée ou au pied des murs) sera réglée à la livraison sur le Pixel.
+- **La guirlande d'Astra**, une fois livrée, remplace celle dessinée en code.
+- **Le détail de la vitrine** dit « C'est Noël ! », « C'est Nouvel An et l'anniversaire de l'entreprise ! »…
+- **Test** : calendrier des fêtes dans `GarageLifeScenario`.

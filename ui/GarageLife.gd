@@ -47,6 +47,20 @@ const LAMPS := {
 	3:[Vector2(0.25, 0.30), Vector2(0.45, 0.25), Vector2(0.62, 0.30), Vector2(0.80, 0.25), Vector2(0.50, 0.50)]}
 const RAIN_DROPS := 260
 
+## J6 : les fêtes du moment. Les objets d'Astra (assets/art/v010/J6_fetes/) apparaissent dès qu'ils
+## sont livrés ; sans fichier, rien n'est dessiné. Positions : devant l'entrée et au pied des murs,
+## à affiner à la livraison sur le Pixel. [fichier, x, y, hauteur (part de la hauteur du décor)]
+const FETE_DIR := "res://assets/art/v010/J6_fetes/"
+const FETE_LABELS := {"NOEL":"Noël", "NOUVEL_AN":"Nouvel An", "HALLOWEEN":"Halloween", "PAQUES":"Pâques",
+	"ETE":"les vacances d'été", "ANNIVERSAIRE":"l'anniversaire de l'entreprise"}
+const FETE_PROPS := {
+	"NOEL":[["fete_noel_sapin", 0.30, 0.84, 0.30], ["fete_noel_guirlande", 0.50, 0.10, 0.08]],
+	"NOUVEL_AN":[["fete_nouvel_an_ballons", 0.70, 0.80, 0.26], ["fete_nouvel_an_table", 0.62, 0.86, 0.13]],
+	"HALLOWEEN":[["fete_halloween_citrouilles", 0.33, 0.86, 0.10], ["fete_halloween_toile", 0.06, 0.12, 0.18]],
+	"PAQUES":[["fete_paques_panier", 0.34, 0.85, 0.09]],
+	"ETE":[["fete_ete_ventilateur", 0.68, 0.82, 0.20]],
+	"ANNIVERSAIRE":[["fete_anniversaire_gateau", 0.56, 0.86, 0.17]]}
+
 const WOOD := Color("8a5a32")
 const WOOD_DARK := Color("5e3b1f")
 const GOLD := Color("e2b33c")
@@ -76,6 +90,8 @@ var _next_flash := 4.0
 var _glow: GradientTexture2D
 ## Vrai si le décor affiché est déjà la version nuit d'Astra (on n'assombrit plus en code).
 var night_art := false
+var _fetes: Array = []
+var _fete_textures := {}
 var _was_night := false
 
 ## La pluie et la neige tombent dehors : au-dessus des murs et sur le trottoir, pas au milieu des bureaux.
@@ -111,7 +127,7 @@ func set_art_rect(rect: Rect2) -> void:
 func scene_state() -> Dictionary:
 	return {"season":_season, "garland":_garland, "chips":_chips.size(), "trophies":_trophies,
 		"front_pages":_front_pages, "staff":_staff, "event":_event, "shelf_visible":shelf_visible(),
-		"weather":_weather, "day_phase":day_phase_name(), "night":night_amount()}
+		"weather":_weather, "day_phase":day_phase_name(), "night":night_amount(), "fetes":_fetes.duplicate()}
 
 func shelf_visible() -> bool:
 	return not _chips.is_empty() or _trophies > 0 or _front_pages > 0
@@ -141,6 +157,7 @@ func refresh() -> void:
 		if _day < 0.0:
 			_day = fmod(float(month_index) * 0.37, 1.0)
 	_garland = TimeManager.month == 12
+	_fetes = fetes_for(TimeManager.year, TimeManager.month, TimeManager.day, CompanyManager.founded_year)
 	_chips = generation_chips()
 	_trophy_labels.clear()
 	for row_value in CAREER.trophy_rows():
@@ -246,10 +263,52 @@ func _card_text() -> String:
 	lines.append("Équipe : %d personne%s, Nora comprise" % [_staff + 1, "s" if _staff > 0 else ""])
 	if _event != "":
 		lines.append("En ce moment : " + _event)
+	if not _fetes.is_empty():
+		var names: Array[String] = []
+		for fete in _fetes:
+			names.append(str(FETE_LABELS.get(str(fete), fete)))
+		lines.append("C'est " + " et ".join(names) + " !")
 	lines.append("Saison : %s • %s • %s" % [str(SEASON_LABELS.get(_season, "")), str(WEATHER_LABELS.get(_weather, "")), day_phase_name()])
 	return "\n".join(lines)
 
 # --- Saisons -----------------------------------------------------------------------------------------
+
+## Les fêtes du moment (plusieurs possibles le même mois).
+static func fetes_for(year: int, month: int, day: int, founded_year: int) -> Array:
+	var out: Array = []
+	match month:
+		12:
+			out.append("NOEL")
+		1:
+			out.append("NOUVEL_AN")
+			if year > founded_year:
+				out.append("ANNIVERSAIRE")
+		10:
+			if day >= 15:
+				out.append("HALLOWEEN")
+		4:
+			out.append("PAQUES")
+		7, 8:
+			out.append("ETE")
+	return out
+
+func _fete_texture(name: String) -> Texture2D:
+	if not _fete_textures.has(name):
+		var path := FETE_DIR + name + ".png"
+		_fete_textures[name] = load(path) if ResourceLoader.exists(path) else null
+	return _fete_textures[name]
+
+func _draw_fetes() -> void:
+	for fete in _fetes:
+		for prop_value in FETE_PROPS.get(str(fete), []):
+			var prop: Array = prop_value
+			var texture := _fete_texture(str(prop[0]))
+			if texture == null:
+				continue
+			var h := art_rect.size.y * float(prop[3])
+			var w := h * float(texture.get_width()) / maxf(float(texture.get_height()), 1.0)
+			var foot := art_rect.position + Vector2(float(prop[1]), float(prop[2])) * art_rect.size
+			draw_texture_rect(texture, Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h)), false)
 
 ## La météo d'un mois : tirée selon la saison, toujours la même pour ce mois-là.
 static func weather_for(year: int, month: int) -> String:
@@ -355,12 +414,13 @@ func _draw() -> void:
 		for k in range(4):
 			var band := Rect2(view.position.x, view.position.y + view.size.y * (0.45 + 0.13 * k), view.size.x, view.size.y * 0.13)
 			draw_rect(band, Color(0.95, 0.95, 0.97, 0.05 + 0.03 * k))
+	_draw_fetes()
 	_draw_day(view)
 	_draw_particles(view)
 	_draw_rain(view)
 	if _flash > 0.0:
 		draw_rect(view, Color(1, 1, 1, 0.35 * _flash))
-	if _garland:
+	if _garland and _fete_texture("fete_noel_guirlande") == null:
 		_draw_garland(view)
 	if shelf_visible():
 		_draw_shelf()

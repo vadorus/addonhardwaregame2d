@@ -72,6 +72,14 @@ static func _check(host: Node) -> String:
 	if str(WORKPLACE.call("ambient_art_path", 0, 7, "RAIN", true)) != str(WORKPLACE.call("seasonal_art_path", 0, 7)) and not ResourceLoader.exists("res://assets/art/v010/J8_ambiances/decor_0_garage_nuit.webp"):
 		life.queue_free()
 		return "K3: without night art, the HQ keeps its seasonal decor"
+	# J6 : calendrier des fêtes (les objets d'Astra s'afficheront à ces périodes).
+	var fetes := {[1971, 12, 1]:["NOEL"], [1972, 1, 5]:["NOUVEL_AN", "ANNIVERSAIRE"], [1971, 1, 5]:["NOUVEL_AN"],
+		[1975, 10, 10]:[], [1975, 10, 20]:["HALLOWEEN"], [1975, 4, 1]:["PAQUES"], [1975, 8, 1]:["ETE"], [1975, 5, 1]:[]}
+	for date in fetes.keys():
+		var got: Array = LIFE.fetes_for(int(date[0]), int(date[1]), int(date[2]), 1971)
+		if got != fetes[date]:
+			life.queue_free()
+			return "J6: fêtes for %s should be %s, got %s" % [str(date), str(fetes[date]), str(got)]
 	# Vitrine : une puce par génération sortie, au plus 5.
 	var chips := LIFE.generation_chips()
 	if chips.size() > LIFE.MAX_CHIPS:
