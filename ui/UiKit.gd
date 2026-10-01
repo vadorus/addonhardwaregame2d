@@ -157,7 +157,14 @@ static func spin(min_value: float, max_value: float, step_value: float, initial_
 	var node := SpinBox.new()
 	node.min_value = min_value
 	node.max_value = max_value
-	node.step = step_value
+	# V0.10 / I6 : un pas de 10 en partant de 1 n'acceptait que 1, 11… 141, 151 — une capacité réelle de 143
+	# s'affichait 141 (« Réduire à 141 »), un prix de 125 € devenait 126 €. Les flèches gardent le pas,
+	# mais la valeur reste exacte.
+	if step_value >= 1.0:
+		node.step = 1.0
+		node.custom_arrow_step = step_value
+	else:
+		node.step = step_value
 	node.value = initial_value
 	node.allow_greater = true
 	node.custom_minimum_size.y = 44

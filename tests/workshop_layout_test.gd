@@ -150,6 +150,26 @@ func _check_fabrication_and_launch_cards() -> bool:
 		_fail("I4: the launch button is not visible without scrolling: %s in %s" % [str(launch_go.get_global_rect()), str(screen.get_global_rect())])
 		return false
 	print("[UI] Launch card opens with its green button in view (phone 1616x720)")
+	# I6 : après le lancement, le champ capacité montrait 141 au lieu de 143 et proposait de « réduire ».
+	launch_go.pressed.emit()
+	SimulationManager.process_month_end()
+	game.call("_refresh_all")
+	for frame in range(4): await get_tree().process_frame
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) != "LAUNCHED":
+			continue
+		lifecycle.call("_select_model", str(product.get("id", "")))
+		var capacity_field: SpinBox = lifecycle.get("sale_capacity")
+		var price_field: SpinBox = lifecycle.get("product_price")
+		var capacity_button: Button = lifecycle.get("_capacity_apply_button")
+		if int(capacity_field.value) != int(product.get("production_capacity", 0)) or int(price_field.value) != int(product.get("price", 0)):
+			_fail("I6: %s shows capacity %d / price %d instead of %d / %d" % [str(product.get("name", "")), int(capacity_field.value), int(price_field.value), int(product.get("production_capacity", 0)), int(product.get("price", 0))])
+			return false
+		if not capacity_button.disabled or capacity_button.text.find("Réduire") >= 0:
+			_fail("I6: at its current capacity %s offers: %s" % [str(product.get("name", "")), capacity_button.text])
+			return false
+	print("[UI] After launch, capacity and price fields show the real values")
 	viewport.queue_free()
 	return true
 
