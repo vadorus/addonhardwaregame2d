@@ -94,6 +94,23 @@ rien ne pousse à la génération suivante, décisions et offres B2B qui s'empil
 6. **L** en fond de tâche dès qu'une source de sons est choisie.
 7. **Audit bêta complet** (mêmes profils, mêmes sondes, Pixel) avant de parler de bêta publique.
 
+## Après l'étude concurrence (décision du 01/10/2026, 22 h 55)
+
+Étude croisée : `docs/design/concurrence/` (brief, analyses d'Astra et de Claude, synthèse de Codex, `decision.md`).
+Promesse retenue : **« Je comprends mes choix, je vois mon entreprise grandir, et je dois encore réfléchir après mes premiers succès. »**
+Les seuils sont ceux proposés par Codex, à ajuster après le premier relevé. Une régression des sauvegardes, un blocage
+tactile ou un résultat incohérent arrête le passage à l'étape suivante. Codex contrôle les preuves de passage.
+
+| Étape | Contenu | Qui | Preuve attendue avant de passer à la suite |
+|---|---|---|---|
+| **C1 — Sauvegarder et mettre à jour sans perte** | Clé de test commune aux deux PC (reprend Q0) ; script de construction et d'installation qui sauvegarde la partie avant et la vérifie après ; sauvegarde quand le jeu passe en arrière-plan ; relevé de démarrage et de fluidité sur le Pixel (puis un appareil plus modeste) | Claude | mise à jour depuis chacun des deux PC sans désinstallation ; 20 interruptions/reprises sans perte ; journal des versions et certificats ; aucun secret dans Git |
+| **C2 — Comprendre le lancement** | Garder la cérémonie existante ; expliquer les contributions réelles du calcul de la note (par média, interview comprise) ; bilan consultable depuis la fiche du produit ; relier note, demande, ventes et marge ; besoins essentiels de chaque marché visibles dès le départ, carnet de Nora pour conseils, comparaisons, historique | Claude (+ Astra si icônes) | 4 novices sur 5 lancent et retrouvent leurs ventes en moins de 15 min sans aide ; 8 testeurs sur 10 expliquent la cause principale du verdict ; tests calcul/texte pour chaque média |
+| **C3 — Garder des choix en carrière** | Mesure de départ par le chemin réel (même mode pour tous les profils) ; réglage des besoins et des réactions existantes des rivaux ; une transition de marché annoncée seulement si les mesures la justifient ; Accessible : erreurs rattrapables avec Nora | Claude | carrière réelle jusqu'à 2010 puis 2030 sans blocage ; sur 6 conditions reproductibles, la stratégie adaptée bat la stratégie figée dans au moins 4 cas au même mode ; marge, parts et décisions publiées |
+| **C4 — Bêta et qualité mobile** | Test fermé **en français** (12 testeurs, 14 jours) ; AAB envoyé via Play ; déclarations (confidentialité, données, classification) ; contrôle des pages mémoire de 16 Ko ; anglais avant d'élargir | Claude + Astra (fiche) | aucun bouton inaccessible ni texte coupé ; téléchargement < 150 Mo ; démarrage < 10 s ; 30 images/s stables sur appareil modeste (60 si la chauffe le permet) ; aucun défaut bloquant connu |
+| **C5 — Donner envie de recommencer** | Après la bêta : 2 scénarios (redressement, spécialiste). Année de départ libre et argent illimité reportés | Claude | victoire et échec atteignables sans blocage ; 3 testeurs expérimentés sur 5 relancent une partie |
+
+Ce qui n'est **pas** décidé : prix et modèle payant (étude monétisation), nouvelle famille de produits (CPU d'abord).
+
 ## Critères de sortie V0.10 (bêta publique)
 
 - Tous les tests verts, y compris les **plafonds** d'équilibrage.
