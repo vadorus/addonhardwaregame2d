@@ -2730,7 +2730,7 @@ func _build_menu_layer() -> void:
 	var music_row := HBoxContainer.new()
 	music_row.add_theme_constant_override("separation", 8)
 	box.add_child(music_row)
-	var music_caption := LOOK.label("Musique", 14)
+	var music_caption := LOOK.label("Musique et ambiance", 14)
 	music_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	music_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	music_row.add_child(music_caption)
@@ -3266,7 +3266,10 @@ func _start_music_for_current_year() -> void:
 	# Pas de musique en mode sans affichage (tests, CI) : la génération tournerait pour rien.
 	if DisplayServer.get_name() == "headless" or not (get_viewport() is Window):
 		return
-	SoundManager.play_music_for_year(TimeManager.year)
+	if CompanyManager.created:
+		SoundManager.play_music_for_year(TimeManager.year)
+	else:
+		SoundManager.play_menu_music()
 
 func _menu_change_music(direction: int) -> void:
 	var steps := [0.0, 0.15, 0.3, 0.45, 0.6, 0.8]

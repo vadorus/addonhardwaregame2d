@@ -1,6 +1,8 @@
 extends Node
-## Sons du jeu, synthétisés au démarrage : aucun fichier audio à télécharger ni à licencier.
-## Timbre doux (sinus + harmonique légère, attaque courte, décroissance) pour rester chaleureux.
+## Sons du jeu. V0.10 / lot L : une banque de sons libres (CC0, voir assets/audio/CREDITS.md),
+## choisie pour être calme : petits sons doux, jingles, musique tranquille par époque et ambiances
+## du QG mélangées selon la météo, l'heure et les fêtes.
+## Si un fichier manque, le son synthétisé d'origine prend le relais (aucun écran muet).
 
 const MIX_RATE := 22050
 const SETTINGS_PATH := "user://settings.cfg"
@@ -10,8 +12,23 @@ var sfx_volume := 0.8
 var muted := false
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
+var _headless := DisplayServer.get_name() == "headless"
 
-# Musique d'ambiance : une boucle douce générée par décennie (construite en arrière-plan).
+# Musique : des morceaux calmes par décennie, enchaînés (lot L). Sans fichier, une boucle douce
+# générée par décennie (construite en arrière-plan) prend le relais.
+const MUSIC_DIR := "res://assets/audio/music/"
+const MUSIC_TRACKS := {
+	"menu":["menu_ambient.ogg"],
+	"1970s":["1970s_contemplation.ogg", "1970s_calm_piano.ogg"],
+	"1980s":["1980s_calm_ambient.ogg", "1980s_another_august.ogg"],
+	"1990s":["1990s_chill_lofi.ogg", "1990s_apple_cider.ogg"]
+}
+## Silence entre deux morceaux : on respire.
+const MUSIC_GAP := 6.0
+var _track_index := 0
+var _music_serial := 0
+var _music_waiting := false
+var _music_tween: Tween
 const MUSIC_RATE := 16000
 var music_volume := 0.45
 var _music_player: AudioStreamPlayer
@@ -28,8 +45,15 @@ func _ready() -> void:
 		_players.append(player)
 	_music_player = AudioStreamPlayer.new()
 	add_child(_music_player)
+	_music_player.finished.connect(_on_music_finished)
 	_build_sounds()
 	_load_settings()
+
+const SFX_DIR := "res://assets/audio/sfx/"
+## Sons remplacés par la banque libre (les autres restent synthétisés : mois, trésorerie, note).
+const SAMPLE_SFX := ["click", "open", "close", "notify", "decision", "error", "success", "launch",
+	"review_good", "review_bad", "unlock", "fete_noel", "fete_nouvel_an", "fete_halloween",
+	"fete_paques", "fete_ete", "fete_anniversaire"]
 
 func _build_sounds() -> void:
 	# [fréquence Hz, durée s] par note ; volume global par son.
@@ -46,6 +70,14 @@ func _build_sounds() -> void:
 	_streams["review_bad"] = _melody([[392.0, 0.10], [330.0, 0.24]], 0.20)
 	_streams["unlock"] = _melody([[659.0, 0.07], [880.0, 0.07], [1175.0, 0.2]], 0.22)
 	_streams["error"] = _melody([[247.0, 0.09], [220.0, 0.14]], 0.16, 0.6)
+	_streams["success"] = _melody([[784.0, 0.07], [988.0, 0.07], [1175.0, 0.16]], 0.2)
+	for sound_name in SAMPLE_SFX:
+		var path := SFX_DIR + str(sound_name) + ".ogg"
+		if ResourceLoader.exists(path):
+			_streams[sound_name] = load(path)
+
+func is_sample(sound_name: String) -> bool:
+	return _streams.get(sound_name) is AudioStreamOggVorbis
 
 func has_sound(sound_name: String) -> bool:
 	return _streams.has(sound_name)
@@ -56,6 +88,8 @@ func sound_names() -> Array:
 func play(sound_name: String, pitch: float = 1.0) -> void:
 	if muted or sfx_volume <= 0.0 or not _streams.has(sound_name):
 		return
+	if _headless:
+		return # tests / CI : rien à entendre (et le moteur garderait la lecture ouverte à la fermeture)
 	var player := _free_player()
 	player.stream = _streams[sound_name]
 	player.pitch_scale = pitch
@@ -138,10 +172,31 @@ func current_music_era() -> String:
 	return _current_era
 
 func play_music_for_year(year: int) -> void:
-	var era := era_for_year(year)
-	if era == _current_era and (_music_player.playing or _music_task != -1):
+	_play_era(era_for_year(year))
+
+## Écran d'accueil (avant la création de l'entreprise) : une boucle d'ambiance calme.
+func play_menu_music() -> void:
+	_play_era("menu")
+
+func music_tracks(era: String) -> Array:
+	var out: Array = []
+	for file_name in MUSIC_TRACKS.get(era, []):
+		var path := MUSIC_DIR + str(file_name)
+		if ResourceLoader.exists(path):
+			out.append(path)
+	return out
+
+func _play_era(era: String) -> void:
+	if era == _current_era and (_music_player.playing or _music_task != -1 or _music_waiting):
 		return
 	_current_era = era
+	var tracks := music_tracks(era)
+	if not tracks.is_empty():
+		# On reprend la décennie là où on l'avait laissée (pas toujours le même premier morceau).
+		_play_track(era, _track_index % tracks.size())
+		return
+	if era == "menu":
+		era = "1970s"
 	if _music_cache.has(era):
 		_start_music(_music_cache[era])
 		return
@@ -150,8 +205,35 @@ func play_music_for_year(year: int) -> void:
 	_building_era = era
 	_music_task = WorkerThreadPool.add_task(_build_music_task.bind(era))
 
+func _play_track(era: String, index: int) -> void:
+	var tracks := music_tracks(era)
+	if tracks.is_empty():
+		return
+	_track_index = index % tracks.size()
+	var stream := load(str(tracks[_track_index])) as AudioStreamOggVorbis
+	if stream == null:
+		return
+	stream.loop = era == "menu"
+	_music_waiting = false
+	_start_music(stream)
+
+func current_track() -> String:
+	return _music_player.stream.resource_path.get_file() if _music_player != null and _music_player.stream != null else ""
+
+func _on_music_finished() -> void:
+	var era := _current_era
+	if era == "" or music_tracks(era).is_empty():
+		return
+	_music_waiting = true
+	_music_serial += 1
+	var serial := _music_serial
+	get_tree().create_timer(MUSIC_GAP, true, false, true).timeout.connect(func():
+		if serial == _music_serial and _current_era == era and _music_waiting:
+			_play_track(era, _track_index + 1))
+
 func stop_music() -> void:
 	_current_era = ""
+	_music_waiting = false
 	if _music_player != null:
 		_music_player.stop()
 
@@ -160,6 +242,7 @@ func set_music_volume(value: float, persist: bool = true) -> void:
 	if _music_player != null:
 		_music_player.volume_db = linear_to_db(maxf(music_volume, 0.001))
 		_music_player.stream_paused = music_volume <= 0.0
+	set_ambience(_ambience_target, 0.0)
 	if persist:
 		var config := ConfigFile.new()
 		config.load(SETTINGS_PATH)
@@ -171,6 +254,8 @@ func _build_music_task(era: String) -> void:
 	call_deferred("_on_music_built", era, stream)
 
 func _on_music_built(era: String, stream: AudioStreamWAV) -> void:
+	if era == "1970s" and _current_era == "menu":
+		era = "menu"
 	if _music_task != -1:
 		WorkerThreadPool.wait_for_task_completion(_music_task)
 	_music_task = -1
@@ -180,16 +265,25 @@ func _on_music_built(era: String, stream: AudioStreamWAV) -> void:
 	elif _current_era != "":
 		var wanted := _current_era
 		_current_era = ""
-		play_music_for_year({"1970s":1975, "1980s":1985}.get(wanted, 1995))
+		if wanted == "menu":
+			play_menu_music()
+		else:
+			play_music_for_year({"1970s":1975, "1980s":1985}.get(wanted, 1995))
 
-func _start_music(stream: AudioStreamWAV) -> void:
-	_music_player.stream = stream
-	_music_player.volume_db = linear_to_db(0.001)
-	_music_player.play()
-	_music_player.stream_paused = music_volume <= 0.0
+func _start_music(stream: AudioStream) -> void:
+	if _music_tween != null and _music_tween.is_valid():
+		_music_tween.kill()
+	_music_tween = create_tween()
+	if _music_player.playing and _music_player.stream != stream:
+		# Changement d'époque : l'ancien morceau s'efface avant le nouveau.
+		_music_tween.tween_property(_music_player, "volume_db", linear_to_db(0.001), 1.2)
+	_music_tween.tween_callback(func():
+		_music_player.stream = stream
+		_music_player.volume_db = linear_to_db(0.001)
+		_music_player.play()
+		_music_player.stream_paused = music_volume <= 0.0)
 	# Fondu d'entrée doux.
-	var tween := create_tween()
-	tween.tween_property(_music_player, "volume_db", linear_to_db(maxf(music_volume, 0.001)), 2.5)
+	_music_tween.tween_property(_music_player, "volume_db", linear_to_db(maxf(music_volume, 0.001)), 2.5)
 
 ## Construit une boucle de `bars` mesures (4 temps) : nappe + basse + arpège, sans clic au bouclage.
 func build_music(era: String, bars: int) -> AudioStreamWAV:
@@ -242,3 +336,95 @@ func build_music(era: String, bars: int) -> AudioStreamWAV:
 	stream.loop_begin = 0
 	stream.loop_end = total
 	return stream
+
+# ---------------------------------------------------------------------------
+# Ambiances du QG (lot L) : des boucles qui se mélangent en fondu selon ce qu'on voit dehors.
+# Le volume suit le réglage « Musique et ambiance ».
+# ---------------------------------------------------------------------------
+
+const AMBIENCE_DIR := "res://assets/audio/ambience/"
+const AMBIENCE_LAYERS := ["rain", "storm", "birds", "crickets", "wind", "chimes", "keyboard"]
+## À 45 % de musique (réglage par défaut), une couche pleine joue à environ 55 % : sous la musique.
+const AMBIENCE_GAIN := 1.2
+var _ambience_target: Dictionary = {}
+var _ambience_players: Dictionary = {}
+
+## `mix` : couche → niveau entre 0 et 1. Les couches absentes s'éteignent en fondu.
+func set_ambience(mix: Dictionary, fade: float = 2.5) -> void:
+	var wanted := {}
+	for layer in mix.keys():
+		if str(layer) in AMBIENCE_LAYERS and float(mix[layer]) > 0.005:
+			wanted[str(layer)] = snappedf(clampf(float(mix[layer]), 0.0, 1.0), 0.01)
+	if fade > 0.0 and wanted == _ambience_target:
+		return # rien n'a changé : on laisse les fondus en cours
+	_ambience_target = wanted
+	for layer in AMBIENCE_LAYERS:
+		var level := float(_ambience_target.get(layer, 0.0))
+		var player: AudioStreamPlayer = _ambience_players.get(layer)
+		if player == null:
+			if level <= 0.0:
+				continue
+			player = _make_ambience_player(layer)
+			if player == null:
+				continue
+		_fade_ambience(player, level * clampf(music_volume * AMBIENCE_GAIN, 0.0, 1.0), fade)
+
+func ambience_levels() -> Dictionary:
+	return _ambience_target.duplicate()
+
+func has_ambience(layer: String) -> bool:
+	return ResourceLoader.exists(AMBIENCE_DIR + layer + ".ogg")
+
+func _make_ambience_player(layer: String) -> AudioStreamPlayer:
+	var path := AMBIENCE_DIR + layer + ".ogg"
+	if not ResourceLoader.exists(path):
+		return null
+	var stream := load(path) as AudioStreamOggVorbis
+	if stream == null:
+		return null
+	stream.loop = true
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = -80.0
+	player.set_meta("level", 0.0)
+	add_child(player)
+	_ambience_players[layer] = player
+	return player
+
+func _fade_ambience(player: AudioStreamPlayer, target: float, fade: float) -> void:
+	if player.has_meta("tween"):
+		var old: Tween = player.get_meta("tween")
+		if old != null and old.is_valid():
+			old.kill()
+	var from := float(player.get_meta("level", 0.0))
+	if _headless:
+		_set_ambience_level(target, player) # tests / CI : on suit les niveaux sans rien lire
+		return
+	if target > 0.0 and not player.playing:
+		# Chaque boucle repart d'un endroit différent : deux visites ne sonnent pas pareil.
+		player.play(randf() * maxf(player.stream.get_length() - 1.0, 0.0))
+	if fade <= 0.0:
+		_set_ambience_level(target, player)
+		if target <= 0.0:
+			player.stop()
+		return
+	var tween := create_tween()
+	tween.tween_method(_set_ambience_level.bind(player), from, target, fade)
+	if target <= 0.0:
+		tween.tween_callback(player.stop)
+	player.set_meta("tween", tween)
+
+func _set_ambience_level(level: float, player: AudioStreamPlayer) -> void:
+	player.set_meta("level", level)
+	player.volume_db = linear_to_db(maxf(level, 0.0001))
+
+## À la fermeture : on coupe tout proprement (sinon le moteur garde des lectures ouvertes).
+func _exit_tree() -> void:
+	for player in _ambience_players.values():
+		(player as AudioStreamPlayer).stop()
+		(player as AudioStreamPlayer).stream = null
+	if _music_player != null:
+		_music_player.stop()
+		_music_player.stream = null
+	for player in _players:
+		player.stop()

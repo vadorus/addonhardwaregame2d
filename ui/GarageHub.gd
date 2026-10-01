@@ -14,6 +14,7 @@ const MUTED := Color("7a6a58")
 const BLUE := Color("d9822b")
 ## V0.10 K1 : un décor par palier de locaux (garage, atelier, siège, campus), dessinés par ChatGPT.
 const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const GARAGE_SOUND := preload("res://ui/GarageSound.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const WORKPLACE_ART := WORKPLACE.ART
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
@@ -91,6 +92,8 @@ var _last_focus_key := ""
 var _phase_row: HBoxContainer
 var _crew: Control
 var _life: Control
+## Lot L : fêtes déjà saluées par leur jingle (« 1975:NOEL »), pour ne le jouer qu'une fois.
+var _fetes_heard := {}
 
 func life() -> Control:
 	return _life
@@ -1182,6 +1185,7 @@ func set_workplace(data: Dictionary) -> void:
 		_room_title.text = str(data.get("name", "Garage aménagé"))
 
 func _on_visibility_changed() -> void:
+	_apply_sound()
 	if not _pending_move.is_empty() and is_visible_in_tree():
 		var pending := _pending_move
 		_pending_move = {}
@@ -1354,6 +1358,33 @@ func _apply_workplace_art() -> void:
 		call_deferred("_layout_zones")
 	if _crew != null and _crew.has_method("set_workplace_tier"):
 		_crew.call("set_workplace_tier", _workplace_tier)
+	_apply_sound()
+
+## Lot L : le son du QG suit le temps dehors, l'heure, l'équipe et les fêtes (rien hors du QG).
+func sound_mix() -> Dictionary:
+	if _life == null or not CompanyManager.created or not is_visible_in_tree():
+		return {}
+	var state: Dictionary = _life.call("scene_state")
+	return GARAGE_SOUND.mix(str(state.get("weather", "SUNNY")), float(state.get("night", 0.0)),
+		TimeManager.month, PersonnelManager.staff.size(), state.get("fetes", []))
+
+func _apply_sound() -> void:
+	SoundManager.set_ambience(sound_mix())
+	if _life == null or not CompanyManager.created or not is_visible_in_tree():
+		return
+	var state: Dictionary = _life.call("scene_state")
+	var first_new := ""
+	for fete_value in state.get("fetes", []):
+		var key := "%d:%s" % [TimeManager.year, str(fete_value)]
+		if not _fetes_heard.has(key):
+			_fetes_heard[key] = true
+			if first_new == "":
+				first_new = str(fete_value)
+	if first_new != "":
+		SoundManager.play(GARAGE_SOUND.fete_sound(first_new))
+
+func fetes_heard() -> Dictionary:
+	return _fetes_heard.duplicate()
 
 ## Deux décors du même local (saisons différentes) : « decor_0_garage » et « decor_0_garage_hiver ».
 static func _same_place(a: String, b: String) -> bool:
