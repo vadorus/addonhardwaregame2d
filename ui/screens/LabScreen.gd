@@ -634,6 +634,15 @@ var research_teams_panel: Control
 var patent_file_button: Button
 var patent_license_button: Button
 
+func expert_form_open() -> bool:
+	return expert_box != null and expert_box.visible
+
+func focus_expert_form() -> void:
+	if expert_toggle == null:
+		return
+	await get_tree().process_frame
+	scroll_to_control_top(expert_toggle)
+
 func set_expert_form_open(open: bool) -> void:
 	if expert_box == null:
 		return

@@ -312,12 +312,59 @@ func _apply_proposal() -> void:
 	var wanted_cores := maxi(1, int(round(float(ref.get("core_reference", 1.0)) * float(p.cores))))
 	cores = mini(_closest(CORE_STEPS, wanted_cores), int(arch.get("max_cores", 1)))
 	freq_factor_index = mini(int(p.freq), max_freq_index())
+	# V0.10 / I6 : l'équipe ne repropose jamais la même puce que la dernière fois ; elle va un cran plus loin
+	# si l'architecture le permet (sauf en Économique, qui assume de rester sobre).
+	var previous := previous_design()
+	if profile != "ECO" and not previous.is_empty() and int(previous.get("node_nm", 0)) == node_nm:
+		var previous_mhz := float(previous.get("frequency_ghz", 0.0)) * 1000.0
+		while frequency_mhz() <= previous_mhz + 0.0001 and freq_factor_index < max_freq_index():
+			freq_factor_index += 1
 	var wanted_cache := int(round(float(ref.get("cache_reference_kb", 0.0)) * float(p.cache)))
 	cache_kb = mini(_closest(CACHE_KB_STEPS, wanted_cache), int(arch.get("max_cache_kb", 0)))
 	cache_kb = _closest_at_most(CACHE_KB_STEPS, cache_kb)
 	tdp_w = TDP_STEPS[0]
 	var required := float(CPU_DESIGN.evaluate(current_design(), ResearchManager.get_cpu_capabilities()).get("required_tdp", 2.0))
 	tdp_w = _closest_at_least(TDP_STEPS, int(ceil(required * float(p.tdp))))
+
+## Le dernier CPU conçu dans la gamme choisie (ou, pour une nouvelle gamme, votre dernier CPU).
+## On compare à la conception du projet, pas au modèle haut de gamme trié en sortie d'usine.
+func previous_product() -> Dictionary:
+	var line := selected_line()
+	var fallback: Dictionary = {}
+	for i in range(ResearchManager.projects.size() - 1, -1, -1):
+		var project: Dictionary = ResearchManager.projects[i]
+		if str(project.get("sector", "")) != "CPU" or (project.get("cpu_design", {}) as Dictionary).is_empty():
+			continue
+		if line.is_empty() or str(project.get("line_id", "")) == str(line.get("id", "")):
+			return project
+		if fallback.is_empty():
+			fallback = project
+	return fallback
+
+func previous_design() -> Dictionary:
+	return previous_product().get("cpu_design", {})
+
+## Une ligne lisible : ce qui progresse par rapport à la puce précédente.
+func progress_text() -> String:
+	var previous := previous_design()
+	if previous.is_empty():
+		return ""
+	var parts: Array[String] = []
+	var previous_mhz := float(previous.get("frequency_ghz", 0.0)) * 1000.0
+	if previous_mhz > 0.0 and frequency_mhz() > previous_mhz * 1.01:
+		parts.append("fréquence +%.0f %%" % ((frequency_mhz() / previous_mhz - 1.0) * 100.0))
+	if node_nm < int(previous.get("node_nm", node_nm)):
+		parts.append("gravure plus fine (%s)" % CPU_DESIGN.node_label(node_nm).get_slice(" —", 0))
+	if cores > int(previous.get("cores", 1)):
+		parts.append("%d cœurs au lieu de %d" % [cores, int(previous.get("cores", 1))])
+	if cache_kb > int(round(float(previous.get("cache_mb", 0.0)) * 1024.0)):
+		parts.append("plus de cache")
+	var previous_arch := str(previous_product().get("architecture_id", ""))
+	if previous_arch != "" and previous_arch != arch_id:
+		parts.append("architecture %s" % str(architecture().short))
+	if parts.is_empty():
+		return "Même puce que la précédente : choisissez une architecture plus récente ou faites progresser la recherche."
+	return "Progrès par rapport à votre dernier CPU : " + ", ".join(parts) + "."
 
 func current_design() -> Dictionary:
 	return CPU_DESIGN.normalize({
@@ -482,6 +529,12 @@ func _build_goal_step() -> void:
 	box.add_child(UI.muted_label("%s  •  %d cœur(s)  •  %s  •  %s  •  %s  •  %d W" % [
 		str(architecture().short), cores, CPU_DESIGN.format_frequency(current_design()),
 		CPU_DESIGN.format_cache(current_design()), CPU_DESIGN.node_label(node_nm), tdp_w], 13))
+	var progress := progress_text()
+	if progress != "":
+		var progress_label := UI.label(progress, 13)
+		progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		progress_label.add_theme_color_override("font_color", Color("2f7a3a") if progress.begins_with("Progrès") else AMBER.darkened(0.25))
+		box.add_child(progress_label)
 	_content.add_child(proposal)
 	var toggle := Button.new()
 	toggle.focus_mode = Control.FOCUS_NONE

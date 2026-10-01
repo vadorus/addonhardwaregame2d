@@ -1335,9 +1335,39 @@ func _complete_project(project: Dictionary, metrics: Dictionary):
 	project.status = "COMPLETED"
 	project.phase_progress = 100.0
 	SupplierManager.complete_project(project)
+	if str(project.get("sector", "")) == "CPU":
+		_apply_completion_lessons(project)
 	project_completed.emit(project)
 	PatentManager.create_candidate(project)
 	CompanyManager.add_alert("Développement terminé : %s est prêt pour l'industrialisation." % str(project.name))
+
+## V0.10 / I6 : terminer un CPU apprend quelque chose à l'équipe (vision d'Alexandre, 28/09 : « le retour
+## d'expérience de chaque modèle nourrit la future architecture »). Avant, le 2e CPU était identique au 1er :
+## l'architecture des circuits restait à 18, sous le seuil (20) de l'architecture 8 bits.
+## Gain dégressif : gros au début (on apprend tout), faible ensuite (la R&D prend le relais).
+const COMPLETION_LESSON_ARCH := 2.6
+const COMPLETION_LESSON_LAYOUT := 1.0
+
+func completed_cpu_project_count() -> int:
+	var count := 0
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("sector", "")) == "CPU" and str(project.get("status", "")) == "COMPLETED":
+			count += 1
+	return count
+
+func completion_lesson_gain(completed_count: int) -> float:
+	return COMPLETION_LESSON_ARCH / (1.0 + 0.6 * float(maxi(completed_count - 1, 0)))
+
+func _apply_completion_lessons(project: Dictionary) -> void:
+	var gain := completion_lesson_gain(completed_cpu_project_count())
+	var learned := raise_capability("ARCHITECTURE", gain)
+	raise_capability("LAYOUT", gain * COMPLETION_LESSON_LAYOUT / COMPLETION_LESSON_ARCH)
+	project["completion_lesson"] = learned
+	if learned >= 0.1 and CompanyManager.created:
+		CompanyManager.add_alert("Retour d'expérience : en terminant %s, l'équipe a appris (architecture des circuits +%.1f)." % [str(project.get("name", "ce CPU")), learned])
+	ArchitectureManager.sync_unlocks(true)
+	research_changed.emit()
 
 func active_departments() -> Array:
 	var active: Array = []

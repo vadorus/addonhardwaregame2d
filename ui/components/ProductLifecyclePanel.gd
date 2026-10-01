@@ -875,8 +875,11 @@ func _on_sale_capacity_changed(_value: float) -> void:
 		_capacity_apply_button.text = "Capacité actuelle : %s/mois (plafond %s)" % [UI.money(target), UI.money(int(quote.get("hard_cap", target)))]
 	elif cost > 0:
 		_capacity_apply_button.text = "Passer à %s/mois — %s €, remboursé en ~%d mois%s" % [UI.money(target), UI.money(cost), int(round(float(quote.get("payback_months", 5.0)))), " (plafond du fondeur)" if at_ceiling else ""]
+	elif target < int(quote.get("current", 0)):
+		# I6 : baisser la production est gratuit ; on ne parle plus de « passer à ».
+		_capacity_apply_button.text = "Réduire à %s/mois (gratuit, moins de stock)" % UI.money(target)
 	else:
-		_capacity_apply_button.text = "Passer à %s/mois (déjà prévu au lancement)" % UI.money(target)
+		_capacity_apply_button.text = "Remonter à %s/mois (déjà réservé, gratuit)" % UI.money(target)
 
 func _emit_update_capacity() -> void:
 	if product_select.item_count == 0 or sale_capacity == null:

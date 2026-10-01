@@ -62,6 +62,7 @@ var setup_name: LineEdit
 var setup_sector: OptionButton
 var setup_difficulty: OptionButton
 var setup_difficulty_label: Label
+var setup_mode_row: HBoxContainer
 var rd_name: LineEdit
 var rd_sector: OptionButton
 var rd_segment: OptionButton
@@ -1271,7 +1272,27 @@ func _build_setup_layer():
 		setup_difficulty.set_item_metadata(setup_difficulty.item_count - 1, difficulty)
 	_select_meta(setup_difficulty, "STANDARD")
 	setup_difficulty.item_selected.connect(func(_i): _refresh_setup_difficulty())
+	# V0.10 / I6 : le menu déroulant était difficile à lire et à toucher sur téléphone.
+	# Trois gros boutons à la place ; le menu reste (caché) comme source de vérité.
+	setup_difficulty.visible = false
 	setup_creation_box.add_child(setup_difficulty)
+	setup_creation_box.add_child(_label("Mode de jeu", 14))
+	setup_mode_row = HBoxContainer.new()
+	setup_mode_row.add_theme_constant_override("separation", 8)
+	setup_creation_box.add_child(setup_mode_row)
+	for difficulty_value in BalanceManager.profile_keys():
+		var mode_key := str(difficulty_value)
+		var mode_button := Button.new()
+		mode_button.name = "Mode_" + mode_key
+		mode_button.text = BalanceManager.profile_label(mode_key)
+		mode_button.toggle_mode = true
+		mode_button.custom_minimum_size = Vector2(0, 48)
+		mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mode_button.add_theme_font_size_override("font_size", 16)
+		mode_button.pressed.connect(func():
+			_select_meta(setup_difficulty, mode_key)
+			_refresh_setup_difficulty())
+		setup_mode_row.add_child(mode_button)
 
 	setup_difficulty_label = _muted_label("", 12)
 	setup_difficulty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1344,11 +1365,19 @@ func _close_cpu_stepper() -> void:
 		cpu_stepper.call("close")
 	SoundManager.play("close")
 
+## V0.10 / I6 : « Conception avancée » promettait tous les réglages… repliés. On les ouvre et on y amène le joueur.
+func _open_lab_advanced_form() -> void:
+	if lab_screen == null:
+		return
+	lab_screen.call("show_section_for_context", "Réglages avancés")
+	lab_screen.call_deferred("focus_expert_form")
+
 func _open_advanced_from_stepper(spec: Dictionary) -> void:
 	_apply_first_cpu_spec_to_lab(spec)
 	_close_cpu_stepper()
 	_show_tab(3)
-	status_label.text = "Mode avancé : votre conception est reprise, tous les réglages sont modifiables."
+	_open_lab_advanced_form()
+	status_label.text = "Mode avancé : votre conception est reprise. Tous les réglages sont ouverts ci-dessous."
 
 func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
@@ -1415,7 +1444,8 @@ func _open_advanced_first_cpu(spec: Dictionary) -> void:
 		first_cpu_workshop.call("close")
 	_show_tab(3)
 	TimeManager.time_scale = 0.0
-	status_label.text = "Mode avancé : le brief est appliqué. Vous pouvez maintenant modifier tous les paramètres avant de lancer le projet."
+	_open_lab_advanced_form()
+	status_label.text = "Mode avancé : le brief est appliqué. Tous les réglages sont ouverts ci-dessous."
 
 func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	if spec.is_empty() or not ResearchManager.projects.is_empty():
@@ -1720,6 +1750,8 @@ func _create_app_theme() -> Theme:
 	app_theme.set_color("font_color", "PopupMenu", APP_TEXT)
 	app_theme.set_color("font_hover_color", "PopupMenu", APP_CYAN)
 	app_theme.set_color("font_disabled_color", "PopupMenu", APP_MUTED)
+	app_theme.set_font_size("font_size", "PopupMenu", 17)
+	app_theme.set_constant("v_separation", "PopupMenu", 16)
 	app_theme.set_stylebox("panel", "PopupPanel", _stylebox(APP_SHELL, 10, 1, APP_LINE, 10))
 	app_theme.set_stylebox("normal", "TextEdit", _stylebox(APP_PANEL_ALT, 8, 1, APP_LINE, 9))
 	app_theme.set_color("font_color", "TextEdit", APP_TEXT)
@@ -2048,6 +2080,16 @@ func _refresh_setup_difficulty():
 	if setup_difficulty_label == null or setup_difficulty == null or setup_difficulty.item_count == 0:
 		return
 	var key := _meta(setup_difficulty)
+	if setup_mode_row != null:
+		for child in setup_mode_row.get_children():
+			var mode_button := child as Button
+			var active := mode_button.name == "Mode_" + key
+			mode_button.set_pressed_no_signal(active)
+			var bg: Color = Color("d9822b") if active else APP_PANEL_ALT
+			for state in ["normal", "hover", "pressed", "focus"]:
+				mode_button.add_theme_stylebox_override(state, _stylebox(bg.darkened(0.06) if state == "hover" else bg, 10, 2 if active else 1, Color("d9822b") if active else APP_LINE, 10))
+			for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+				mode_button.add_theme_color_override(color_name, Color.WHITE if active else APP_TEXT)
 	var data := BalanceManager.profile_data(key)
 	var capital := int(data.get("starting_capital", 100000))
 	var guidance_labels := {"GUIDED":"Nora très présente", "CONTEXTUAL":"Nora contextuelle", "MINIMAL":"Nora discrète"}
