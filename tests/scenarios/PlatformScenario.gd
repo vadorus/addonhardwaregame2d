@@ -18,11 +18,19 @@ static func run(host: Node) -> String:
 	# Sauvegarde : écrite, relisible, et l'ancienne conservée en secours.
 	_clear_saves()
 	SimulationManager.reset_all("CI Platform", "CPU", "STANDARD")
-	if not bool(SaveManager.save_game(true)) or not FileAccess.file_exists(SaveManager.SAVE_PATH):
+	if not bool(SaveManager.save_game(true)) or not FileAccess.file_exists(SaveManager.save_path()):
 		return "Quiet autosave did not write the save file"
-	if not bool(SaveManager.save_game(true)) or not FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH):
+	if not bool(SaveManager.save_game(true)) or not FileAccess.file_exists(SaveManager.backup_path()):
 		return "Second save did not keep the previous save as a backup"
+	# C1 : les tests n'écrivent jamais dans le dossier du joueur.
+	if not SaveManager.save_path().begins_with(SaveManager.TEST_ROOT):
+		_clear_saves()
+		return "Tests must save into %s, not into the player's folder (%s)" % [SaveManager.TEST_ROOT, SaveManager.save_path()]
 	_clear_saves()
+	var recovery_error := _recovery_checks()
+	_clear_saves()
+	if recovery_error != "":
+		return recovery_error
 
 	# Emplacements manuels : écriture, résumé lisible, rechargement, « Continuer » = le plus récent.
 	SimulationManager.reset_all("CI Slot Company", "CPU", "STANDARD")
@@ -53,9 +61,15 @@ static func run(host: Node) -> String:
 	viewport.add_child(game)
 	game.call("_start_new_game")
 	game.call("_on_month_closed", {"month":1, "year":1971, "result":0, "money":Economy.money})
-	if not FileAccess.file_exists(SaveManager.SAVE_PATH):
+	if not FileAccess.file_exists(SaveManager.save_path()):
 		viewport.queue_free()
 		return "Closing a month did not autosave the game"
+	# C1 : Android met l'appli en arrière-plan (puis peut la tuer sans prévenir) : la partie est sauvegardée tout de suite.
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.save_path()))
+	game.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	if not FileAccess.file_exists(SaveManager.save_path()):
+		viewport.queue_free()
+		return "Sending the app to the background did not save the game"
 
 	# Retour / Échap : ferme d'abord ce qui est ouvert, puis ouvre le menu (PC).
 	game.call("_show_first_cpu_workshop")
@@ -74,6 +88,53 @@ static func run(host: Node) -> String:
 		return "Back/Escape does not close the system menu"
 	viewport.queue_free()
 	_clear_saves()
+	return ""
+
+## C1 : une sauvegarde interrompue ou abîmée ne fait jamais perdre la partie.
+static func _recovery_checks() -> String:
+	var main_abs := ProjectSettings.globalize_path(SaveManager.save_path())
+	var temp_abs := ProjectSettings.globalize_path(SaveManager.temp_path())
+	# Appli tuée entre l'écriture de la temporaire et son remplacement : la temporaire, complète, est la plus récente.
+	SimulationManager.reset_all("CI Ancienne", "CPU", "STANDARD")
+	SaveManager.save_game(true)
+	SimulationManager.reset_all("CI Neuve", "CPU", "STANDARD")
+	SaveManager.save_game(true)
+	DirAccess.rename_absolute(main_abs, temp_abs)
+	if str(SaveManager.slot_info(0).get("company", "")) != "CI Neuve":
+		return "Continue does not offer an interrupted (complete) save: %s" % SaveManager.slot_info(0)
+	SimulationManager.reset_all("CI Autre", "CPU", "STANDARD")
+	if not bool(SaveManager.load_from_slot(0)) or CompanyManager.company_name != "CI Neuve":
+		return "An interrupted (complete) save was not recovered: got %s" % CompanyManager.company_name
+	# Temporaire coupée en pleine écriture : ignorée, la principale reste la bonne.
+	SaveManager.save_game(true)
+	var main_text := FileAccess.get_file_as_string(SaveManager.save_path())
+	var partial := FileAccess.open(SaveManager.temp_path(), FileAccess.WRITE)
+	partial.store_string(main_text.substr(0, mini(200, main_text.length())))
+	partial.close()
+	SimulationManager.reset_all("CI Autre", "CPU", "STANDARD")
+	if not bool(SaveManager.load_from_slot(0)) or CompanyManager.company_name != "CI Neuve":
+		return "A half-written temporary save hid the good save: got %s" % CompanyManager.company_name
+	DirAccess.remove_absolute(temp_abs)
+	# Principale abîmée : « Continuer » la voit quand même, et charge la copie de secours.
+	SimulationManager.reset_all("CI Secours", "CPU", "STANDARD")
+	SaveManager.save_game(true)
+	SimulationManager.reset_all("CI Dernière", "CPU", "STANDARD")
+	SaveManager.save_game(true)
+	var broken := FileAccess.open(SaveManager.save_path(), FileAccess.WRITE)
+	broken.store_string("{\"version\":29, \"comp")
+	broken.close()
+	if str(SaveManager.slot_info(0).get("company", "")) != "CI Secours" or SaveManager.most_recent_slot() != 0:
+		return "Continue hides a game whose main save is damaged but whose backup is fine: %s" % SaveManager.slot_info(0)
+	SimulationManager.reset_all("CI Autre", "CPU", "STANDARD")
+	if not bool(SaveManager.load_from_slot(0)) or CompanyManager.company_name != "CI Secours":
+		return "The backup of a damaged save was not loaded: got %s" % CompanyManager.company_name
+	# Outils de capture : le jeu ne peut rien écrire.
+	SaveManager.delete_slot(0)
+	SaveManager.writes_enabled = false
+	var wrote := bool(SaveManager.save_game(true)) or FileAccess.file_exists(SaveManager.save_path())
+	SaveManager.writes_enabled = true
+	if wrote:
+		return "Saving still writes files while writes are disabled (capture tools)"
 	return ""
 
 static func _clear_saves() -> void:

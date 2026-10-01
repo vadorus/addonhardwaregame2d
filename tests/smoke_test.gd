@@ -56,6 +56,8 @@ const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.
 
 func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
+	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
+	SaveManager.use_test_folder()
 	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
 	if market_guard_error != "":
 		_fail(market_guard_error)
@@ -335,13 +337,13 @@ func _ready() -> void:
 			return
 
 	SaveManager.save_game()
-	if not FileAccess.file_exists(SaveManager.SAVE_PATH):
+	if not FileAccess.file_exists(SaveManager.save_path()):
 		_fail("Atomic save did not create the final save file")
 		return
-	if FileAccess.file_exists(SaveManager.TEMP_SAVE_PATH):
+	if FileAccess.file_exists(SaveManager.temp_path()):
 		_fail("Atomic save left a temporary save file behind")
 		return
-	var save_probe_file := FileAccess.open(SaveManager.SAVE_PATH, FileAccess.READ)
+	var save_probe_file := FileAccess.open(SaveManager.save_path(), FileAccess.READ)
 	if save_probe_file == null:
 		_fail("Could not inspect the atomic save")
 		return
@@ -353,9 +355,9 @@ func _ready() -> void:
 	if typeof(saved_probe.get("market", {}).get("rng_state", null)) != TYPE_STRING:
 		_fail("Saved JSON does not preserve RNG state as text")
 		return
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.SAVE_PATH))
-	if FileAccess.file_exists(SaveManager.BACKUP_SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.BACKUP_SAVE_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.save_path()))
+	if FileAccess.file_exists(SaveManager.backup_path()):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveManager.backup_path()))
 
 	if Economy.money != BalanceManager.starting_capital():
 		_fail("Unexpected starting money: %s (expected %s for %s)" % [Economy.money, BalanceManager.starting_capital(), BalanceManager.active_profile])

@@ -20,6 +20,8 @@ func _ready() -> void:
 	for i in range(6):
 		await get_tree().process_frame
 	game.call("_load_game_slot", 0)
+	# On change la date, les locaux et la vitrine pour la photo : surtout ne rien sauvegarder (fermeture comprise).
+	SaveManager.writes_enabled = false
 	for i in range(6):
 		await get_tree().process_frame
 	print("[CAPTURE] dossier : ", OS.get_user_data_dir(), " ", FileAccess.file_exists(SaveManager.slot_path(0)))

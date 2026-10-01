@@ -1,8 +1,12 @@
 ﻿param(
   [string]$Godot = "",
   [switch]$SkipTests,
-  [switch]$Install
+  [switch]$Install,
+  [switch]$AllowReinstall
 )
+# C1 (01/10) : -Install refuse d'installer si le jeu est ouvert, vérifie après coup que la partie est identique
+# à l'octet près, et note chaque installation dans build\pixel_saves\journal-installations.csv.
+# -AllowReinstall : si le téléphone porte une autre clé, copie → désinstallation → réinstallation → restauration.
 # Construit la version PC (Windows) et la version Android (APK) de Tech Empire.
 # Usage : powershell -ExecutionPolicy Bypass -File tools\build_all.ps1 [-Install] [-SkipTests] [-Godot <chemin>]
 # V0.10 / Q0 : l'APK est toujours signé avec la clé de test commune du projet
@@ -113,6 +117,13 @@ if ($Install) {
   # Démarre le serveur adb AVANT les copies : né dans un « cmd /c ... > fichier », il gardait la sortie
   # ouverte et le script restait bloqué (30/09, PC maison, deux fois).
   & $adb start-server 2>&1 | Out-Null
+  $package = "com.vadorus.techempire"
+  & $adb shell pidof $package *> $null
+  if ($LASTEXITCODE -eq 0) { throw "Le jeu est ouvert sur le téléphone : fermez-le avant d'installer (et ne jouez pas pendant l'installation)." }
+  function Get-SaveMd5 {
+    $sum = (& $adb shell "run-as $package md5sum files/tech_empire_save.json 2>/dev/null" 2>$null | Out-String).Trim().Split(" ")[0]
+    if ($sum -match '^[0-9a-f]{32}$') { return $sum } else { return "" }
+  }
   # Copie de sécurité de la partie du téléphone avant toute installation.
   $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
   $backup = Join-Path $root "build\pixel_saves\$stamp"
@@ -123,13 +134,39 @@ if ($Install) {
     if ((Test-Path "$backup\$f") -and -not ((Get-Content "$backup\$f" -TotalCount 1 -Encoding UTF8) -match '^\s*\{')) { Remove-Item "$backup\$f" }
   }
   Write-Host "   Parties du téléphone copiées dans $backup"
+  $before = Get-SaveMd5
   Write-Host "Installation sur le téléphone (mise à jour, parties conservées)"
   # --no-incremental : l'installation « incrémentale » laisse adb servir les fichiers en arrière-plan,
   # ce qui bloquait le script indéfiniment (30/09, PC maison).
   $result = & $adb install --no-incremental -r $apkPath 2>&1 | Out-String
   Write-Host $result
+  $restored = $false
   if ($result -match "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
-    throw "Le jeu du téléphone a été signé avec une autre clé. Ne pas désinstaller sans copier les parties : voir docs/BUILD_PC_ANDROID.md, section « Clé de signature commune »."
+    if (-not $AllowReinstall) {
+      throw "Le jeu du téléphone a été signé avec une autre clé. Relancer avec -Install -AllowReinstall : copie, désinstallation, réinstallation et restauration automatiques des parties."
+    }
+    Write-Host "Autre clé sur le téléphone : désinstallation, réinstallation, puis restauration des parties copiées." -ForegroundColor Yellow
+    & $adb uninstall $package 2>&1 | Out-Null
+    $result = & $adb install --no-incremental $apkPath 2>&1 | Out-String
+    if ($result -notmatch "Success") { throw "Réinstallation impossible : $result — les parties sont copiées dans $backup" }
+    & $adb shell "run-as $package mkdir -p files" 2>&1 | Out-Null
+    foreach ($file in Get-ChildItem $backup -File) {
+      & $adb push $file.FullName "/data/local/tmp/$($file.Name)" 2>&1 | Out-Null
+      & $adb shell "run-as $package cp /data/local/tmp/$($file.Name) files/$($file.Name) && run-as $package chmod 600 files/$($file.Name) && rm /data/local/tmp/$($file.Name)" 2>&1 | Out-Null
+    }
+    & $adb shell "run-as $package chmod 700 files" 2>&1 | Out-Null
+    $restored = $true
+  } elseif ($result -notmatch "Success") {
+    throw "Installation refusée : $result"
   }
+  # La partie doit être identique à l'octet près (même empreinte MD5 qu'avant l'installation).
+  $after = Get-SaveMd5
+  $ok = ($before -eq $after)
+  $journal = Join-Path $root "build\pixel_saves\journal-installations.csv"
+  if (-not (Test-Path $journal)) { "date;pc;commit;version;apk;restauree;partie_avant;partie_apres;resultat" | Out-File -Encoding utf8 $journal }
+  $commit = (& git rev-parse --short HEAD 2>$null)
+  ("{0};{1};{2};{3};{4};{5};{6};{7};{8}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $env:COMPUTERNAME, $commit, $versionName, (Split-Path $apkPath -Leaf), $restored, $before, $after, $(if ($ok) { "OK" } else { "PARTIE DIFFERENTE" })) | Out-File -Append -Encoding utf8 $journal
+  if (-not $ok) { throw "La partie du téléphone a changé pendant l'installation ! Copie intacte : $backup" }
+  Write-Host ("   Partie vérifiée : identique à l'octet près{0}." -f $(if ($restored) { " (restaurée)" } else { "" })) -ForegroundColor Green
 }
 Write-Host "Terminé." -ForegroundColor Green

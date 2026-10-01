@@ -9,17 +9,40 @@ const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SLOT_COUNT := 3 # emplacements manuels 1..3
 const SAVE_VERSION := 29
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
+const TEST_ROOT := "user://ci_tests/"
+
+## C1 : dossier des sauvegardes. Les tests passent dans un sous-dossier à part (use_test_folder) :
+## lancer les tests sur un PC où l'on joue n'efface plus jamais la vraie partie.
+var save_root := "user://"
+## Faux pendant les outils de capture : le jeu peut charger une partie mais ne peut rien écrire.
+var writes_enabled := true
 
 # --- Chemins ----------------------------------------------------------------
 
+func use_test_folder() -> void:
+	save_root = TEST_ROOT
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TEST_ROOT))
+
+func _rooted(user_path: String) -> String:
+	return save_root + user_path.trim_prefix("user://")
+
+func save_path() -> String:
+	return _rooted(SAVE_PATH)
+
+func temp_path() -> String:
+	return _rooted(TEMP_SAVE_PATH)
+
+func backup_path() -> String:
+	return _rooted(BACKUP_SAVE_PATH)
+
 func slot_path(slot: int) -> String:
-	return SAVE_PATH if slot <= 0 else "user://tech_empire_slot_%d.json" % slot
+	return save_path() if slot <= 0 else _rooted("user://tech_empire_slot_%d.json" % slot)
 
 func _slot_temp(slot: int) -> String:
-	return TEMP_SAVE_PATH if slot <= 0 else slot_path(slot) + ".tmp"
+	return temp_path() if slot <= 0 else slot_path(slot) + ".tmp"
 
 func _slot_backup(slot: int) -> String:
-	return BACKUP_SAVE_PATH if slot <= 0 else slot_path(slot) + ".bak"
+	return backup_path() if slot <= 0 else slot_path(slot) + ".bak"
 
 # --- Sauvegarde -------------------------------------------------------------
 
@@ -28,6 +51,8 @@ func save_game(quiet: bool = false) -> bool:
 	return save_to_slot(0, quiet)
 
 func save_to_slot(slot: int, quiet: bool = false) -> bool:
+	if not writes_enabled:
+		return false
 	if not CompanyManager.created:
 		if not quiet:
 			save_completed.emit(false, "Aucune partie à sauvegarder.")
@@ -73,11 +98,12 @@ func load_game() -> bool:
 
 func load_from_slot(slot: int) -> bool:
 	slot = clampi(slot, 0, SLOT_COUNT)
-	var state := _read_save_state(slot_path(slot))
-	if state.is_empty() and FileAccess.file_exists(_slot_backup(slot)):
-		state = _read_save_state(_slot_backup(slot))
-		if not state.is_empty():
-			save_completed.emit(true, "Sauvegarde principale invalide : copie de secours récupérée.")
+	var best := _best_state(slot)
+	var state: Dictionary = best.get("state", {})
+	if str(best.get("path", "")) == _slot_backup(slot):
+		save_completed.emit(true, "Sauvegarde principale invalide : copie de secours récupérée.")
+	elif str(best.get("path", "")) == _slot_temp(slot):
+		save_completed.emit(true, "Sauvegarde interrompue récupérée.")
 	if state.is_empty():
 		save_completed.emit(false, "Aucune sauvegarde valide trouvée.")
 		return false
@@ -115,15 +141,34 @@ func load_from_slot(slot: int) -> bool:
 
 # --- Informations d'emplacement (écran de choix) -----------------------------
 
+## C1 : la meilleure sauvegarde lisible d'un emplacement, et son fichier.
+## - La principale et la temporaire : la plus récente des deux qui se relit en entier. Une temporaire complète
+##   veut dire que l'appli a été tuée (Android, coupure) entre l'écriture et le remplacement : c'est la plus fraîche.
+##   Une temporaire coupée en cours d'écriture ne se relit pas et est ignorée.
+## - Sinon la copie de secours (.bak).
+func _best_state(slot: int) -> Dictionary:
+	var best := {}
+	var best_time := -1
+	for path in [slot_path(slot), _slot_temp(slot)]:
+		var state := _read_save_state(path)
+		if state.is_empty() or not state.has("company"):
+			continue
+		var saved_at := int((state.get("meta", {}) as Dictionary).get("saved_at", 0))
+		if saved_at > best_time:
+			best_time = saved_at
+			best = {"state":state, "path":path}
+	if best.is_empty():
+		var backup := _read_save_state(_slot_backup(slot))
+		if not backup.is_empty() and backup.has("company"):
+			best = {"state":backup, "path":_slot_backup(slot)}
+	return best
+
 func slot_info(slot: int) -> Dictionary:
-	var path := slot_path(slot)
-	if not FileAccess.file_exists(path):
-		path = _slot_backup(slot)
-		if not FileAccess.file_exists(path):
-			return {"exists":false, "slot":slot}
-	var state := _read_save_state(path)
-	if state.is_empty():
+	var best := _best_state(slot)
+	if best.is_empty():
 		return {"exists":false, "slot":slot}
+	var path := str(best.path)
+	var state: Dictionary = best.state
 	var meta: Dictionary = state.get("meta", {})
 	var company: Dictionary = state.get("company", {})
 	var time_state: Dictionary = state.get("time", {})
@@ -160,7 +205,13 @@ func delete_slot(slot: int) -> void:
 
 # --- Écriture atomique --------------------------------------------------------
 
-func _write_atomic(json_text: String, target: String = SAVE_PATH, temp: String = TEMP_SAVE_PATH, backup: String = BACKUP_SAVE_PATH) -> bool:
+func _write_atomic(json_text: String, target: String = "", temp: String = "", backup: String = "") -> bool:
+	if target == "":
+		target = save_path()
+	if temp == "":
+		temp = temp_path()
+	if backup == "":
+		backup = backup_path()
 	var temp_file := FileAccess.open(temp, FileAccess.WRITE)
 	if temp_file == null:
 		return false
@@ -197,8 +248,11 @@ func _read_save_state(path: String) -> Dictionary:
 		return {}
 	var raw := file.get_as_text()
 	file.close()
-	var parsed = JSON.parse_string(raw)
-	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}
+	# JSON.parse (et non parse_string) : un fichier abîmé est un cas prévu, pas une erreur à afficher.
+	var json := JSON.new()
+	if json.parse(raw) != OK:
+		return {}
+	return json.data if typeof(json.data) == TYPE_DICTIONARY else {}
 
 func _migrate_state(state: Dictionary, source_version: int) -> Dictionary:
 	var migrated := state.duplicate(true)

@@ -50,8 +50,28 @@ Une mise à jour depuis n'importe quel PC passe donc par-dessus l'ancienne versi
   et s'arrête au lieu de désinstaller si le téléphone porte une autre clé.
 - Pour que les exports faits **depuis l'éditeur Godot** (ou par une autre IA en ligne de commande) l'utilisent aussi,
   lancer une fois par PC, Godot fermé : `powershell -ExecutionPolicy Bypass -File tools\setup_debug_keystore.ps1`
-  (fait sur le PC du travail le 30/09 ; **à faire sur le PC maison**).
-- Cette clé ne sert **qu'aux versions de test**. Une version publiée sur le Play Store aura sa propre clé, jamais dans le dépôt.
+  (fait sur le PC du travail le 30/09, **et sur le PC maison le 01/10 à 23 h 08**).
+- Cette clé ne sert **qu'aux versions de test**. Une version publiée sur le Play Store a sa propre clé, jamais dans le dépôt
+  (voir `docs/PUBLICATION_PLAY_STORE.md`).
+
+**Incident du 01/10 (soir, PC maison)** : une installation faite *sans* `build_all.ps1`, alors que le PC maison n'était pas
+encore réglé, a signé l'APK avec la clé personnelle du PC (`CC:61:D2…`). Android a refusé la mise à jour et la partie
+d'Alexandre a été effacée ; elle a été restaurée depuis la copie faite juste avant. Depuis (étape C1) :
+
+- `build_all.ps1 -Install` **refuse d'installer si le jeu est ouvert**, **vérifie que la partie est identique à l'octet près**
+  après l'installation et note chaque installation dans `build\pixel_saves\journal-installations.csv` ;
+- `build_all.ps1 -Install -AllowReinstall` : si le téléphone porte une autre clé, copie → désinstallation → réinstallation →
+  **restauration automatique** des parties, puis la même vérification ;
+- **toujours installer avec `build_all.ps1`**, jamais avec un `adb install` à la main.
+
+### Tester les interruptions sur le téléphone (étape C1)
+
+`powershell -ExecutionPolicy Bypass -File tools\android_interrupt_test.ps1 -Cycles 20` : lance le jeu, touche « Continuer »,
+passe en arrière-plan, vérifie que la partie a été sauvegardée et qu'elle est intacte, puis tue l'appli comme le ferait Android.
+Ne fait jamais avancer le temps du jeu. Le téléphone ne doit pas être utilisé pendant le test (environ 6 minutes).
+
+Les tests automatiques (`tests/smoke_test.tscn`) écrivent leurs sauvegardes dans un sous-dossier à part (`ci_tests/`) :
+les lancer sur un PC où l'on joue n'efface plus la vraie partie.
 
 ### Deuxième PC (PC du travail)
 

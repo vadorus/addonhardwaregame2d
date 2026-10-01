@@ -20,6 +20,8 @@ dist/
 android/
 *.keystore
 *.jks
+# Seule exception : la cle de TEST commune aux deux PC (lot Q0, mot de passe public, jamais pour le Play Store)
+!tools/android/techempire-debug.keystore
 android/.gradle/
 *.apk
 *.aab
