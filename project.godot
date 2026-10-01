@@ -62,3 +62,10 @@ window/handheld/orientation=4
 
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[importer_defaults]
+
+texture={
+"compress/lossy_quality": 0.82,
+"compress/mode": 1
+}

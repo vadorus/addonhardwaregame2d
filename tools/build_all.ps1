@@ -54,6 +54,13 @@ New-Item -ItemType Directory build/windows, build/android -Force | Out-Null
 if (-not (Test-Path build/.gdignore)) { New-Item -ItemType File build/.gdignore | Out-Null }
 
 Write-Host "1/4 Import du projet"
+# V0.10 : les images sont importées « avec perte » (project.godot, [importer_defaults]) : APK ~59 → ~13 Mo.
+# Les .import locaux (non versionnés) gardaient l'ancien réglage « sans perte » : on les retire une fois,
+# Godot les recrée avec le réglage du projet. Sans effet aux builds suivants.
+Get-ChildItem assets -Recurse -Filter *.import | Where-Object {
+  $text = Get-Content $_.FullName -Raw
+  $text -match 'importer="texture"' -and $text -match 'compress/mode=0'
+} | ForEach-Object { Remove-Item $_.FullName }
 & $Godot --headless --path . --import 2>&1 | Out-Null
 
 if (-not $SkipTests) {

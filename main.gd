@@ -3018,11 +3018,17 @@ func _show_pending_reviews() -> void:
 	var next: Dictionary = _pending_reviews.pop_front()
 	var other_models := _pending_reviews.size()
 	_pending_reviews.clear()
+	# V0.10 (test Pixel du 01/10) : après le 1er mois, trois fenêtres s'enchaînaient (notes, « À la une »,
+	# rupture). Le triomphe passe dans cette fenêtre, et les autres moments attendent le mois suivant.
+	var front_page := MOMENTS.is_good_press(next.get("reviews", [])) and not ExecutiveManager.moment_seen("GOOD_PRESS")
+	if front_page:
+		ExecutiveManager.mark_moment_seen("GOOD_PRESS")
+	_last_big_card_month = TimeManager.year * 12 + TimeManager.month
 	_review_resume_scale = TimeManager.time_scale
 	TimeManager.time_scale = 0.0
 	review_layer.visible = true
 	JUICE.fade_in(review_layer, 0.25)
-	review_panel.call("show_reviews", str(next.get("name", "")), next.get("reviews", []), other_models)
+	review_panel.call("show_reviews", str(next.get("name", "")), next.get("reviews", []), other_models, front_page)
 
 func review_reveal_visible() -> bool:
 	return review_layer != null and review_layer.visible
@@ -3038,6 +3044,8 @@ func _close_review_reveal() -> void:
 	call_deferred("_check_moments")
 
 ## V0.10 / J3 : un moment clé à la fois, jamais par-dessus un autre grand moment ou un choix.
+var _last_big_card_month := -1
+
 func _check_moments() -> void:
 	if moment_layer == null or moment_layer.visible or not CompanyManager.created or SimulationManager.is_game_over:
 		return
@@ -3046,10 +3054,14 @@ func _check_moments() -> void:
 	for other in [game_over_layer, ceo_layer]:
 		if other != null and other.visible:
 			return
+	# Une seule grande fenêtre par mois : le reste attend la clôture suivante.
+	if _last_big_card_month == TimeManager.year * 12 + TimeManager.month:
+		return
 	var moment_id := MOMENTS.next_unseen(_moment_flags)
 	if moment_id == "":
 		return
 	ExecutiveManager.mark_moment_seen(moment_id)
+	_last_big_card_month = TimeManager.year * 12 + TimeManager.month
 	moment_layer.call("show_moment", moment_id)
 
 func _on_moment_closed(_moment_id: String) -> void:

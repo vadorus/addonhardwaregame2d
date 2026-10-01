@@ -152,6 +152,12 @@ func _check_fabrication_and_launch_cards() -> bool:
 	print("[UI] Launch card opens with its green button in view (phone 1616x720)")
 	# I6 : après le lancement, le champ capacité montrait 141 au lieu de 143 et proposait de « réduire ».
 	launch_go.pressed.emit()
+	for frame in range(3): await get_tree().process_frame
+	# Le joueur ferme la carte « Jour de sortie », l'interview et le moment « Premier CPU ».
+	for layer_name in ["launch_layer", "dialogue_layer", "moment_layer"]:
+		var layer: Control = game.get(layer_name)
+		if layer != null:
+			layer.visible = false
 	SimulationManager.process_month_end()
 	game.call("_refresh_all")
 	for frame in range(4): await get_tree().process_frame
@@ -199,6 +205,16 @@ func _check_fabrication_and_launch_cards() -> bool:
 		print("[UI] Nora's advice (%s) opens a quote, nothing spent, confirm in view" % str(advice.get("kind", "")))
 	else:
 		print("[UI] Sales page opens on Nora's month card (%s)" % (str(advice.get("kind", "")) if not advice.is_empty() else "calm"))
+	# Test Pixel (01/10) : après le 1er mois, une seule grande fenêtre (les notes), pas trois d'affilée.
+	if bool(game.call("review_reveal_visible")):
+		game.call("_close_review_reveal")
+		for frame in range(6): await get_tree().process_frame
+		if bool(game.call("moment_visible")):
+			_fail("After the press reveal, no other big window may open in the same month")
+			return false
+		print("[UI] One big window after the first sales month (press reveal only)")
+	else:
+		print("[UI] (no press reveal in this run)")
 	viewport.queue_free()
 	return true
 

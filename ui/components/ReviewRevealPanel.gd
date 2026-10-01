@@ -14,6 +14,10 @@ var _verdict: Label
 var _continue: Button
 var _reviews: Array = []
 var _revealed := 0
+## V0.10 : un triomphe dans la presse s'affiche ici, en bandeau, au lieu d'une fenêtre « À la une » de plus.
+var _banner: TextureRect
+var _kicker: Label
+const FRONT_PAGE_ART := "res://assets/art/v010/J3_moments/moment_presse.webp"
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(520, 0)
@@ -30,8 +34,16 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	add_child(box)
+	_banner = TextureRect.new()
+	_banner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_banner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_banner.custom_minimum_size = Vector2(0, 110)
+	_banner.clip_contents = true
+	_banner.visible = false
+	box.add_child(_banner)
 	var kicker := LOOK.eyebrow("LA PRESSE A TESTÉ")
 	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_kicker = kicker
 	box.add_child(kicker)
 	_title = LOOK.label("", 24)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -55,7 +67,11 @@ func _ready() -> void:
 	box.add_child(_continue)
 
 ## reviews : [{source_name, channel_label, score (0-100), headline}] ; other_models : autres modèles de la gamme testés.
-func show_reviews(product_name: String, reviews: Array, other_models: int = 0) -> void:
+func show_reviews(product_name: String, reviews: Array, other_models: int = 0, front_page: bool = false) -> void:
+	_banner.visible = front_page and ResourceLoader.exists(FRONT_PAGE_ART)
+	if _banner.visible and _banner.texture == null:
+		_banner.texture = load(FRONT_PAGE_ART)
+	_kicker.text = "À LA UNE  •  LA PRESSE A TESTÉ" if _banner.visible else "LA PRESSE A TESTÉ"
 	_reviews = reviews.duplicate(true)
 	_revealed = 0
 	_title.text = product_name
