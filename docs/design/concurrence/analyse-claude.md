@@ -159,3 +159,14 @@ Effort (supposition, en soirées de travail d'Alexandre avec les IA) : R 4, N 3,
 - Hardware Tycoon : [page Steam](https://store.steampowered.com/app/4490710/Hardware_Tycoon/), [avis Steam](https://steamcommunity.com/app/4490710/reviews/?browsefilter=toprated)
 - Processor Dev Tycoon : [page Steam](https://store.steampowered.com/app/3600280/Processor_Dev_Tycoon/), [avis Steam](https://steamcommunity.com/app/3600280/reviews/?browsefilter=toprated)
 - Test fermé Google Play (12 testeurs, 14 jours) : [Squirrel, guide 2026](https://www.squirrel.fr/comment-creer-compte-developpeur-google-play-android/)
+
+## Correctif (01/10, 22 h 50, après lecture de l'analyse d'Astra)
+
+Au point 3.2, j'ai écrit qu'aucun écran n'explique la note. **C'est inexact.** La révélation progressive des tests
+existe déjà, avec son et verdict (`ui/components/ReviewRevealPanel.gd`), et chaque test compare la puce à son
+prédécesseur et au meilleur rival (`scripts/MediaManager.gd`, `press_comparison` et `comparison_summary`).
+Mes recherches dans le code utilisaient d'autres mots et l'ont manquée.
+
+Ce qui reste vrai : il n'y a pas de **détail par critère** (performance, consommation, prix, fiabilité) relié au calcul réel,
+ni de lien clair entre la note et les ventes. Le lot N devient donc « compléter l'existant » (N1 + N2), et **N3 (mise en
+scène) est à retirer** : elle est déjà faite.
