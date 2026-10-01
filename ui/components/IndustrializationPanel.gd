@@ -37,6 +37,10 @@ var _fab_box: VBoxContainer
 var _done_box: VBoxContainer
 var _foundries_box: VBoxContainer
 var _choices: Dictionary = {}
+var _adjust_open: Dictionary = {}
+var _go_buttons: Dictionary = {}
+var _team_details: VBoxContainer
+var _team_toggle: Button
 var _signature := ""
 var _narrow := false
 
@@ -47,11 +51,22 @@ func _ready() -> void:
 
 func _build() -> void:
 	add_child(UI.section("Fabrication"))
-	_team_label = UI.muted_label("", 13)
-	_team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_team_label)
+	# I4 : les CPU qui attendent un choix d'abord ; le savoir-faire de l'équipe ensuite, replié.
 	_jobs_box = _vbox(10)
 	add_child(_jobs_box)
+	_team_toggle = Button.new()
+	_team_toggle.flat = true
+	_team_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_team_toggle.pressed.connect(func():
+		_team_details.visible = not _team_details.visible
+		_team_toggle.text = _team_toggle_text())
+	add_child(_team_toggle)
+	_team_details = _vbox(2)
+	_team_details.visible = false
+	add_child(_team_details)
+	_team_label = UI.muted_label("", 12)
+	_team_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_team_details.add_child(_team_label)
 	add_child(UI.section("Votre usine"))
 	_fab_box = _vbox(8)
 	add_child(_fab_box)
@@ -77,6 +92,8 @@ func refresh() -> void:
 		return
 	_signature = signature
 	_team_label.text = _team_text()
+	_team_toggle.text = _team_toggle_text()
+	_go_buttons.clear()
 	_rebuild_jobs()
 	_rebuild_fab()
 	_rebuild_done()
@@ -104,6 +121,11 @@ func _state_signature() -> String:
 		parts.append(str(int(float(FoundryManager.get_external_foundry(str(foundry_id)).get("technology_score", 0.0)))))
 	return ";".join(parts)
 
+func _team_toggle_text() -> String:
+	var people := PersonnelManager.count_department("Production")
+	var head := "Équipe production : %d personne%s" % [people, "s" if people > 1 else ""]
+	return head + ("  ▴" if _team_details != null and _team_details.visible else "  •  savoir-faire  ▾")
+
 func _team_text() -> String:
 	var nodes := CPU_DESIGN.available_nodes_for_capabilities(
 		float(ResearchManager.technologies.get("manufacturing", 0.0)), ResearchManager.get_cpu_capability("MINIATURIZATION"))
@@ -111,8 +133,8 @@ func _team_text() -> String:
 	for i in range(maxi(nodes.size() - 3, 0), nodes.size()):
 		var node_nm := int(nodes[i])
 		mastery.append("%s %.0f" % [CPU_DESIGN.node_label(node_nm), ProductionManager.get_process_mastery(node_nm)])
-	return "Équipe production : %d personne(s) • savoir-faire qualité %.0f • maintenance %.0f\nMaîtrise de la gravure : %s" % [
-		PersonnelManager.count_department("Production"), ProductionManager.quality_knowledge,
+	return "Savoir-faire qualité %.0f (moins de défauts) • maintenance %.0f (usine en meilleur état)\nMaîtrise de la gravure (plus on produit, mieux c'est) : %s" % [
+		ProductionManager.quality_knowledge,
 		ProductionManager.maintenance_knowledge, " • ".join(mastery) if not mastery.is_empty() else "—"]
 
 # --- CPU en préparation d'usine -------------------------------------------------------------
@@ -153,8 +175,9 @@ func _job_card(job: Dictionary) -> Control:
 		chip_color = IDLE_TEXT
 	head.add_child(_chip(chip_text, chip_color))
 	var progress := float(job.get("progress", 0.0))
-	box.add_child(UI.label("Préparation de l'usine : %.0f %%  •  %d mois" % [progress, int(job.get("months_spent", 0))], 14))
-	box.add_child(_bar(progress, UI.APP_GREEN if committed else AMBER))
+	if not needs_choice:
+		box.add_child(UI.label("Préparation de l'usine : %.0f %%  •  %d mois" % [progress, int(job.get("months_spent", 0))], 14))
+		box.add_child(_bar(progress, UI.APP_GREEN if committed else AMBER))
 	var route_error := str(job.get("route_error", ""))
 	if route_error != "":
 		var warn := UI.label("⚠ " + route_error, 13)
@@ -202,22 +225,67 @@ func _route_options(node_nm: int) -> Array:
 			result.append({"id":str(foundry_id), "quote":quote})
 	return result
 
+## V0.10 / I4 : d'abord la recommandation de Nora et le bouton vert (visible sans défiler sur téléphone),
+## puis « Ajuster moi-même » replié avec les trois questions, chaque option expliquée en une phrase.
 func _add_choices(box: VBoxContainer, job: Dictionary) -> void:
 	var job_id := str(job.get("id", ""))
 	var choice := _choice_for(job)
 	var node_nm := int(job.get("node_nm", 10000))
+	var options := _route_options(node_nm)
+	var provider := str(choice.provider)
+	var mode := "INTERNAL" if provider == "INTERNAL" else "EXTERNAL"
+	var quote := FoundryManager.route_quote(mode, provider, node_nm)
+	if options.is_empty() or quote.is_empty():
+		var none := UI.label("Aucune usine ne sait encore graver en %s : il faut attendre que les fonderies progressent ou changer de gravure." % CPU_DESIGN.node_label(node_nm), 13)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(none)
+	else:
+		var plan := UI.label(choice_summary(job_id), 14)
+		plan.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(plan)
+		var cost := UI.muted_label(choice_cost_text(job), 13)
+		cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(cost)
+	var go := Button.new()
+	go.name = "GoProduction"
+	go.custom_minimum_size = Vector2(0, 50)
+	go.add_theme_font_size_override("font_size", 16)
+	if quote.is_empty():
+		go.text = "Choisissez où fabriquer"
+		go.disabled = true
+	else:
+		go.text = "Lancer la production chez %s" % str(quote.get("provider_name", provider))
+		go.add_theme_color_override("font_color", Color.WHITE)
+		go.add_theme_color_override("font_hover_color", Color.WHITE)
+		go.add_theme_color_override("font_pressed_color", Color.WHITE)
+		go.add_theme_stylebox_override("normal", UI.stylebox(UI.APP_GREEN, 12, 0, UI.APP_GREEN, 10))
+		go.add_theme_stylebox_override("hover", UI.stylebox(UI.APP_GREEN.darkened(0.1), 12, 0, UI.APP_GREEN, 10))
+		go.add_theme_stylebox_override("pressed", UI.stylebox(UI.APP_GREEN.darkened(0.2), 12, 0, UI.APP_GREEN, 10))
+		go.pressed.connect(func(): _apply(job_id))
+	box.add_child(go)
+	_go_buttons[job_id] = go
+	if options.is_empty():
+		return
+	# Réglages fins, repliés : l'état ouvert/fermé survit aux reconstructions de la page.
+	var open := bool(_adjust_open.get(job_id, false))
+	var toggle := Button.new()
+	toggle.flat = true
+	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	toggle.text = ("Masquer les réglages  ▴" if open else "Ajuster moi-même (usine, priorité, tri des puces)  ▾")
+	toggle.pressed.connect(func():
+		_adjust_open[job_id] = not bool(_adjust_open.get(job_id, false))
+		call_deferred("_force_refresh"))
+	box.add_child(toggle)
+	if not open:
+		return
 	var recommended := FoundryManager.recommended_external_foundry(node_nm)
 	# 1. Où fabriquer ?
 	box.add_child(_question("1. Où fabriquer ?"))
+	box.add_child(_hint("Précision : des puces plus réussies. Fiabilité : moins de retards. Coût : multiplie les frais mensuels."))
 	var routes := HFlowContainer.new()
 	routes.add_theme_constant_override("h_separation", 8)
 	routes.add_theme_constant_override("v_separation", 8)
 	box.add_child(routes)
-	var options := _route_options(node_nm)
-	if options.is_empty():
-		var none := UI.label("Aucune usine ne sait encore graver en %s : il faut attendre que les fonderies progressent ou changer de gravure." % CPU_DESIGN.node_label(node_nm), 13)
-		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		box.add_child(none)
 	for option_value in options:
 		var option: Dictionary = option_value
 		var option_id := str(option.id)
@@ -230,7 +298,7 @@ func _add_choices(box: VBoxContainer, job: Dictionary) -> void:
 		var text := "%s%s\nPrécision %.0f • fiabilité %.0f • coût x%.2f\nMise en route %s €" % [
 			str(option_quote.get("provider_name", option_id)), tag, float(option_quote.get("precision", 0.0)),
 			float(option_quote.get("reliability", 0.0)), float(option_quote.get("cost_factor", 1.0)), UI.money(int(option_quote.get("setup_fee", 0)))]
-		var tile := _toggle_button(text, str(choice.provider) == option_id, 250 if not _narrow else 0, 78)
+		var tile := _toggle_button(text, provider == option_id, 250 if not _narrow else 0, 78)
 		tile.pressed.connect(func(): _pick(job_id, "provider", option_id))
 		routes.add_child(tile)
 	# 2. Priorité de l'usine.
@@ -241,26 +309,58 @@ func _add_choices(box: VBoxContainer, job: Dictionary) -> void:
 	box.add_child(_question("3. Tri des puces"))
 	box.add_child(_segmented(job_id, "binning", BINNING_ORDER, BINNING_SHORT, str(choice.binning)))
 	box.add_child(_hint(str(BINNING_HINTS.get(str(choice.binning), ""))))
-	# Coût et validation.
+
+## Une phrase : où, comment, et si c'est le conseil de Nora.
+func choice_summary(job_id: String) -> String:
+	var job := _job_by_id(job_id)
+	if job.is_empty():
+		return ""
+	var choice := _choice_for(job)
+	var node_nm := int(job.get("node_nm", 10000))
 	var provider := str(choice.provider)
-	var mode := "INTERNAL" if provider == "INTERNAL" else "EXTERNAL"
-	var quote := FoundryManager.route_quote(mode, provider, node_nm)
-	var go := Button.new()
-	go.custom_minimum_size = Vector2(0, 50)
-	go.add_theme_font_size_override("font_size", 16)
+	var quote := FoundryManager.route_quote("INTERNAL" if provider == "INTERNAL" else "EXTERNAL", provider, node_nm)
+	var where := str(quote.get("provider_name", provider))
+	var advised := provider == "INTERNAL" or provider == FoundryManager.recommended_external_foundry(node_nm)
+	var settings := "priorité %s, tri %s" % [str(STRATEGY_SHORT.get(str(choice.strategy), "")).to_lower(), str(BINNING_SHORT.get(str(choice.binning), "")).to_lower()]
+	if advised and str(choice.strategy) == "BALANCED" and str(choice.binning) == "BALANCED":
+		return "Nora conseille : fabriquer chez %s, réglages équilibrés." % where
+	return "Votre choix : fabriquer chez %s, %s." % [where, settings]
+
+func choice_cost_text(job: Dictionary) -> String:
+	var choice := _choice_for(job)
+	var provider := str(choice.provider)
+	var quote := FoundryManager.route_quote("INTERNAL" if provider == "INTERNAL" else "EXTERNAL", provider, int(job.get("node_nm", 10000)))
 	if quote.is_empty():
-		go.text = "Choisissez où fabriquer"
-		go.disabled = true
-	else:
-		var monthly := int(round(float(job.get("monthly_cost", 0)) * float(ProductionManager.STRATEGIES.get(str(choice.strategy), {}).get("cost", 1.0)) * float(quote.get("cost_factor", 1.0))))
-		box.add_child(UI.muted_label("Coût : ~%s €/mois pendant la préparation + %s € de mise en route." % [UI.money(monthly), UI.money(int(quote.get("setup_fee", 0)))], 13))
-		go.text = "Lancer la production"
-		go.add_theme_color_override("font_color", Color.WHITE)
-		go.add_theme_stylebox_override("normal", UI.stylebox(UI.APP_GREEN, 12, 0, UI.APP_GREEN, 10))
-		go.add_theme_stylebox_override("hover", UI.stylebox(UI.APP_GREEN.darkened(0.1), 12, 0, UI.APP_GREEN, 10))
-		go.add_theme_stylebox_override("pressed", UI.stylebox(UI.APP_GREEN.darkened(0.2), 12, 0, UI.APP_GREEN, 10))
-		go.pressed.connect(func(): _apply(job_id))
-	box.add_child(go)
+		return ""
+	var monthly := int(round(float(job.get("monthly_cost", 0)) * float(ProductionManager.STRATEGIES.get(str(choice.strategy), {}).get("cost", 1.0)) * float(quote.get("cost_factor", 1.0))))
+	return "Coût : %s € de mise en route, puis ~%s €/mois pendant la préparation de l'usine." % [UI.money(int(quote.get("setup_fee", 0))), UI.money(monthly)]
+
+## Le bouton vert de la carte (pour la navigation et les tests).
+func go_button(job_id: String = "") -> Button:
+	if job_id == "":
+		for key in _go_buttons.keys():
+			var b: Button = _go_buttons[key]
+			if is_instance_valid(b):
+				return b
+		return null
+	var button: Button = _go_buttons.get(job_id, null)
+	return button if is_instance_valid(button) else null
+
+## La première carte qui attend un choix (pour y amener le joueur).
+func first_choice_card() -> Control:
+	var button := go_button()
+	if button == null:
+		return null
+	var node: Node = button
+	while node != null and node.get_parent() != _jobs_box:
+		node = node.get_parent()
+	return node as Control
+
+func _job_by_id(job_id: String) -> Dictionary:
+	for job_value in ProductionManager.jobs:
+		if str((job_value as Dictionary).get("id", "")) == job_id:
+			return job_value
+	return {}
 
 func _pick(job_id: String, field: String, value: String) -> void:
 	if _choices.has(job_id):

@@ -48,6 +48,8 @@ func _ready() -> void:
 		await get_tree().process_frame
 	if not await _check_project_decision_card():
 		return
+	if not await _check_fabrication_and_launch_cards():
+		return
 	print("[CI] Workshop layout test passed")
 	get_tree().quit()
 
@@ -85,6 +87,69 @@ func _check_project_decision_card() -> bool:
 		_fail("I1: the decision card opens with its question cut off at the top")
 		return false
 	print("[UI] Project decision card opens on its question (phone 1616x720)")
+	viewport.queue_free()
+	return true
+
+## V0.10 / I4 : « Choisir la fabrication » puis « Préparer le lancement » arrivent chacun sur leur carte,
+## avec le bouton vert visible sans défiler, à la taille du Pixel.
+func _check_fabrication_and_launch_cards() -> bool:
+	const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1616, 720)
+	add_child(viewport)
+	var game := (load("res://main.tscn") as PackedScene).instantiate() as Control
+	viewport.add_child(game)
+	for frame in range(8): await get_tree().process_frame
+	game.get("setup_name").text = "I4"
+	game.call("_start_new_game")
+	ResearchManager.start_project("I4 CPU", "CPU", "EMBEDDED", "INTERNAL", "BALANCED", 45000, CPU_DESIGN.preset("BALANCED"))
+	var pid := str((ResearchManager.projects[0] as Dictionary).get("id", ""))
+	GarageBusiness.mark_shown("first_silicon_shown")
+	for month in range(30):
+		SimulationManager.process_month_end()
+		var pending := ResearchManager.get_project_decision(pid)
+		if not pending.is_empty():
+			ResearchManager.resolve_project_decision(pid, "BALANCE" if str(pending.get("type", "")) == "PROTOTYPE_REVIEW" else "APPROVE")
+		if not ProductionManager.get_active_jobs().is_empty():
+			break
+	if ProductionManager.get_active_jobs().is_empty():
+		_fail("I4: no production job reached")
+		return false
+	game.call("_refresh_all")
+	for frame in range(4): await get_tree().process_frame
+	game.call("_on_dashboard_navigation", 4, "Production")
+	for frame in range(16): await get_tree().process_frame
+	var screen: Control = game.get("products_screen")
+	var panel: Control = screen.get("industrialization_panel")
+	var go: Button = panel.call("go_button")
+	if go == null or go.disabled or not go.is_visible_in_tree():
+		_fail("I4: no green production button on the fabrication card")
+		return false
+	if not screen.get_global_rect().encloses(go.get_global_rect()):
+		_fail("I4: the production button is not visible without scrolling: %s in %s" % [str(go.get_global_rect()), str(screen.get_global_rect())])
+		return false
+	print("[UI] Fabrication card opens with its green button in view (phone 1616x720)")
+	go.emit_signal("pressed")
+	var job: Dictionary = ProductionManager.get_active_jobs()[0]
+	for month in range(24):
+		SimulationManager.process_month_end()
+		if str(job.get("status", "")) == "COMPLETED":
+			break
+	GarageBusiness.mark_shown("first_binning_shown")
+	game.call("close_dialogue")
+	game.call("_refresh_all")
+	for frame in range(4): await get_tree().process_frame
+	game.call("_on_dashboard_navigation", 4, "PRODUCT_LAUNCH")
+	for frame in range(16): await get_tree().process_frame
+	var lifecycle: Control = screen.get("lifecycle_panel")
+	var launch_go: Button = lifecycle.get("_launch_go")
+	if launch_go == null or not launch_go.is_visible_in_tree():
+		_fail("I4: no green launch button on the launch card")
+		return false
+	if not screen.get_global_rect().encloses(launch_go.get_global_rect()):
+		_fail("I4: the launch button is not visible without scrolling: %s in %s" % [str(launch_go.get_global_rect()), str(screen.get_global_rect())])
+		return false
+	print("[UI] Launch card opens with its green button in view (phone 1616x720)")
 	viewport.queue_free()
 	return true
 

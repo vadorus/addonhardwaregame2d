@@ -39,6 +39,11 @@ var _attack_button: Button
 
 const STATUS_LABELS := {"READY":"Prêt à lancer", "LAUNCHED":"En vente", "RETIRED":"Retiré", "DISCONTINUED":"Arrêté"}
 const AMBER := Color("d9822b")
+var _launch_card: PanelContainer
+var _launch_title: Label
+var _launch_numbers: HBoxContainer
+var _launch_note: Label
+var _launch_go: Button
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
@@ -49,6 +54,38 @@ func _build() -> void:
 	# V0.9 (29/09) : la page listait 21 lignes « LAUNCHED » puis une fiche de 15 lignes.
 	# Maintenant : la gamme en cartes (générations récentes d'abord, anciennes repliées),
 	# un modèle sélectionné résumé en jauges, et la fiche technique complète repliée.
+	# V0.10 / I4 : quand des modèles sont prêts, une seule carte en haut : 3 chiffres qui comptent et
+	# un grand bouton. Les réglages fins et la veille détaillée restent plus bas, repliés.
+	_launch_card = PanelContainer.new()
+	_launch_card.add_theme_stylebox_override("panel", UI.stylebox(Color("fffaf1"), 14, 2, AMBER, 14))
+	_launch_card.visible = false
+	add_child(_launch_card)
+	var launch_box := VBoxContainer.new()
+	launch_box.add_theme_constant_override("separation", 8)
+	_launch_card.add_child(launch_box)
+	var launch_kicker := UI.eyebrow("PRÊT À LANCER")
+	launch_kicker.add_theme_color_override("font_color", AMBER)
+	launch_box.add_child(launch_kicker)
+	_launch_title = UI.label("", 20)
+	_launch_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	launch_box.add_child(_launch_title)
+	_launch_numbers = HBoxContainer.new()
+	_launch_numbers.add_theme_constant_override("separation", 10)
+	launch_box.add_child(_launch_numbers)
+	_launch_note = UI.muted_label("", 13)
+	_launch_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	launch_box.add_child(_launch_note)
+	_launch_go = Button.new()
+	_launch_go.custom_minimum_size.y = 52
+	_launch_go.add_theme_font_size_override("font_size", 17)
+	_launch_go.add_theme_stylebox_override("normal", UI.stylebox(Color("14a44d"), 12, 0, Color("14a44d"), 10))
+	_launch_go.add_theme_stylebox_override("hover", UI.stylebox(Color("12924a"), 12, 0, Color("12924a"), 10))
+	_launch_go.add_theme_color_override("font_color", Color.WHITE)
+	_launch_go.add_theme_color_override("font_hover_color", Color.WHITE)
+	_launch_go.pressed.connect(_emit_launch_range)
+	launch_box.add_child(_launch_go)
+	launch_box.add_child(UI.muted_label("Ou réglez le prix et la capacité de chaque modèle plus bas.", 12))
+
 	add_child(UI.section("Votre gamme"))
 	products_label = UI.muted_label("", 13)
 	products_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -102,8 +139,8 @@ func _build() -> void:
 	launch_grid.add_child(product_capacity)
 
 	var intel_card := UI.card(UI.APP_CYAN_DARK, 10, 10)
-	_intel_card = intel_card
-	add_child(intel_card)
+	_intel_card = _collapsible("Prévision détaillée de ce modèle (veille, rival, marges)", intel_card)
+	add_child(_intel_card)
 	var intel_box := VBoxContainer.new()
 	intel_box.add_theme_constant_override("separation", 6)
 	intel_card.add_child(intel_box)
@@ -221,6 +258,67 @@ func set_viewport_width(width: float) -> void:
 
 func refresh() -> void:
 	_refresh_product_list()
+	refresh_launch_card()
+
+## V0.10 / I4 : ce qu'un novice doit savoir avant de lancer, en trois chiffres.
+func launch_card_data() -> Dictionary:
+	var ready: Array = []
+	for product_value in ProductManager.products:
+		if str((product_value as Dictionary).get("status", "")) == "READY":
+			ready.append(product_value)
+	if ready.is_empty():
+		return {}
+	var expected_total := 0
+	var margin_total := 0.0
+	var monthly_profit := 0
+	var commitment := 0
+	for product_value in ready:
+		var product: Dictionary = product_value
+		var capacity := maxi(1, int(product.get("recommended_capacity", product.get("production_capacity", 1))))
+		var candidate := product.duplicate(true)
+		candidate["production_capacity"] = capacity
+		var forecast := MarketManager.forecast_cpu_launch(candidate, int(product.get("price", 1)))
+		var expected := mini(int(forecast.get("expected_units", 0)), capacity)
+		var margin := ProductManager.net_margin_per_unit(candidate)
+		expected_total += expected
+		margin_total += float(margin) * float(maxi(expected, 1))
+		monthly_profit += expected * margin - ProductManager.monthly_capacity_reservation_cost(candidate, expected)
+		commitment += ProductManager.launch_capacity_commitment_cost(candidate, capacity)
+	return {"models":ready.size(), "name":str((ready[0] as Dictionary).get("name", "Votre CPU")).split(" ")[0],
+		"expected":expected_total, "margin":int(round(margin_total / maxf(float(expected_total), 1.0))),
+		"profit":monthly_profit, "commitment":commitment, "cash_after":Economy.money - commitment}
+
+func refresh_launch_card() -> void:
+	if _launch_card == null:
+		return
+	var data := launch_card_data()
+	_launch_card.visible = not data.is_empty()
+	if data.is_empty():
+		return
+	_launch_title.text = ("Votre gamme %s est prête : %d modèles" % [str(data.name), int(data.models)]) if int(data.models) > 1 else "%s est prêt" % str(data.name)
+	for child in _launch_numbers.get_children():
+		_launch_numbers.remove_child(child)
+		child.queue_free()
+	for pair in [["Ventes attendues", "~%s / mois" % UI.money(int(data.expected))],
+			["Gagné par puce", "~%s €" % UI.money(int(data.margin))],
+			["Bénéfice des ventes", "~%s € / mois" % UI.money(int(data.profit))]]:
+		var tile := PanelContainer.new()
+		tile.add_theme_stylebox_override("panel", UI.stylebox(Color("f6ead6"), 10, 0, Color("f6ead6"), 10))
+		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var tile_box := VBoxContainer.new()
+		tile.add_child(tile_box)
+		tile_box.add_child(UI.muted_label(str(pair[0]), 12))
+		tile_box.add_child(UI.label(str(pair[1]), 20))
+		_launch_numbers.add_child(tile)
+	var cash_after := int(data.cash_after)
+	_launch_note.text = "Prix et capacités conseillés par l'équipe. Réserver l'usine coûte ~%s € : il vous restera ~%s €. Salaires et loyer ne sont pas comptés dans le bénéfice des ventes." % [UI.money(int(data.commitment)), UI.money(cash_after)]
+	if cash_after < 0:
+		_launch_note.text = "⚠ Réserver l'usine coûte ~%s € : la trésorerie ne suffit pas. Baissez la capacité de certains modèles plus bas." % UI.money(int(data.commitment))
+	_launch_go.text = ("Lancer les %d modèles" % int(data.models)) if int(data.models) > 1 else "Lancer %s" % str(data.name)
+	_launch_go.disabled = cash_after < 0
+
+func launch_card() -> Control:
+	return _launch_card
 
 func _refresh_product_list() -> void:
 	var current_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""

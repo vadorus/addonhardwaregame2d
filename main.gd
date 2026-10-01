@@ -471,10 +471,26 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 		return
 	if tab_index == 4 and context == "PRODUCT_LAUNCH" and products_screen != null:
 		TimeManager.time_scale = 0.0
-		status_label.text = "Nora : le CPU est prêt. Choisissez un prix et une capacité que la trésorerie peut réellement soutenir."
+		status_label.text = "Nora : le CPU est prêt. Le bouton vert lance toute la gamme aux réglages conseillés."
+		if notification_feed != null:
+			notification_feed.call("clear")
 		products_screen.call_deferred("focus_product_launch")
 		return
+	if tab_index == 4 and context in ["Production", "PRODUCTION"] and products_screen != null and _production_choice_waiting():
+		TimeManager.time_scale = 0.0
+		status_label.text = "Nora : je vous conseille un partenaire. Le bouton vert lance la fabrication ; « Ajuster moi-même » si vous voulez choisir."
+		if notification_feed != null:
+			notification_feed.call("clear")
+		products_screen.call_deferred("focus_production")
+		return
 	# V0.9 : plus de message « X ouvert » : il restait affiché une fois revenu au garage.
+
+func _production_choice_waiting() -> bool:
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		if not bool(job.get("route_selected", false)) and not bool(job.get("route_committed", false)):
+			return true
+	return false
 
 ## Lot A (29/09) : le SAV n'existe plus qu'en Produits › SAV (il était aussi dans Marché).
 ## Les anciennes décisions et repères qui visent l'onglet Marché pour un dossier SAV y sont redirigés.

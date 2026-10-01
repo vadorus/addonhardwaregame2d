@@ -31,7 +31,7 @@ func show_section_for_context(context: String) -> void:
 	match context:
 		"SAV", "Supporter":
 			focus_support()
-		"PRODUCTION", "Fabriquer", "Stock & production":
+		"PRODUCTION", "Production", "Fabriquer", "Stock & production":
 			_select_mode("BUILD")
 		"PRODUCT_LAUNCH", "Vendre":
 			_select_mode("SELL")
@@ -145,8 +145,31 @@ func focus_product_launch() -> void:
 		call_deferred("_focus_product_launch_deferred")
 
 func _focus_product_launch_deferred() -> void:
-	if lifecycle_panel != null:
-		ensure_control_visible(lifecycle_panel)
+	if lifecycle_panel == null:
+		return
+	# V0.10 / I4 : on arrive sur la carte « Prêt à lancer » (en haut), pas au bas de la page.
+	await get_tree().process_frame
+	var target: Control = lifecycle_panel.call("launch_card") if lifecycle_panel.has_method("launch_card") else lifecycle_panel
+	if target == null or not target.visible:
+		target = lifecycle_panel
+	if get_child_count() > 0 and get_child(0) is Control:
+		scroll_vertical = maxi(int(target.global_position.y - (get_child(0) as Control).global_position.y - 8.0), 0)
+
+## V0.10 / I4 : « Choisir la fabrication » amène sur la carte du CPU qui attend, bouton vert en vue.
+func focus_production() -> void:
+	refresh()
+	_select_mode("BUILD")
+	call_deferred("_focus_production_deferred")
+
+func _focus_production_deferred() -> void:
+	if industrialization_panel == null:
+		return
+	await get_tree().process_frame
+	var target: Control = industrialization_panel.call("first_choice_card") if industrialization_panel.has_method("first_choice_card") else null
+	if target == null:
+		target = industrialization_panel
+	if get_child_count() > 0 and get_child(0) is Control:
+		scroll_vertical = maxi(int(target.global_position.y - (get_child(0) as Control).global_position.y - 8.0), 0)
 
 func focus_support() -> void:
 	refresh()

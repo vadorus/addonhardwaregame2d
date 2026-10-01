@@ -1,6 +1,7 @@
 extends RefCounted
 ## Produits > Fabriquer (29/09) : une carte par CPU, trois questions en boutons, « Lancer la production »
 ## qui règle vraiment la route ; plus de pavé de texte.
+## V0.10 / I4 : le conseil de Nora et le bouton vert d'abord, les trois questions repliées sous « Ajuster moi-même ».
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
@@ -20,9 +21,26 @@ static func run(host: Node) -> String:
 	if go == null or go.disabled:
 		panel.queue_free()
 		return "Fabrication page: « Lancer la production » button missing for a job waiting for a choice"
+	if not str(panel.call("choice_summary", job_id)).begins_with("Nora conseille"):
+		panel.queue_free()
+		return "Fabrication page: the card should open on Nora's recommendation (%s)" % str(panel.call("choice_summary", job_id))
+	if _find_button(panel, "Qualité") != null:
+		panel.queue_free()
+		return "Fabrication page: fine settings should be folded under « Ajuster moi-même »"
+	if _find_button(panel, "Ajuster moi-même") == null:
+		panel.queue_free()
+		return "Fabrication page: « Ajuster moi-même » toggle missing"
+	(panel.get("_adjust_open") as Dictionary)[job_id] = true
+	panel.call("_force_refresh")
 	if _find_button(panel, "Qualité") == null or _find_button(panel, "Strict") == null:
 		panel.queue_free()
 		return "Fabrication page: priority / chip sorting choices should be buttons"
+	((panel.get("_choices") as Dictionary)[job_id] as Dictionary)["strategy"] = "QUALITY"
+	panel.call("_force_refresh")
+	if not str(panel.call("choice_summary", job_id)).begins_with("Votre choix"):
+		panel.queue_free()
+		return "Fabrication page: the summary should follow the player's own settings"
+	go = _find_button(panel, "Lancer la production")
 	var longest := _longest_label(panel)
 	go.emit_signal("pressed")
 	panel.queue_free()
@@ -31,6 +49,8 @@ static func run(host: Node) -> String:
 	var payload: Dictionary = received.get("payload", {})
 	if str(payload.get("job_id", "")) != job_id:
 		return "Fabrication page: wrong job in payload"
+	if str(payload.get("strategy", "")) != "QUALITY":
+		return "Fabrication page: the adjusted priority was not sent"
 	var ok := ProductionManager.set_strategy(job_id, str(payload.strategy)) and ProductionManager.set_binning_strategy(job_id, str(payload.binning)) \
 		and ProductionManager.set_manufacturing_route(job_id, str(payload.mode), str(payload.provider))
 	if not ok or not bool(ProductionManager.get_job(job_id).get("route_selected", false)):

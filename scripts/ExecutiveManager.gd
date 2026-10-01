@@ -1075,7 +1075,7 @@ func get_executive_brief() -> Dictionary:
 		var industrial_job: Dictionary = active_industrial_jobs[0]
 		var industrial_action := "La route est engagée : surveillez rendement, qualité, coût et capacité jusqu'à la création de la gamme."
 		if not bool(industrial_job.get("route_selected", false)):
-			industrial_action = "Ouvrez Production & Produits pour choisir stratégie industrielle, binning et fonderie avant de laisser avancer le temps."
+			industrial_action = "Ouvrez Produits › Fabriquer : Nora conseille un partenaire, le bouton vert lance la fabrication."
 		elif not bool(industrial_job.get("route_committed", false)):
 			industrial_action = "La configuration industrielle est validée. Le prochain mois engagera la route et lancera réellement l'industrialisation."
 		priorities.append({
