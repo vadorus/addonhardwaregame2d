@@ -178,4 +178,24 @@ func focus_support() -> void:
 		call_deferred("ensure_control_visible", after_sales_panel)
 
 func _relay_action(action: String, payload: Dictionary) -> void:
-	action_requested.emit(action, payload)
+	match action:
+		"focus_control":
+			# I5 : le portefeuille ou la carte de Nora amènent sur la fiche / « Gérer ce modèle ».
+			call_deferred("_scroll_to", payload.get("control", null))
+		"open_support":
+			focus_support()
+		_:
+			action_requested.emit(action, payload)
+
+func _scroll_to(target: Variant) -> void:
+	await get_tree().process_frame
+	if target == null or not (target is Control) or not is_instance_valid(target):
+		return
+	if get_child_count() > 0 and get_child(0) is Control:
+		scroll_vertical = maxi(int((target as Control).global_position.y - (get_child(0) as Control).global_position.y - 8.0), 0)
+
+## V0.10 / I5 : « Vendre » s'ouvre en haut, sur la carte « Ce mois-ci ».
+func focus_sales() -> void:
+	refresh()
+	_select_mode("SELL")
+	scroll_vertical = 0

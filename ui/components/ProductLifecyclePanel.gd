@@ -34,8 +34,6 @@ var _intel_card: Control
 var _range_advice_box: VBoxContainer
 var _clearance_button: Button
 var _retire_button: Button
-var _attack_select: OptionButton
-var _attack_button: Button
 
 const STATUS_LABELS := {"READY":"Prêt à lancer", "LAUNCHED":"En vente", "RETIRED":"Retiré", "DISCONTINUED":"Arrêté"}
 const AMBER := Color("d9822b")
@@ -44,6 +42,22 @@ var _launch_title: Label
 var _launch_numbers: HBoxContainer
 var _launch_note: Label
 var _launch_go: Button
+# V0.10 / I5 : carte « Ce mois-ci », portefeuille, « Gérer ce modèle » replié, dépenses confirmées.
+const ADVISOR := preload("res://scripts/SalesAdvisor.gd")
+var _month_card: Control
+var _portfolio: Control
+var _range_title: Control
+var _model_title: Control
+var _manage: Control
+var _manage_toggle: Button
+var _manage_content: Control
+var _locks_label: Label
+var sale_price: SpinBox
+var _sale_price_button: Button
+var _promote_button: Button
+var _revise_button: Button
+var _market_button: Button
+var _armed: Button
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
@@ -86,20 +100,33 @@ func _build() -> void:
 	launch_box.add_child(_launch_go)
 	launch_box.add_child(UI.muted_label("Ou réglez le prix et la capacité de chaque modèle plus bas.", 12))
 
-	add_child(UI.section("Votre gamme"))
+	_month_card = (load("res://ui/components/SalesMonthCard.gd") as Script).new() as Control
+	_month_card.connect("action_requested", func(action: String, payload: Dictionary): action_requested.emit(action, payload))
+	_month_card.connect("navigate_requested", _on_month_navigate)
+	_month_card.connect("focus_requested", func(): action_requested.emit("focus_control", {"control":_month_card}))
+	add_child(_month_card)
+
+	_range_title = UI.section("Vos CPU")
+	add_child(_range_title)
 	products_label = UI.muted_label("", 13)
 	products_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(products_label)
 	_range_advice_box = VBoxContainer.new()
 	_range_advice_box.add_theme_constant_override("separation", 6)
 	add_child(_range_advice_box)
+	_portfolio = (load("res://ui/components/SalesPortfolio.gd") as Script).new() as Control
+	_portfolio.connect("model_selected", _on_portfolio_selected)
+	add_child(_portfolio)
 	_range_box = VBoxContainer.new()
 	_range_box.add_theme_constant_override("separation", 8)
 	add_child(_range_box)
 
-	add_child(UI.section("Modèle sélectionné"))
+	_model_title = UI.section("Modèle sélectionné")
+	add_child(_model_title)
 	product_select = OptionButton.new()
 	product_select.item_selected.connect(_on_product_selected)
+	# I5 : le portefeuille et les cartes de génération remplacent ce menu ; il reste la source de vérité.
+	product_select.visible = false
 	add_child(product_select)
 	_model_header = UI.label("", 18)
 	_model_header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -163,17 +190,33 @@ func _build() -> void:
 	post_launch_group = VBoxContainer.new()
 	post_launch_group.add_theme_constant_override("separation", 10)
 	add_child(post_launch_group)
-	post_launch_group.add_child(UI.section("Vie après lancement"))
+	post_launch_group.add_child(UI.section("Suivi de ce modèle"))
 	var pulse_script: Script = load("res://ui/components/ProductPulsePanel.gd")
 	product_pulse_panel = pulse_script.new() as Control
 	post_launch_group.add_child(product_pulse_panel)
 
+	# I5 : toutes les commandes restent là, mais repliées sous « Gérer ce modèle ».
 	# Une action = une ligne : ce qu'on choisit, puis le bouton qui l'applique.
+	# Ce qui coûte ou ne se défait pas demande un second toucher (« Toucher encore pour confirmer »).
+	var manage_box := VBoxContainer.new()
+	manage_box.add_theme_constant_override("separation", 8)
+	_manage = _collapsible("Gérer ce modèle (prix, capacité, campagnes, révisions, fin de vie)", manage_box)
+	_manage_toggle = _manage.get_child(0) as Button
+	_manage_content = manage_box
+	post_launch_group.add_child(_manage)
 	lifecycle_grid = GridContainer.new()
 	lifecycle_grid.columns = 3
 	lifecycle_grid.add_theme_constant_override("h_separation", 8)
 	lifecycle_grid.add_theme_constant_override("v_separation", 8)
-	post_launch_group.add_child(lifecycle_grid)
+	manage_box.add_child(lifecycle_grid)
+
+	lifecycle_grid.add_child(UI.label("Prix de vente (€)", 13))
+	sale_price = UI.spin(1, 1000000, 5, 300)
+	sale_price.value_changed.connect(func(_value): _refresh_sale_price_button())
+	lifecycle_grid.add_child(sale_price)
+	_sale_price_button = Button.new()
+	_sale_price_button.pressed.connect(_emit_sale_price)
+	lifecycle_grid.add_child(_sale_price_button)
 
 	# Lot M : la capacité se règle aussi après le lancement (rupture = clients perdus).
 	lifecycle_grid.add_child(UI.label("Capacité de production", 13))
@@ -182,7 +225,7 @@ func _build() -> void:
 	lifecycle_grid.add_child(sale_capacity)
 	_capacity_apply_button = Button.new()
 	_capacity_apply_button.text = "Ajuster la capacité"
-	_capacity_apply_button.pressed.connect(_emit_update_capacity)
+	_capacity_apply_button.pressed.connect(func(): _arm_or_run(_capacity_apply_button, _emit_update_capacity, _capacity_change_cost() > 0))
 	lifecycle_grid.add_child(_capacity_apply_button)
 
 	lifecycle_grid.add_child(UI.label("Promotion", 13))
@@ -191,10 +234,11 @@ func _build() -> void:
 		promotion_select.add_item(ProductManager.promotion_label(promotion_key))
 		promotion_select.set_item_metadata(promotion_select.item_count - 1, promotion_key)
 	lifecycle_grid.add_child(promotion_select)
-	var promote := Button.new()
-	promote.text = "Lancer la promotion"
-	promote.pressed.connect(_emit_promotion)
-	lifecycle_grid.add_child(promote)
+	promotion_select.item_selected.connect(func(_i): _refresh_manage_costs())
+	_promote_button = Button.new()
+	_promote_button.text = "Lancer la promotion"
+	_promote_button.pressed.connect(func(): _arm_or_run(_promote_button, _emit_promotion))
+	lifecycle_grid.add_child(_promote_button)
 
 	lifecycle_grid.add_child(UI.label("Révision matérielle", 13))
 	revision_select = OptionButton.new()
@@ -202,10 +246,11 @@ func _build() -> void:
 		revision_select.add_item(ProductManager.revision_label(revision_key))
 		revision_select.set_item_metadata(revision_select.item_count - 1, revision_key)
 	lifecycle_grid.add_child(revision_select)
-	var revise := Button.new()
-	revise.text = "Valider le stepping"
-	revise.pressed.connect(_emit_revision)
-	lifecycle_grid.add_child(revise)
+	revision_select.item_selected.connect(func(_i): _refresh_manage_costs())
+	_revise_button = Button.new()
+	_revise_button.text = "Valider le stepping"
+	_revise_button.pressed.connect(func(): _arm_or_run(_revise_button, _emit_revision))
+	lifecycle_grid.add_child(_revise_button)
 
 	lifecycle_grid.add_child(UI.label("Firmware / microcode", 13))
 	firmware_select = OptionButton.new()
@@ -216,33 +261,39 @@ func _build() -> void:
 	lifecycle_grid.add_child(firmware_select)
 	firmware_release_button = Button.new()
 	firmware_release_button.text = "Publier le firmware"
-	firmware_release_button.pressed.connect(_emit_firmware)
+	firmware_select.item_selected.connect(func(_i): _refresh_manage_costs())
+	firmware_release_button.pressed.connect(func(): _arm_or_run(firmware_release_button, _emit_firmware))
 	lifecycle_grid.add_child(firmware_release_button)
 
-	# Lot D : attaquer le rival qui domine ce marché.
+	# I5 (décision d'Alexandre) : l'offensive contre un rival vit dans Marché ; ici, un raccourci.
 	lifecycle_grid.add_child(UI.label("Attaquer un rival", 13))
-	_attack_select = OptionButton.new()
-	lifecycle_grid.add_child(_attack_select)
-	_attack_button = Button.new()
-	_attack_button.text = "Lancer l'offensive"
-	_attack_button.pressed.connect(_emit_attack)
-	lifecycle_grid.add_child(_attack_button)
+	var market_hint := UI.muted_label("Les offensives se préparent dans Marché.", 12)
+	market_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lifecycle_grid.add_child(market_hint)
+	_market_button = Button.new()
+	_market_button.text = "Voir les rivaux dans Marché"
+	_market_button.pressed.connect(func(): action_requested.emit("open_market_rivals", {"product_id":UI.option_meta(product_select)}))
+	lifecycle_grid.add_child(_market_button)
 
 	# Lot D : fin de série (prix -25 % pendant 3 mois) puis retrait, ou retrait immédiat.
 	lifecycle_grid.add_child(UI.label("Fin de vie", 13))
 	_clearance_button = Button.new()
 	_clearance_button.text = "Fin de série (-25 %%, %d mois)" % ProductManager.CLEARANCE_MONTHS
-	_clearance_button.pressed.connect(_emit_clearance)
+	_clearance_button.pressed.connect(func(): _arm_or_run(_clearance_button, _emit_clearance))
 	lifecycle_grid.add_child(_clearance_button)
 	_retire_button = Button.new()
 	_retire_button.text = "Retirer maintenant"
-	_retire_button.pressed.connect(_emit_retire)
+	_retire_button.pressed.connect(func(): _arm_or_run(_retire_button, _emit_retire))
 	lifecycle_grid.add_child(_retire_button)
 
 	control_software_button = Button.new()
 	control_software_button.text = "Développer / mettre à jour le logiciel de contrôle"
-	control_software_button.pressed.connect(_emit_control_software)
-	post_launch_group.add_child(control_software_button)
+	control_software_button.pressed.connect(func(): _arm_or_run(control_software_button, _emit_control_software))
+	manage_box.add_child(control_software_button)
+	# Une commande bloquée dit pourquoi (pas seulement au survol).
+	_locks_label = UI.muted_label("", 12)
+	_locks_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	manage_box.add_child(_locks_label)
 
 	post_launch_label = UI.rich_label()
 	post_launch_group.add_child(_collapsible("Historique et retours du terrain", post_launch_label))
@@ -259,6 +310,8 @@ func set_viewport_width(width: float) -> void:
 func refresh() -> void:
 	_refresh_product_list()
 	refresh_launch_card()
+	if _month_card != null:
+		_month_card.call("refresh")
 
 ## V0.10 / I4 : ce qu'un novice doit savoir avant de lancer, en trois chiffres.
 func launch_card_data() -> Dictionary:
@@ -399,7 +452,8 @@ func _refresh_range() -> void:
 	for child in _range_box.get_children():
 		_range_box.remove_child(child)
 		child.queue_free()
-	_refresh_range_advice()
+	# I5 : le conseil de fin de série passe par la carte « Ce mois-ci » (devis puis confirmation).
+	_range_advice_box.visible = false
 	var launched := 0
 	var ready_count := 0
 	var monthly_units := 0
@@ -427,12 +481,23 @@ func _refresh_range() -> void:
 	older.add_theme_constant_override("separation", 8)
 	var older_count := 0
 	var selected_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""
+	if _portfolio != null:
+		_portfolio.set("selected_id", selected_id)
+		_portfolio.call("refresh")
+	# I5 : les modèles en vente sont dans le portefeuille ; les cartes de génération ne servent plus
+	# qu'à choisir un modèle prêt à lancer.
+	var any_on_market := launched > 0
+	for product_value in ProductManager.products:
+		if str((product_value as Dictionary).get("status", "")) in ["RETIRED", "DISCONTINUED"]:
+			any_on_market = true
 	for i in range(generations.size()):
 		var generation: Dictionary = generations[i]
 		var has_ready := false
 		for model_id in generation.get("model_ids", []):
 			if str(ProductManager.get_product(str(model_id)).get("status", "")) == "READY":
 				has_ready = true
+		if any_on_market and not has_ready:
+			continue
 		var card := _generation_card(generation, selected_id)
 		if i < 2 or has_ready:
 			_range_box.add_child(card)
@@ -556,6 +621,8 @@ func _refresh_model_summary(product: Dictionary) -> void:
 			_voices_label.text = "\n".join(voice_lines)
 	# Lancement : capacité + veille seulement pour un modèle prêt ; prix modifiable en vente.
 	var is_ready := status == "READY"
+	if launch_grid != null:
+		launch_grid.visible = is_ready
 	if _capacity_title != null:
 		_capacity_title.visible = is_ready
 		product_capacity.visible = is_ready
@@ -567,6 +634,7 @@ func _refresh_model_summary(product: Dictionary) -> void:
 		launch_button.visible = is_ready
 
 func _refresh_product_details() -> void:
+	_disarm()
 	if product_select.item_count == 0:
 		product_details_label.text = "Aucun produit sélectionné."
 		post_launch_group.visible = false
@@ -594,12 +662,16 @@ func _refresh_product_details() -> void:
 		]
 
 	product_price.value = float(product.price)
+	if sale_price != null:
+		sale_price.set_value_no_signal(float(product.price))
+		_refresh_sale_price_button()
 	_refresh_post_launch(product)
 	var has_capacity_limit := product.has("max_monthly_capacity")
 	product_capacity.allow_greater = not has_capacity_limit
 	product_capacity.max_value = float(product.get("max_monthly_capacity", 1000000))
 	product_capacity.value = float(product.production_capacity)
 	_refresh_sale_capacity(product)
+	_refresh_manage_costs()
 	_refresh_launch_intel()
 
 func _set_cpu_detail(product: Dictionary, metric_lines: Array[String]) -> void:
@@ -704,26 +776,10 @@ func _refresh_end_of_life(product: Dictionary) -> void:
 	_clearance_button.text = ("Fin de série : retrait dans %d mois" % int(product.get("clearance_months_remaining", 0))) if in_clearance else ("Fin de série (-25 %%, %d mois)" % ProductManager.CLEARANCE_MONTHS)
 
 func _refresh_attack(product: Dictionary) -> void:
-	if _attack_select == null:
+	if _market_button == null:
 		return
-	_attack_select.clear()
-	var targets := MarketManager.attack_targets(product)
-	for target_value in targets:
-		var target: Dictionary = target_value
-		_attack_select.add_item("%s — %s (%s €)" % [str(target.get("company", "")), str(target.get("name", "")), UI.money(int(target.get("price", 0)))])
-		_attack_select.set_item_metadata(_attack_select.item_count - 1, str(target.get("id", "")))
 	var running := MarketManager.attack_for_product(str(product.get("id", "")))
-	if not running.is_empty():
-		_attack_button.text = "Offensive en cours (%d mois)" % int(running.get("months_remaining", 0))
-		_attack_button.disabled = true
-	elif targets.is_empty():
-		_attack_button.text = "Aucun rival sur ce marché"
-		_attack_button.disabled = true
-	else:
-		var cost := MarketManager.attack_cost()
-		_attack_button.text = "Lancer l'offensive — %s €" % UI.money(cost)
-		_attack_button.disabled = not Economy.can_afford(cost)
-	_attack_select.disabled = targets.is_empty()
+	_market_button.text = ("Offensive en cours (%d mois) — voir Marché" % int(running.get("months_remaining", 0))) if not running.is_empty() else "Voir les rivaux dans Marché"
 
 func _refresh_launch_intel() -> void:
 	if product_select.item_count == 0:
@@ -863,6 +919,8 @@ func _refresh_sale_capacity(product: Dictionary) -> void:
 func _on_sale_capacity_changed(_value: float) -> void:
 	if _capacity_apply_button == null or product_select == null or product_select.item_count == 0:
 		return
+	if _armed == _capacity_apply_button:
+		_disarm()
 	var quote := ProductManager.capacity_change_quote(UI.option_meta(product_select), int(sale_capacity.value))
 	var cost := int(quote.get("cost", 0))
 	var target := int(quote.get("capacity", 0))
@@ -904,11 +962,6 @@ func _emit_retire() -> void:
 func _emit_clearance_many() -> void:
 	action_requested.emit("clearance_many", {"product_ids":ProductManager.retire_candidate_ids()})
 
-func _emit_attack() -> void:
-	if product_select.item_count == 0 or _attack_select.item_count == 0:
-		return
-	action_requested.emit("attack_rival", {"product_id":UI.option_meta(product_select), "competitor_id":UI.option_meta(_attack_select)})
-
 func _emit_promotion() -> void:
 	if product_select.item_count == 0:
 		return
@@ -928,3 +981,127 @@ func _emit_control_software() -> void:
 	if product_select.item_count == 0:
 		return
 	action_requested.emit("release_control_software", {"product_id":UI.option_meta(product_select)})
+
+# --- V0.10 / I5 ------------------------------------------------------------------------------------
+
+func month_card() -> Control:
+	return _month_card
+
+func portfolio() -> Control:
+	return _portfolio
+
+func manage_section() -> Control:
+	return _manage
+
+func manage_open() -> bool:
+	return _manage_content != null and _manage_content.visible
+
+func open_manage() -> void:
+	if _manage_content != null and not _manage_content.visible:
+		_manage_toggle.emit_signal("pressed")
+
+func _on_portfolio_selected(product_id: String) -> void:
+	_select_model(product_id)
+	action_requested.emit("focus_control", {"control":_model_title})
+
+func _on_month_navigate(target: String, product_id: String) -> void:
+	match target:
+		"SAV":
+			action_requested.emit("open_support", {"product_id":product_id})
+		"MARKET":
+			action_requested.emit("open_market_rivals", {"product_id":product_id})
+		"MANAGE":
+			_select_model(product_id)
+			open_manage()
+			action_requested.emit("focus_control", {"control":_manage})
+
+## Ce qui coûte ou ne se défait pas : un premier toucher montre ce qu'il restera en caisse,
+## un second confirme. Toucher ailleurs (ou un nouveau mois) annule.
+func _arm_or_run(button: Button, run: Callable, needs_confirm: bool = true) -> void:
+	if not needs_confirm or _armed == button:
+		_disarm()
+		run.call()
+		return
+	_disarm()
+	_armed = button
+	button.set_meta("base_text", button.text)
+	var cost := int(button.get_meta("cost", 0))
+	if cost > 0:
+		var finance := ExecutiveManager.financial_advice(cost)
+		button.text = "Toucher encore pour confirmer — il restera %s €%s" % [UI.money(int(finance.cash_after)), "  ⚠" if str(finance.level) in ["DANGEREUX", "IMPOSSIBLE"] else ""]
+	else:
+		button.text = "Toucher encore pour confirmer (définitif)"
+	for state in ["normal", "hover", "focus"]:
+		button.add_theme_stylebox_override(state, UI.stylebox(Color("fbe8cc"), 10, 2, AMBER, 8))
+
+func _disarm() -> void:
+	if _armed == null or not is_instance_valid(_armed):
+		_armed = null
+		return
+	_armed.text = str(_armed.get_meta("base_text", _armed.text))
+	for state in ["normal", "hover", "focus"]:
+		_armed.remove_theme_stylebox_override(state)
+	_armed = null
+
+func armed_button() -> Button:
+	return _armed
+
+func _selected_product() -> Dictionary:
+	return ProductManager.get_product(UI.option_meta(product_select)) if product_select.item_count > 0 else {}
+
+func _capacity_change_cost() -> int:
+	var product := _selected_product()
+	if product.is_empty() or sale_capacity == null:
+		return 0
+	return int(ProductManager.capacity_change_quote(str(product.get("id", "")), int(sale_capacity.value)).get("cost", 0))
+
+func _refresh_manage_costs() -> void:
+	var product := _selected_product()
+	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or _promote_button == null:
+		return
+	var promotion_key := UI.option_meta(promotion_select)
+	var promotion_cost := int((ProductManager.PROMOTION_TYPES.get(promotion_key, {}) as Dictionary).get("cost", 0))
+	_promote_button.text = "Lancer la promotion — %s €" % UI.money(promotion_cost)
+	_promote_button.set_meta("cost", promotion_cost)
+	var revision_cost := ProductManager.revision_cost(product, UI.option_meta(revision_select))
+	_revise_button.text = "Valider le stepping — %s €" % UI.money(revision_cost)
+	_revise_button.set_meta("cost", revision_cost)
+	var firmware_cost := ProductManager.firmware_cost(product, UI.option_meta(firmware_select))
+	firmware_release_button.text = ("Publier le firmware — %s €" % UI.money(firmware_cost)) if ProductManager.firmware_available(product) else "Publier le firmware (bloqué)"
+	firmware_release_button.set_meta("cost", firmware_cost)
+	var software_cost := ProductManager.control_software_cost(product)
+	control_software_button.text = ("Logiciel de contrôle pour toute la génération — %s €" % UI.money(software_cost)) if ProductManager.control_software_available(product) else "Logiciel de contrôle (bloqué)"
+	control_software_button.set_meta("cost", software_cost)
+	_capacity_apply_button.set_meta("cost", _capacity_change_cost())
+	var locks: Array[String] = []
+	var firmware_reason := ProductManager.firmware_block_reason(product)
+	if firmware_reason != "":
+		locks.append("Firmware — " + firmware_reason)
+	var software_reason := ProductManager.control_software_block_reason(product)
+	if software_reason != "":
+		locks.append("Logiciel de contrôle — " + software_reason)
+	var retire_reason := ProductManager.retire_block_reason(product)
+	if retire_reason != "":
+		locks.append("Fin de vie : " + retire_reason)
+	_locks_label.text = "\n".join(locks)
+	_locks_label.visible = not locks.is_empty()
+
+func _refresh_sale_price_button() -> void:
+	var product := _selected_product()
+	if product.is_empty() or _sale_price_button == null:
+		return
+	var price := int(sale_price.value)
+	if price == int(product.get("price", 0)):
+		_sale_price_button.text = "Prix actuel : %s €" % UI.money(price)
+		_sale_price_button.disabled = true
+		return
+	var candidate := product.duplicate(true)
+	candidate["price"] = price
+	_sale_price_button.text = "Passer à %s € (gagné par puce ~%s €)" % [UI.money(price), UI.money(ProductManager.net_margin_per_unit(candidate))]
+	_sale_price_button.disabled = false
+
+func _emit_sale_price() -> void:
+	var product := _selected_product()
+	if product.is_empty():
+		return
+	action_requested.emit("update_price", {"product_id":str(product.get("id", "")), "price":int(sale_price.value)})

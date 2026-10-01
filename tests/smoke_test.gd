@@ -18,6 +18,7 @@ const NEXT_GENERATION_SCENARIO := preload("res://tests/scenarios/NextGenerationS
 const STOCKOUT_CASH_SCENARIO := preload("res://tests/scenarios/StockoutCashScenario.gd")
 const CEO_INBOX_SCENARIO := preload("res://tests/scenarios/CeoInboxScenario.gd")
 const SMALL_DEFECTS_SCENARIO := preload("res://tests/scenarios/SmallDefectsScenario.gd")
+const SALES_ADVISOR_SCENARIO := preload("res://tests/scenarios/SalesAdvisorScenario.gd")
 const MARKET_ECONOMY_GUARD_SCENARIO := preload("res://tests/scenarios/MarketEconomyGuardScenario.gd")
 const NEXT_GENERATION_MARKET_LEARNING_SCENARIO := preload("res://tests/scenarios/NextGenerationMarketLearningScenario.gd")
 const FULL_CPU_PLAYER_JOURNEY_SCENARIO := preload("res://tests/scenarios/FullCpuPlayerJourneyScenario.gd")
@@ -262,6 +263,10 @@ func _ready() -> void:
 	var small_defects_error := SMALL_DEFECTS_SCENARIO.run(self)
 	if small_defects_error != "":
 		_fail(small_defects_error)
+		return
+	var sales_advisor_error := SALES_ADVISOR_SCENARIO.run(self)
+	if sales_advisor_error != "":
+		_fail(sales_advisor_error)
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame

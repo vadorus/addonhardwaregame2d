@@ -9,6 +9,7 @@ extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CAREER := preload("res://scripts/CareerPrestige.gd")
+const SALES_ADVISOR := preload("res://scripts/SalesAdvisor.gd")
 
 const PROFILES := {
 	"NOVICE":{"mode":"ACCESSIBLE", "hire_every":0, "hire_cash":0, "max_projects":1, "budget_ratio":0.85, "move":false, "expand":false, "reach":1.0},
@@ -50,6 +51,13 @@ func _play(profile_name: String, years: int) -> Dictionary:
 	var max_decisions := 0
 	var max_total_decisions := 0
 	var decision_kinds := {}
+	var sales_months := 0
+	var advice_months := 0
+	var first_year_advice := 0
+	var advice_kinds := {}
+	var advice_episodes := 0
+	var first_year_kinds := {}
+	var last_advice_key := ""
 	var units := 0
 	var bankrupt := ""
 	var gen := 0
@@ -125,6 +133,20 @@ func _play(profile_name: String, years: int) -> Dictionary:
 					var quote := ProductManager.capacity_change_quote(str(product.id), demand)
 					if int(quote.get("capacity", 0)) > int(product.get("production_capacity", 0)) and Economy.money > int(quote.get("cost", 0)) * 2:
 						ProductManager.set_production_capacity(str(product.id), demand)
+		# I5 : combien de mois Nora affiche un conseil sur la page Vendre (le bot ne touche jamais « Plus tard »).
+		var advice: Dictionary = (SALES_ADVISOR.month_summary().get("top", {}) as Dictionary) if not ProductManager.products.is_empty() else {}
+		if not SALES_ADVISOR.launched_products().is_empty():
+			sales_months += 1
+			var advice_key := ("%s|%s" % [str(advice.kind), str(advice.product_id)]) if not advice.is_empty() else ""
+			if advice_key != "" and advice_key != last_advice_key:
+				advice_episodes += 1
+			last_advice_key = advice_key
+			if not advice.is_empty():
+				advice_months += 1
+				advice_kinds[str(advice.kind)] = int(advice_kinds.get(str(advice.kind), 0)) + 1
+				if sales_months <= 12:
+					first_year_advice += 1
+					first_year_kinds[str(advice.kind)] = int(first_year_kinds.get(str(advice.kind), 0)) + 1
 		var pending_decisions: Array = ExecutiveManager.get_ceo_decisions()
 		if ExecutiveManager.visible_ceo_decisions().size() > max_decisions:
 			max_decisions = ExecutiveManager.visible_ceo_decisions().size()
@@ -155,6 +177,7 @@ func _play(profile_name: String, years: int) -> Dictionary:
 			quality += total / maxf(float(fm.size()), 1.0)
 			done += 1
 	var nora_settled := CompanyManager.alerts.filter(func(a): return str(a).begins_with("Nora a tranché")).size()
+	print("[PROFILES] %s conseils Vendre : %d nouveaux conseils, %d mois sur %d avec un conseil affiché (12 premiers mois de vente : %d %s) | %s" % [profile_name, advice_episodes, advice_months, sales_months, first_year_advice, str(first_year_kinds), str(advice_kinds)])
 	print("[PROFILES] %s décisions visibles : max %d (en tout max %d) | tranchées par Nora (alertes récentes) %d | mois-décisions %s" % [profile_name, max_decisions, max_total_decisions, nora_settled, str(decision_kinds)])
 	return {"avg_dev_months":dev_months / maxf(done, 1.0), "avg_quality":quality / maxf(done, 1.0), "money":Economy.money, "income":last_income, "units":units, "staff":PersonnelManager.staff.size(),
 		"devs":PersonnelManager.count_department("Développement"), "tier":int(ExecutiveManager.workplace.get("tier", 0)),

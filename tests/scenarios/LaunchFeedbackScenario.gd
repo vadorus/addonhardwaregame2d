@@ -50,7 +50,7 @@ static func run(host: Node) -> String:
 		"ip_ownership":100.0,
 		"cpu_design":CPU_DESIGN.default_design(),
 		"metrics":metrics,
-		"unit_cost":55,
+		"unit_cost":30,  # I5 : distributeurs (35 %) désormais comptés ; à 55 € chaque puce perdait de l'argent
 		"price":120,
 		"recommended_capacity":500,
 		"max_monthly_capacity":2000,
@@ -116,7 +116,7 @@ static func run(host: Node) -> String:
 		return "Market feedback did not expose demand lost to insufficient capacity"
 	if str(feedback.get("lesson", "")).find("capacité") < 0:
 		_restore(snapshot)
-		return "Market feedback did not convert capacity saturation into a useful lesson"
+		return "Market feedback did not convert capacity saturation into a useful lesson: %s" % str(feedback)
 	if int(feedback.get("revenue", 0)) <= 0:
 		_restore(snapshot)
 		return "Market feedback did not preserve commercial revenue"

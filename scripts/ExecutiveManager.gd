@@ -890,8 +890,8 @@ func get_ceo_decisions() -> Array:
 			"severity":44.0,
 			"title":"Nora : attaquer %s ?" % str(attack_idea.company),
 			"text":"Sur le marché %s, le %s vend %s puces par mois contre %s pour votre %s." % [MarketManager.segment_label(str(attack_idea.segment)), str(attack_idea.rival_product), _group_digits(int(attack_idea.rival_units)), _group_digits(int(attack_idea.player_units)), str(attack_idea.product_name)],
-			"recommendation":"Une offensive de %d mois (publicité, remises, revendeurs) prend des clients au rival. Il réagira : baisse de prix, publicité ou sortie anticipée." % MarketManager.ATTACK_MONTHS,
-			"target_tab":4,
+			"recommendation":"Une offensive de %d mois (publicité, remises, revendeurs) prend des clients au rival. Il réagira : baisse de prix, publicité ou sortie anticipée. Elle se prépare dans Marché." % MarketManager.ATTACK_MONTHS,
+			"target_tab":5,
 			"can_defer":true
 		})
 	# Lot F1 : Nora a trouvé une société à racheter (rival en difficulté à prix cassé, ou rival sain au prix fort).

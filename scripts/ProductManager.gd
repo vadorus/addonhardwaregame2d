@@ -279,7 +279,7 @@ func apply_hardware_revision(product_id: String, revision_type: String) -> bool:
 	_ensure_lifecycle_fields(product)
 	var data: Dictionary = REVISION_TYPES[revision_type]
 	var current_revision := int(product.get("hardware_revision", 0))
-	var cost := int(data.base_cost) + current_revision * 4500 + int(float(product.get("unit_cost", 1)) * 55.0)
+	var cost := revision_cost(product, revision_type)
 	if not Economy.can_afford(cost, "Révision matérielle — %s" % str(product.get("name", "CPU"))):
 		return false
 	Economy.add_expense(cost, "Révision matérielle — %s" % str(product.get("name", "CPU")))
@@ -339,6 +339,35 @@ func control_software_available(product: Dictionary) -> bool:
 		return false
 	return float(ResearchManager.technologies.get("software", 0.0)) >= 18.0 and float(ResearchManager.technologies.get("integration", 0.0)) >= 24.0
 
+## V0.10 / I5 : les devis, sans rien dépenser (« Examiner » avant de confirmer).
+func revision_cost(product: Dictionary, revision_type: String) -> int:
+	var data: Dictionary = REVISION_TYPES.get(revision_type, REVISION_TYPES["QUALITY"])
+	return int(data.base_cost) + int(product.get("hardware_revision", 0)) * 4500 + int(float(product.get("unit_cost", 1)) * 55.0)
+
+func firmware_cost(product: Dictionary, firmware_type: String) -> int:
+	var data: Dictionary = FIRMWARE_TYPES.get(firmware_type, FIRMWARE_TYPES["BALANCED"])
+	var version := int(product.get("firmware_version", 1)) + 1
+	return int(data.cost) + int(product.get("units_sold_total", 0)) / 25 + version * 850
+
+func control_software_cost(product: Dictionary) -> int:
+	var generation_id := str(product.get("generation_id", ""))
+	var supported := 0
+	for candidate in products:
+		if str(candidate.get("sector", "")) == "CPU" and str(candidate.get("generation_id", "")) == generation_id:
+			supported += 1
+	var next_version := int((product.get("control_software", {}) as Dictionary).get("version", 0)) + 1
+	return 9000 + supported * 2200 + maxi(next_version - 1, 0) * 3500
+
+func firmware_block_reason(product: Dictionary) -> String:
+	if firmware_available(product):
+		return ""
+	return "Bloqué : savoir-faire logiciel 12 et architecture des circuits 24 nécessaires (actuellement %.0f et %.0f). Ils montent avec la R&D." % [float(ResearchManager.technologies.get("software", 0.0)), ResearchManager.get_cpu_capability("ARCHITECTURE")]
+
+func control_software_block_reason(product: Dictionary) -> String:
+	if control_software_available(product):
+		return ""
+	return "Bloqué : savoir-faire logiciel 18 et intégration 24 nécessaires (actuellement %.0f et %.0f)." % [float(ResearchManager.technologies.get("software", 0.0)), float(ResearchManager.technologies.get("integration", 0.0))]
+
 func release_firmware(product_id: String, firmware_type: String) -> bool:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED" or str(product.get("sector", "")) != "CPU" or not FIRMWARE_TYPES.has(firmware_type):
@@ -348,7 +377,7 @@ func release_firmware(product_id: String, firmware_type: String) -> bool:
 	_ensure_lifecycle_fields(product)
 	var data: Dictionary = FIRMWARE_TYPES[firmware_type]
 	var version := int(product.get("firmware_version", 1)) + 1
-	var cost := int(data.cost) + int(product.get("units_sold_total", 0)) / 25 + version * 850
+	var cost := firmware_cost(product, firmware_type)
 	if not Economy.can_afford(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU"))):
 		return false
 	Economy.add_expense(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU")))
@@ -389,7 +418,7 @@ func release_control_software(product_id: String) -> bool:
 			supported.append(str(candidate.get("id", "")))
 	var software: Dictionary = product.get("control_software", {}).duplicate(true)
 	var next_version := int(software.get("version", 0)) + 1
-	var cost := 9000 + supported.size() * 2200 + maxi(next_version - 1, 0) * 3500
+	var cost := control_software_cost(product)
 	if not Economy.can_afford(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU")))):
 		return false
 	Economy.add_expense(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU"))))
@@ -766,6 +795,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var lost_sales := maxi(consumer_units - sold_consumer, 0)
 	product["last_month_demand"] = consumer_units + b2b_units
 	product["last_month_lost_sales"] = lost_sales
+	product["last_month_consumer_demand"] = consumer_units
 	frustration = next_stockout_frustration(frustration, float(lost_sales) / maxf(float(consumer_units), 1.0))
 	product["stockout_frustration"] = frustration
 	if lost_sales >= 20 and float(lost_sales) >= float(consumer_units) * 0.20:
@@ -799,7 +829,9 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"innovation":(float(product.metrics.innovation)-60.0)/180.0 * weight,
 		"sustainability":(float(product.metrics.sustainability)-55.0)/220.0 * weight
 	})
-	var net_contribution := revenue - production_cost - capacity_reservation_cost - royalty_cost - warranty_cost
+	# V0.10 / I5 (relevé par Astra, vérifié le 01/10) : la part des distributeurs était bien débitée
+	# mais oubliée ici ; la « contribution » affichée était trop belle de 15 à 30 % du CA grand public.
+	var net_contribution := revenue - production_cost - distributor_cost - capacity_reservation_cost - royalty_cost - warranty_cost
 	var report := {
 		"product_id":product.id,
 		"units":total_units,
@@ -807,6 +839,7 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 		"b2b_units":sold_b2b,
 		"revenue":revenue,
 		"production_cost":production_cost,
+		"distributor_cost":distributor_cost,
 		"capacity_reservation_cost":capacity_reservation_cost,
 		"royalty_cost":royalty_cost,
 		"warranty_cost":warranty_cost,
@@ -854,7 +887,13 @@ func _record_market_feedback(product: Dictionary, report: Dictionary) -> void:
 		else:
 			verdict = "Dans la prévision"
 	var lesson := "Le lancement fournit maintenant une base réelle pour ajuster prix, capacité et produit."
-	if utilization >= 0.95 and demand_units > capacity:
+	# I5 (Astra) : si chaque puce vendue perd de l'argent, produire plus aggraverait la perte : ce conseil
+	# passe avant la rupture. (Une perte due seulement aux frais fixes de réservation, elle, se résorbe
+	# avec le volume : là, la rupture reste la bonne leçon.)
+	var variable_margin := int(report.get("net_contribution", 0)) + int(report.get("capacity_reservation_cost", 0))
+	if variable_margin <= 0:
+		lesson = "Chaque puce vendue fait perdre de l'argent : revoyez prix, coût, royalties ou qualité avant d'augmenter les volumes."
+	elif utilization >= 0.95 and demand_units > capacity:
 		lesson = "La capacité limite les ventes : augmenter la capacité peut convertir une partie de la demande non servie."
 	elif int(report.get("net_contribution", 0)) <= 0:
 		lesson = "Le mois détruit de la marge : revoyez prix, coût, royalties ou qualité avant d'augmenter les volumes."

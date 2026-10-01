@@ -6,6 +6,7 @@ const UI := preload("res://ui/UiKit.gd")
 
 var overview_panel: Control
 var tender_panel: Control
+var attack_panel: Control
 
 func _ready() -> void:
 	name = "Marché"
@@ -16,6 +17,11 @@ func _ready() -> void:
 	add_child(box)
 	box.add_child(UI.eyebrow("MARCHÉ & CLIENTS"))
 	box.add_child(UI.label("Lire le marché, affronter les concurrents et décrocher des contrats", 24))
+
+	# V0.10 / I5 : l'offensive contre un rival se prépare ici (décision d'Alexandre).
+	attack_panel = (load("res://ui/components/RivalAttackPanel.gd") as Script).new() as Control
+	attack_panel.connect("action_requested", _relay_action)
+	box.add_child(attack_panel)
 
 	var overview_script: Script = load("res://ui/components/MarketOverviewPanel.gd")
 	overview_panel = overview_script.new() as Control
@@ -69,6 +75,8 @@ func set_viewport_width(width: float) -> void:
 		overview_panel.call("set_viewport_width", width)
 
 func refresh() -> void:
+	if attack_panel != null:
+		attack_panel.call("refresh")
 	if overview_panel != null:
 		overview_panel.call("refresh")
 	if tender_panel != null:
@@ -76,3 +84,8 @@ func refresh() -> void:
 
 func _relay_action(action: String, payload: Dictionary) -> void:
 	action_requested.emit(action, payload)
+
+func focus_offensive(product_id: String = "") -> void:
+	if attack_panel != null:
+		attack_panel.call("focus_product", product_id)
+	scroll_vertical = 0

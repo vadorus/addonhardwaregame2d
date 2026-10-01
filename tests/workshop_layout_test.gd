@@ -170,6 +170,35 @@ func _check_fabrication_and_launch_cards() -> bool:
 			_fail("I6: at its current capacity %s offers: %s" % [str(product.get("name", "")), capacity_button.text])
 			return false
 	print("[UI] After launch, capacity and price fields show the real values")
+	# I5 : la page Vendre s'ouvre sur la carte « Ce mois-ci » ; un seul bouton, le reste replié.
+	screen.call("focus_sales")
+	for frame in range(6): await get_tree().process_frame
+	var month: Control = lifecycle.call("month_card")
+	if month == null or not month.is_visible_in_tree() or month.get_global_rect().position.y > screen.get_global_rect().end.y - 120:
+		_fail("I5: the « Ce mois-ci » card must open the sales page")
+		return false
+	if (lifecycle.get("lifecycle_grid") as Control).is_visible_in_tree():
+		_fail("I5: the full action grid must stay folded under « Gérer ce modèle »")
+		return false
+	var primary: Button = month.call("primary_button")
+	var advice: Dictionary = month.call("current_signal")
+	if primary.is_visible_in_tree() and not screen.get_global_rect().encloses(primary.get_global_rect()):
+		_fail("I5: Nora's button must be visible without scrolling: %s" % str(primary.get_global_rect()))
+		return false
+	if str(advice.get("cta_kind", "")) == "EXAMINE":
+		var cash_before := Economy.money
+		primary.pressed.emit()
+		for frame in range(8): await get_tree().process_frame
+		var confirm: Button = month.call("confirm_button")
+		if Economy.money != cash_before or not bool(month.call("quote_open")) or primary.is_visible_in_tree():
+			_fail("I5: « Examiner » must open a quote without spending, and hide the first button")
+			return false
+		if not screen.get_global_rect().encloses(confirm.get_global_rect()):
+			_fail("I5: the quote's confirm button must be in view: %s in %s" % [str(confirm.get_global_rect()), str(screen.get_global_rect())])
+			return false
+		print("[UI] Nora's advice (%s) opens a quote, nothing spent, confirm in view" % str(advice.get("kind", "")))
+	else:
+		print("[UI] Sales page opens on Nora's month card (%s)" % (str(advice.get("kind", "")) if not advice.is_empty() else "calm"))
 	viewport.queue_free()
 	return true
 

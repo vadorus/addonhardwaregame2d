@@ -1124,6 +1124,11 @@ func _create_market_tab():
 
 func _on_market_action(action: String, payload: Dictionary):
 	match action:
+		"attack_rival":
+			# I5 : l'offensive se prépare maintenant dans Marché.
+			_on_products_action(action, payload)
+			if market_screen != null:
+				market_screen.call("refresh")
 		"submit_tender":
 			if payload.is_empty():
 				status_label.text = "Aucun appel d'offres ou CPU disponible."
@@ -2505,6 +2510,10 @@ func _on_products_action(action: String, payload: Dictionary):
 			status_label.text = "%d modèle(s) en fin de série : ils quitteront le marché dans %d mois." % [cleared, ProductManager.CLEARANCE_MONTHS]
 			if cleared > 0:
 				notify("%d modèle(s) en fin de série" % cleared, "good")
+		"open_market_rivals":
+			_show_tab(5)
+			if market_screen != null and market_screen.has_method("focus_offensive"):
+				market_screen.call("focus_offensive", str(payload.get("product_id", "")))
 		"attack_rival":
 			if MarketManager.attack_rival(str(payload.get("product_id", "")), str(payload.get("competitor_id", ""))):
 				status_label.text = "Offensive lancée : %d mois de pression commerciale. Le rival va réagir." % MarketManager.ATTACK_MONTHS
