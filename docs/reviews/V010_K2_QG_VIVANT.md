@@ -42,3 +42,14 @@ L'objectif de 5 changements visibles est atteint pour les trois profils, et les 
   - la signature de scène.
 - smoke, garage_layout, workshop_layout et balance_ceiling : OK.
 - Captures dans `K2_captures/` : hiver avec la guirlande, printemps, automne, détail de la vitrine.
+
+## J5 — Les saisons du garage dessinées par Astra (01/10)
+
+- Astra a livré `decor_0_garage_hiver`, `_printemps` et `_automne` (1774 × 887 px, environ 240 Ko chacun, dans `assets/art/v010/J5_saisons/`).
+- **Contrôle d'alignement** : contours de l'original comparés à chaque retouche, avec le meilleur décalage cherché de −6 à +6 pixels. Résultat : **(0, 0) pour les trois saisons**. L'équipe et les repères restent posés au bon endroit.
+- **Dans le jeu** :
+  - le décor suit le mois : décembre à février l'hiver, mars à mai le printemps, septembre à novembre l'automne, et l'été garde le décor de base ;
+  - le passage d'une saison à l'autre se fait en **fondu de 1,6 s** ;
+  - les effets en code (neige, pétales, feuilles, guirlande de décembre) restent par-dessus pour le mouvement ;
+  - les locaux dont les saisons ne sont pas encore livrées gardent leur décor de base.
+- Test ajouté à `GarageLifeScenario`. Capture des 4 saisons dans le jeu : `K2_captures/garage_4_saisons_astra.jpg`.

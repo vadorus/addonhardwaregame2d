@@ -52,6 +52,20 @@ static func tier_of(tier: int) -> int:
 static func art_path(tier: int) -> String:
 	return str(ART[tier_of(tier)])
 
+## V0.10 / J5 (Astra, 01/10) : le décor change avec la saison. L'été est le décor de base ;
+## une saison sans image (pas encore livrée) garde aussi le décor de base.
+const SEASON_DIR := "res://assets/art/v010/J5_saisons/"
+const SEASON_SUFFIX := {12:"hiver", 1:"hiver", 2:"hiver", 3:"printemps", 4:"printemps", 5:"printemps",
+	9:"automne", 10:"automne", 11:"automne"}
+
+static func seasonal_art_path(tier: int, month: int) -> String:
+	var base := art_path(tier)
+	var suffix := str(SEASON_SUFFIX.get(month, ""))
+	if suffix == "":
+		return base
+	var path := SEASON_DIR + base.get_file().get_basename() + "_" + suffix + ".webp"
+	return path if ResourceLoader.exists(path) else base
+
 static func zone_spot(tier: int, zone_name: String, fallback: Vector2) -> Vector2:
 	var spots: Dictionary = ZONE_SPOTS[tier_of(tier)]
 	return spots.get(zone_name, fallback)

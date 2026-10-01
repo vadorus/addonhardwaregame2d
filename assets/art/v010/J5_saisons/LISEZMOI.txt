@@ -1,0 +1,78 @@
+TECH EMPIRE — J5 SAISONS — GARAGE
+Livraison : hiver, printemps et automne uniquement.
+Destination prévue : assets/art/v010/J5_saisons/
+L'été reste assets/art/v010/J1_decors/decor_0_garage.webp.
+Aucun fichier de code du jeu modifié. Aucune intégration automatique.
+
+SOURCE
+Dépôt : vadorus/addonhardwaregame2d
+Branche de référence : feature/ui-v09-navigation
+Source : assets/art/v010/J1_decors/decor_0_garage.webp
+Blob Git de la source : 6d7589d8e9179effd986fac65b78e1d555912d62
+Brief : docs/BRIEF_ASTRA_LOT3_SAISONS_FETES.md
+Les trois retouches partent chacune de l'original, sans retoucher une saison précédente.
+
+FICHIERS
+decor_0_garage_hiver.webp : 1774 x 887 px, 244336 octets.
+decor_0_garage_printemps.webp : 1774 x 887 px, 238070 octets.
+decor_0_garage_automne.webp : 1774 x 887 px, 241002 octets.
+WebP qualité 85, image opaque, sans redimensionnement ni recadrage.
+Chaque fichier est inférieur à 1,5 Mo.
+
+REMARQUES ARTISTIQUES
+Hiver : neige extérieure, végétation givrée, lumière froide dehors,
+intérieur chaud ; manteau et écharpe sur la chaise centrale existante.
+Printemps : arbres fleuris, végétation tendre, pétales près de l'entrée ;
+le pot existant du bureau porte les fleurs pour ne pas encombrer un poste.
+Automne : feuillage roux, feuilles près de l'entrée, lumière dorée ;
+tasse et plaid sur le bureau/la chaise existants, sans nouveau fauteuil.
+La structure, le cadrage, les grands meubles et leurs emplacements sont conservés.
+La retouche générative réinterprète de petites textures : ce ne sont pas des pixels
+intérieurs intégralement identiques à l'original.
+
+CONTROLES REALISES
+Inspection visuelle des trois images, dimensions et poids des exports vérifiés.
+Analyse de corrélation des contours sur 11 zones fixes, à taille native,
+avec recherche du meilleur décalage de -12 à +12 pixels sur chaque axe :
+porte, cadre fenêtre gauche, étagère du fond, établi CPU, tabouret CPU,
+tableau, bureau fondateur, banc de test, stock, établi droit, voiture.
+Sur les zones établi CPU, tableau, bureau fondateur, banc de test, stock,
+tabouret, voiture et autres établis : meilleur décalage (0,0) pour chaque saison.
+Porte : hiver (-2,+1), printemps (+1,0), automne (+1,0) pixels.
+Cadre fenêtre gauche : hiver (0,+1), autres saisons (0,0).
+Ces mesures locales ne garantissent pas l'identité géométrique de chaque pixel.
+Aucun test Godot ni Pixel réalisé : superposition et validation finale dans
+le jeu à effectuer par Claude comme prévu au brief.
+Ne pas déplacer les repères pour adapter ces images avant cette vérification.
+Atelier, siège, campus, fêtes et trophées hors de cette première livraison.
+
+PRODUCTION
+Retouches : outil intégré imagegen, une génération distincte par saison.
+Conversion PNG vers WebP : ImageMagick, qualité 85.
+Aucune transformation géométrique appliquée aux sorties.
+Prompts effectivement utilisés ci-dessous.
+
+=== HIVER ===
+Use case: lighting-weather. EDIT TARGET: the provided existing Tech Empire garage background. This is a precise localized seasonal retouch, NOT a redesign or a new rendition. Deliver a single image in the exact original 2:1 aspect ratio, requested 1774 x 887 pixels. Preserve the original frame edge to edge. Keep all architecture, furniture, chairs, car, workbenches, desks, machinery, shelving, boxes, windows, door, wall edges, floor grid, rug and object silhouettes at their EXACT original coordinates and sizes. No camera change, no zoom, no crop, no rearrangement, no new room elements. These are aligned to game hitboxes and character sprites at pixel precision. Restrict changes to weather/season, exterior vegetation and snow, window frost, subtle lighting, plus the requested tiny clothing detail placed on the EXISTING central chair without moving its silhouette. Warm isometric painterly 1970s workshop style of the original must stay identical. No people, no new text, no logos. Keep original small diagrams illegible.
+
+Apply this brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version hiver : neige épaisse sur le sol extérieur, sur les toits et sur les branches ; arbres sans feuilles, givrés ; lumière extérieure froide et bleutée, mais intérieur toujours chaud et éclairé par les lampes ; un peu de givre dans les coins des vitres ; une écharpe et un manteau sur un portemanteau ou un dossier de chaise. Aucun personnage, aucun texte.
+
+Do not add a coat stand or chair: hang the small scarf and coat on the existing central desk chair. Outside snow only, not on the open cutaway interior floor. All existing interior furniture and room geometry remain fixed; do not redraw their layout.
+
+=== PRINTEMPS ===
+Use case: lighting-weather. EDIT TARGET: the provided ORIGINAL summer Tech Empire garage background. This is a precise localized seasonal retouch, NOT a redesign or a new rendition. Deliver one image in the exact original 2:1 aspect ratio, requested 1774 x 887 pixels. Preserve original frame edge to edge. Keep all architecture, furniture, chairs, car, workbenches, desks, machinery, shelving, boxes, windows, door, wall edges, floor grid, rug and object silhouettes at their EXACT original coordinates and sizes. No camera change, no zoom, no crop, no rearrangement, no new room elements. Game hitboxes and character sprites align to these pixels. Restrict changes to spring vegetation OUTSIDE, views through EXISTING windows, subtle lighting and the single tiny flower pot. Keep the warm painterly isometric 1970s workshop style identical. No people, no new text, no logos. All small diagrams must remain illegible.
+
+Apply this brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version printemps : arbres extérieurs en fleurs (rose pâle et blanc), herbe vert tendre, lumière douce du matin ; quelques pétales au sol près de l'entrée ; un petit pot de fleurs sur un bureau libre. Aucun personnage, aucun texte.
+
+There is no empty desk to add: use an existing clear corner of a desk for a very small flower pot, without removing or moving any existing tool, device, plant, paper or chair. No flowers in indoor floor surfaces, just a few scattered petals near the entrance. Preserve all interior silhouettes and perspective precisely.
+
+=== AUTOMNE ===
+Use case: lighting-weather. EDIT TARGET: the supplied ORIGINAL summer Tech Empire garage background. This is a pixel-aligned seasonal retouch, NOT a new rendition. Single output, exact original 2:1 frame, requested 1774 x 887 pixels. Preserve original frame edge to edge. All architecture, furniture, chairs, car, workbenches, desks, machinery, shelving, boxes, windows, door, wall edges, floor grid, rug and object silhouettes must stay at their EXACT original coordinates and sizes. No camera change, zoom, crop, rearrangement, removed tools or new furniture. Game hitboxes align to these pixels. Changes only to exterior seasonal vegetation and scattered exterior leaves, subtle late-afternoon lighting, plus the specified mug and small throw on the EXISTING central desk chair. Keep identical warm isometric painterly retro 1970s workshop style. No people, no readable text, no logos, keep diagrams illegible.
+
+Apply this brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version automne : feuillage orange, rouge et brun, tas de feuilles mortes dehors et quelques feuilles près de l'entrée ; lumière dorée de fin d'après-midi, rasante ; une tasse fumante et un plaid sur un fauteuil. Aucun personnage, aucun texte.
+
+No armchair exists, so use the existing central office chair for the small throw, retaining exact chair shape and position; never add a chair. Put a small steaming mug in clear desk space without moving papers, plant or tools. No piles of leaves over the interior working floor. Preserve original furniture and building geometry at pixel level.
+

@@ -961,6 +961,7 @@ func _refresh_gameplay_overlays() -> void:
 		_crew.call("refresh")
 	if _life != null:
 		_life.call("refresh")
+	_apply_workplace_art()
 	var active_project: Dictionary = {}
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":
@@ -1305,7 +1306,7 @@ func move_moment_visible() -> bool:
 
 func _art_path_for_tier(tier: int) -> String:
 	var normalized_tier := clampi(tier, 0, 3)
-	var path := str(WORKPLACE_ART.get(normalized_tier, WORKPLACE_ART[0]))
+	var path := WORKPLACE.seasonal_art_path(normalized_tier, TimeManager.month) if CompanyManager.created else str(WORKPLACE_ART.get(normalized_tier, WORKPLACE_ART[0]))
 	if ResourceLoader.exists(path):
 		return path
 	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
@@ -1327,12 +1328,35 @@ func _apply_workplace_art() -> void:
 		current_path = str(_background.texture.resource_path)
 	if current_path != wanted_path:
 		var texture := _load_workplace_texture(_workplace_tier)
+		# J5 : changement de saison dans les mêmes locaux = fondu doux de l'ancien décor vers le nouveau.
+		if _background.texture != null and is_inside_tree() and _same_place(current_path, wanted_path):
+			var fade := TextureRect.new()
+			fade.texture = _background.texture
+			fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			fade.stretch_mode = TextureRect.STRETCH_SCALE
+			fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			fade.position = _background.position
+			fade.size = _background.size
+			add_child(fade)
+			move_child(fade, _background.get_index() + 1)
+			var tween := create_tween()
+			tween.tween_property(fade, "modulate:a", 0.0, 1.6)
+			tween.tween_callback(fade.queue_free)
 		_background.texture = texture
 		if _ambient_background != null:
 			_ambient_background.texture = texture
 		call_deferred("_layout_zones")
 	if _crew != null and _crew.has_method("set_workplace_tier"):
 		_crew.call("set_workplace_tier", _workplace_tier)
+
+## Deux décors du même local (saisons différentes) : « decor_0_garage » et « decor_0_garage_hiver ».
+static func _same_place(a: String, b: String) -> bool:
+	var base_a := a.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0)
+	var base_b := b.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0)
+	return base_a == base_b
+
+func season_art_path() -> String:
+	return str(_background.texture.resource_path) if _background != null and _background.texture != null else ""
 
 func zone_count() -> int:
 	return _zone_buttons.size()

@@ -32,6 +32,20 @@ static func _check(host: Node) -> String:
 		if bool(state.garland) != (int(month) == 12):
 			life.queue_free()
 			return "K2: the garland belongs to December only"
+	# J5 (Astra) : le garage a ses décors d'hiver, de printemps et d'automne ; l'été et les locaux
+	# pas encore livrés gardent le décor de base.
+	var WORKPLACE: Script = load("res://ui/WorkplaceArt.gd")
+	var seasonal := {1:"decor_0_garage_hiver.webp", 4:"decor_0_garage_printemps.webp", 10:"decor_0_garage_automne.webp", 7:"decor_0_garage.webp"}
+	for month in seasonal.keys():
+		var path := str(WORKPLACE.call("seasonal_art_path", 0, int(month)))
+		if path.get_file() != str(seasonal[month]) or not ResourceLoader.exists(path):
+			life.queue_free()
+			return "J5: garage art for month %d should be %s, got %s" % [month, seasonal[month], path]
+	for tier in [1, 2, 3]:
+		var path := str(WORKPLACE.call("seasonal_art_path", tier, 1))
+		if not ResourceLoader.exists(path):
+			life.queue_free()
+			return "J5: missing art for tier %d in winter: %s" % [tier, path]
 	# Vitrine : une puce par génération sortie, au plus 5.
 	var chips := LIFE.generation_chips()
 	if chips.size() > LIFE.MAX_CHIPS:
