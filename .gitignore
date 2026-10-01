@@ -16,7 +16,10 @@ exports/
 dist/
 
 # Android export/generated local files
-android/build/
+# (modèle Gradle réinstallable : godot --install-android-build-template, voir docs/PUBLICATION_PLAY_STORE.md)
+android/
+*.keystore
+*.jks
 android/.gradle/
 *.apk
 *.aab
