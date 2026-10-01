@@ -88,12 +88,16 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 	var comparison_summary := _comparison_summary(comparison)
 	for outlet_value in selected:
 		var outlet: Dictionary = outlet_value
-		var raw_score := _outlet_score(outlet, product, segment_scores, benchmark_rank, benchmark_total)
-		var review_score := press_pitch_adjusted(_era_relative_score(raw_score, comparison), str(product.get("press_pitch", "")), str(outlet.get("channel", "")), benchmark_rank)
+		# C2 : la note et son explication viennent du même calcul.
+		var breakdown := review_breakdown(outlet, product, benchmark_rank, benchmark_total, comparison)
+		var why := compact_breakdown(breakdown)
+		var review_score := float(breakdown.final)
 		var sentiment := clampf((review_score - 56.0) / 34.0, -1.0, 1.0)
 		var tone := _tone_for_score(review_score)
 		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total, comparison)
-		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score, "headline":str(text.headline), "comparison_summary":comparison_summary})
+		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score,
+			"headline":str(text.headline), "comparison_summary":comparison_summary, "why":why, "channel":str(outlet.channel),
+			"product_id":str(product.get("id", "")), "segment":str(product.get("target_segment", ""))})
 		add_news(
 			channel_label(str(outlet.channel)),
 			str(text.headline),
@@ -106,7 +110,8 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 				"comparison_previous_name":str(comparison.get("previous_name", "")),
 				"comparison_previous_delta":float(comparison.get("previous_delta", 0.0)),
 				"comparison_rival_name":str(comparison.get("rival_name", "")),
-				"comparison_rival_delta":float(comparison.get("rival_delta", 0.0))
+				"comparison_rival_delta":float(comparison.get("rival_delta", 0.0)),
+				"why":why, "segment":str(product.get("target_segment", ""))
 			}
 		)
 	if not published.is_empty():
@@ -185,32 +190,79 @@ func _has_outlet(rows: Array, outlet_id: String) -> bool:
 			return true
 	return false
 
-func _outlet_score(outlet: Dictionary, product: Dictionary, segment_scores: Dictionary, benchmark_rank: int, benchmark_total: int) -> float:
-	var metrics: Dictionary = product.get("metrics", {})
-	var price := MarketManager.price_score(product, str(product.get("target_segment", MarketManager.default_segment())))
-	var performance := float(metrics.get("performance", 50.0))
-	var efficiency := float(metrics.get("efficiency", 50.0))
-	var reliability := float(metrics.get("reliability", 50.0))
-	var usability := float(metrics.get("usability", 50.0))
-	var innovation := float(metrics.get("innovation", 50.0))
-	var ecosystem := float(metrics.get("ecosystem", 50.0))
-	var rank_bonus := 0.0
-	if benchmark_total > 0:
-		rank_bonus = (1.0 - float(maxi(benchmark_rank - 1, 0)) / float(maxi(benchmark_total - 1, 1))) * 12.0 - 4.0
+## C2 (01/10) : ce que chaque type de média regarde, et combien (la somme fait toujours 1).
+## UNE seule source pour la note ET pour son explication : elles ne peuvent pas se contredire.
+## « price » = attractivité du prix sur le marché visé ; « brand » = image de marque de l'entreprise.
+const OUTLET_WEIGHTS := {
+	"BENCHMARK":{"performance":0.34, "efficiency":0.22, "reliability":0.20, "price":0.24},
+	"BENCHMARK_SITE":{"performance":0.34, "efficiency":0.22, "reliability":0.20, "price":0.24},
+	"GENERAL_PRESS":{"innovation":0.42, "performance":0.18, "usability":0.18, "brand":0.22},
+	"COMMUNITY":{"price":0.32, "usability":0.22, "ecosystem":0.20, "performance":0.16, "reliability":0.10},
+	"VIDEO_CREATOR":{"performance":0.26, "price":0.25, "innovation":0.19, "usability":0.15, "reliability":0.15},
+	"STREAMER":{"performance":0.34, "reliability":0.20, "usability":0.16, "price":0.14, "ecosystem":0.16},
+	"SPECIALIST_PRESS":{"reliability":0.38, "efficiency":0.20, "performance":0.16, "price":0.14, "ecosystem":0.12}
+}
+
+func _outlet_score(outlet: Dictionary, product: Dictionary, _segment_scores: Dictionary, benchmark_rank: int, benchmark_total: int) -> float:
+	return float(review_breakdown(outlet, product, benchmark_rank, benchmark_total, {}).base)
+
+## C2 : la note d'un média, décomposée exactement comme elle est calculée.
+## Départ 50 (un produit moyen partout), puis pour chaque critère (valeur − 50) × poids, le classement au banc
+## d'essai (médias de benchmark), la marge d'overclocking (vidéastes) → « base ». Ensuite la comparaison au
+## meilleur rival et à votre modèle précédent, puis l'effet de l'interview → « final », la note publiée.
+## parts : [{key, points}] du plus grand effet au plus petit ; les bornes 0-100 apparaissent en « clamp ».
+func review_breakdown(outlet: Dictionary, product: Dictionary, benchmark_rank: int, benchmark_total: int, comparison: Dictionary) -> Dictionary:
 	var channel := str(outlet.get("channel", "SPECIALIST_PRESS"))
-	match channel:
-		"BENCHMARK", "BENCHMARK_SITE":
-			return clampf(performance * 0.34 + efficiency * 0.22 + reliability * 0.20 + price * 0.24 + rank_bonus, 0.0, 100.0)
-		"GENERAL_PRESS":
-			return clampf(innovation * 0.42 + performance * 0.18 + usability * 0.18 + CompanyManager.get_brand_score() * 0.22, 0.0, 100.0)
-		"COMMUNITY":
-			return clampf(price * 0.32 + usability * 0.22 + ecosystem * 0.20 + performance * 0.16 + reliability * 0.10, 0.0, 100.0)
-		"VIDEO_CREATOR":
-			return clampf(performance * 0.26 + price * 0.25 + innovation * 0.19 + usability * 0.15 + reliability * 0.15 + float(product.get("oc_headroom_pct", 0.0)) * 0.35, 0.0, 100.0)
-		"STREAMER":
-			return clampf(performance * 0.34 + reliability * 0.20 + usability * 0.16 + price * 0.14 + ecosystem * 0.16, 0.0, 100.0)
-		_:
-			return clampf(reliability * 0.38 + efficiency * 0.20 + performance * 0.16 + price * 0.14 + ecosystem * 0.12, 0.0, 100.0)
+	var weights: Dictionary = OUTLET_WEIGHTS.get(channel, OUTLET_WEIGHTS.SPECIALIST_PRESS)
+	var metrics: Dictionary = product.get("metrics", {})
+	var parts: Array = []
+	var raw := 50.0
+	for key_value in weights.keys():
+		var key := str(key_value)
+		var value := 50.0
+		if key == "price":
+			value = MarketManager.price_score(product, str(product.get("target_segment", MarketManager.default_segment())))
+		elif key == "brand":
+			value = CompanyManager.get_brand_score()
+		else:
+			value = float(metrics.get(key, 50.0))
+		var points := (value - 50.0) * float(weights[key])
+		parts.append({"key":key, "points":points, "weight":float(weights[key]), "value":value})
+		raw += points
+	if channel in ["BENCHMARK", "BENCHMARK_SITE"] and benchmark_total > 0:
+		var rank_bonus := (1.0 - float(maxi(benchmark_rank - 1, 0)) / float(maxi(benchmark_total - 1, 1))) * 12.0 - 4.0
+		parts.append({"key":"rank", "points":rank_bonus})
+		raw += rank_bonus
+	if channel == "VIDEO_CREATOR":
+		var overclock := float(product.get("oc_headroom_pct", 0.0)) * 0.35
+		if absf(overclock) > 0.001:
+			parts.append({"key":"overclock", "points":overclock})
+			raw += overclock
+	var base := clampf(raw, 0.0, 100.0)
+	var rival := clampf(float(comparison.get("rival_delta", 0.0)) * 0.52, -14.0, 14.0) if bool(comparison.get("has_rival", false)) else 0.0
+	var previous := clampf(float(comparison.get("previous_delta", 0.0)) * 0.30, -9.0, 9.0) if bool(comparison.get("has_previous", false)) else 0.0
+	var era := _era_relative_score(base, comparison)
+	var final := press_pitch_adjusted(era, str(product.get("press_pitch", "")), channel, benchmark_rank)
+	parts.sort_custom(func(a, b): return absf(float(a.points)) > absf(float(b.points)))
+	return {
+		"channel":channel, "start":50.0, "parts":parts, "base":base,
+		"rival":rival, "rival_name":str(comparison.get("rival_name", "")),
+		"previous":previous, "previous_name":str(comparison.get("previous_name", "")),
+		"interview":final - era, "final":final,
+		# Ce que les bornes 0-100 ont retiré ou ajouté (rare) : la somme affichée tombe toujours juste.
+		"clamp":final - (raw + rival + previous + (final - era))
+	}
+
+## Version compacte gardée avec chaque test (sauvegardée) : [[clé, points arrondis au dixième], …].
+static func compact_breakdown(breakdown: Dictionary) -> Dictionary:
+	var parts: Array = []
+	for part_value in breakdown.get("parts", []):
+		var part: Dictionary = part_value
+		parts.append([str(part.key), snappedf(float(part.points), 0.1)])
+	return {"parts":parts, "rival":snappedf(float(breakdown.get("rival", 0.0)), 0.1), "rival_name":str(breakdown.get("rival_name", "")),
+		"previous":snappedf(float(breakdown.get("previous", 0.0)), 0.1), "previous_name":str(breakdown.get("previous_name", "")),
+		"interview":snappedf(float(breakdown.get("interview", 0.0)), 0.1), "clamp":snappedf(float(breakdown.get("clamp", 0.0)), 0.1),
+		"final":float(breakdown.get("final", 50.0))}
 
 func _tone_for_score(score: float) -> String:
 	if score >= 80.0: return "enthousiaste"

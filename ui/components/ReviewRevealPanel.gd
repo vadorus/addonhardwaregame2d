@@ -5,6 +5,7 @@ signal continue_requested
 
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const JUICE := preload("res://ui/Juice.gd")
+const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
 const REVEAL_STEP := 0.7
 
 var _title: Label
@@ -12,8 +13,18 @@ var _subtitle: Label
 var _cards: VBoxContainer
 var _verdict: Label
 var _continue: Button
+var _body: BoxContainer
+var _side: VBoxContainer
+var _why: VBoxContainer
+var _pleased: Label
+var _held_back: Label
+var _next: Label
+var _sales_hint: Label
+var _detail: Label
+var _detail_button: Button
 var _reviews: Array = []
 var _revealed := 0
+var _silent := false
 ## V0.10 : un triomphe dans la presse s'affiche ici, en bandeau, au lieu d'une fenêtre « À la une » de plus.
 var _banner: TextureRect
 var _kicker: Label
@@ -53,20 +64,134 @@ func _ready() -> void:
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_subtitle)
+	# C2 : sur un écran large (téléphone en paysage), deux colonnes : les tests à gauche, le verdict et
+	# « pourquoi » à droite. Sur un écran étroit, tout est empilé.
+	_body = HBoxContainer.new()
+	_body.add_theme_constant_override("separation", 18)
+	box.add_child(_body)
 	_cards = VBoxContainer.new()
 	_cards.add_theme_constant_override("separation", 8)
-	box.add_child(_cards)
+	_cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_cards.custom_minimum_size = Vector2(420, 0)
+	_body.add_child(_cards)
+	_side = VBoxContainer.new()
+	_side.add_theme_constant_override("separation", 8)
+	_side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_side.custom_minimum_size = Vector2(360, 0)
+	_body.add_child(_side)
 	_verdict = LOOK.label("", 16)
 	_verdict.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(_verdict)
+	_side.add_child(_verdict)
+	_why = VBoxContainer.new()
+	_why.add_theme_constant_override("separation", 4)
+	_why.visible = false
+	_side.add_child(_why)
+	_pleased = _why_label(Color("10703a"))
+	_held_back = _why_label(Color("a8431f"))
+	_next = _why_label(Color("3b2b1e"))
+	_sales_hint = LOOK.muted_label("", 12)
+	_sales_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_why.add_child(_sales_hint)
+	_detail = LOOK.muted_label("", 12)
+	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.visible = false
+	_side.add_child(_detail)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 8)
+	_side.add_child(buttons)
+	_detail_button = Button.new()
+	_detail_button.text = "Voir le calcul"
+	_detail_button.visible = false
+	LOOK.button_style(_detail_button, false)
+	_detail_button.pressed.connect(_toggle_detail)
+	buttons.add_child(_detail_button)
 	_continue = Button.new()
 	_continue.text = "Continuer"
+	_continue.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	LOOK.button_style(_continue, true)
 	_continue.pressed.connect(func(): continue_requested.emit())
-	box.add_child(_continue)
+	buttons.add_child(_continue)
+
+func _why_label(color: Color) -> Label:
+	var label := LOOK.label("", 13)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", color)
+	_why.add_child(label)
+	return label
+
+## Deux colonnes si l'écran est assez large, sinon une seule (les tests puis le verdict).
+func _apply_layout() -> void:
+	var wide := not is_inside_tree() or get_viewport_rect().size.x >= 980.0
+	var target: BoxContainer = HBoxContainer.new() if wide else VBoxContainer.new()
+	if (_body is HBoxContainer) != wide:
+		target.add_theme_constant_override("separation", 18 if wide else 10)
+		var parent := _body.get_parent()
+		var index := _body.get_index()
+		for child in _body.get_children():
+			_body.remove_child(child)
+			target.add_child(child)
+		parent.remove_child(_body)
+		_body.queue_free()
+		parent.add_child(target)
+		parent.move_child(target, index)
+		_body = target
+	else:
+		target.free()
+	custom_minimum_size = Vector2(900 if wide else 520, 0)
+	_cards.custom_minimum_size = Vector2(420 if wide else 0, 0)
+	_side.custom_minimum_size = Vector2(360 if wide else 0, 0)
+
+func _toggle_detail() -> void:
+	_detail.visible = not _detail.visible
+	_why.visible = not _detail.visible
+	_detail_button.text = "Retour au résumé" if _detail.visible else "Voir le calcul"
+
+## C2 : le résumé « ce qui a plu / ce qui freine / prochain essai », tiré du vrai calcul des notes.
+func _show_why() -> void:
+	var summary: Dictionary = EXPLAIN.summarize(_reviews)
+	if not bool(summary.get("available", false)):
+		_why.visible = false
+		_detail_button.visible = false
+		return
+	var pleased: Array[String] = []
+	for row_value in summary.pleased:
+		var row: Dictionary = row_value
+		pleased.append("%s (%s)" % [str(row.label), EXPLAIN.tenths(float(row.points))])
+	var held: Array[String] = []
+	for row_value in summary.held_back:
+		var row: Dictionary = row_value
+		held.append("%s (%s)" % [str(row.label), EXPLAIN.tenths(float(row.points))])
+	_pleased.text = "Ce qui a plu : " + (", ".join(pleased) if not pleased.is_empty() else "rien de marquant.")
+	_held_back.text = "Ce qui freine : " + (", ".join(held) if not held.is_empty() else "rien de marquant.")
+	_next.text = "Prochain essai : " + str(summary.next)
+	_sales_hint.text = "La presse ne pèse qu'un peu sur les ventes. Ce qui fait vendre : la valeur de la puce sur son marché face aux rivaux, et son prix (fiche du produit, « Pourquoi ces ventes »)."
+	var lines: Array[String] = []
+	for review_value in _reviews:
+		var review: Dictionary = review_value
+		var why: Dictionary = review.get("why", {})
+		if not why.is_empty():
+			lines.append("%s : %s" % [str(review.get("source_name", "Presse")), EXPLAIN.detail_line(why)])
+	_detail.text = "\n".join(lines)
+	_detail.visible = false
+	_why.visible = true
+	_detail_button.visible = not lines.is_empty()
+	_detail_button.text = "Voir le calcul"
+
+func why_text() -> String:
+	return "\n".join([_pleased.text, _held_back.text, _next.text]) if _why.visible else ""
+
+func detail_text() -> String:
+	return _detail.text
 
 ## reviews : [{source_name, channel_label, score (0-100), headline}] ; other_models : autres modèles de la gamme testés.
+## C2 : revoir plus tard les tests d'un produit (depuis sa fiche) — tout est affiché d'un coup, sans son.
+func show_archived(product_name: String, reviews: Array) -> void:
+	_silent = true
+	show_reviews(product_name, reviews)
+	_kicker.text = "LES TESTS DE LA PRESSE"
+	_subtitle.text = "Publiés au lancement. Le résumé et le calcul de chaque note sont à droite."
+
 func show_reviews(product_name: String, reviews: Array, other_models: int = 0, front_page: bool = false) -> void:
 	_banner.visible = front_page and ResourceLoader.exists(FRONT_PAGE_ART)
 	if _banner.visible and _banner.texture == null:
@@ -74,6 +199,10 @@ func show_reviews(product_name: String, reviews: Array, other_models: int = 0, f
 	_kicker.text = "À LA UNE  •  LA PRESSE A TESTÉ" if _banner.visible else "LA PRESSE A TESTÉ"
 	_reviews = reviews.duplicate(true)
 	_revealed = 0
+	_apply_layout()
+	_why.visible = false
+	_detail.visible = false
+	_detail_button.visible = false
 	_title.text = product_name
 	_subtitle.text = "%d média(s) ont publié leur test." % _reviews.size()
 	if other_models > 0:
@@ -88,10 +217,11 @@ func show_reviews(product_name: String, reviews: Array, other_models: int = 0, f
 		var card := _review_card(review)
 		card.modulate.a = 0.0
 		_cards.add_child(card)
-	if is_inside_tree():
+	if is_inside_tree() and not _silent:
 		_reveal_next()
 	else:
 		reveal_all()
+	_silent = false
 
 func reveal_all() -> void:
 	for card in _cards.get_children():
@@ -141,9 +271,10 @@ func _show_verdict() -> void:
 	elif mean_ten >= 5.0:
 		words = "Accueil correct, sans enthousiasme."
 		sound = "review"
-	_verdict.text = "Moyenne %.1f/10 — %s" % [mean_ten, words]
+	_verdict.text = "Moyenne %s/10 — %s" % [("%.1f" % mean_ten).replace(".", ","), words]
 	_continue.disabled = false
-	if is_inside_tree():
+	_show_why()
+	if is_inside_tree() and not _silent:
 		JUICE.pop_in(_verdict, 0.25)
 		if get_node_or_null("/root/SoundManager") != null:
 			SoundManager.play(sound)
@@ -187,4 +318,12 @@ func _review_card(review: Dictionary) -> Control:
 		var comparison_label := LOOK.muted_label(comparison_summary, 12)
 		comparison_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text_box.add_child(comparison_label)
+	# C2 : l'atout et le frein principaux de ce média, tirés du calcul de SA note.
+	var why: Dictionary = review.get("why", {})
+	var line := EXPLAIN.card_line(why) if not why.is_empty() else ""
+	if line != "":
+		var why_label := LOOK.label(line, 12)
+		why_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		why_label.add_theme_color_override("font_color", Color("6b4a2b"))
+		text_box.add_child(why_label)
 	return card

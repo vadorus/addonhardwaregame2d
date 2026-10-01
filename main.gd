@@ -2427,6 +2427,18 @@ func _refresh_products():
 
 func _on_products_action(action: String, payload: Dictionary):
 	match action:
+		"show_product_reviews":
+			# C2 : revoir les tests d'un produit, avec le résumé et le calcul de chaque note.
+			var reviewed := ProductManager.get_product(str(payload.get("product_id", "")))
+			var archived: Array = (load("res://ui/components/ProductLifecyclePanel.gd") as Script).call("archived_reviews", reviewed)
+			if reviewed.is_empty() or archived.is_empty() or review_layer == null or review_layer.visible:
+				status_label.text = "Aucun test de presse enregistré pour ce modèle."
+				return
+			_review_resume_scale = TimeManager.time_scale
+			TimeManager.time_scale = 0.0
+			review_layer.visible = true
+			JUICE.fade_in(review_layer, 0.2)
+			review_panel.call("show_archived", str(reviewed.get("name", "CPU")), archived)
 		"apply_industrialization":
 			if payload.is_empty():
 				status_label.text = "Aucun CPU en industrialisation."

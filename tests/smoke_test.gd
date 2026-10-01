@@ -1727,6 +1727,13 @@ func _ready() -> void:
 	if sensation_error != "":
 		_fail(sensation_error)
 		return
+	await get_tree().process_frame
+	# C2 : la note s'explique avec son vrai calcul, sans changer.
+	var explanation_error: String = (load("res://tests/scenarios/ReviewExplanationScenario.gd") as Script).call("run", self)
+	if explanation_error != "":
+		_fail(explanation_error)
+		return
+	print("[CI] C2 : note expliquée par son calcul, note inchangée, conseil et ventes OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)

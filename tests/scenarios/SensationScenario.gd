@@ -57,7 +57,7 @@ static func run(host: Node) -> String:
 	if int(panel.call("revealed_count")) != 2:
 		panel.queue_free()
 		return "Review reveal did not show one card per outlet"
-	if not str(panel.call("verdict_text")).contains("7.8/10"):
+	if not str(panel.call("verdict_text")).contains("7,8/10"):
 		panel.queue_free()
 		return "Review reveal verdict does not show the average out of 10: %s" % str(panel.call("verdict_text"))
 	panel.queue_free()

@@ -141,6 +141,20 @@ func _build() -> void:
 	_voices_label = UI.rich_label()
 	_voices_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_voices_label)
+	# C2 : relier note, demande et ventes, avec les vrais facteurs de la demande.
+	_why_sales_label = UI.label("", 13)
+	_why_sales_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_why_sales_label.visible = false
+	add_child(_why_sales_label)
+	_reviews_button = Button.new()
+	_reviews_button.text = "Revoir les tests de la presse"
+	_reviews_button.visible = false
+	_reviews_button.custom_minimum_size.y = 44
+	_reviews_button.pressed.connect(func():
+		var product := _selected_product()
+		if not product.is_empty():
+			action_requested.emit("show_product_reviews", {"product_id":str(product.get("id", ""))}))
+	add_child(_reviews_button)
 
 	product_details_label = UI.rich_label()
 	add_child(_collapsible("Fiche technique complète", product_details_label))
@@ -622,6 +636,10 @@ func _refresh_model_summary(product: Dictionary) -> void:
 				var mark := "+" if str(voice.mood) == "HAPPY" else ("−" if str(voice.mood) == "UNHAPPY" else "=")
 				voice_lines.append("%s %s : « %s »" % [mark, str(voice.who), str(voice.text)])
 			_voices_label.text = "\n".join(voice_lines)
+	if _why_sales_label != null:
+		_why_sales_label.text = why_sales_text(product)
+		_why_sales_label.visible = _why_sales_label.text != ""
+		_reviews_button.visible = status in ["LAUNCHED", "RETIRED", "DISCONTINUED"] and not archived_reviews(product).is_empty()
 	# Lancement : capacité + veille seulement pour un modèle prêt ; prix modifiable en vente.
 	var is_ready := status == "READY"
 	if launch_grid != null:
@@ -906,6 +924,44 @@ func selected_product_id() -> String:
 
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 var _voices_label: Label
+## C2 : « Pourquoi ces ventes » et « Revoir les tests de la presse » pour le modèle sélectionné.
+const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
+var _why_sales_label: Label
+var _reviews_button: Button
+
+## C2 : « Pourquoi ces ventes » d'un modèle en vente (vide sinon).
+static func why_sales_text(product: Dictionary) -> String:
+	if str(product.get("status", "")) != "LAUNCHED":
+		return ""
+	var sales: Dictionary = EXPLAIN.sales_reasons(product)
+	if not bool(sales.get("available", false)):
+		return ""
+	var lines: Array[String] = ["Pourquoi ces ventes :", str(sales.headline)]
+	var effects: Array[String] = []
+	for effect_value in sales.effects:
+		effects.append(EXPLAIN.effect_text(effect_value))
+	if not effects.is_empty():
+		lines.append("Ce qui joue ce mois-ci : " + " ; ".join(effects) + ".")
+	lines.append(EXPLAIN.market_priorities_text(str(sales.segment)) + ".")
+	return "\n".join(lines)
+
+## Les tests de presse publiés pour ce modèle (ou, à défaut, pour sa génération), au format de l'écran des notes.
+static func archived_reviews(product: Dictionary) -> Array:
+	var product_id := str(product.get("id", ""))
+	var generation_id := str(product.get("generation_id", ""))
+	var own: Array = []
+	var family: Array = []
+	for item_value in MediaManager.news:
+		var item: Dictionary = item_value
+		if not item.has("review_score"):
+			continue
+		var review := {"source_name":str(item.get("source_name", "Presse")), "channel_label":str(item.get("category", "")),
+			"score":float(item.review_score), "headline":str(item.get("headline", "")), "why":item.get("why", {})}
+		if str(item.get("product_id", "")) == product_id:
+			own.append(review)
+		elif generation_id != "" and str(item.get("generation_id", "")) == generation_id and family.size() < 3:
+			family.append(review)
+	return own if not own.is_empty() else family
 var sale_capacity: SpinBox
 var _capacity_apply_button: Button
 

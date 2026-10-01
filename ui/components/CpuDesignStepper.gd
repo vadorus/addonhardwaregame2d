@@ -12,6 +12,7 @@ const UI := preload("res://ui/UiKit.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CATALOG := preload("res://scripts/ArchitectureCatalog.gd")
 const CHIP := preload("res://ui/ChipPreview.gd")
+const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
 
 const WOOD := Color("3b2b1e")
 const AMBER := Color("d9822b")
@@ -460,9 +461,18 @@ func _build_line_step() -> void:
 	_content.add_child(grid)
 	for key_value in MarketManager.available_segment_keys():
 		var key := str(key_value)
-		grid.add_child(_choice_card(MarketManager.segment_label(key), key == segment, func():
+		# C2 : ce que le marché regarde en premier, visible dès le choix (poids réels de la demande).
+		var top: Array = EXPLAIN.market_priorities(key, 1)
+		var hint := ("\nsurtout : %s" % str((top[0] as Dictionary).label).to_lower()) if not top.is_empty() else ""
+		grid.add_child(_choice_card(MarketManager.segment_label(key) + hint, key == segment, func():
 			segment = key
-			_changed(false)))
+			_changed(false), 58 if hint != "" else 46))
+	var need: Dictionary = MarketManager.MARKET_NEEDS.get(MarketManager.normalize_segment(segment), {})
+	var needs_text := EXPLAIN.market_priorities_text(segment)
+	if needs_text != "":
+		var why_market := _note("« %s » regarde surtout : %s.\n%s" % [MarketManager.segment_label(segment), needs_text.trim_prefix("Ce que ce marché regarde : "), str(need.get("description", ""))])
+		why_market.add_theme_color_override("font_color", Color("6b4a2b"))
+		_content.add_child(why_market)
 
 func _build_architecture_step() -> void:
 	_content.add_child(_step_title("Sur quelle architecture ?"))
