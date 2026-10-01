@@ -5,7 +5,8 @@ extends Control
 ## - les saisons : neige l'hiver (guirlande en décembre), pétales au printemps, poussière dorée l'été,
 ##   feuilles l'automne ;
 ## - les événements du moment (salon, guerre des prix, pénurie…) sur une petite pancarte.
-## Toucher l'étagère ouvre le détail. Tout est dessiné en code, sous les cartes du QG.
+## Toucher l'étagère ouvre le détail. Dessiné sous les cartes du QG, avec les images d'Astra
+## (fêtes J6, vitrine J7) quand elles sont là, sinon en code.
 
 ## La nuit tombe ou la météo change : le QG peut passer sur un décor d'ambiance (nuit, pluie) d'Astra.
 signal ambiance_changed
@@ -48,18 +49,34 @@ const LAMPS := {
 const RAIN_DROPS := 260
 
 ## J6 : les fêtes du moment. Les objets d'Astra (assets/art/v010/J6_fetes/) apparaissent dès qu'ils
-## sont livrés ; sans fichier, rien n'est dessiné. Positions : devant l'entrée et au pied des murs,
-## à affiner à la livraison sur le Pixel. [fichier, x, y, hauteur (part de la hauteur du décor)]
+## sont livrés ; sans fichier, rien n'est dessiné. [fichier, x, y, hauteur (part de la hauteur du décor)]
+## Livrés le 01/10 : à l'écran, chaque objet reste entier et évite l'équipe (_fit_prop) ; la guirlande
+## court le long du haut de l'écran ; la toile pend en haut, à gauche de la carte de projet.
 const FETE_DIR := "res://assets/art/v010/J6_fetes/"
 const FETE_LABELS := {"NOEL":"Noël", "NOUVEL_AN":"Nouvel An", "HALLOWEEN":"Halloween", "PAQUES":"Pâques",
 	"ETE":"les vacances d'été", "ANNIVERSAIRE":"l'anniversaire de l'entreprise"}
 const FETE_PROPS := {
 	"NOEL":[["fete_noel_sapin", 0.30, 0.84, 0.30], ["fete_noel_guirlande", 0.50, 0.10, 0.08]],
 	"NOUVEL_AN":[["fete_nouvel_an_ballons", 0.70, 0.80, 0.26], ["fete_nouvel_an_table", 0.62, 0.86, 0.13]],
-	"HALLOWEEN":[["fete_halloween_citrouilles", 0.33, 0.86, 0.10], ["fete_halloween_toile", 0.06, 0.12, 0.18]],
+	"HALLOWEEN":[["fete_halloween_citrouilles", 0.33, 0.86, 0.10], ["fete_halloween_toile", 0.70, 0.12, 0.18]],
 	"PAQUES":[["fete_paques_panier", 0.34, 0.85, 0.09]],
 	"ETE":[["fete_ete_ventilateur", 0.68, 0.82, 0.20]],
 	"ANNIVERSAIRE":[["fete_anniversaire_gateau", 0.56, 0.86, 0.17]]}
+
+## J7 : la vitrine d'Astra (étagère, coupes, Unes encadrées, pancarte). Sans fichier, on garde le dessin en code.
+const SHOWCASE_DIR := "res://assets/art/v010/J7_vitrine/"
+## Coupe en or pour les grands trophées (prestige ≥ 1,2), en argent pour les autres.
+const GOLD_PRESTIGE := 1.2
+## Tailles à l'écran. L'étagère (1000 × 90) et la pancarte (640 × 110) s'allongent par le milieu :
+## leurs bouts (équerres, ficelles) gardent leurs proportions. Les objets posent à 22/90 de l'étagère.
+const SHELF_H := 34.0
+const SHELF_FOOT := 22.0 / 90.0
+const SHELF_CAP := 210.0
+const SIGN_H := 44.0
+const SIGN_CAP := 110.0
+const SIGN_TEXT_Y := 79.0 / 110.0
+const CUP_H := 36.0
+const COVER_H := 34.0
 
 const WOOD := Color("8a5a32")
 const WOOD_DARK := Color("5e3b1f")
@@ -72,6 +89,8 @@ var _particles: Array = []
 var _chips: Array = []
 var _trophies := 0
 var _trophy_labels: Array[String] = []
+var _trophy_gold: Array[bool] = []
+var _showcase_textures := {}
 var _front_pages := 0
 var _staff := 0
 var _event := ""
@@ -127,7 +146,8 @@ func set_art_rect(rect: Rect2) -> void:
 func scene_state() -> Dictionary:
 	return {"season":_season, "garland":_garland, "chips":_chips.size(), "trophies":_trophies,
 		"front_pages":_front_pages, "staff":_staff, "event":_event, "shelf_visible":shelf_visible(),
-		"weather":_weather, "day_phase":day_phase_name(), "night":night_amount(), "fetes":_fetes.duplicate()}
+		"weather":_weather, "day_phase":day_phase_name(), "night":night_amount(), "fetes":_fetes.duplicate(),
+		"showcase_art":_showcase_texture("vitrine_etagere") != null, "gold_cups":_trophy_gold.count(true)}
 
 func shelf_visible() -> bool:
 	return not _chips.is_empty() or _trophies > 0 or _front_pages > 0
@@ -160,10 +180,13 @@ func refresh() -> void:
 	_fetes = fetes_for(TimeManager.year, TimeManager.month, TimeManager.day, CompanyManager.founded_year)
 	_chips = generation_chips()
 	_trophy_labels.clear()
+	_trophy_gold.clear()
 	for row_value in CAREER.trophy_rows():
 		var row: Dictionary = row_value
 		if bool(row.get("unlocked", false)):
 			_trophy_labels.append(str(row.get("label", "")))
+			var data: Dictionary = CAREER.TROPHIES.get(str(row.get("id", "")), {})
+			_trophy_gold.append(float(data.get("prestige", 0.0)) >= GOLD_PRESTIGE)
 	_trophies = _trophy_labels.size()
 	_front_pages = int(MediaManager.front_pages)
 	_staff = PersonnelManager.staff.size()
@@ -222,17 +245,18 @@ func _content_width() -> float:
 	var w := 44.0 * float(_chips.size())
 	if not _chips.is_empty():
 		w += 8.0
-	w += 28.0 * float(mini(_trophies, 4)) + (30.0 if _trophies > 4 else 0.0)
-	w += 26.0 * float(mini(_front_pages, 3)) + (30.0 if _front_pages > 3 else 0.0)
+	w += 30.0 * float(mini(_trophies, 4)) + (30.0 if _trophies > 4 else 0.0)
+	w += 28.0 * float(mini(_front_pages, 3)) + (30.0 if _front_pages > 3 else 0.0)
 	return w
 
 func _layout() -> void:
-	var width := clampf(_content_width() + 36.0, 150.0, maxf(size.x * 0.45, 150.0))
-	_shelf = Rect2(Vector2((size.x - width) * 0.5, 12.0), Vector2(width, 74.0))
+	# Les équerres de l'étagère d'Astra prennent ~55 px de chaque côté : l'étagère ne descend pas en dessous de 190 px.
+	var width := clampf(_content_width() + 60.0, 190.0, maxf(size.x * 0.45, 190.0))
+	_shelf = Rect2(Vector2((size.x - width) * 0.5, 12.0), Vector2(width, 80.0))
 	_shelf_button.position = _shelf.position
 	_shelf_button.size = _shelf.size
 	_shelf_button.visible = shelf_visible()
-	_card.position = Vector2(_shelf.position.x, _shelf.end.y + (34.0 if _event != "" else 6.0)) + position
+	_card.position = Vector2(_shelf.position.x, _shelf.end.y + (SIGN_H + 4.0 if _event != "" else 6.0)) + position
 	queue_redraw()
 
 func _toggle_card() -> void:
@@ -303,16 +327,63 @@ func _fete_texture(name: String) -> Texture2D:
 	return _fete_textures[name]
 
 func _draw_fetes() -> void:
+	if _fetes.is_empty():
+		return
+	var view := Rect2(Vector2.ZERO, size).intersection(art_rect)
+	var obstacles := _people_rects()
 	for fete in _fetes:
 		for prop_value in FETE_PROPS.get(str(fete), []):
 			var prop: Array = prop_value
 			var texture := _fete_texture(str(prop[0]))
 			if texture == null:
 				continue
+			if str(prop[0]) == "fete_noel_guirlande":
+				_draw_garland_art(texture)
+				continue
 			var h := art_rect.size.y * float(prop[3])
 			var w := h * float(texture.get_width()) / maxf(float(texture.get_height()), 1.0)
 			var foot := art_rect.position + Vector2(float(prop[1]), float(prop[2])) * art_rect.size
-			draw_texture_rect(texture, Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h)), false)
+			var rect := _fit_prop(Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h)), view, obstacles)
+			obstacles.append(rect)
+			draw_texture_rect(texture, rect, false)
+
+## Où sont Nora et l'équipe à l'écran (rectangles des personnages, pieds aux postes du décor).
+func _people_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var tier := clampi(int(ExecutiveManager.workplace.get("tier", 0)), 0, 3)
+	var layout: Dictionary = WORKPLACE.crew_layout(tier)
+	var ch := art_rect.size.y * float(layout.scale)
+	var spots: Array = [layout.nora]
+	var seats: Array = layout.seats
+	for i in range(mini(_staff, seats.size())):
+		var seat: Vector3 = seats[i]
+		spots.append(Vector2(seat.x, seat.y))
+	for spot_value in spots:
+		var foot := art_rect.position + (spot_value as Vector2) * art_rect.size
+		out.append(Rect2(foot - Vector2(ch * 0.3, ch), Vector2(ch * 0.6, ch)))
+	return out
+
+## Un objet de fête reste entier à l'écran (sur téléphone, le décor est rogné en haut et en bas) et
+## se décale sur le côté s'il cache quelqu'un ou un autre objet.
+func _fit_prop(rect: Rect2, view: Rect2, obstacles: Array[Rect2]) -> Rect2:
+	const MARGIN := 4.0
+	rect.position.y = clampf(rect.position.y, view.position.y + MARGIN, maxf(view.end.y - MARGIN - rect.size.y, view.position.y + MARGIN))
+	for attempt in range(3):
+		var moved := false
+		for obstacle in obstacles:
+			if rect.intersection(obstacle).get_area() < obstacle.get_area() * 0.08:
+				continue
+			var left := obstacle.position.x - rect.end.x - 4.0
+			var right := obstacle.end.x - rect.position.x + 4.0
+			var shift := left if absf(left) < absf(right) else right
+			if rect.position.x + shift < view.position.x or rect.end.x + shift > view.end.x:
+				shift = right if shift == left else left
+			rect.position.x += shift
+			moved = true
+		if not moved:
+			break
+	rect.position.x = clampf(rect.position.x, view.position.x + MARGIN, maxf(view.end.x - MARGIN - rect.size.x, view.position.x + MARGIN))
+	return rect
 
 ## La météo d'un mois : tirée selon la saison, toujours la même pour ce mois-là.
 static func weather_for(year: int, month: int) -> String:
@@ -473,15 +544,53 @@ func _draw_garland(view: Rect2) -> void:
 		var on := int(_time * 2.0 + i) % 2 == 0
 		draw_circle(point + Vector2(0, 6), 5.5, (colors[i % colors.size()] as Color) * Color(1, 1, 1, 1.0 if on else 0.45))
 
+## La guirlande d'Astra court tout le long du haut de l'écran (le haut du décor est souvent coupé
+## sur téléphone) : autant de guirlandes côte à côte qu'il faut, à 30-60 px de haut.
+func _draw_garland_art(texture: Texture2D) -> void:
+	var view := Rect2(Vector2.ZERO, size).intersection(art_rect)
+	if view.size.x <= 0.0:
+		return
+	var ratio := float(texture.get_width()) / maxf(float(texture.get_height()), 1.0)
+	var natural_w := clampf(view.size.y * 0.085, 30.0, 60.0) * ratio
+	var count := maxi(1, roundi(view.size.x / natural_w))
+	var w := view.size.x / float(count)
+	var h := w / ratio
+	for i in range(count):
+		draw_texture_rect(texture, Rect2(Vector2(view.position.x + w * float(i), view.position.y + 2.0), Vector2(w, h)), false)
+
+func _showcase_texture(name: String) -> Texture2D:
+	if not _showcase_textures.has(name):
+		var path := SHOWCASE_DIR + name + ".png"
+		_showcase_textures[name] = load(path) if ResourceLoader.exists(path) else null
+	return _showcase_textures[name]
+
+## Dessine une image en l'allongeant par le milieu seulement : ses deux bouts (cap, en pixels de l'image)
+## gardent leurs proportions, à l'échelle de la hauteur demandée.
+func _draw_capped(texture: Texture2D, rect: Rect2, cap: float) -> void:
+	var th := float(texture.get_height())
+	var tw := float(texture.get_width())
+	var s := rect.size.y / th
+	var cap_px := minf(cap * s, rect.size.x * 0.5)
+	var cap_src := cap_px / s
+	draw_texture_rect_region(texture, Rect2(rect.position, Vector2(cap_px, rect.size.y)), Rect2(0, 0, cap_src, th))
+	draw_texture_rect_region(texture, Rect2(rect.position + Vector2(cap_px, 0), Vector2(rect.size.x - cap_px * 2.0, rect.size.y)),
+		Rect2(cap_src, 0, tw - cap_src * 2.0, th))
+	draw_texture_rect_region(texture, Rect2(Vector2(rect.end.x - cap_px, rect.position.y), Vector2(cap_px, rect.size.y)),
+		Rect2(tw - cap_src, 0, cap_src, th))
+
 func _draw_shelf() -> void:
 	var r := _shelf
 	var plank_y := r.position.y + 50.0
-	# Équerres, planche, ombre.
-	draw_rect(Rect2(r.position.x + 18.0, plank_y, 6.0, 16.0), WOOD_DARK)
-	draw_rect(Rect2(r.end.x - 24.0, plank_y, 6.0, 16.0), WOOD_DARK)
-	draw_rect(Rect2(r.position.x, plank_y + 9.0, r.size.x, 5.0), Color(0, 0, 0, 0.25))
-	draw_rect(Rect2(r.position.x, plank_y, r.size.x, 9.0), WOOD)
-	draw_rect(Rect2(r.position.x, plank_y, r.size.x, 2.0), Color("b07a48"))
+	var shelf_art := _showcase_texture("vitrine_etagere")
+	if shelf_art != null:
+		_draw_capped(shelf_art, Rect2(r.position.x, plank_y - SHELF_H * SHELF_FOOT, r.size.x, SHELF_H), SHELF_CAP)
+	else:
+		# Équerres, planche, ombre.
+		draw_rect(Rect2(r.position.x + 18.0, plank_y, 6.0, 16.0), WOOD_DARK)
+		draw_rect(Rect2(r.end.x - 24.0, plank_y, 6.0, 16.0), WOOD_DARK)
+		draw_rect(Rect2(r.position.x, plank_y + 9.0, r.size.x, 5.0), Color(0, 0, 0, 0.25))
+		draw_rect(Rect2(r.position.x, plank_y, r.size.x, 9.0), WOOD)
+		draw_rect(Rect2(r.position.x, plank_y, r.size.x, 2.0), Color("b07a48"))
 	var x := r.position.x + (r.size.x - _content_width()) * 0.5
 	# Les puces, une par génération.
 	for chip_value in _chips:
@@ -496,14 +605,25 @@ func _draw_shelf() -> void:
 		x += 8.0
 	# Les trophées de carrière (coupes) puis les Unes encadrées.
 	for i in range(mini(_trophies, 4)):
-		_draw_cup(Vector2(x + 12.0, plank_y))
-		x += 28.0
+		var gold := i < _trophy_gold.size() and _trophy_gold[i]
+		var cup_art := _showcase_texture("trophee_or" if gold else "trophee_argent")
+		if cup_art != null:
+			var cup_w := CUP_H * float(cup_art.get_width()) / float(cup_art.get_height())
+			draw_texture_rect(cup_art, Rect2(Vector2(x + 15.0 - cup_w * 0.5, plank_y - CUP_H), Vector2(cup_w, CUP_H)), false)
+		else:
+			_draw_cup(Vector2(x + 12.0, plank_y))
+		x += 30.0
 	if _trophies > 4:
 		_draw_tag(Vector2(x, plank_y - 22.0), "×%d" % _trophies)
 		x += 30.0
+	var cover_art := _showcase_texture("une_encadree")
 	for i in range(mini(_front_pages, 3)):
-		_draw_cover(Vector2(x, plank_y - 30.0))
-		x += 26.0
+		if cover_art != null:
+			var cover_w := COVER_H * float(cover_art.get_width()) / float(cover_art.get_height())
+			draw_texture_rect(cover_art, Rect2(Vector2(x + 14.0 - cover_w * 0.5, plank_y - COVER_H), Vector2(cover_w, COVER_H)), false)
+		else:
+			_draw_cover(Vector2(x, plank_y - 30.0))
+		x += 28.0
 	if _front_pages > 3:
 		_draw_tag(Vector2(x, plank_y - 22.0), "×%d" % _front_pages)
 
@@ -530,9 +650,24 @@ func _draw_tag(pos: Vector2, text: String) -> void:
 
 func _draw_event_sign() -> void:
 	var font := get_theme_default_font()
+	var top := (_shelf.end.y + 2.0) if shelf_visible() else 14.0
+	var sign_art := _showcase_texture("pancarte_evenement")
+	if sign_art != null:
+		# La pancarte d'Astra pend à ses ficelles ; le jeu écrit au milieu de la planche.
+		var label := _event
+		var text_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		var s := SIGN_H / float(sign_art.get_height())
+		var sign_w := maxf(text_w + 40.0, SIGN_CAP * s * 2.0 + 20.0)
+		# Sous l'étagère, les ficelles partent de dessous la planche, entre les équerres.
+		var sign_top := (top - 16.0) if shelf_visible() else (top - 4.0)
+		var sign_rect := Rect2(Vector2(size.x * 0.5 - sign_w * 0.5, sign_top), Vector2(sign_w, SIGN_H))
+		_draw_capped(sign_art, sign_rect, SIGN_CAP)
+		var base := Vector2(size.x * 0.5 - text_w * 0.5, sign_rect.position.y + SIGN_H * SIGN_TEXT_Y + 5.0)
+		draw_string_outline(font, base, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, Color("4a1a10", 0.7))
+		draw_string(font, base, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CREAM)
+		return
 	var text := "⚑ " + _event
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 22.0
-	var top := (_shelf.end.y + 2.0) if shelf_visible() else 14.0
 	var rect := Rect2(Vector2(size.x * 0.5 - width * 0.5, top + 6.0), Vector2(width, 24.0))
 	draw_line(Vector2(rect.position.x + 12.0, top), rect.position + Vector2(12, 0), WOOD_DARK, 2.0)
 	draw_line(Vector2(rect.end.x - 12.0, top), Vector2(rect.end.x - 12.0, rect.position.y), WOOD_DARK, 2.0)

@@ -1,0 +1,33 @@
+TECH EMPIRE — LOT GRAPHIQUE 3
+Livraison du 01/10/2026, reprise et finalisation après validation du garage.
+Dépôt : vadorus/addonhardwaregame2d ; branche de référence : feature/ui-v09-navigation.
+Brief : docs/BRIEF_ASTRA_LOT3_SAISONS_FETES.md.
+Aucun fichier de code du jeu modifié. Images à intégrer par Claude.
+
+J7 — VITRINE
+Cinq éléments indépendants à fond transparent.
+Étagère vide avec deux équerres en laiton. Pancarte vierge avec deux ficelles, centre réservé au texte du jeu.
+La coupe argentée est une retouche de la coupe dorée ; cadrage commun à l'export.
+La une encadrée comporte une puce, des traits de colonnes sans texte lisible et un bandeau rouge vide.
+Étagère et pancarte vues presque de face, légèrement plongeantes, selon le brief.
+
+Dossier de livraison : J7_vitrine/.
+
+EXPORT ET CONTRÔLES
+PNG RGBA 8 bits, transparence conservée. Dimensions exactes du brief.
+Décodage complet, présence du canal alpha et de pixels totalement transparents vérifiés.
+Détourage inspecté sur fonds clair et foncé ; pas de fond blanc ou de damier incrusté observé.
+Les marges presque invisibles des générations ont été recadrées avant réduction. La guirlande, l'étagère et la pancarte ont été redimensionnées aux dimensions exactes des bandes demandées ; les autres objets conservent leurs proportions avec marges transparentes si nécessaire.
+Les faibles lueurs autour des ampoules de la guirlande sont intentionnelles.
+Placement, échelle dans le QG et contrôle sur Pixel restent à vérifier après intégration.
+
+INVENTAIRE (MESURES DES FICHIERS LIVRÉS)
+Fichier | Dimensions (px) | Octets | SHA-256
+pancarte_evenement.png | 640 x 110 | 75945 | e957fcea5f0d1319cc72e11d625a77f2ba4bd6249f037ce250a418c62aa957db
+trophee_argent.png | 128 x 170 | 33751 | 0d762baad7a6f80ab7217deea24c75312f337e34f93e5bba2c2ec67ac9f8a025
+trophee_or.png | 128 x 170 | 32676 | 3ca2c834e4e3d71194219d97743d93f2d76382d9969862b478bf7ab20d5fcdae
+une_encadree.png | 120 x 160 | 40211 | 2b8e83a8452d812d92f602be1f1571ab5e2af1f785bfdab23265f567512da339
+vitrine_etagere.png | 1000 x 90 | 90901 | f6568c8a4560802d6b47e9c74e76d1cf3c7c7d37ed342cff3d083d80b19c3c74
+
+RETouche DE LA COUPE ARGENTÉE
+Use case: precise-object-edit. Change ONLY the metal material of this exact gold trophy to polished SILVER: silver bowl, handles, stem and metal foot. Preserve the EXACT silhouette, camera, proportions, every detail, highlights, placement and dark brown wooden pedestal. No redesign. Keep wooden base brown unchanged. TRUE transparent background with clean antialiased alpha edges, holes through handles transparent. No glow, shadow, text or logo. This must be a matching silver version of the same gold trophy sprite.

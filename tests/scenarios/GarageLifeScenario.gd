@@ -80,6 +80,21 @@ static func _check(host: Node) -> String:
 		if got != fetes[date]:
 			life.queue_free()
 			return "J6: fêtes for %s should be %s, got %s" % [str(date), str(fetes[date]), str(got)]
+	# J6 / J7 (Astra, 01/10) : chaque objet de fête et chaque pièce de la vitrine est livré et se charge.
+	for fete_key in LIFE.FETE_PROPS.keys():
+		for prop_value in LIFE.FETE_PROPS[fete_key]:
+			var prop_path: String = LIFE.FETE_DIR + str((prop_value as Array)[0]) + ".png"
+			if not ResourceLoader.exists(prop_path) or load(prop_path) == null:
+				life.queue_free()
+				return "J6: missing fête art %s" % prop_path
+	for piece in ["vitrine_etagere", "trophee_or", "trophee_argent", "une_encadree", "pancarte_evenement"]:
+		var piece_path: String = LIFE.SHOWCASE_DIR + piece + ".png"
+		if not ResourceLoader.exists(piece_path) or load(piece_path) == null:
+			life.queue_free()
+			return "J7: missing showcase art %s" % piece_path
+	if not bool((life.call("scene_state") as Dictionary).get("showcase_art", false)):
+		life.queue_free()
+		return "J7: the HQ shelf must use Astra's art"
 	# Vitrine : une puce par génération sortie, au plus 5.
 	var chips := LIFE.generation_chips()
 	if chips.size() > LIFE.MAX_CHIPS:

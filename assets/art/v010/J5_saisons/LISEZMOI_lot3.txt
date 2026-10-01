@@ -1,0 +1,130 @@
+TECH EMPIRE — LOT GRAPHIQUE 3
+Livraison du 01/10/2026, reprise et finalisation après validation du garage.
+Dépôt : vadorus/addonhardwaregame2d ; branche de référence : feature/ui-v09-navigation.
+Brief : docs/BRIEF_ASTRA_LOT3_SAISONS_FETES.md.
+Aucun fichier de code du jeu modifié. Images à intégrer par Claude.
+
+J5 — ATELIER, SIÈGE, CAMPUS : HIVER, PRINTEMPS, AUTOMNE
+Complément du garage déjà livré et validé. Ne contient pas le garage.
+Destination : assets/art/v010/J5_saisons/.
+Format : WebP, qualité 85, 1774 x 887 px. Chaque fichier est inférieur à 1 500 000 octets.
+Retouches générées à partir de chaque décor original, sans changement demandé de caméra ou d'agencement. L'été utilise toujours le décor original.
+
+SOURCES D'ORIGINE (SHA Git des blobs)
+assets/art/v010/J1_decors/decor_1_atelier.webp : fb14b24f6b66d0423c96e8dbadcea387b621c5bd
+assets/art/v010/J1_decors/decor_2_siege.webp : 08522cd231288726d4e9d7b932465661f56762c4
+assets/art/v010/J1_decors/decor_3_campus.webp : 7f313721dc1eca691900536fd0a1c4d01b6449d3
+Brief utilisé pour les saisons : blob a10150ca3b6ff332ae8799330a8bafbf0b40694f.
+
+CONTRÔLES LOCAUX
+Décodage complet des neuf fichiers, dimensions et poids vérifiés.
+Inspection visuelle des variantes et comparaison locale des structures fixes.
+Alignement : corrélation normalisée des gradients (Sobel), recherche de translation entière dans +/- 8 px, quatre zones fixes par variante. Le déplacement retenu varie de 0 à 1 px par axe ; ce contrôle par échantillons ne prouve pas l'identité géométrique de chaque détail de l'image.
+Résultats (dx,dy), coordonnées du rectangle d'origine (gauche,haut,droite,bas), corrélation :
+decor_1_atelier_hiver.webp
+  bureau_central [640, 460, 850, 600] : (0,0), 0.8645
+  etabli_fond [880, 245, 1060, 355] : (0,0), 0.8596
+  banc_test [1050, 370, 1210, 510] : (0,0), 0.8608
+  rayonnage [1450, 360, 1600, 550] : (0,0), 0.8761
+decor_1_atelier_printemps.webp
+  bureau_central [640, 460, 850, 600] : (0,0), 0.8772
+  etabli_fond [880, 245, 1060, 355] : (0,0), 0.8583
+  banc_test [1050, 370, 1210, 510] : (0,0), 0.862
+  rayonnage [1450, 360, 1600, 550] : (0,0), 0.8708
+decor_1_atelier_automne.webp
+  bureau_central [640, 460, 850, 600] : (0,0), 0.8869
+  etabli_fond [880, 245, 1060, 355] : (0,0), 0.8525
+  banc_test [1050, 370, 1210, 510] : (0,0), 0.8649
+  rayonnage [1450, 360, 1600, 550] : (0,0), 0.8336
+decor_2_siege_hiver.webp
+  bureau_fond [570, 275, 760, 390] : (0,0), 0.7274
+  escalier [665, 100, 770, 225] : (0,0), 0.7138
+  table_mezzanine [950, 135, 1120, 235] : (1,1), 0.7604
+  bureau_vitre [840, 550, 1030, 650] : (0,0), 0.8099
+decor_2_siege_printemps.webp
+  bureau_fond [570, 275, 760, 390] : (0,0), 0.7348
+  escalier [665, 100, 770, 225] : (0,0), 0.7516
+  table_mezzanine [950, 135, 1120, 235] : (0,0), 0.7898
+  bureau_vitre [840, 550, 1030, 650] : (0,0), 0.8167
+decor_2_siege_automne.webp
+  bureau_fond [570, 275, 760, 390] : (0,0), 0.7852
+  escalier [665, 100, 770, 225] : (0,0), 0.7895
+  table_mezzanine [950, 135, 1120, 235] : (0,0), 0.8633
+  bureau_vitre [840, 550, 1030, 650] : (0,0), 0.8019
+decor_3_campus_hiver.webp
+  bureau_central [750, 400, 980, 535] : (0,0), 0.77
+  postes_avant [890, 610, 1110, 710] : (0,-1), 0.7915
+  table_reunion [145, 490, 350, 595] : (0,0), 0.7878
+  machines [1400, 190, 1530, 330] : (0,1), 0.732
+decor_3_campus_printemps.webp
+  bureau_central [750, 400, 980, 535] : (0,0), 0.8488
+  postes_avant [890, 610, 1110, 710] : (0,0), 0.8414
+  table_reunion [145, 490, 350, 595] : (0,0), 0.8839
+  machines [1400, 190, 1530, 330] : (0,0), 0.8471
+decor_3_campus_automne.webp
+  bureau_central [750, 400, 980, 535] : (0,0), 0.8506
+  postes_avant [890, 610, 1110, 710] : (0,0), 0.8858
+  table_reunion [145, 490, 350, 595] : (0,0), 0.9031
+  machines [1400, 190, 1530, 330] : (0,0), 0.8377
+
+Corrections ciblées réalisées : rétablissement du portemanteau et retrait d'un plaid non demandé au siège au printemps ; retrait du givre des plantes intérieures du siège en hiver ; retrait du givre de la cloison vitrée intérieure du campus en hiver.
+Contrôle final dans Godot et sur Pixel non effectué ici : à faire après intégration, notamment superposition complète et position des personnages/repères.
+
+INVENTAIRE (MESURES DES FICHIERS LIVRÉS)
+Fichier | Dimensions (px) | Octets | SHA-256
+decor_1_atelier_automne.webp | 1774 x 887 | 252190 | 74e5c0ed8dda872091c9e1606ba1b91393ae0041d4cd3f5d85d95516df52f546
+decor_1_atelier_hiver.webp | 1774 x 887 | 238192 | 92c4b6de7e8f6042b8943762f408b834a5cb53cfb9a9aa20f8bb50d5e4f9a203
+decor_1_atelier_printemps.webp | 1774 x 887 | 252926 | 4b709e59cce143e455da93bfcc52e82c6d5f2bb6ad69076521c69d2e01e4c1db
+decor_2_siege_automne.webp | 1774 x 887 | 317196 | 1aae754fe5e3db31efffba71b7a7635b29ca893192b07639bda6876fec9d9580
+decor_2_siege_hiver.webp | 1774 x 887 | 288290 | f884028c76ccdef981407f8f4ce0ddf97caf86757ab829e6d042b255dad19144
+decor_2_siege_printemps.webp | 1774 x 887 | 267612 | 00ccbda713a1b0da4bed06a12bd6e6ca9007bf7bf1c8de595335da4f1b8eb467
+decor_3_campus_automne.webp | 1774 x 887 | 306368 | 0b88df3384835e7d0994e09dfefc8e240fcaf858036bdb0cd31b25ceeae1b64f
+decor_3_campus_hiver.webp | 1774 x 887 | 278510 | 585ade0ef03750d7968d0d12306e77a2e2eaa2171d0fa529235ce3113dcfeaf8
+decor_3_campus_printemps.webp | 1774 x 887 | 324470 | 9191006b97a4acd7312d49ba2bc027e4a0c4993719ed85b66a9ad4c26f508678
+
+TEXTES DE GÉNÉRATION UTILISÉS
+
+decor_1_atelier_hiver.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version hiver : neige épaisse sur le sol extérieur, sur les toits et sur les branches ; arbres sans feuilles, givrés ; lumière extérieure froide et bleutée, mais intérieur toujours chaud et éclairé par les lampes ; un peu de givre dans les coins des vitres ; une écharpe et un manteau sur un portemanteau ou un dossier de chaise. Aucun personnage, aucun texte.
+
+decor_1_atelier_printemps.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version printemps : arbres extérieurs en fleurs (rose pâle et blanc), herbe vert tendre, lumière douce du matin ; quelques pétales au sol près de l'entrée ; un petit pot de fleurs sur un bureau libre. Aucun personnage, aucun texte.
+
+decor_1_atelier_automne.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version automne : feuillage orange, rouge et brun, tas de feuilles mortes dehors et quelques feuilles près de l'entrée ; lumière dorée de fin d'après-midi, rasante ; une tasse fumante et un plaid sur un fauteuil. Aucun personnage, aucun texte.
+
+decor_2_siege_hiver.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version hiver : neige épaisse sur le sol extérieur, sur les toits et sur les branches ; arbres sans feuilles, givrés ; lumière extérieure froide et bleutée, mais intérieur toujours chaud et éclairé par les lampes ; un peu de givre dans les coins des vitres ; une écharpe et un manteau sur un portemanteau ou un dossier de chaise. Aucun personnage, aucun texte.
+Keep the interior glass office transparent: it is an indoor partition, not a window to outside. Never put snow, exterior leaves or trees inside it. Preserve stairs and mezzanine exactly.
+Retouche corrective : Use case: precise-object-edit. Image 1 is EDIT TARGET, image 2 is ORIGINAL for restoration reference only. Perform ONLY this localized correction. Output 1774x887, exact framing; all furniture, walls, windows and small objects must keep their current original pixel coordinates. No other repainting or layout change. Remove snow/frost only from ALL INDOOR potted plants and their pots: left wall, plant near stair top/right, pot in front of glass office at x470,y625, front office pot x860,y800, far right wall potted plants. These plants and pots must have original healthy green leaves and soil, with no snow. Keep the exterior snow and frosted EXTERIOR windows. Preserve furniture and clothing.
+
+decor_2_siege_printemps.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version printemps : arbres extérieurs en fleurs (rose pâle et blanc), herbe vert tendre, lumière douce du matin ; quelques pétales au sol près de l'entrée ; un petit pot de fleurs sur un bureau libre. Aucun personnage, aucun texte.
+Keep the interior glass office transparent: it is an indoor partition, not a window to outside. Never put snow, exterior leaves or trees inside it. Preserve stairs and mezzanine exactly.
+Retouche corrective : Use case: precise-object-edit. Image 1 is EDIT TARGET, image 2 is ORIGINAL for restoration reference only. Perform ONLY this localized correction. Output 1774x887, exact framing; all furniture, walls, windows and small objects must keep their current original pixel coordinates. No other repainting or layout change. Restore original black coat stand with brown coat at pixel location around x1130,y530, removing the newly substituted green plant at that location. Remove the newly added cream throw from the small lounge chair at x610,y630 so it matches original bare chair. Keep flower pot on desk and every other spring detail unchanged.
+
+decor_2_siege_automne.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version automne : feuillage orange, rouge et brun, tas de feuilles mortes dehors et quelques feuilles près de l'entrée ; lumière dorée de fin d'après-midi, rasante ; une tasse fumante et un plaid sur un fauteuil. Aucun personnage, aucun texte.
+Keep the interior glass office transparent: it is an indoor partition, not a window to outside. Never put snow, exterior leaves or trees inside it. Preserve stairs and mezzanine exactly.
+
+decor_3_campus_hiver.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version hiver : neige épaisse sur le sol extérieur, sur les toits et sur les branches ; arbres sans feuilles, givrés ; lumière extérieure froide et bleutée, mais intérieur toujours chaud et éclairé par les lampes ; un peu de givre dans les coins des vitres ; une écharpe et un manteau sur un portemanteau ou un dossier de chaise. Aucun personnage, aucun texte.
+CRITICAL: every plant inside the building remains GREEN and untouched. NO snow, frost or leaves on interior plants, shelves or floor. The glass meeting room and clean room are INSIDE; do not put seasonal landscape within these rooms or on their glass partitions. Frost only on EXTERIOR windows. Do not add or remove an interior plant. Preserve ALL clean-room machines and glass mullions at exact coordinates.
+Retouche corrective : Use case: precise-object-edit. Image 1 is EDIT TARGET, image 2 is ORIGINAL for restoration reference only. Perform ONLY this localized correction. Output 1774x887, exact framing; all furniture, walls, windows and small objects must keep their current original pixel coordinates. No other repainting or layout change. Remove all frost/snow from the INTERIOR GLASS MEETING ROOM PARTITION at lower left, running diagonally from around x95,y340 to x550,y540 and its door. Restore transparent glass exactly as second original image so one sees the same furniture behind it. This is an indoor partition, not an exterior window. Keep frost on real windows on the BACK LEFT WALL. Keep outdoor snow and ALL furniture precisely.
+
+decor_3_campus_printemps.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version printemps : arbres extérieurs en fleurs (rose pâle et blanc), herbe vert tendre, lumière douce du matin ; quelques pétales au sol près de l'entrée ; un petit pot de fleurs sur un bureau libre. Aucun personnage, aucun texte.
+CRITICAL: every plant inside the building remains GREEN and untouched. NO snow, frost or leaves on interior plants, shelves or floor. The glass meeting room and clean room are INSIDE; do not put seasonal landscape within these rooms or on their glass partitions. Frost only on EXTERIOR windows. Do not add or remove an interior plant. Preserve ALL clean-room machines and glass mullions at exact coordinates.
+
+decor_3_campus_automne.webp
+Use case: lighting-weather. EDIT TARGET: supplied ORIGINAL Tech Empire background. PRECISE LOCAL SEASONAL RETOUCH, not a new rendition. Output exact original frame 1774 x 887 pixels (2:1). Preserve EVERY interior architectural and furniture edge, all desks, chairs, computers, machines, windows, doors, stairs, partitions, shelving and their objects at their EXACT original coordinates, sizes and perspective. Game sprites and hitboxes are aligned to these pixels. No camera movement, zoom, crop, rearrangement or new furniture. Preserve original warm painterly isometric retro game art and wood/cream/amber palette. Only change weather, exterior vegetation seen outside and THROUGH EXISTING WINDOWS, plus subtle seasonal light and the tiny requested detail on existing furniture. Keep indoor floors clear. No person, text, logo or new wall openings. Use an existing chair for clothes/throw, never add a coat stand or armchair. Do not move desktop equipment to make space. All diagrams remain illegible. Apply this French brief verbatim:
+Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version automne : feuillage orange, rouge et brun, tas de feuilles mortes dehors et quelques feuilles près de l'entrée ; lumière dorée de fin d'après-midi, rasante ; une tasse fumante et un plaid sur un fauteuil. Aucun personnage, aucun texte.
+CRITICAL: every plant inside the building remains GREEN and untouched. NO snow, frost or leaves on interior plants, shelves or floor. The glass meeting room and clean room are INSIDE; do not put seasonal landscape within these rooms or on their glass partitions. Frost only on EXTERIOR windows. Do not add or remove an interior plant. Preserve ALL clean-room machines and glass mullions at exact coordinates.

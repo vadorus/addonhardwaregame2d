@@ -1,0 +1,64 @@
+TECH EMPIRE — LOT GRAPHIQUE 3
+Livraison du 01/10/2026, reprise et finalisation après validation du garage.
+Dépôt : vadorus/addonhardwaregame2d ; branche de référence : feature/ui-v09-navigation.
+Brief : docs/BRIEF_ASTRA_LOT3_SAISONS_FETES.md.
+Aucun fichier de code du jeu modifié. Images à intégrer par Claude.
+
+J6 — FÊTES
+Neuf objets indépendants à fond transparent, époque rétro 1970-1980.
+La guirlande possède trois arcs ; les trois citrouilles sont souriantes ; le gâteau porte deux ballons. Aucun texte ni marque lisible.
+La toile est pâle pour rester visible sur le bois foncé ; vérifier son contraste à l'emplacement choisi.
+Les coupes et le seau de la table du Nouvel An sont sans étiquette.
+
+Dossier de livraison : J6_fetes/.
+
+EXPORT ET CONTRÔLES
+PNG RGBA 8 bits, transparence conservée. Dimensions exactes du brief.
+Décodage complet, présence du canal alpha et de pixels totalement transparents vérifiés.
+Détourage inspecté sur fonds clair et foncé ; pas de fond blanc ou de damier incrusté observé.
+Les marges presque invisibles des générations ont été recadrées avant réduction. La guirlande, l'étagère et la pancarte ont été redimensionnées aux dimensions exactes des bandes demandées ; les autres objets conservent leurs proportions avec marges transparentes si nécessaire.
+Les faibles lueurs autour des ampoules de la guirlande sont intentionnelles.
+Placement, échelle dans le QG et contrôle sur Pixel restent à vérifier après intégration.
+
+INVENTAIRE (MESURES DES FICHIERS LIVRÉS)
+Fichier | Dimensions (px) | Octets | SHA-256
+fete_anniversaire_gateau.png | 188 x 260 | 85231 | bd76bce6859e23b097251e48253314c4c85f12a3951431f9962c65698236c6ae
+fete_ete_ventilateur.png | 138 x 300 | 78942 | 8086f5201b3eb21bb74bcc0343b0b17c71218a0ad34bbe4cedef96ca8808fc84
+fete_halloween_citrouilles.png | 194 x 160 | 54018 | a2fee41b7e06a3d1ae70a9d9b59396e2e76482c4775c75927a0649cceb049158
+fete_halloween_toile.png | 300 x 300 | 95989 | ebf6706b53f5161249799fd6a51f8c8f00c0ddb888301986a241ea7c07cfd23b
+fete_noel_guirlande.png | 1600 x 140 | 296534 | 0d3ec6c6cfce3e98ee551f119bcf4be4dd9a541fa796f3c89b15275e4b8af4f5
+fete_noel_sapin.png | 258 x 420 | 205587 | 2a025919348668216bb2667931f586c872a69393e715ea69a0615fc6fa8b9ea2
+fete_nouvel_an_ballons.png | 215 x 380 | 122445 | b5b7817780c5cb228858d4a470d755e294e1b545f4e7756400050cb24969d60c
+fete_nouvel_an_table.png | 158 x 200 | 52389 | b1205e4fd2cbea05b5e9d09940c74dce52a4f9dfb159192e84d04e362dcccf47
+fete_paques_panier.png | 151 x 150 | 52615 | afee26b2428ac3599e2d41857bc8dd63605f6623ca2e022df963ef0735dfcfdb
+
+TEXTES DE GÉNÉRATION
+
+fete_noel_sapin.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. Decorated Christmas fir tree with amber and red baubles, a warm light garland, golden star on top and a few small gift boxes at its foot. Traditional retro ornaments. Vertical sprite, final 420 px high.
+Retouche de détourage : retrait du halo diffus extérieur, conservation du dessin et de la transparence entre les éléments.
+
+fete_noel_guirlande.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. Exactly THREE SHALLOW hanging arcs of a single dark-green electrical string with small multicoloured glowing retro bulbs. Horizontal garland ONLY, no fir foliage, no wall, no posts. Very wide, short ribbon composition, requested exact image 1600 x 140 pixels (80:7). Three equally sized shallow downward curves stretching from left to right, tiny clean light glows and transparent empty space. No tall loops.
+
+fete_nouvel_an_ballons.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. A compact celebratory cluster of gold, cream and amber balloons, tied together with curled ribbon streamers hanging down. No text or printed year. Full cluster with ribbon ends visible. Vertical sprite, final 380 px high.
+
+fete_nouvel_an_table.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. A small round retro wooden table bearing champagne coupe glasses and an unlabelled metal ice bucket. Tasteful cream/amber party setup. Whole table and legs visible. Final sprite 200 px high.
+
+fete_halloween_citrouilles.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. Exactly THREE carved pumpkins, one large, one medium and one small, grouped together. Friendly smiling faces, soft warm light inside, cozy and not scary. No other objects. Final sprite 160 px high.
+
+fete_halloween_toile.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. A decorative spider web for a ceiling corner: triangular fan web with fine pale cream silk strands, one tiny cute dark-brown spider with eight little legs. Orthographic slightly elevated view appropriate for a wall corner, clear at small scale. Transparent background, no wall or frame. Final square canvas 300 x 300 px.
+
+fete_paques_panier.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. A small woven wicker basket filled with painted Easter eggs in pastel cream, amber, gentle pink and pale green, tied with a soft ribbon. Full handle and basket visible. Final sprite 150 px high.
+
+fete_ete_ventilateur.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. One vintage 1970s cream-coloured pedestal electric fan, rounded wire safety cage, simple blades, narrow adjustable stem and stable round base. Slightly aged cream enamel, dark wood/amber reflections. Entire fan visible. No brand, labels or markings. Final vertical sprite 300 px high.
+Retouche de détourage : retrait du halo diffus extérieur, conservation du dessin et de la transparence entre les éléments.
+
+fete_anniversaire_gateau.png
+Use case: stylized-concept. Standalone sprite asset for Tech Empire warm painterly isometric retro 1970s/1980s management game. Three-quarter view looking down approximately 30 degrees, orthographic game-object perspective. Warm wood #3b2b1e, cream #f6e3c6 and amber #d9822b palette with appropriate festive accents. Clean detailed illustrated materials matching a cozy electronics workshop. One isolated object/group as specified, centred, fully visible, no cropping. REAL TRANSPARENT BACKGROUND with clean alpha edges, no white matte, NO checkerboard painted in, no environment, no floor plane, no cast ground shadow, no text, letters, numbers, logos or brands. Small transparent margins. Must remain readable when reduced to in-game sprite size. A small wooden celebration table with a tiered birthday cake with lit candles, exactly TWO balloons tied to the table, one amber and one cream. No written message or numerals. Entire table, balloons, strings and cake in one coherent compact sprite. Final image 260 px high.
