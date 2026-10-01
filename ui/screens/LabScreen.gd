@@ -1070,7 +1070,27 @@ func focus_project_decision() -> void:
 func _focus_project_decision_deferred() -> void:
 	if project_decision_card == null or not project_decision_card.visible:
 		return
-	ensure_control_visible(project_decision_card)
+	# V0.10 / I1 : « ensure_control_visible » faisait défiler juste assez pour voir le BAS de la carte :
+	# sur téléphone, la question et le titre restaient coupés en haut. On aligne le HAUT de la carte.
+	await get_tree().process_frame
+	scroll_to_control_top(project_decision_card)
+
+## Fait défiler pour que le haut de `control` soit en haut de l'écran (avec une petite marge).
+func scroll_to_control_top(control: Control, margin: float = 8.0) -> void:
+	if control == null or get_child_count() == 0:
+		return
+	var content := get_child(0) as Control
+	if content == null:
+		return
+	var offset := control.global_position.y - content.global_position.y
+	scroll_vertical = maxi(int(offset - margin), 0)
+
+func project_decision_top_visible() -> bool:
+	if project_decision_card == null or not project_decision_card.visible:
+		return false
+	var top := project_decision_card.global_position.y
+	var view := get_global_rect()
+	return top >= view.position.y - 1.0 and top < view.position.y + view.size.y * 0.5
 
 func _emit_action(action: String, payload: Variant = null) -> void:
 	action_requested.emit(action, payload)

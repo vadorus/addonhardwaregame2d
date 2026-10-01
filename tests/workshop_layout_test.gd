@@ -46,8 +46,47 @@ func _ready() -> void:
 		print("[UI] Workshop choice, configuration, errors and signals passed: ", dimensions)
 		viewport.queue_free()
 		await get_tree().process_frame
+	if not await _check_project_decision_card():
+		return
 	print("[CI] Workshop layout test passed")
 	get_tree().quit()
+
+## V0.10 / I1 : sur téléphone, la carte de décision prototype s'ouvrait coupée en haut (question invisible).
+## Reproduit le vrai chemin : le jeu complet à la taille logique du Pixel, bouton vert → Labo › Projets.
+func _check_project_decision_card() -> bool:
+	const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1616, 720)
+	add_child(viewport)
+	var game := (load("res://main.tscn") as PackedScene).instantiate() as Control
+	viewport.add_child(game)
+	for frame in range(8): await get_tree().process_frame
+	game.get("setup_name").text = "I1"
+	game.call("_start_new_game")
+	ResearchManager.start_project("I1 CPU", "CPU", "EMBEDDED", "INTERNAL", "BALANCED", 45000, CPU_DESIGN.preset("BALANCED"))
+	var pid := str((ResearchManager.projects[0] as Dictionary).get("id", ""))
+	for month in range(30):
+		SimulationManager.process_month_end()
+		if not ResearchManager.get_project_decision(pid).is_empty():
+			break
+	if ResearchManager.get_project_decision(pid).is_empty():
+		_fail("I1: no prototype decision reached")
+		return false
+	GarageBusiness.mark_shown("first_silicon_shown")
+	game.call("_refresh_all")
+	for frame in range(4): await get_tree().process_frame
+	game.call("_on_dashboard_navigation", 3, "PROJECT_DECISION")
+	for frame in range(16): await get_tree().process_frame
+	var lab: Control = game.get("lab_screen")
+	var card: Control = lab.get("project_decision_card")
+	print("[I1] carte y %.0f h %.0f, zone %s" % [card.global_position.y, card.size.y, str(lab.get_global_rect())])
+	# La carte s'ouvre en haut de la zone visible : la question est la première chose qu'on lit.
+	if not bool(lab.call("project_decision_top_visible")) or card.global_position.y - lab.get_global_rect().position.y > 40.0:
+		_fail("I1: the decision card opens with its question cut off at the top")
+		return false
+	print("[UI] Project decision card opens on its question (phone 1616x720)")
+	viewport.queue_free()
+	return true
 
 func _check_width(panel: Control, dimensions: Vector2i) -> bool:
 	if panel.size.x > dimensions.x - 24:

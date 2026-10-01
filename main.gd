@@ -464,6 +464,9 @@ func _on_dashboard_navigation(tab_index: int, context: String):
 	if tab_index == 3 and context == "PROJECT_DECISION" and lab_screen != null:
 		TimeManager.time_scale = 0.0
 		status_label.text = "Nora : le prototype attend votre décision."
+		# V0.10 / I1 : les bulles d'actualité masquaient le coin de la carte de décision.
+		if notification_feed != null:
+			notification_feed.call("clear")
 		lab_screen.call_deferred("focus_project_decision")
 		return
 	if tab_index == 4 and context == "PRODUCT_LAUNCH" and products_screen != null:
