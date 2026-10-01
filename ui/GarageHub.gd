@@ -149,6 +149,7 @@ func _build_background() -> void:
 	_life = (load("res://ui/GarageLife.gd") as Script).new() as Control
 	_life.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_life)
+	_life.connect("ambiance_changed", _apply_workplace_art)
 
 func _build_overlay() -> void:
 	_room_badge = PanelContainer.new()
@@ -1306,7 +1307,12 @@ func move_moment_visible() -> bool:
 
 func _art_path_for_tier(tier: int) -> String:
 	var normalized_tier := clampi(tier, 0, 3)
-	var path := WORKPLACE.seasonal_art_path(normalized_tier, TimeManager.month) if CompanyManager.created else str(WORKPLACE_ART.get(normalized_tier, WORKPLACE_ART[0]))
+	var path := str(WORKPLACE_ART.get(normalized_tier, WORKPLACE_ART[0]))
+	if CompanyManager.created:
+		var ambiance: Dictionary = _life.call("scene_state") if _life != null else {}
+		path = WORKPLACE.ambient_art_path(normalized_tier, TimeManager.month, str(ambiance.get("weather", "SUNNY")), float(ambiance.get("night", 0.0)) >= 0.5)
+		if _life != null:
+			_life.set("night_art", path.ends_with("_nuit.webp"))
 	if ResourceLoader.exists(path):
 		return path
 	if ResourceLoader.exists(GARAGE_EMPTY_ART_PATH):
@@ -1351,8 +1357,8 @@ func _apply_workplace_art() -> void:
 
 ## Deux décors du même local (saisons différentes) : « decor_0_garage » et « decor_0_garage_hiver ».
 static func _same_place(a: String, b: String) -> bool:
-	var base_a := a.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0)
-	var base_b := b.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0)
+	var base_a := a.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0).get_slice("_nuit", 0).get_slice("_pluie", 0)
+	var base_b := b.get_file().get_basename().get_slice("_hiver", 0).get_slice("_printemps", 0).get_slice("_automne", 0).get_slice("_nuit", 0).get_slice("_pluie", 0)
 	return base_a == base_b
 
 func season_art_path() -> String:

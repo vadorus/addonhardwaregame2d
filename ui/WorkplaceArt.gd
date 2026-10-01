@@ -58,6 +58,17 @@ const SEASON_DIR := "res://assets/art/v010/J5_saisons/"
 const SEASON_SUFFIX := {12:"hiver", 1:"hiver", 2:"hiver", 3:"printemps", 4:"printemps", 5:"printemps",
 	9:"automne", 10:"automne", 11:"automne"}
 
+## K3 : décors d'ambiance d'Astra (nuit, pluie), utilisés dès qu'ils existent ; sinon décor de saison.
+const AMBIANCE_DIR := "res://assets/art/v010/J8_ambiances/"
+
+static func ambient_art_path(tier: int, month: int, weather: String, is_night: bool) -> String:
+	var stem := art_path(tier).get_file().get_basename()
+	if is_night and ResourceLoader.exists(AMBIANCE_DIR + stem + "_nuit.webp"):
+		return AMBIANCE_DIR + stem + "_nuit.webp"
+	if weather in ["RAIN", "STORM"] and ResourceLoader.exists(AMBIANCE_DIR + stem + "_pluie.webp"):
+		return AMBIANCE_DIR + stem + "_pluie.webp"
+	return seasonal_art_path(tier, month)
+
 static func seasonal_art_path(tier: int, month: int) -> String:
 	var base := art_path(tier)
 	var suffix := str(SEASON_SUFFIX.get(month, ""))

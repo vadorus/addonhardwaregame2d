@@ -7,6 +7,9 @@ extends Control
 ## - les événements du moment (salon, guerre des prix, pénurie…) sur une petite pancarte.
 ## Toucher l'étagère ouvre le détail. Tout est dessiné en code, sous les cartes du QG.
 
+## La nuit tombe ou la météo change : le QG peut passer sur un décor d'ambiance (nuit, pluie) d'Astra.
+signal ambiance_changed
+
 const CHIP := preload("res://ui/ChipPreview.gd")
 const CAREER := preload("res://scripts/CareerPrestige.gd")
 const LATE := preload("res://scripts/LateGameEvents.gd")
@@ -20,6 +23,30 @@ const SEASON_LABELS := {"WINTER":"hiver", "SPRING":"printemps", "SUMMER":"été"
 const TINTS := {"WINTER":Color(0.55, 0.72, 1.0, 0.10), "SPRING":Color(0.85, 1.0, 0.85, 0.05),
 	"SUMMER":Color(1.0, 0.8, 0.4, 0.08), "AUTUMN":Color(1.0, 0.5, 0.15, 0.09)}
 const PARTICLES := {"WINTER":46, "SPRING":26, "SUMMER":30, "AUTUMN":22}
+## K3 (01/10, idée d'Alexandre) : le temps qu'il fait et le moment de la journée, pour sentir le temps passer.
+## Météo tirée chaque mois selon la saison (toujours la même pour un mois donné) ; journée qui avance avec le
+## jeu (figée en pause) : matin, journée, soir, nuit avec les lampes allumées. Rien ne change le jeu.
+const WEATHER_WEIGHTS := {
+	"WINTER":[["SNOW", 40], ["CLOUDY", 25], ["SUNNY", 20], ["FOG", 15]],
+	"SPRING":[["SUNNY", 45], ["RAIN", 30], ["CLOUDY", 25]],
+	"SUMMER":[["SUNNY", 60], ["STORM", 15], ["CLOUDY", 15], ["RAIN", 10]],
+	"AUTUMN":[["RAIN", 35], ["CLOUDY", 25], ["FOG", 20], ["SUNNY", 20]]}
+const WEATHER_LABELS := {"SUNNY":"beau temps", "CLOUDY":"nuageux", "RAIN":"pluie", "STORM":"orage", "SNOW":"neige", "FOG":"brouillard"}
+const WEATHER_TINTS := {"CLOUDY":Color(0.4, 0.42, 0.48, 0.12), "RAIN":Color(0.26, 0.32, 0.44, 0.2),
+	"STORM":Color(0.18, 0.22, 0.34, 0.26), "SNOW":Color(0.85, 0.9, 1.0, 0.08), "FOG":Color(0.9, 0.9, 0.92, 0.1)}
+## Une journée complète dure 2 minutes à vitesse ×1 (elle va plus vite en accéléré, et s'arrête en pause).
+const DAY_SECONDS := 120.0
+const DAY_KEYS := [[0.0, Color(0.95, 0.55, 0.55, 0.10)], [0.10, Color(1, 1, 1, 0.0)], [0.55, Color(1, 1, 1, 0.0)],
+	[0.65, Color(1.0, 0.5, 0.2, 0.15)], [0.75, Color(0.05, 0.07, 0.2, 0.38)], [0.92, Color(0.05, 0.07, 0.2, 0.38)],
+	[1.0, Color(0.95, 0.55, 0.55, 0.10)]]
+## Lampes de chaque décor (position dans l'image), allumées le soir et la nuit.
+const LAMPS := {
+	0:[Vector2(0.05, 0.37), Vector2(0.525, 0.2), Vector2(0.615, 0.42), Vector2(0.40, 0.50), Vector2(0.27, 0.36)],
+	1:[Vector2(0.49, 0.17), Vector2(0.15, 0.42), Vector2(0.36, 0.38), Vector2(0.62, 0.40), Vector2(0.80, 0.33)],
+	2:[Vector2(0.28, 0.18), Vector2(0.55, 0.12), Vector2(0.42, 0.45), Vector2(0.70, 0.35), Vector2(0.85, 0.30)],
+	3:[Vector2(0.25, 0.30), Vector2(0.45, 0.25), Vector2(0.62, 0.30), Vector2(0.80, 0.25), Vector2(0.50, 0.50)]}
+const RAIN_DROPS := 260
+
 const WOOD := Color("8a5a32")
 const WOOD_DARK := Color("5e3b1f")
 const GOLD := Color("e2b33c")
@@ -40,6 +67,20 @@ var _shelf_button: Button
 var _card: PanelContainer
 var _card_label: Label
 var _time := 0.0
+var _weather := "SUNNY"
+var _weather_month := -1
+var _drops: Array = []
+var _day := -1.0
+var _flash := 0.0
+var _next_flash := 4.0
+var _glow: GradientTexture2D
+## Vrai si le décor affiché est déjà la version nuit d'Astra (on n'assombrit plus en code).
+var night_art := false
+var _was_night := false
+
+## La pluie et la neige tombent dehors : au-dessus des murs et sur le trottoir, pas au milieu des bureaux.
+static func outdoors(y: float) -> bool:
+	return y < 0.17 or y > 0.84
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -69,7 +110,8 @@ func set_art_rect(rect: Rect2) -> void:
 ## Ce que le QG montre en ce moment (sert aussi aux tests).
 func scene_state() -> Dictionary:
 	return {"season":_season, "garland":_garland, "chips":_chips.size(), "trophies":_trophies,
-		"front_pages":_front_pages, "staff":_staff, "event":_event, "shelf_visible":shelf_visible()}
+		"front_pages":_front_pages, "staff":_staff, "event":_event, "shelf_visible":shelf_visible(),
+		"weather":_weather, "day_phase":day_phase_name(), "night":night_amount()}
 
 func shelf_visible() -> bool:
 	return not _chips.is_empty() or _trophies > 0 or _front_pages > 0
@@ -90,6 +132,14 @@ func refresh() -> void:
 	if season != _season:
 		_season = season
 		_spawn_particles()
+	var month_index := TimeManager.year * 12 + TimeManager.month
+	if month_index != _weather_month:
+		_weather_month = month_index
+		_weather = weather_for(TimeManager.year, TimeManager.month)
+		_spawn_particles()
+		ambiance_changed.emit()
+		if _day < 0.0:
+			_day = fmod(float(month_index) * 0.37, 1.0)
 	_garland = TimeManager.month == 12
 	_chips = generation_chips()
 	_trophy_labels.clear()
@@ -196,23 +246,94 @@ func _card_text() -> String:
 	lines.append("Équipe : %d personne%s, Nora comprise" % [_staff + 1, "s" if _staff > 0 else ""])
 	if _event != "":
 		lines.append("En ce moment : " + _event)
-	lines.append("Saison : " + str(SEASON_LABELS.get(_season, "")))
+	lines.append("Saison : %s • %s • %s" % [str(SEASON_LABELS.get(_season, "")), str(WEATHER_LABELS.get(_weather, "")), day_phase_name()])
 	return "\n".join(lines)
 
 # --- Saisons -----------------------------------------------------------------------------------------
 
+## La météo d'un mois : tirée selon la saison, toujours la même pour ce mois-là.
+static func weather_for(year: int, month: int) -> String:
+	var weights: Array = WEATHER_WEIGHTS.get(str(SEASONS.get(month, "SUMMER")), [["SUNNY", 1]])
+	var total := 0
+	for pair in weights:
+		total += int(pair[1])
+	var roll := absi(hash("meteo:%d:%d" % [year, month])) % maxi(total, 1)
+	for pair in weights:
+		roll -= int(pair[1])
+		if roll < 0:
+			return str(pair[0])
+	return "SUNNY"
+
+func day_phase_name() -> String:
+	var d := maxf(_day, 0.0)
+	if d < 0.10 or d >= 0.95:
+		return "matin"
+	if d < 0.58:
+		return "journée"
+	if d < 0.70:
+		return "soir"
+	return "nuit"
+
+## 0 = plein jour, 1 = pleine nuit.
+func night_amount() -> float:
+	return clampf((_day_tint().a - 0.15) / 0.23, 0.0, 1.0) if _day_tint().b > 0.15 else 0.0
+
+func _day_tint() -> Color:
+	var d := maxf(_day, 0.0)
+	for i in range(DAY_KEYS.size() - 1):
+		var a: Array = DAY_KEYS[i]
+		var b: Array = DAY_KEYS[i + 1]
+		if d >= float(a[0]) and d <= float(b[0]):
+			var t := (d - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.0001)
+			return (a[1] as Color).lerp(b[1] as Color, t)
+	return Color(1, 1, 1, 0)
+
+func set_day_phase(value: float) -> void:
+	_day = fposmod(value, 1.0)
+	_was_night = night_amount() >= 0.5
+	ambiance_changed.emit()
+	queue_redraw()
+
 func _spawn_particles() -> void:
 	_particles.clear()
+	_drops.clear()
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(_season)
-	for i in range(int(PARTICLES.get(_season, 0))):
+	rng.seed = hash(_season + _weather)
+	if _weather in ["RAIN", "STORM"]:
+		for i in range(RAIN_DROPS):
+			_drops.append({"x":rng.randf(), "y":rng.randf(), "speed":rng.randf_range(0.9, 1.4), "len":rng.randf_range(10.0, 18.0)})
+		return
+	var count := int(PARTICLES.get(_season, 0))
+	if _weather == "SNOW":
+		count = 95
+	elif _weather == "FOG":
+		count = count / 2
+	for i in range(count):
 		_particles.append({"x":rng.randf(), "y":rng.randf(), "speed":rng.randf_range(0.025, 0.06),
 			"sway":rng.randf_range(0.004, 0.018), "phase":rng.randf() * TAU, "size":rng.randf_range(1.4, 3.2)})
 
 func _process(delta: float) -> void:
-	if not is_visible_in_tree() or _particles.is_empty():
+	if not is_visible_in_tree() or not CompanyManager.created:
 		return
 	_time += delta
+	if _day >= 0.0 and TimeManager.time_scale > 0.0:
+		_day = fposmod(_day + delta * TimeManager.time_scale / DAY_SECONDS, 1.0)
+		var is_night := night_amount() >= 0.5
+		if is_night != _was_night:
+			_was_night = is_night
+			ambiance_changed.emit()
+	for d_value in _drops:
+		var d: Dictionary = d_value
+		d.y = float(d.y) + float(d.speed) * delta
+		if d.y > 1.02:
+			d.y = -0.05
+			d.x = fposmod(float(d.x) + 0.37, 1.0)
+	if _weather == "STORM":
+		_flash = maxf(_flash - delta * 3.0, 0.0)
+		_next_flash -= delta
+		if _next_flash <= 0.0:
+			_flash = 1.0
+			_next_flash = 5.0 + fposmod(_time * 7.3, 6.0)
 	var rise := _season == "SUMMER"
 	for p_value in _particles:
 		var p: Dictionary = p_value
@@ -229,7 +350,16 @@ func _draw() -> void:
 		return
 	var view := Rect2(Vector2.ZERO, size).intersection(art_rect)
 	draw_rect(view, TINTS.get(_season, Color(0, 0, 0, 0)))
+	draw_rect(view, WEATHER_TINTS.get(_weather, Color(0, 0, 0, 0)))
+	if _weather == "FOG":
+		for k in range(4):
+			var band := Rect2(view.position.x, view.position.y + view.size.y * (0.45 + 0.13 * k), view.size.x, view.size.y * 0.13)
+			draw_rect(band, Color(0.95, 0.95, 0.97, 0.05 + 0.03 * k))
+	_draw_day(view)
 	_draw_particles(view)
+	_draw_rain(view)
+	if _flash > 0.0:
+		draw_rect(view, Color(1, 1, 1, 0.35 * _flash))
 	if _garland:
 		_draw_garland(view)
 	if shelf_visible():
@@ -245,6 +375,8 @@ func _draw_particles(view: Rect2) -> void:
 		var s := float(p.size) * clampf(view.size.y / 600.0, 0.8, 1.6)
 		match _season:
 			"WINTER":
+				if not outdoors((pos.y - art_rect.position.y) / maxf(art_rect.size.y, 1.0)):
+					continue
 				draw_circle(pos, s * 1.3, Color(1, 1, 1, 0.9))
 			"SPRING":
 				draw_circle(pos, s * 1.8, Color("f6b8c8", 0.9))
@@ -342,3 +474,43 @@ func _draw_event_sign() -> void:
 	draw_line(Vector2(rect.end.x - 12.0, top), Vector2(rect.end.x - 12.0, rect.position.y), WOOD_DARK, 2.0)
 	draw_style_box(UI.stylebox(Color("b5482b"), 6, 1, Color("7a2e1b"), 4), rect)
 	draw_string(font, rect.position + Vector2(11, 17), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CREAM)
+
+func _draw_day(view: Rect2) -> void:
+	var tint := _day_tint()
+	if night_art:
+		tint.a *= 0.25
+	if tint.a <= 0.0:
+		return
+	draw_rect(view, tint)
+	var night := night_amount()
+	if night <= 0.0 or art_rect.size.x <= 0.0:
+		return
+	# Les lampes du décor s'allument : halos chauds superposés.
+	if _glow == null:
+		var gradient := Gradient.new()
+		gradient.set_color(0, Color(1.0, 0.8, 0.45, 0.55))
+		gradient.set_color(1, Color(1.0, 0.8, 0.45, 0.0))
+		_glow = GradientTexture2D.new()
+		_glow.gradient = gradient
+		_glow.fill = GradientTexture2D.FILL_RADIAL
+		_glow.fill_from = Vector2(0.5, 0.5)
+		_glow.fill_to = Vector2(1.0, 0.5)
+		_glow.width = 128
+		_glow.height = 128
+	var tier := clampi(int(ExecutiveManager.workplace.get("tier", 0)), 0, 3)
+	var radius := art_rect.size.x * 0.06
+	for spot_value in LAMPS.get(tier, []):
+		var spot: Vector2 = spot_value
+		var center := art_rect.position + spot * art_rect.size
+		draw_texture_rect(_glow, Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0), false, Color(1, 1, 1, night))
+
+func _draw_rain(view: Rect2) -> void:
+	if _drops.is_empty():
+		return
+	for d_value in _drops:
+		var d: Dictionary = d_value
+		var pos := view.position + Vector2(float(d.x) * view.size.x, float(d.y) * view.size.y)
+		var art_y := (pos.y - art_rect.position.y) / maxf(art_rect.size.y, 1.0)
+		if not outdoors(art_y):
+			continue
+		draw_line(pos, pos + Vector2(-0.25, 1.0) * float(d.len), Color(0.85, 0.9, 1.0, 0.75), 1.6)

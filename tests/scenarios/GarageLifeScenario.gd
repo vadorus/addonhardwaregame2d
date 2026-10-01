@@ -46,6 +46,32 @@ static func _check(host: Node) -> String:
 		if not ResourceLoader.exists(path):
 			life.queue_free()
 			return "J5: missing art for tier %d in winter: %s" % [tier, path]
+	# K3 : météo selon la saison (jamais de pluie en hiver ni de neige l'été), stable pour un mois donné,
+	# variée d'un mois à l'autre ; journée qui passe du jour à la nuit.
+	var kinds := {}
+	for year in range(1971, 1981):
+		for month in range(1, 13):
+			var w := LIFE.weather_for(year, month)
+			if w != LIFE.weather_for(year, month):
+				life.queue_free()
+				return "K3: weather must be stable for a given month"
+			if (month in [12, 1, 2] and w in ["RAIN", "STORM"]) or (month in [6, 7, 8] and w in ["SNOW", "FOG"]):
+				life.queue_free()
+				return "K3: %s in month %d does not fit the season" % [w, month]
+			kinds[w] = true
+	if kinds.size() < 5:
+		life.queue_free()
+		return "K3: 10 years should show at least 5 kinds of weather (%s)" % str(kinds.keys())
+	life.call("set_day_phase", 0.3)
+	var day: Dictionary = life.call("scene_state")
+	life.call("set_day_phase", 0.82)
+	var night: Dictionary = life.call("scene_state")
+	if str(day.day_phase) != "journée" or float(day.night) > 0.0 or str(night.day_phase) != "nuit" or float(night.night) < 0.9:
+		life.queue_free()
+		return "K3: the day must turn to night (%s / %s)" % [str(day), str(night)]
+	if str(WORKPLACE.call("ambient_art_path", 0, 7, "RAIN", true)) != str(WORKPLACE.call("seasonal_art_path", 0, 7)) and not ResourceLoader.exists("res://assets/art/v010/J8_ambiances/decor_0_garage_nuit.webp"):
+		life.queue_free()
+		return "K3: without night art, the HQ keeps its seasonal decor"
 	# Vitrine : une puce par génération sortie, au plus 5.
 	var chips := LIFE.generation_chips()
 	if chips.size() > LIFE.MAX_CHIPS:

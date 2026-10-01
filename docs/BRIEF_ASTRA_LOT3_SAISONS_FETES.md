@@ -96,6 +96,28 @@ Ils remplacent l'étagère et les coupes dessinées en code en haut du QG.
 
 ---
 
+## J8 — La nuit et la pluie (priorité 4, ajout du 01/10 après-midi)
+
+Alexandre veut **sentir le temps passer**. Le jeu a maintenant une météo par mois (beau temps, nuages, pluie, orage, neige, brouillard) et une journée qui avance (matin, journée, soir, nuit).
+
+En code, la nuit n'est qu'un voile sombre avec des halos de lampes, et la pluie un voile gris. **Avec tes images, ce sera bien plus beau.** Le jeu les prendra automatiquement dès qu'elles seront dans `assets/art/v010/J8_ambiances/`.
+
+Ce sont encore des **retouches au pixel près** des 4 décors d'été, comme pour J5. Il en faut 8 :
+- `decor_0_garage_nuit.webp`, `decor_0_garage_pluie.webp` ;
+- même chose pour `decor_1_atelier_…`, `decor_2_siege_…` et `decor_3_campus_…`.
+
+Format 1774 × 887 px, WebP qualité 85.
+
+**Nuit** :
+> Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version nuit : ciel bleu nuit profond dehors, quelques étoiles, réverbère allumé dans la rue ; plus aucune tache de soleil au sol ; toutes les lampes intérieures allumées (lampes de bureau, suspensions, appliques), avec des halos chauds ; écrans allumés qui éclairent un peu les bureaux ; fenêtres sombres vues de l'intérieur. Ambiance « on travaille tard », chaleureuse, jamais lugubre. Aucun personnage, aucun texte.
+
+**Pluie** :
+> Retouche cette image sans rien déplacer : même cadrage, mêmes meubles aux mêmes places. Version jour de pluie : ciel gris, pluie visible dehors uniquement, trottoir et sol extérieur mouillés et brillants avec des flaques ; gouttes sur les vitres ; plus de taches de soleil au sol, lumière intérieure douce et grise, lampes de bureau allumées. Aucun personnage, aucun texte.
+
+**Ordre** : le garage d'abord (nuit, puis pluie), comme pour les saisons.
+
+---
+
 ## Ce que fait Claude en face
 
 1. **Saisons** : le décor change avec le mois du jeu, en fondu. Les petits effets en code (neige qui tombe, feuilles…) restent par-dessus pour le mouvement.
