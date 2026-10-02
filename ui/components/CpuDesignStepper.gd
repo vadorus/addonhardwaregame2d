@@ -13,10 +13,13 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CATALOG := preload("res://scripts/ArchitectureCatalog.gd")
 const CHIP := preload("res://ui/ChipPreview.gd")
 const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
+const IMPACT := preload("res://scripts/ImpactPreview.gd")
 
 const WOOD := Color("3b2b1e")
 const AMBER := Color("d9822b")
 const CREAM := Color("f6e3c6")
+const GOOD_TEXT := Color("2f7a3a")
+const BAD_TEXT := Color("b3261e")
 const STEPS := ["Gamme", "Architecture", "Objectif", "Modèles", "Budget"]
 const CORE_STEPS := [1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64]
 const FREQ_FACTORS := [0.4, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
@@ -70,6 +73,9 @@ var _meters: Dictionary = {}
 var _cost_label: Label
 var _time_label: Label
 var _hint_label: Label
+## Fiche d'impact : la dernière mesure, pour montrer « avant → après » à chaque réglage.
+var _last_snapshot: Dictionary = {}
+var last_change: Array = []
 var _error_label: Label
 var _prev_button: Button
 var _next_button: Button
@@ -239,6 +245,7 @@ func open(prefill: Dictionary = {}) -> void:
 	tiers = ["ESSENTIAL", "SIGNATURE", "APEX"]
 	budget = int(prefill.get("budget", 45000))
 	_apply_proposal()
+	_last_snapshot = {}
 	_error_label.visible = false
 	visible = true
 	go_to_step(0)
@@ -529,7 +536,7 @@ func _build_goal_step() -> void:
 			profile = key
 			_apply_proposal()
 			_changed(false)
-		grid.add_child(_choice_card("%s\n%s" % [str(p.label), str(p.hint)], key == profile, pick, 62))
+		grid.add_child(_profile_card(key, pick))
 	var proposal := PanelContainer.new()
 	proposal.add_theme_stylebox_override("panel", UI.stylebox(Color("fbe8cc"), 12, 1, AMBER, 12))
 	var box := VBoxContainer.new()
@@ -563,23 +570,23 @@ func _build_goal_step() -> void:
 	var core_ref := maxf(float(profile_ref.get("core_reference", 1.0)), 1.0)
 	var cache_ref := float(profile_ref.get("cache_reference_kb", 0.0))
 	_content.add_child(_stepper_row("Nombre de cœurs", "%d  (max %d)" % [cores, int(arch.max_cores)], float(cores) / core_ref,
-		func(): _shift_core(-1), func(): _shift_core(1)))
+		func(): _shift_core(-1), func(): _shift_core(1), false, "cores"))
 	_content.add_child(_stepper_row("Fréquence", CPU_DESIGN.format_frequency(current_design()), float(FREQ_FACTORS[freq_factor_index]),
-		func(): _shift_freq(-1), func(): _shift_freq(1)))
+		func(): _shift_freq(-1), func(): _shift_freq(1), false, "freq"))
 	var cache_ratio := 1.0 if cache_kb == 0 else (float(cache_kb) + 1.0) / (cache_ref + 1.0)
 	if cache_ref <= 0.0 and cache_kb > 0:
 		cache_ratio = 1.6
 	_content.add_child(_stepper_row("Cache", "%s  (max %s)" % [CPU_DESIGN.format_cache(current_design()), _cache_text(int(arch.max_cache_kb))], cache_ratio,
-		func(): _shift_cache(-1), func(): _shift_cache(1)))
+		func(): _shift_cache(-1), func(): _shift_cache(1), false, "cache"))
 	var nodes := available_nodes()
 	_content.add_child(_stepper_row("Procédé de gravure", CPU_DESIGN.node_label(node_nm), float(nodes.find(node_nm) + 1) / float(maxi(nodes.size(), 1)) * 0.99,
-		func(): _shift_node(-1), func(): _shift_node(1), true))
+		func(): _shift_node(-1), func(): _shift_node(1), true, "node"))
 	var required := maxf(float(CPU_DESIGN.evaluate(current_design(), ResearchManager.get_cpu_capabilities()).get("required_tdp", 1.0)), 0.5)
 	var tdp_ratio := 0.8 if float(tdp_w) >= required else 1.8
 	if float(tdp_w) >= required * 2.5:
 		tdp_ratio = 1.3
 	_content.add_child(_stepper_row("Enveloppe électrique", "%d W  (besoin ~%.0f W)" % [tdp_w, ceil(required)], tdp_ratio,
-		func(): _shift_tdp(-1), func(): _shift_tdp(1)))
+		func(): _shift_tdp(-1), func(): _shift_tdp(1), false, "tdp"))
 
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 
@@ -637,7 +644,7 @@ func _build_budget_step() -> void:
 	_content.add_child(_step_title("Budget de développement"))
 	var index := BUDGET_STEPS.find(_closest(BUDGET_STEPS, budget))
 	_content.add_child(_stepper_row("Effort mensuel", "%s €" % UI.money(budget), float(index + 1) / float(BUDGET_STEPS.size()) * 0.99,
-		func(): _shift_budget(-1), func(): _shift_budget(1), true))
+		func(): _shift_budget(-1), func(): _shift_budget(1), true, "budget"))
 	var monthly := ResearchManager.quoted_development_monthly_cost("INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
 	var spec_segment := str(current_spec().get("segment", segment))
 	var estimate := ResearchManager.estimate_cpu_development(current_design(), "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"), 0, 0, {}, spec_segment)
@@ -711,32 +718,128 @@ func _scroll_to_settings() -> void:
 # --- Réglages ◀ ▶ (dans les limites de l'architecture) --------------------------------------
 
 func _shift_core(delta: int) -> void:
-	var index := clampi(CORE_STEPS.find(_closest(CORE_STEPS, cores)) + delta, 0, CORE_STEPS.size() - 1)
-	cores = mini(int(CORE_STEPS[index]), int(architecture().get("max_cores", 1)))
+	_step_setting("cores", delta)
 	_changed()
 
 func _shift_freq(delta: int) -> void:
-	freq_factor_index = clampi(freq_factor_index + delta, 0, max_freq_index())
+	_step_setting("freq", delta)
 	_changed()
 
 func _shift_cache(delta: int) -> void:
-	var index := clampi(CACHE_KB_STEPS.find(_closest(CACHE_KB_STEPS, cache_kb)) + delta, 0, CACHE_KB_STEPS.size() - 1)
-	cache_kb = mini(int(CACHE_KB_STEPS[index]), int(architecture().get("max_cache_kb", 0)))
-	cache_kb = _closest_at_most(CACHE_KB_STEPS, cache_kb)
+	_step_setting("cache", delta)
 	_changed()
 
 func _shift_node(delta: int) -> void:
-	var nodes := available_nodes()
-	node_nm = int(nodes[clampi(nodes.find(node_nm) + delta, 0, nodes.size() - 1)])
+	_step_setting("node", delta)
 	_changed()
 
 func _shift_tdp(delta: int) -> void:
-	tdp_w = TDP_STEPS[clampi(TDP_STEPS.find(_closest(TDP_STEPS, tdp_w)) + delta, 0, TDP_STEPS.size() - 1)]
+	_step_setting("tdp", delta)
 	_changed()
 
 func _shift_budget(delta: int) -> void:
-	budget = BUDGET_STEPS[clampi(BUDGET_STEPS.find(_closest(BUDGET_STEPS, budget)) + delta, 0, BUDGET_STEPS.size() - 1)]
+	_step_setting("budget", delta)
 	_changed()
+
+## Un cran de réglage, sans rien redessiner (sert aussi à prévoir l'effet d'une flèche).
+func _step_setting(kind: String, delta: int) -> void:
+	match kind:
+		"cores":
+			var index := clampi(CORE_STEPS.find(_closest(CORE_STEPS, cores)) + delta, 0, CORE_STEPS.size() - 1)
+			cores = mini(int(CORE_STEPS[index]), int(architecture().get("max_cores", 1)))
+		"freq":
+			freq_factor_index = clampi(freq_factor_index + delta, 0, max_freq_index())
+		"cache":
+			var index := clampi(CACHE_KB_STEPS.find(_closest(CACHE_KB_STEPS, cache_kb)) + delta, 0, CACHE_KB_STEPS.size() - 1)
+			cache_kb = mini(int(CACHE_KB_STEPS[index]), int(architecture().get("max_cache_kb", 0)))
+			cache_kb = _closest_at_most(CACHE_KB_STEPS, cache_kb)
+		"node":
+			var nodes := available_nodes()
+			node_nm = int(nodes[clampi(nodes.find(node_nm) + delta, 0, nodes.size() - 1)])
+		"tdp":
+			tdp_w = TDP_STEPS[clampi(TDP_STEPS.find(_closest(TDP_STEPS, tdp_w)) + delta, 0, TDP_STEPS.size() - 1)]
+		"budget":
+			budget = BUDGET_STEPS[clampi(BUDGET_STEPS.find(_closest(BUDGET_STEPS, budget)) + delta, 0, BUDGET_STEPS.size() - 1)]
+
+# --- Fiche d'impact (02/10) : ce que change un choix, avant de cliquer ---------------------
+
+func _design_state() -> Dictionary:
+	return {"profile":profile, "arch_id":arch_id, "cores":cores, "freq":freq_factor_index, "cache":cache_kb,
+		"node":node_nm, "tdp":tdp_w, "budget":budget}
+
+func _restore_design_state(saved: Dictionary) -> void:
+	profile = str(saved.profile)
+	arch_id = str(saved.arch_id)
+	cores = int(saved.cores)
+	freq_factor_index = int(saved.freq)
+	cache_kb = int(saved.cache)
+	node_nm = int(saved.node)
+	tdp_w = int(saved.tdp)
+	budget = int(saved.budget)
+
+## Les chiffres que la fiche d'impact compare : performance, chaleur, fiabilité, coût, durée, sortie de caisse.
+func impact_snapshot() -> Dictionary:
+	var design := current_design()
+	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
+	var sourcing := GameData.sourcing_profile("INTERNAL")
+	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", budget, sourcing, 0, 0, evaluation, str(current_spec().get("segment", segment)))
+	var adjustments := architecture_adjustments()
+	# L'objectif choisi pousse son critère pendant le développement (Robuste → fiabilité, Performant → performance…).
+	var focus_metric := str((GameData.FOCUS_OPTIONS.get(str((PROFILES[profile] as Dictionary).focus), {}) as Dictionary).get("metric", ""))
+	if adjustments.has(focus_metric):
+		adjustments[focus_metric] = float(adjustments[focus_metric]) + IMPACT.focus_bonus(float(evaluation.get(focus_metric, 50.0)))
+	return IMPACT.snapshot(evaluation, int(estimate.get("months", 0)), ResearchManager.quoted_development_monthly_cost("INTERNAL", budget, sourcing), adjustments)
+
+## Ce que l'architecture ajoutera ou retirera au produit fini (usure, première puce, tick / tock, équipes),
+## exactement comme au lancement du projet.
+func architecture_adjustments() -> Dictionary:
+	var mode := ArchitectureManager.project_mode(selected_line(), arch_id)
+	return ArchitectureManager.metric_adjustments(mode, arch_id, ArchitectureManager.team_signature(), ArchitectureManager.is_first_use(arch_id))
+
+## Prévoit l'effet d'un choix sans le faire : {chips, same} (same = le choix ne change rien, limite atteinte).
+func preview_impact(change: Callable) -> Dictionary:
+	var saved := _design_state()
+	var before := impact_snapshot()
+	change.call()
+	var same := _design_state() == saved
+	var after := impact_snapshot()
+	_restore_design_state(saved)
+	return {"chips":IMPACT.chips(before, after), "same":same}
+
+func preview_setting(kind: String, delta: int) -> Dictionary:
+	return preview_impact(func(): _step_setting(kind, delta))
+
+func preview_profile(key: String) -> Dictionary:
+	return preview_impact(func():
+		profile = key
+		_apply_proposal())
+
+func preview_architecture(id: String) -> Dictionary:
+	return preview_impact(func():
+		arch_id = id
+		_apply_proposal())
+
+## Une rangée de pastilles colorées : vert = ce que vous gagnez, rouge = ce que ça coûte.
+func _impact_flow(chip_list: Array, prefix: String = "", font_size: int = 12) -> Control:
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 0)
+	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if prefix != "":
+		var head := UI.muted_label(prefix, font_size)
+		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		flow.add_child(head)
+	if chip_list.is_empty():
+		var none := UI.muted_label("sans effet notable", font_size)
+		none.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		flow.add_child(none)
+	for chip_value in chip_list:
+		var chip: Dictionary = chip_value
+		var label := UI.label(str(chip.text), font_size)
+		label.add_theme_color_override("font_color", GOOD_TEXT if bool(chip.good) else BAD_TEXT)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		flow.add_child(label)
+	return flow
 
 func _changed(click: bool = true) -> void:
 	if click:
@@ -777,6 +880,46 @@ func _choice_card(text: String, selected: bool, on_pick: Callable, height: int =
 		on_pick.call())
 	return button
 
+## Carte d'objectif : nom, promesse, et ce que ce choix changerait par rapport à la puce actuelle.
+func _profile_card(key: String, on_pick: Callable) -> Control:
+	var p: Dictionary = PROFILES[key]
+	var selected := key == profile
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size.y = 62
+	var bg := Color("fbe3c2") if selected else UI.APP_PANEL
+	panel.add_theme_stylebox_override("panel", UI.stylebox(bg, 10, 2 if selected else 1, AMBER if selected else UI.APP_LINE, 12))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 1)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(box)
+	var title := UI.label(("✓  " if selected else "") + str(p.label), 15)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(title)
+	var hint := UI.muted_label(str(p.hint), 12)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	if selected:
+		var current := UI.muted_label("Votre choix actuel", 12)
+		current.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(current)
+	else:
+		box.add_child(_impact_flow(preview_profile(key).chips))
+	# Toute la carte est cliquable (bouton transparent posé par-dessus).
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.flat = true
+	button.name = "Pick_" + key
+	for style_name in ["normal", "pressed", "focus"]:
+		button.add_theme_stylebox_override(style_name, StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("hover", UI.stylebox(Color(0.85, 0.51, 0.17, 0.08), 12, 2, AMBER, 0))
+	button.pressed.connect(func():
+		SoundManager.play("click")
+		on_pick.call())
+	panel.add_child(button)
+	return panel
+
 ## Carte d'architecture : nom, promesse, 3 axes, limites, maturité (retour d'expérience).
 func _architecture_card(arch: Dictionary, owned: bool) -> Control:
 	var this_id := str(arch.id)
@@ -784,7 +927,7 @@ func _architecture_card(arch: Dictionary, owned: bool) -> Control:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.custom_minimum_size = Vector2(0, 140 if owned and ArchitectureManager.wear_of(this_id) >= 0.2 else 118)
+	button.custom_minimum_size = Vector2(0, (140 if owned and ArchitectureManager.wear_of(this_id) >= 0.2 else 118) + (22 if owned and not selected else 0))
 	var bg := Color("fbe3c2") if selected else (UI.APP_PANEL if owned else UI.APP_PANEL_ALT)
 	var edge := AMBER if selected else UI.APP_LINE
 	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
@@ -826,6 +969,8 @@ func _architecture_card(arch: Dictionary, owned: bool) -> Control:
 			var wear_note := _note("Usure : %s (%.0f %%) — performance -%.0f" % [ArchitectureManager.wear_label(this_id), wear * 100.0, wear * ArchitectureManager.WEAR_PERFORMANCE_PENALTY])
 			wear_note.add_theme_color_override("font_color", Color("b0452a") if wear >= 0.5 else Color("8a5a2a"))
 			box.add_child(wear_note)
+		if not selected:
+			box.add_child(_impact_flow(preview_architecture(this_id).chips, "Si vous la choisissez :"))
 	for child in box.get_children():
 		if child is Control:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -850,7 +995,7 @@ func _axis_bar(title: String, value: float) -> Control:
 	col.add_child(bar)
 	return col
 
-func _stepper_row(title: String, value: String, ratio: float, on_prev: Callable, on_next: Callable, neutral: bool = false) -> Control:
+func _stepper_row(title: String, value: String, ratio: float, on_prev: Callable, on_next: Callable, neutral: bool = false, kind: String = "") -> Control:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.y = 64
 	panel.add_theme_stylebox_override("panel", UI.stylebox(UI.APP_PANEL, 12, 1, UI.APP_LINE, 10))
@@ -868,6 +1013,14 @@ func _stepper_row(title: String, value: String, ratio: float, on_prev: Callable,
 		var hint_label := UI.muted_label(hint, 12)
 		hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text_box.add_child(hint_label)
+	if kind != "":
+		# Fiche d'impact : ce que fera chaque flèche, avant de cliquer.
+		for pair in [["▶", 1], ["◀", -1]]:
+			var preview := preview_setting(kind, int(pair[1]))
+			if bool(preview.same):
+				text_box.add_child(UI.muted_label("%s  limite atteinte" % str(pair[0]), 12))
+			else:
+				text_box.add_child(_impact_flow(preview.chips, str(pair[0])))
 	row.add_child(_arrow("◀", on_prev))
 	var value_label := UI.label(value, 18)
 	value_label.custom_minimum_size.x = 230
@@ -943,18 +1096,47 @@ func _refresh_live() -> void:
 		_chip.call("set_design", design)
 	_name_label.text = project_name()
 	_profile_label.text = "%s  •  %s" % [str(architecture().short), str((PROFILES[profile] as Dictionary).label)]
+	# Fiche d'impact : « avant → après » du dernier réglage, sur les jauges elles-mêmes.
+	var snap := impact_snapshot()
+	var previous := _last_snapshot
+	last_change = [] if previous.is_empty() else IMPACT.chips(previous, snap)
+	_last_snapshot = snap
 	var names := {"performance":"Performance", "efficiency":"Efficacité", "reliability":"Fiabilité"}
 	for key in _meters.keys():
 		var meter: ProgressBar = _meters[key][0]
-		var value := float(evaluation.get(key, 0.0))
-		meter.value = value
+		var caption: Label = _meters[key][1]
+		var value := float(snap.get(key, 0.0))
+		var before := float(previous.get(key, value))
 		var color := UI.APP_GREEN if value >= 65.0 else (AMBER if value >= 45.0 else UI.APP_RED)
 		meter.add_theme_stylebox_override("fill", UI.stylebox(color, 5, 0, color, 0))
 		meter.add_theme_stylebox_override("background", UI.stylebox(Color("ead9c0"), 5, 0, UI.APP_LINE, 0))
-		(_meters[key][1] as Label).text = "%s  %d" % [str(names[key]), int(round(value))]
-	_cost_label.text = "%s € / unité" % UI.money(int(evaluation.get("unit_cost", 0)))
-	_time_label.text = "~%d mois" % int(estimate.get("months", 0))
+		var gap := int(round(value - before))
+		caption.text = "%s  %d" % [str(names[key]), int(round(value))] + ("" if gap == 0 else "  (%s%d)" % ["+" if gap > 0 else "−", absi(gap)])
+		if gap == 0:
+			caption.add_theme_color_override("font_color", UI.APP_MUTED)
+		else:
+			caption.add_theme_color_override("font_color", GOOD_TEXT if gap > 0 else BAD_TEXT)
+		if gap != 0 and is_inside_tree():
+			meter.value = before
+			create_tween().tween_property(meter, "value", value, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		else:
+			meter.value = value
+	var cost := int(evaluation.get("unit_cost", 0))
+	var cost_gap := cost - int(previous.get("unit_cost", cost))
+	_cost_label.text = "%s € / unité" % UI.money(cost) + ("" if cost_gap == 0 else "  (%s%d)" % ["+" if cost_gap > 0 else "−", absi(cost_gap)])
+	_set_gap_color(_cost_label, cost_gap)
+	var months := int(estimate.get("months", 0))
+	var month_gap := months - int(previous.get("months", months))
+	_time_label.text = "~%d mois" % months + ("" if month_gap == 0 else "  (%s%d)" % ["+" if month_gap > 0 else "−", absi(month_gap)])
+	_set_gap_color(_time_label, month_gap)
 	_hint_label.text = str(evaluation.get("tradeoff", ""))
+
+## Coût ou délai : rouge s'il augmente, vert s'il baisse.
+func _set_gap_color(label: Label, gap: int) -> void:
+	if gap == 0:
+		label.add_theme_color_override("font_color", UI.APP_TEXT)
+	else:
+		label.add_theme_color_override("font_color", BAD_TEXT if gap > 0 else GOOD_TEXT)
 
 ## Pour les tests.
 func step_count() -> int:

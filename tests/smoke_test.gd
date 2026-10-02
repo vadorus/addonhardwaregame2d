@@ -1744,6 +1744,13 @@ func _ready() -> void:
 		_fail(live_theme_error)
 		return
 	print("[CI] Thème du moment : dates, réglage, guirlande et QG OK")
+	await get_tree().process_frame
+	# Fiche d'impact (02/10) : ce qu'un choix change, annoncé avant le clic et fidèle au résultat.
+	var impact_error: String = (load("res://tests/scenarios/ImpactPreviewScenario.gd") as Script).call("run", self)
+	if impact_error != "":
+		_fail(impact_error)
+		return
+	print("[CI] Fiche d'impact : aperçu fidèle sur chaque flèche, objectifs, architectures et jauges OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)
