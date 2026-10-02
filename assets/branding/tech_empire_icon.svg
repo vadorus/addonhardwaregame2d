@@ -1,0 +1,15 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2b1f15"/>
+  <rect x="20" y="20" width="472" height="472" rx="78" fill="none" stroke="#6a4527" stroke-width="10"/>
+  <g stroke="#d9822b" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M138 184H82V126H46"/><path d="M138 256H58"/><path d="M138 328H82V386H46"/>
+    <path d="M374 184H430V126H466"/><path d="M374 256H454"/><path d="M374 328H430V386H466"/>
+    <path d="M184 138V82H126V46"/><path d="M256 138V58"/><path d="M328 138V82H386V46"/>
+    <path d="M184 374V430H126V466"/><path d="M256 374V454"/><path d="M328 374V430H386V466"/>
+  </g>
+  <g fill="#f2a541"><circle cx="46" cy="126" r="10"/><circle cx="46" cy="386" r="10"/><circle cx="466" cy="126" r="10"/><circle cx="466" cy="386" r="10"/><circle cx="58" cy="256" r="10"/><circle cx="454" cy="256" r="10"/><circle cx="256" cy="58" r="10"/><circle cx="256" cy="454" r="10"/></g>
+  <rect x="138" y="138" width="236" height="236" rx="42" fill="#3b2b1e" stroke="#f2a541" stroke-width="14"/>
+  <rect x="168" y="168" width="176" height="176" rx="30" fill="#fffaf1" stroke="#93600c" stroke-width="8"/>
+  <path d="M196 314V246h26v-28h22v-34l42 34v28h26v68z" fill="#d9822b"/>
+  <path d="M220 314v-42h72v42M244 272v-28h24v28" fill="none" stroke="#2b1f15" stroke-width="12" stroke-linejoin="round"/>
+</svg>

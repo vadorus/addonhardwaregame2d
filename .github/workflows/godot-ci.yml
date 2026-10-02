@@ -55,6 +55,13 @@ jobs:
           timeout 120s godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/smoke.log; then exit 1; fi
 
+      - name: Branding configuration
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/branding_config_test.gd 2>&1 | tee /tmp/branding.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/branding.log; then exit 1; fi
+          grep -q '\[CI\] Branding config test passed' /tmp/branding.log
       - name: Layout tests (garage + atelier, formats paysage PC / Android)
         shell: bash
         run: |
