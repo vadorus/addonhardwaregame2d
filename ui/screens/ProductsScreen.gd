@@ -11,6 +11,7 @@ var current_mode := "BUILD"
 var industrialization_panel: Control
 var lifecycle_panel: Control
 var after_sales_panel: Control
+var components_panel: Control
 
 func _ready() -> void:
 	name = "Produits"
@@ -35,6 +36,8 @@ func show_section_for_context(context: String) -> void:
 			_select_mode("BUILD")
 		"PRODUCT_LAUNCH", "Vendre":
 			_select_mode("SELL")
+		"COMPONENTS", "Gammes":
+			_select_mode("RANGES")
 
 func current_section() -> String:
 	return current_mode
@@ -54,13 +57,15 @@ func _build() -> void:
 	# Lot A (29/09) : « Concevoir » ne faisait que renvoyer au Labo, et le SAV existait aussi dans
 	# Marché. Le cockpit garde trois étapes ; le SAV n'existe plus qu'ici.
 	mode_grid = GridContainer.new()
-	mode_grid.columns = 3
+	mode_grid.columns = 4
 	mode_grid.add_theme_constant_override("h_separation", 8)
 	mode_grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_grid)
 	_add_mode_button("BUILD", "1  FABRIQUER")
 	_add_mode_button("SELL", "2  VENDRE")
 	_add_mode_button("SUPPORT", "3  SAV")
+	# V0.10 / Gammes : mémoire, alimentations, boîtiers.
+	_add_mode_button("RANGES", "4  GAMMES")
 
 	var industrialization_script: Script = load("res://ui/components/IndustrializationPanel.gd")
 	industrialization_panel = industrialization_script.new() as Control
@@ -79,6 +84,12 @@ func _build() -> void:
 	after_sales_panel.connect("action_requested", _relay_action)
 	box.add_child(after_sales_panel)
 	pages["SUPPORT"] = after_sales_panel
+
+	var components_script: Script = load("res://ui/components/ComponentsPanel.gd")
+	components_panel = components_script.new() as Control
+	components_panel.connect("status_changed", func(message: String): action_requested.emit("status", {"text":message}))
+	box.add_child(components_panel)
+	pages["RANGES"] = components_panel
 
 func _add_mode_button(mode: String, title: String) -> void:
 	var button := Button.new()
@@ -99,14 +110,18 @@ func _select_mode(mode: String) -> void:
 		var key := str(key_value)
 		var button: Button = mode_buttons[key_value]
 		button.disabled = key == current_mode
+	if mode == "RANGES" and components_panel != null:
+		components_panel.call("refresh")
 
 func set_viewport_width(width: float) -> void:
 	if mode_grid != null:
-		mode_grid.columns = 3
+		mode_grid.columns = 4 if width >= 700.0 else 2
 	if industrialization_panel != null and industrialization_panel.has_method("set_viewport_width"):
 		industrialization_panel.call("set_viewport_width", width)
 	if lifecycle_panel != null and lifecycle_panel.has_method("set_viewport_width"):
 		lifecycle_panel.call("set_viewport_width", width)
+	if components_panel != null:
+		components_panel.call("set_viewport_width", width)
 
 func refresh() -> void:
 	if industrialization_panel != null:
@@ -115,6 +130,8 @@ func refresh() -> void:
 		lifecycle_panel.call("refresh")
 	if after_sales_panel != null:
 		after_sales_panel.call("refresh")
+	if components_panel != null and components_panel.visible:
+		components_panel.call("refresh")
 	_refresh_mode_badges()
 
 func _refresh_mode_badges() -> void:
@@ -133,6 +150,8 @@ func _refresh_mode_badges() -> void:
 	mode_buttons["BUILD"].text = "1  FABRIQUER%s" % ("  • %d" % active_jobs if active_jobs > 0 else "")
 	mode_buttons["SELL"].text = "2  VENDRE%s" % ("  • %d" % (ready_products + launched_products) if ready_products + launched_products > 0 else "")
 	mode_buttons["SUPPORT"].text = "3  SAV%s" % ("  • %d" % open_sav if open_sav > 0 else "")
+	var ranges := ComponentManager.active_products().size()
+	mode_buttons["RANGES"].text = "4  GAMMES%s" % ("  • %d" % ranges if ranges > 0 else ("  • nouveau" if ComponentManager.any_open() else ""))
 
 func focus_product_launch() -> void:
 	refresh()

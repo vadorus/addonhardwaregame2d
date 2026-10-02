@@ -26,6 +26,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	MediaManager.reset()
 	ArchitectureManager.reset()
 	GarageBusiness.reset()
+	ComponentManager.reset()
 	Objectives.reset()
 
 func process_month_end() -> Dictionary:
@@ -46,6 +47,9 @@ func process_month_end() -> Dictionary:
 	for dept in AfterSalesManager.active_departments():
 		if not active.has(dept):
 			active.append(dept)
+	for dept in ComponentManager.active_departments():
+		if not active.has(dept):
+			active.append(dept)
 	PersonnelManager.process_month(active)
 	ExecutiveManager.process_month()
 	ResearchManager.process_month()
@@ -56,6 +60,8 @@ func process_month_end() -> Dictionary:
 	SupplierManager.process_month()
 	AfterSalesManager.process_month()
 	MarketManager.process_month(ProductManager.products)
+	# V0.10 / Gammes : mémoire, alimentations, boîtiers (projets, rivaux, ventes).
+	ComponentManager.process_month()
 	PatentManager.process_month()
 	GarageBusiness.process_month()
 	# K4 : Nora annonce la période qui commence (rentrée, fêtes, vacances…).

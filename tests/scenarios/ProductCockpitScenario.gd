@@ -23,9 +23,10 @@ static func run(host: Node) -> String:
 		return "Product cockpit still shows the duplicate Concevoir stage"
 
 	screen.call("set_viewport_width", 700.0)
-	if mode_grid.columns != 3:
+	# V0.10 / Gammes : quatre étapes (Fabriquer, Vendre, SAV, Gammes), toujours sur une ligne sur Android.
+	if mode_grid.columns != 4 or not mode_buttons.has("RANGES"):
 		screen.queue_free()
-		return "Product cockpit should keep its three stages on one row on Android"
+		return "Product cockpit should keep its four stages on one row on Android"
 	screen.call("focus_product_launch")
 	if str(screen.get("current_mode")) != "SELL" or not bool((pages["SELL"] as Control).visible):
 		screen.queue_free()

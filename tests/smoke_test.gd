@@ -1768,6 +1768,12 @@ func _ready() -> void:
 		_fail(reset_error)
 		return
 	print("[CI] Nouvelle partie : les marchés de la partie précédente ne fuient plus, migration OK")
+	await get_tree().process_frame
+	var ranges_error: String = (load("res://tests/scenarios/ComponentRangesScenario.gd") as Script).call("run", self)
+	if ranges_error != "":
+		_fail(ranges_error)
+		return
+	print("[CI] Gammes : mémoire, alimentations, boîtiers — ouverture, fiche d'impact fidèle, note et ventes annoncées = obtenues, sauvegarde OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)

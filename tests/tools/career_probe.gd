@@ -81,7 +81,7 @@ func _run_strategy(strategy: String, seed: int, mode: String) -> void:
 		push_error("[C3] impossible d'ouvrir %s" % path)
 		return
 	_write_header(csv)
-	while TimeManager.year <= END_YEAR and not SimulationManager.is_game_over:
+	while TimeManager.year <= _end_year() and not SimulationManager.is_game_over:
 		if strategy == "FIGEE":
 			_replace_departures(state)
 		else:
@@ -92,6 +92,7 @@ func _run_strategy(strategy: String, seed: int, mode: String) -> void:
 		_retire_if_needed(state)
 		_maybe_start_project(state)
 		_handle_market_threats(state)
+		_extra_month(state)
 		var report: Dictionary = SimulationManager.process_month_end()
 		state.year_revenue = int(state.year_revenue) + int(report.get("income", 0))
 		state.year_margin = int(state.year_margin) + int(report.get("result", 0))
@@ -120,6 +121,13 @@ func _run_strategy(strategy: String, seed: int, mode: String) -> void:
 	print("[C3][RESULT] mode=%s seed=%d strategy=%s margin=%d cash=%d rank=%d first_rank1=%d lost_rank1=%s blocker=%s" % [
 		mode, seed, strategy, int(state.cumulative_margin), Economy.money, int(CAREER.player_rank()),
 		int(state.first_rank1), str(state.lost_rank1), str(state.blocker)])
+
+## Points d'extension pour les sondes dérivées (ex. components_probe).
+func _end_year() -> int:
+	return END_YEAR
+
+func _extra_month(_state: Dictionary) -> void:
+	pass
 
 func _department_counts() -> Dictionary:
 	return {

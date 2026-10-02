@@ -163,6 +163,10 @@ const MOMENTS := preload("res://scripts/Moments.gd")
 var moment_layer: ColorRect
 var _moment_flags := {}
 var review_panel: Control
+## V0.10 / Gammes : sortie d'un composant (mémoire, alimentation, boîtier).
+var component_layer: ColorRect
+var component_panel: Control
+var _component_resume_scale := 0.0
 var _pending_reviews: Array = []
 var _money_shown := 0.0
 var _money_shown_ready := false
@@ -195,6 +199,7 @@ func _ready():
 	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()
+	_build_component_layer()
 	moment_layer = (load("res://ui/components/MomentCard.gd") as Script).new() as ColorRect
 	add_child(moment_layer)
 	moment_layer.connect("closed", _on_moment_closed)
@@ -208,6 +213,7 @@ func _ready():
 	TimeManager.month_changed.connect(_on_month_changed_music)
 	_start_music_for_current_year()
 	MediaManager.reviews_published.connect(_on_reviews_published)
+	ComponentManager.component_launched.connect(func(_product): call_deferred("_show_component_reveal"))
 	MediaManager.news_changed.connect(_on_news_changed)
 	tabs.tab_changed.connect(func(_index): JUICE.fade_in(tabs.get_current_tab_control(), 0.18))
 	var garage: Control = dashboard_screen.get("dashboard_garage") if dashboard_screen != null else null
@@ -2375,7 +2381,7 @@ var _pending_unlock_labels: Array[String] = []
 func _big_moment_active() -> bool:
 	if not _pending_reviews.is_empty():
 		return true
-	for layer in [launch_layer, review_layer, research_event_layer, first_cpu_workshop, setup_layer, dialogue_layer]:
+	for layer in [launch_layer, review_layer, research_event_layer, first_cpu_workshop, setup_layer, dialogue_layer, component_layer]:
 		if layer != null and layer.visible:
 			return true
 	return false
@@ -2470,6 +2476,8 @@ func _refresh_products():
 
 func _on_products_action(action: String, payload: Dictionary):
 	match action:
+		"status":
+			status_label.text = str(payload.get("text", ""))
 		"show_product_reviews":
 			# C2 : revoir les tests d'un produit, avec le résumé et le calcul de chaque note.
 			var reviewed := ProductManager.get_product(str(payload.get("product_id", "")))
@@ -2939,7 +2947,7 @@ func _handle_back_request() -> void:
 		ceo_panel.call("choose", "LATER")
 		return
 	# Les écrans de décision (lancement, événement de recherche, bilan, faillite) exigent un choix.
-	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer, review_layer]:
+	for blocking in [launch_layer, research_event_layer, month_layer, game_over_layer, review_layer, component_layer]:
 		if blocking != null and blocking.visible:
 			return
 	if setup_layer != null and setup_layer.visible:
@@ -3075,7 +3083,7 @@ func _show_pending_reviews() -> void:
 	if _pending_reviews.is_empty() or review_layer == null or review_layer.visible:
 		return
 	# Ne jamais empiler deux grands moments : on attend la fin du lancement ou d'un choix bloquant.
-	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer, dialogue_layer]:
+	for other in [launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer, dialogue_layer, component_layer]:
 		if other != null and other.visible:
 			return
 	var next: Dictionary = _pending_reviews.pop_front()
@@ -3093,6 +3101,50 @@ func _show_pending_reviews() -> void:
 	JUICE.fade_in(review_layer, 0.25)
 	review_panel.call("show_reviews", str(next.get("name", "")), next.get("reviews", []), other_models, front_page)
 
+func _build_component_layer() -> void:
+	component_layer = ColorRect.new()
+	component_layer.color = Color(0.10, 0.06, 0.02, 0.80)
+	component_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	component_layer.visible = false
+	component_layer.z_index = 100
+	add_child(component_layer)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	component_layer.add_child(center)
+	component_panel = (load("res://ui/components/ComponentRevealPanel.gd") as Script).new() as Control
+	component_panel.connect("continue_requested", _close_component_reveal)
+	component_panel.connect("open_ranges_requested", func(family_id: String):
+		_close_component_reveal()
+		_on_dashboard_navigation(4, "COMPONENTS")
+		if products_screen != null and products_screen.get("components_panel") != null:
+			products_screen.components_panel.call("select_family", family_id))
+	center.add_child(component_panel)
+
+## Une sortie de composant à la fois, jamais par-dessus un autre grand moment.
+func _show_component_reveal() -> void:
+	if component_layer == null or component_layer.visible or not CompanyManager.created:
+		return
+	for other in [review_layer, launch_layer, research_event_layer, game_over_layer, first_cpu_workshop, setup_layer, ceo_layer, dialogue_layer, moment_layer]:
+		if other != null and other.visible:
+			return
+	var product: Dictionary = ComponentManager.pop_reveal()
+	if product.is_empty():
+		return
+	_component_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	component_layer.visible = true
+	JUICE.fade_in(component_layer, 0.25)
+	component_panel.call("show_product", product)
+
+func _close_component_reveal() -> void:
+	if component_layer == null or not component_layer.visible:
+		return
+	component_layer.visible = false
+	if _component_resume_scale > 0.0 and _blocking_company_decision().is_empty() and not SimulationManager.is_game_over:
+		TimeManager.time_scale = _component_resume_scale
+	call_deferred("_show_component_reveal")
+	call_deferred("_show_pending_reviews")
+
 func review_reveal_visible() -> bool:
 	return review_layer != null and review_layer.visible
 
@@ -3104,6 +3156,7 @@ func _close_review_reveal() -> void:
 		TimeManager.time_scale = _review_resume_scale
 	_show_pending_reviews()
 	_flush_unlock_notice()
+	call_deferred("_show_component_reveal")
 	call_deferred("_check_moments")
 
 ## V0.10 / J3 : un moment clé à la fois, jamais par-dessus un autre grand moment ou un choix.

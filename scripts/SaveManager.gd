@@ -82,6 +82,7 @@ func save_to_slot(slot: int, quiet: bool = false) -> bool:
 		"media":MediaManager.get_state(),
 		"architectures":ArchitectureManager.get_state(),
 		"garage_business":GarageBusiness.get_state(),
+		"components":ComponentManager.get_state(),
 		"objectives":Objectives.get_state()
 	}
 	if not _write_atomic(JSON.stringify(state), slot_path(slot), _slot_temp(slot), _slot_backup(slot)):
@@ -134,6 +135,8 @@ func load_from_slot(slot: int) -> bool:
 	ArchitectureManager.load_state(state.get("architectures", {}))
 	# Lot B : après les produits (une ancienne partie déjà lancée ne rejoue pas le « premier silicium »).
 	GarageBusiness.load_state(state.get("garage_business", {}))
+	# V0.10 / Gammes : absent des anciennes parties -> marchés fermés, ouverts au prochain mois si leur date est passée.
+	ComponentManager.load_state(state.get("components", {}))
 	# Lot C : tout en dernier (les objectifs lisent l'état de tous les systèmes).
 	Objectives.load_state(state.get("objectives", {}))
 	save_completed.emit(true, "Partie chargée.")
