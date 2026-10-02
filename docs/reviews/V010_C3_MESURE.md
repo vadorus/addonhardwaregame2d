@@ -14,13 +14,12 @@ Aucun réglage du jeu dans ce lot : uniquement `tests/tools/career_probe.*` et c
 - CSV annuels non versionnés dans `build/` : trésorerie, CA, marge annuelle/cumulée, parts de marché, rang, demande perdue, décisions, rivaux devant, gravure, architecture.
 
 Pour chaque chiffre ci-dessous, la source est donnée sous la forme **graine / mode / commit eff0871**.
-« Trésorerie non contraignante » désigne ici le premier point après lequel les garde-fous financiers du probe
-(embauche/runway, changement de marché, déménagement, Concept R&D, réponse aux menaces) ne bloquent plus une action déclenchée ;
-ce n'est donc pas un seuil arbitraire de richesse.
+« Trésorerie non contraignante » est ici un **proxy annuel** : caisse au-dessus des seuils financiers explicites du probe
+et marge annuelle positive sur tous les relevés suivants jusqu'en 2030. Sa limite intra-annuelle est précisée plus bas.
 
 ## STANDARD — résultat principal
 
-| Source (graine / mode / commit) | FIGÉE marge 2030 | ADAPTÉE marge 2030 | EN RETARD marge 2030 | Trésorerie 1990 A / R |
+| Source (graine / mode / commit) | FIGÉE marge cumulée 2030 | ADAPTÉE marge cumulée 2030 | EN RETARD marge cumulée 2030 | Trésorerie 1990 A / R |
 |---|---:|---:|---:|---:|
 | 104729 / STANDARD / eff0871 | 6,54 M€ | 2 190,37 M€ | 2 324,22 M€ | 329,8 / 351,2 M€ |
 | 208877 / STANDARD / eff0871 | 7,14 M€ | 2 222,53 M€ | 2 353,87 M€ | 337,5 / 364,6 M€ |
@@ -118,3 +117,10 @@ Il faut ensuite régler coûts de croissance, investissements et risques tardifs
 
 **P2 — revoir la progression mondiale.** Malgré 2,1–3,2 Md€ de marge cumulée, les stratégies finissent rang 4–6 selon la graine ;
 les rares n°1 sont temporaires (313133/625919 STANDARD ; 521657 ACCESSIBLE / eff0871). La carrière économique et le rang divergent trop.
+
+## Reproduction
+
+Probe figé au commit `f08b8ae`, jeu mesuré à `eff0871`.
+`godot --headless --path . res://tests/tools/career_probe.tscn -- 104729,208877,313133,417401,521657,625919 STANDARD`
+`godot --headless --path . res://tests/tools/career_probe.tscn -- 104729,208877,313133,417401,521657,625919 ACCESSIBLE`
+Sorties annuelles : `build/career_<mode>_<strategie>_seed<graine>.csv` ; logs complets : `build/c3_standard.log`, `build/c3_accessible.log`.
