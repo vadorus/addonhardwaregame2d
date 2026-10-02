@@ -1,4 +1,6 @@
 extends Node
+## Thème du moment : les tests ne dépendent jamais du mois réel (Halloween, fêtes…).
+const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
@@ -55,6 +57,7 @@ const CAREER_PRESTIGE_SCENARIO := preload("res://tests/scenarios/CareerPrestigeS
 const CPU_STEPPER_SCENARIO := preload("res://tests/scenarios/CpuStepperScenario.gd")
 
 func _ready() -> void:
+	_LIVE_THEME.override = "NONE"
 	print("[CI] Tech Empire smoke test starting")
 	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
 	SaveManager.use_test_folder()
@@ -1734,6 +1737,13 @@ func _ready() -> void:
 		_fail(explanation_error)
 		return
 	print("[CI] C2 : note expliquée par son calcul, note inchangée, conseil et ventes OK")
+	await get_tree().process_frame
+	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
+	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)
+	if live_theme_error != "":
+		_fail(live_theme_error)
+		return
+	print("[CI] Thème du moment : dates, réglage, guirlande et QG OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)

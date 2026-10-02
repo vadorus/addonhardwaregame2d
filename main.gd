@@ -147,6 +147,12 @@ var header_brand_box: VBoxContainer
 var header_wordmark: Array = []
 var header_compact := false
 var setup_continue_button: Button
+## Thème du moment (02/10) : couche décorative selon la vraie date, message de saison sur l'accueil.
+const LIVE_THEME := preload("res://scripts/LiveTheme.gd")
+var live_overlay: Control
+var setup_season_label: Label
+var _season_jingle_played := false
+var menu_live_theme_button: Button
 
 # Étape 1 « Sensation » : notifications, révélation des notes, trésorerie animée, sons.
 const JUICE := preload("res://ui/Juice.gd")
@@ -179,6 +185,10 @@ var _ceo_resume_scale := 0.0
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
 	_apply_saved_ui_scale()
+	# Thème du moment : réglage du joueur (menu « Décorations du moment »), lu avant de construire les écrans.
+	var live_config := ConfigFile.new()
+	if live_config.load(SETTINGS_PATH) == OK:
+		LIVE_THEME.enabled = bool(live_config.get_value("ui", "live_theme", true))
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
@@ -190,6 +200,10 @@ func _ready():
 	moment_layer.connect("closed", _on_moment_closed)
 	_build_ceo_layer()
 	_build_dialogue_layer()
+	# Thème du moment : la couche décorative au-dessus du jeu (sous les grandes fenêtres).
+	live_overlay = (load("res://ui/LiveThemeOverlay.gd") as Script).new() as Control
+	live_overlay.set("title_visible", func() -> bool: return setup_layer != null and setup_layer.visible)
+	add_child(live_overlay)
 	_connect_signals()
 	TimeManager.month_changed.connect(_on_month_changed_music)
 	_start_music_for_current_year()
@@ -1213,6 +1227,11 @@ func _build_setup_layer():
 	var version := _eyebrow("SIMULATION D'ENTREPRISE • 1971")
 	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(version)
+	setup_season_label = _label("", 18)
+	setup_season_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	setup_season_label.add_theme_color_override("font_color", Color("d9822b"))
+	setup_season_label.visible = false
+	setup_title_box.add_child(setup_season_label)
 	var title := _label("Du garage à l'empire technologique", 22)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	setup_title_box.add_child(title)
@@ -1332,6 +1351,30 @@ func _show_title_screen() -> void:
 		setup_title_box.visible = true
 	if setup_creation_box != null:
 		setup_creation_box.visible = false
+	_refresh_live_theme()
+
+## Thème du moment : message de saison sur l'accueil, petit air joué une seule fois par lancement.
+func _refresh_live_theme() -> void:
+	var greeting := LIVE_THEME.greeting()
+	if setup_season_label != null:
+		setup_season_label.text = greeting
+		setup_season_label.visible = greeting != ""
+	if live_overlay != null:
+		live_overlay.call("refresh")
+	if greeting != "" and not _season_jingle_played and setup_layer != null and setup_layer.visible:
+		_season_jingle_played = true
+		SoundManager.play(LIVE_THEME.jingle())
+	if menu_live_theme_button != null:
+		menu_live_theme_button.text = "Décorations du moment : %s" % ("oui" if LIVE_THEME.enabled else "non")
+
+func _menu_toggle_live_theme() -> void:
+	LIVE_THEME.enabled = not LIVE_THEME.enabled
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("ui", "live_theme", LIVE_THEME.enabled)
+	config.save(SETTINGS_PATH)
+	_refresh_live_theme()
+	_refresh_all()
 
 func _show_creation_screen() -> void:
 	if setup_title_box != null:
@@ -2688,7 +2731,7 @@ func _build_menu_layer() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_layer.add_child(center)
 	var panel := LOOK.card(Color("fffaf1"), 18, 20)
-	panel.custom_minimum_size = Vector2(380, 0)
+	panel.custom_minimum_size = Vector2(440, 0)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
@@ -2701,8 +2744,14 @@ func _build_menu_layer() -> void:
 	menu_save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(menu_save_label)
 	box.add_child(_menu_button("Reprendre", close_system_menu, true))
-	box.add_child(_menu_button("Sauvegarder dans un emplacement", open_slot_picker.bind("save")))
-	box.add_child(_menu_button("Charger une partie", open_slot_picker.bind("load")))
+	# 02/10 : sauvegarder et charger côte à côte, pour garder la place du réglage « Décorations du moment »
+	# sans allonger le menu (téléphone en paysage).
+	var slots_row := HBoxContainer.new()
+	slots_row.add_theme_constant_override("separation", 8)
+	box.add_child(slots_row)
+	for slot_button in [_menu_button("Sauvegarder…", open_slot_picker.bind("save")), _menu_button("Charger une partie", open_slot_picker.bind("load"))]:
+		(slot_button as Button).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slots_row.add_child(slot_button)
 	var scale_row := HBoxContainer.new()
 	scale_row.add_theme_constant_override("separation", 8)
 	box.add_child(scale_row)
@@ -2757,6 +2806,8 @@ func _build_menu_layer() -> void:
 	var music_up := _menu_button("+", _menu_change_music.bind(1))
 	music_up.custom_minimum_size = Vector2(52, 46)
 	music_row.add_child(music_up)
+	menu_live_theme_button = _menu_button("Décorations du moment : %s" % ("oui" if LIVE_THEME.enabled else "non"), _menu_toggle_live_theme)
+	box.add_child(menu_live_theme_button)
 	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
 	menu_fullscreen_button.visible = not _is_mobile()
 	box.add_child(menu_fullscreen_button)

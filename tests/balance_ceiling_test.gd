@@ -1,4 +1,6 @@
 extends Node
+## Thème du moment : les tests ne dépendent jamais du mois réel (Halloween, fêtes…).
+const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 ## V0.10 / Q1 — Plafonds d'équilibrage (pas seulement des minima de survie).
 ## Échoue si la première gamme rend le joueur trop riche, si agir rapporte moins que ne rien faire,
 ## ou si une extension de capacité se rembourse de façon absurde.
@@ -25,6 +27,7 @@ const MIN_EXPANSION_PAYBACK_MONTHS := 4.0
 var _failures: Array[String] = []
 
 func _ready() -> void:
+	_LIVE_THEME.override = "NONE"
 	print("[CI] Tech Empire balance ceilings starting")
 	var results := {}
 	for case_name in ["STANDARD_PASSIF", "NOVICE_PASSIF", "STANDARD_ACTIF", "SIMULATION_ACTIF"]:

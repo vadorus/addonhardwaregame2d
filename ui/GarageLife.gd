@@ -16,6 +16,7 @@ const CAREER := preload("res://scripts/CareerPrestige.gd")
 const LATE := preload("res://scripts/LateGameEvents.gd")
 const UI := preload("res://ui/UiKit.gd")
 const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const LIVE := preload("res://scripts/LiveTheme.gd")
 
 const MAX_CHIPS := 5
 const SEASONS := {12:"WINTER", 1:"WINTER", 2:"WINTER", 3:"SPRING", 4:"SPRING", 5:"SPRING",
@@ -178,6 +179,10 @@ func refresh() -> void:
 			_day = fmod(float(month_index) * 0.37, 1.0)
 	_garland = TimeManager.month == 12
 	_fetes = fetes_for(TimeManager.year, TimeManager.month, TimeManager.day, CompanyManager.founded_year)
+	# Thème du moment (02/10) : la vraie date décore aussi le QG (citrouilles en octobre, sapin pour les fêtes).
+	for live_fete in LIVE.hq_fetes():
+		if not _fetes.has(live_fete):
+			_fetes.append(live_fete)
 	_chips = generation_chips()
 	_trophy_labels.clear()
 	_trophy_gold.clear()
@@ -338,7 +343,9 @@ func _draw_fetes() -> void:
 			if texture == null:
 				continue
 			if str(prop[0]) == "fete_noel_guirlande":
-				_draw_garland_art(texture)
+				# Pendant les fêtes réelles, la guirlande lumineuse court déjà le long de l'écran (LiveThemeOverlay).
+				if LIVE.current() != "FIN_ANNEE":
+					_draw_garland_art(texture)
 				continue
 			var h := art_rect.size.y * float(prop[3])
 			var w := h * float(texture.get_width()) / maxf(float(texture.get_height()), 1.0)

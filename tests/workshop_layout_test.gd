@@ -1,8 +1,11 @@
 extends Node
+## Thème du moment : les tests ne dépendent jamais du mois réel (Halloween, fêtes…).
+const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 
 var _launched: Dictionary = {}
 
 func _ready() -> void:
+	_LIVE_THEME.override = "NONE"
 	for dimensions in [Vector2i(1616, 720), Vector2i(1280, 720), Vector2i(700, 720)]:
 		var viewport := SubViewport.new()
 		viewport.size = dimensions
