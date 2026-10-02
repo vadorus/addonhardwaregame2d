@@ -216,6 +216,21 @@ func start_cpu_concept_program(axis: String, monthly_budget: int, ambition: int)
 	research_changed.emit()
 	return true
 
+## Avancement mensuel d'un programme Concept (sur 100). Partagé avec la fiche d'impact de la recherche.
+func concept_month_progress(budget: int, ambition: int, domain: String, team: float = -1.0, management: float = -1.0) -> float:
+	if team < 0.0:
+		team = PersonnelManager.team_score("R&D", "cpu")
+	if management < 0.0:
+		management = CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
+	var knowledge := float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
+	var budget_factor := clampf(float(budget) / (9000.0 + float(ambition) * 4500.0), 0.45, 1.75)
+	var difficulty := 1.0 + float(ambition - 1) * 0.23
+	return (9.0 + team * 0.17 + knowledge * 0.08 + budget_factor * 8.0) * management / difficulty
+
+## Gain nominal de maîtrise à la fin d'un programme Concept (avant le frein « état de l'art »).
+func concept_nominal_gain(axis: String, ambition: int) -> float:
+	return 5.0 + float(clampi(ambition, 1, 3)) * 3.5 + (2.0 if axis == "MINIATURIZATION" else 0.0)
+
 func _concept_stage(progress: float) -> String:
 	if progress >= 100.0:
 		return "TRANSFÉRABLE"
@@ -236,10 +251,7 @@ func _process_concept_programs():
 		Economy.add_expense(cash_cost, "R&D Concept — %s" % get_cpu_concept_axis_label(str(program.get("axis", ""))))
 		var ambition := clampi(int(program.get("ambition", 1)), 1, 3)
 		var domain := str(program.get("domain", "ARCHITECTURE"))
-		var knowledge := float(cpu_research_domains.get(domain, {}).get("knowledge", 0.0))
-		var budget_factor := clampf(float(budget) / (9000.0 + float(ambition) * 4500.0), 0.45, 1.75)
-		var difficulty := 1.0 + float(ambition - 1) * 0.23
-		var progress_gain := (9.0 + team * 0.17 + knowledge * 0.08 + budget_factor * 8.0) * management / difficulty
+		var progress_gain := concept_month_progress(budget, ambition, domain, team, management)
 		program["progress"] = minf(float(program.get("progress", 0.0)) + progress_gain, 100.0)
 		program["months_spent"] = int(program.get("months_spent", 0)) + 1
 		program["stage"] = _concept_stage(float(program.progress))
@@ -253,9 +265,7 @@ func _complete_concept_program(program: Dictionary):
 	var ambition := clampi(int(program.get("ambition", 1)), 1, 3)
 	var capability_key := str(program.get("capability", "ARCHITECTURE"))
 	var domain := str(program.get("domain", "ARCHITECTURE"))
-	var gain := 5.0 + float(ambition) * 3.5
-	if axis == "MINIATURIZATION":
-		gain += 2.0
+	var gain := concept_nominal_gain(axis, ambition)
 	var nominal_gain := gain
 	gain = raise_capability(capability_key, gain)
 	if cpu_research_domains.has(domain):
@@ -644,6 +654,17 @@ func _create_research_event(domain: String, threshold: float):
 	CompanyManager.add_alert("R&D : %s — %s." % [title, get_cpu_research_label(domain)])
 	research_event_created.emit(event.duplicate(true))
 
+## Connaissance gagnée en un mois sur une piste (partagé avec la fiche d'impact de la recherche).
+func research_month_gain(domain: String, allocated: int, knowledge: float, budget_factor: float, team: float, management: float, momentum: bool = false) -> float:
+	var diminishing := lerpf(1.0, 0.34, clampf(knowledge / 100.0, 0.0, 1.0))
+	# Le niveau de l'équipe (compétences, responsable, expert) accélère ou freine son domaine.
+	return float(allocated) * (0.48 + team / 260.0) * budget_factor * management * diminishing * (1.15 if momentum else 1.0) * RESEARCH_TEAMS.level_factor(domain)
+
+## Facteur budget de la recherche continue pour un nombre total de chercheurs affectés.
+func research_budget_factor(total_allocation: int) -> float:
+	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
+	return clampf(float(continuous_research_budget) / expected_budget, 0.25, 1.80)
+
 func _process_continuous_research():
 	# Lot E2 : formations, affectations des équipes Vitesse / Énergie / Fiabilité.
 	RESEARCH_TEAMS.process_month()
@@ -653,8 +674,7 @@ func _process_continuous_research():
 	Economy.add_expense(internal_research_monthly_base_cost(continuous_research_budget), "Recherche fondamentale CPU")
 	var team := PersonnelManager.team_score("R&D", "cpu")
 	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
-	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
-	var budget_factor := clampf(float(continuous_research_budget) / expected_budget, 0.25, 1.80)
+	var budget_factor := research_budget_factor(total_allocation)
 	var total_gain := 0.0
 	for key in CPU_RESEARCH_DOMAIN_ORDER:
 		var data: Dictionary = cpu_research_domains[key]
@@ -662,10 +682,7 @@ func _process_continuous_research():
 		if allocated <= 0:
 			continue
 		var before := float(data.get("knowledge", 0.0))
-		var diminishing := lerpf(1.0, 0.34, clampf(before / 100.0, 0.0, 1.0))
-		var momentum := 1.15 if int(data.get("momentum_months", 0)) > 0 else 1.0
-		# Le niveau de l'équipe (compétences, responsable, expert) accélère ou freine son domaine.
-		var gain := float(allocated) * (0.48 + team / 260.0) * budget_factor * management * diminishing * momentum * RESEARCH_TEAMS.level_factor(key)
+		var gain := research_month_gain(key, allocated, before, budget_factor, team, management, int(data.get("momentum_months", 0)) > 0)
 		data["knowledge"] = clampf(before + gain, 0.0, 100.0)
 		data["experience"] = clampf(float(data.get("experience", 0.0)) + float(allocated) * 0.16 * management, 0.0, 100.0)
 		data["months"] = int(data.get("months", 0)) + 1

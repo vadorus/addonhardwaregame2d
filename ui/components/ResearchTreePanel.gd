@@ -7,10 +7,17 @@ signal action_requested(action: Dictionary)
 
 const UI := preload("res://ui/UiKit.gd")
 const TREE := preload("res://scripts/ResearchTree.gd")
+const RESEARCH_IMPACT := preload("res://scripts/ResearchImpact.gd")
+const CHIPS := preload("res://ui/components/ImpactChips.gd")
 
 var _lanes_box: VBoxContainer
 var _detail_title: Label
 var _detail_unlocks: Label
+## Fiche d'impact (02/10) : ce que le palier change pour le prochain CPU, et ce qu'il faut pour y arriver.
+var _detail_impact: VBoxContainer
+var _detail_route: Label
+var _selected_lane := ""
+var last_preview: Dictionary = {}
 var _detail_need: Label
 var _detail_meter: HBoxContainer
 var _detail_how: Label
@@ -41,6 +48,7 @@ func refresh() -> void:
 		_tiles.add_child(_lane_tile(lane))
 		for node_value in lane.nodes:
 			var node: Dictionary = node_value
+			node["lane"] = str(lane.id)
 			if str(node.id) == _selected_id:
 				_selected = node
 			if fallback.is_empty() and str(node.state) == "NEXT":
@@ -143,6 +151,12 @@ func _ready() -> void:
 	_detail_unlocks = UI.label("", 14)
 	_detail_unlocks.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail_box.add_child(_detail_unlocks)
+	_detail_impact = VBoxContainer.new()
+	_detail_impact.add_theme_constant_override("separation", 0)
+	detail_box.add_child(_detail_impact)
+	_detail_route = UI.label("", 13)
+	_detail_route.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_box.add_child(_detail_route)
 	_detail_need = UI.muted_label("", 12)
 	detail_box.add_child(_detail_need)
 	_detail_meter = UI.meter_row("Progression", "")
@@ -226,6 +240,9 @@ func _show_detail() -> void:
 	if _selected.is_empty():
 		_detail_title.text = "Tout est débloqué sur ces branches."
 		_detail_unlocks.text = ""
+		_detail_route.text = ""
+		for child in _detail_impact.get_children():
+			child.queue_free()
 		_detail_need.text = ""
 		_detail_how.text = ""
 		_detail_meter.visible = false
@@ -236,6 +253,7 @@ func _show_detail() -> void:
 	var value := float(_selected.value)
 	_detail_title.text = "%s %s" % ["✓" if state == "DONE" else ("→" if state == "NEXT" else "○"), str(_selected.title)]
 	_detail_unlocks.text = "Débloque : %s" % str(_selected.unlocks)
+	_show_impact()
 	_detail_need.text = "Condition : %s ≥ %.0f (vous : %.0f)" % [str(_selected.measure), target, value]
 	_detail_meter.visible = state != "DONE"
 	UI.set_meter(_detail_meter, value / maxf(target, 1.0) * 100.0, "%.0f/%.0f" % [value, target])
@@ -243,3 +261,15 @@ func _show_detail() -> void:
 	var action: Dictionary = _selected.get("action", {})
 	_detail_button.visible = state != "DONE"
 	_detail_button.text = "Ajouter un chercheur sur cette piste" if str(action.get("type", "")) == "ALLOCATE" else "Lancer le programme Concept adapté"
+
+## Fiche d'impact du palier choisi : pastilles « pour votre prochain CPU » et chemin pour y arriver.
+func _show_impact() -> void:
+	for child in _detail_impact.get_children():
+		_detail_impact.remove_child(child)
+		child.queue_free()
+	last_preview = RESEARCH_IMPACT.preview(str(_selected.get("lane", "")), _selected)
+	_detail_route.text = str(last_preview.get("route", ""))
+	if bool(last_preview.get("done", false)):
+		_detail_route.text = ""
+		return
+	_detail_impact.add_child(CHIPS.flow(last_preview.get("chips", []), "%s :" % str(last_preview.get("scope", "")), 13))

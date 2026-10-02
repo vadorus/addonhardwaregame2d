@@ -14,6 +14,7 @@ const CATALOG := preload("res://scripts/ArchitectureCatalog.gd")
 const CHIP := preload("res://ui/ChipPreview.gd")
 const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
 const IMPACT := preload("res://scripts/ImpactPreview.gd")
+const CHIPS := preload("res://ui/components/ImpactChips.gd")
 
 const WOOD := Color("3b2b1e")
 const AMBER := Color("d9822b")
@@ -821,25 +822,7 @@ func preview_architecture(id: String) -> Dictionary:
 
 ## Une rangée de pastilles colorées : vert = ce que vous gagnez, rouge = ce que ça coûte.
 func _impact_flow(chip_list: Array, prefix: String = "", font_size: int = 12) -> Control:
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 8)
-	flow.add_theme_constant_override("v_separation", 0)
-	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if prefix != "":
-		var head := UI.muted_label(prefix, font_size)
-		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		flow.add_child(head)
-	if chip_list.is_empty():
-		var none := UI.muted_label("sans effet notable", font_size)
-		none.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		flow.add_child(none)
-	for chip_value in chip_list:
-		var chip: Dictionary = chip_value
-		var label := UI.label(str(chip.text), font_size)
-		label.add_theme_color_override("font_color", GOOD_TEXT if bool(chip.good) else BAD_TEXT)
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		flow.add_child(label)
-	return flow
+	return CHIPS.flow(chip_list, prefix, font_size)
 
 func _changed(click: bool = true) -> void:
 	if click:

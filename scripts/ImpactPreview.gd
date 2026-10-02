@@ -27,6 +27,7 @@ static func snapshot(evaluation: Dictionary, months: int, monthly_cost: int = 0,
 		"performance":clampf(float(evaluation.get("performance", 0.0)) + float(adjustments.get("performance", 0.0)), 0.0, 100.0),
 		"reliability":clampf(float(evaluation.get("reliability", 0.0)) + float(adjustments.get("reliability", 0.0)), 0.0, 100.0),
 		"efficiency":clampf(float(evaluation.get("efficiency", 0.0)) + float(adjustments.get("efficiency", 0.0)), 0.0, 100.0),
+		"innovation":float(evaluation.get("innovation", 0.0)),
 		"deficit":float(evaluation.get("power_deficit_ratio", 0.0)),
 		"heat":maxf(float(evaluation.get("required_tdp", 0.0)), 0.0),
 		"unit_cost":int(evaluation.get("unit_cost", 0)),
@@ -69,12 +70,16 @@ static func chips(before: Dictionary, after: Dictionary) -> Array:
 	n = level(absf(rel), SCORE_STEPS)
 	if n > 0:
 		result.append({"key":"reliability", "text":"Fiabilité %s" % _arrows(n, rel > 0.0), "good":rel > 0.0, "delta":rel})
+	var inno := float(after.get("innovation", 0.0)) - float(before.get("innovation", 0.0))
+	n = level(absf(inno), SCORE_STEPS)
+	if n > 0:
+		result.append({"key":"innovation", "text":"Innovation %s" % _arrows(n, inno > 0.0), "good":inno > 0.0, "delta":inno})
 	var cost := int(after.get("unit_cost", 0)) - int(before.get("unit_cost", 0))
 	if cost != 0:
 		result.append({"key":"unit_cost", "text":"%s%d € / unité" % ["+" if cost > 0 else "−", absi(cost)], "good":cost < 0, "delta":float(cost)})
 	var monthly := int(after.get("monthly_cost", 0)) - int(before.get("monthly_cost", 0))
 	if monthly != 0:
-		result.append({"key":"monthly_cost", "text":"%s%s € / mois" % ["+" if monthly > 0 else "−", _money(absi(monthly))], "good":monthly < 0, "delta":float(monthly)})
+		result.append({"key":"monthly_cost", "text":"%s%s € / mois" % ["+" if monthly > 0 else "−", money(absi(monthly))], "good":monthly < 0, "delta":float(monthly)})
 	var months := int(after.get("months", 0)) - int(before.get("months", 0))
 	if months != 0:
 		result.append({"key":"months", "text":"%s%d mois" % ["+" if months > 0 else "−", absi(months)], "good":months < 0, "delta":float(months)})
@@ -100,7 +105,7 @@ static func balance(chip_list: Array) -> Dictionary:
 			bad += 1
 	return {"good":good, "bad":bad}
 
-static func _money(value: int) -> String:
+static func money(value: int) -> String:
 	var digits := str(value)
 	var out := ""
 	while digits.length() > 3:

@@ -43,6 +43,9 @@ du bas après un clic ; que l'aperçu ne modifie pas la conception ; que le rés
   cartes d'objectif cliquables en entier, réglages refactorés (`_step_setting` pur + `_shift_*`), jauges animées.
 - `tests/scenarios/ImpactPreviewScenario.gd` (nouveau), branché dans `tests/smoke_test.gd`.
 - `tests/tools/capture_impact.gd/.tscn` : outil de capture (pas un test CI).
+- Lot recherche : `scripts/ResearchImpact.gd` (nouveau), `ui/components/ImpactChips.gd` (nouveau, rangée de pastilles partagée),
+  `ui/components/ResearchTreePanel.gd`, `scripts/ResearchManager.gd` (fonctions partagées), `scripts/ResearchTree.gd` (texte),
+  `tests/scenarios/ResearchImpactScenario.gd` (nouveau).
 
 Aucune formule de jeu n'a changé ; aucune donnée de sauvegarde nouvelle (pas de migration nécessaire).
 
@@ -60,7 +63,39 @@ Aucune formule de jeu n'a changé ; aucune donnée de sauvegarde nouvelle (pas d
    l'annonce maintenant (« Chaleur ▲ · Fiabilité ▼ » sans « Perf ▲ »). C'est fidèle au modèle, et c'est
    justement l'arbitrage chaleur / stabilité qui manque à PC Tycoon.
 
+## Deuxième lot : la recherche (Labo > Recherche)
+
+Toucher un palier de l'arbre affiche maintenant, sous « Débloque » :
+
+- **Pour votre prochain CPU (procédé, équilibré) :** les mêmes pastilles, calculées sur le CPU « Équilibré »
+  que l'équipe proposerait avec votre meilleure gravure et votre architecture la plus récente.
+  Exemple 1971 : `→ 8 µm : Chaleur ▲ · Fiabilité ▼ · Innovation ▲ · +4 € / unité`.
+- **Pour y arriver :** `1 programme Concept · ~4 mois · ~2 400 €` ou `~4 mois avec 1 chercheur sur la piste · ~480 € / mois`.
+  Le chemin rejoue les vraies formules mensuelles (avancement Concept, gain de connaissance, frein « état de l'art »),
+  avec les réglages par défaut du Labo (15 000 € / mois, ambition normale).
+
+Pour que l'aperçu et la simulation ne divergent jamais, les calculs mensuels ont été sortis en fonctions partagées
+dans `ResearchManager` (`concept_month_progress`, `concept_nominal_gain`, `research_month_gain`,
+`research_budget_factor`) — mêmes formules, résultat identique (tous les tests passent).
+Le test `ResearchImpactScenario` lance un vrai programme Concept et vérifie qu'il dure **exactement** le nombre
+de mois annoncé ; il fait travailler un vrai chercheur et vérifie l'annonce à un mois près
+(la formation des équipes de recherche bouge un peu le rythme).
+
+Captures : `IMPACT_recherche.png` (gravure), `IMPACT_recherche_piste.png` (piste Fiabilité).
+
+4. **Graver plus fin ne rend pas votre CPU meilleur dans le modèle actuel.** Les notes du joueur sont relatives au
+   procédé (fréquence, cœurs et cache comparés à la référence du procédé) : passer de 10 µm à 8 µm donne
+   +0,5 performance et +1,4 innovation, mais plus de chaleur (puissance de base plus forte), moins de fiabilité
+   (procédé moins mûr) et un coût unitaire plus élevé. Rien ne pénalise un joueur qui resterait sur un vieux procédé
+   (les rivaux, eux, sont notés par rapport à l'état de l'art de l'époque). **C'est probablement le constat le plus
+   important pour l'équilibrage C3** : la mesure FIGÉE / ADAPTÉE de Codex doit dire si rester en arrière est rentable.
+   J'ai seulement retiré du texte « Débloque » la promesse « moins de consommation par calcul », que le jeu ne tenait pas.
+5. **Les paliers de connaissance « Fiabilité & stabilité » rendent les estimations plus sûres, pas les CPU plus fiables.**
+   Cette piste ne fait monter aucune maîtrise ; son effet passe par la confiance et les propositions de génération.
+   La fiche affiche donc honnêtement « Confiance ▲ ». Si l'on veut tenir la promesse du texte, il faut brancher la piste
+   sur la fiabilité (proposition pour C3).
+
 ## Prochaines étapes proposées
 
-- Même langage de pastilles pour la **recherche** (ce qu'une technologie débloque ou améliore) et l'**équipe**.
+- Même langage de pastilles pour l'**équipe** (recruter un développeur, un validateur : délai, finition, salaire).
 - Validation humaine pendant la bêta C4 : un novice doit pouvoir dire, sans aide, quelle flèche rend la puce plus froide.

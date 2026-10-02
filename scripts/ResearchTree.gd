@@ -28,7 +28,7 @@ static func lanes(max_nodes: int = 7) -> Array:
 		var label := str(profile.get("label", "")).split(" — ")[0].split(" - ")[0]
 		process_nodes.append({
 			"id":"NODE_%d" % node_nm, "title":label, "target":float(profile.get("unlock", 0.0)),
-			"unlocks":"Graver vos CPU en %s : plus de fréquence et de transistors, moins de consommation par calcul." % label,
+			"unlocks":"Graver vos CPU en %s (plus de MHz et de transistors ; l'effet réel sur votre CPU est détaillé juste dessous)." % label,
 		})
 	result.append(_lane("PROCESS", "Gravure", "Miniaturisation", process, process_nodes, max_nodes,
 		{"type":"CONCEPT", "axis":"MINIATURIZATION"},

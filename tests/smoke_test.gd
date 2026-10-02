@@ -1751,6 +1751,12 @@ func _ready() -> void:
 		_fail(impact_error)
 		return
 	print("[CI] Fiche d'impact : aperçu fidèle sur chaque flèche, objectifs, architectures et jauges OK")
+	await get_tree().process_frame
+	var research_impact_error: String = (load("res://tests/scenarios/ResearchImpactScenario.gd") as Script).call("run", self)
+	if research_impact_error != "":
+		_fail(research_impact_error)
+		return
+	print("[CI] Fiche d'impact recherche : effet sur le prochain CPU et chemin fidèle (Concept, chercheur) OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)
