@@ -78,3 +78,21 @@ Donc aucune stratégie ne reste n°1 sans agir.
 
 Aucun `BLOCKER`, aucune faillite et aucune erreur Godot sur les 18 runs ACCESSIBLE ; bilan total : **36/36 carrières jusqu'en 2030**
 (6 graines × 3 stratégies × 2 modes / eff0871).
+
+## Plateau ACCESSIBLE et limites de mesure
+
+Après 1978, ADAPTÉE gagne en moyenne **59,5 M€/an sans décision** contre **44,8 M€/an avec décisions** ;
+EN RETARD **71,6 M€ sans décision** contre **56,7 M€ avec décisions** (6 graines / ACCESSIBLE / eff0871).
+Années sans décision + marge positive communes aux 6 graines :
+- ADAPTÉE : **2001, 2004, 2005, 2008, 2009, 2012, 2013, 2016, 2017, 2020, 2021, 2024, 2025, 2028** ;
+- EN RETARD : **2000, 2001, 2004, 2008, 2012, 2016, 2026, 2030**
+(6 graines / ACCESSIBLE / eff0871). Le mode facile accentue donc encore la carrière passive.
+
+Limite importante : **0 action `SalesAdvisor`** est enregistrée dans les 24 runs ADAPTÉE/EN RETARD des deux modes
+(6 graines × 2 stratégies × 2 modes / eff0871). Le code consulte bien `SalesAdvisor`, mais ces conditions ne déclenchent
+aucun conseil actionnable de prix/capacité/promotion ; la couverture « ajuste le prix » n'est donc pas démontrée par C3.
+
+Le « cash non contraignant » (1979 STANDARD ; au plus tard 1978 ACCESSIBLE) est un **proxy annuel** fondé sur les seuils
+financiers explicites du probe et une marge annuelle positive jusqu'en 2030. Pour prouver le mois exact, crochet souhaité :
+journaliser toute décision candidate refusée pour trésorerie avec `action`, `cash requis`, `cash disponible` ; idem pour compter
+les épisodes SalesAdvisor actionnables. Aucun crochet n'a été ajouté dans ce lot, conformément au brief.
