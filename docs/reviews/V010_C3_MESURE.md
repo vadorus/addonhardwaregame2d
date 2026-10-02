@@ -42,3 +42,16 @@ EN RETARD ne l'atteint que sur 313133 en 1983 et la reperd. Toutes les autres co
 (sources respectives : graines citées / STANDARD / eff0871). **Aucune stratégie ne devient n°1 puis ne le reste sans agir.**
 
 Aucun `BLOCKER`, aucune faillite et aucune erreur Godot sur les 18 runs STANDARD (6 graines / STANDARD / eff0871).
+
+## Quand les décisions cessent de peser — STANDARD
+
+Après 1979, ADAPTÉE a 65 années-graines sans aucune décision et pourtant une marge annuelle moyenne de **59,1 M€**,
+contre **37,4 M€** sur 247 années-graines avec décisions (6 graines / STANDARD / eff0871).
+EN RETARD : **56,9 M€** sur 91 années-graines sans décision contre **40,8 M€** sur 221 années-graines actives
+(6 graines / STANDARD / eff0871). La croissance devient donc largement passive une fois le moteur de ventes lancé.
+
+Années sans décision + marge positive communes aux 6 graines :
+- ADAPTÉE : **2002, 2006, 2010, 2014, 2018, 2022, 2025, 2026, 2029, 2030** ;
+- EN RETARD : **2001, 2002, 2005, 2006, 2009, 2013, 2016, 2017, 2020, 2021, 2024, 2025, 2028** ;
+- FIGÉE : **1982, 1996, 2000, 2004, 2008, 2012, 2021, 2025, 2029**
+(6 graines / STANDARD / eff0871).
