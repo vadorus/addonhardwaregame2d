@@ -38,27 +38,45 @@ dans les deux modes. Constats n° 1 et n° 4 de la fiche d'impact (`V010_FICHE_I
   (Perf −9, Innovation −12, ventes −30 %) »), et la fiche d'impact de la recherche montre désormais
   `Perf ▲ · Innovation ▲▲` pour une gravure plus fine.
 
-## Mesure après correction (même sonde, mêmes 6 graines, 1971 → 2030)
+## Bug trouvé en chemin : une nouvelle partie gardait les marchés de la précédente
 
-| Mode | FIGÉE | ADAPTÉE | EN RETARD | ADAPTÉE bat EN RETARD |
-|---|---:|---:|---:|---:|
-| STANDARD — avant (eff0871, Codex) | 6,8 M€ | 2 181,5 M€ | 2 365,2 M€ | 0 / 6 |
-| **STANDARD — après** | 1,8 M€ | **1 003,5 M€** | 532,3 M€ | **6 / 6** |
-| ACCESSIBLE — avant (eff0871, Codex) | 11,9 M€ | 2 609,1 M€ | 3 161,8 M€ | 0 / 6 |
-| **ACCESSIBLE — après** | 6,4 M€ | **1 617,5 M€** | 803,9 M€ | **6 / 6** |
+`MarketManager.reset()` recalculait la liste des marchés connus **en lisant l'ancienne liste**. Après une partie menée
+jusqu'en 2030, « Nouvelle partie » ouvrait donc tous les marchés dès 1971 (datacenters, mobiles…). Dans la sonde,
+chaque carrière (sauf la toute première) héritait de la précédente : c'est ce qui produisait les **dizaines de millions
+de 1980-1983** (marché Datacenter en 1980, historiquement 2002). Le constat P1 de Codex (« l'argent ne contraint plus
+dès 1979 ») venait surtout de là.
 
-Marge cumulée moyenne 2030. Suivre les conseils rapporte désormais **≈ 1,9 à 2 fois** plus que rester en arrière,
-et ADAPTÉE bat FIGÉE 6/6. 36 / 36 carrières vont jusqu'en 2030, sans blocage, faillite ni erreur.
-Trajectoire ADAPTÉE (104729 STANDARD) : 1 µm en 1988, 350 nm en 1992, 90 nm en 2000, 7 nm en 2008
-(avant : 350 nm en 2030).
+- Correctif : la liste est vidée avant d'être recalculée.
+- **Migration des sauvegardes** : au chargement, les marchés qui ne peuvent pas encore exister
+  (plus de 7 ans avant leur date historique) sont retirés. Un produit lancé sur un tel marché ne s'y vendra plus.
+- Test : `tests/scenarios/NewGameResetScenario.gd` (dans le smoke test).
 
-## Ce qui reste (P1, P2 du rapport de Codex)
+## Mesure propre (même sonde, mêmes 6 graines, 1971 → 2030, correctif de réinitialisation appliqué)
 
-- **P1 — l'argent ne contraint plus rien** : la trésorerie dépasse encore 100 M€ dès **1983** (STANDARD) et **1981**
-  (ACCESSIBLE), 6/6 graines. La correction P0 a divisé les gains par deux mais n'a pas déplacé ce moment.
-  Origine visible dans les relevés : 1979-1982, la demande dépasse de loin la capacité (des dizaines de milliers
-  d'unités perdues par an) et chaque puce produite est vendue.
-- **P2 — le rang mondial** : les stratégies finissent encore 4e à 6e malgré des marges élevées.
+« Avant » = jeu d'origine (`592510a`) + seul correctif de réinitialisation ; « après » = P0 + correctif.
+
+| Mode | | FIGÉE | ADAPTÉE | EN RETARD | ADAPTÉE bat EN RETARD |
+|---|---|---:|---:|---:|---:|
+| STANDARD | avant | 6,6 M€ | 1 485,6 M€ | 1 851,5 M€ | 0 / 6 |
+| STANDARD | **après** | 1,4 M€ | **534,8 M€** | 86,7 M€ | **6 / 6** |
+| ACCESSIBLE | avant | 11,7 M€ | 2 002,8 M€ | 2 423,3 M€ | 0 / 6 |
+| ACCESSIBLE | **après** | 6,1 M€ | **872,3 M€** | 200,3 M€ | **6 / 6** |
+
+Marge cumulée moyenne en 2030. Le défaut P0 était bien réel (avant : EN RETARD gagne 6/6 même sans la fuite).
+Après : suivre les conseils rapporte **6 fois plus** (Standard) et **4 fois plus** (Accessible) que rester en arrière.
+36 / 36 carrières vont jusqu'en 2030, sans blocage, faillite ni erreur.
+
+Trésorerie moyenne d'ADAPTÉE (Standard) : **3,5 M€ en 1980, 26 M€ en 1990, 41 M€ en 2000, 122 M€ en 2010, 535 M€ en 2030**.
+Le seuil de 100 M€ est franchi en **2009-2010** en Standard (avant correctifs : 1983) et entre **2002 et 2007** en Accessible.
+EN RETARD ne l'atteint jamais en Standard. Dans les années 1990, EN RETARD a un peu plus de trésorerie qu'ADAPTÉE
+(36 contre 26 M€ en 1990) : le progrès coûte d'abord, puis rapporte. L'argent redevient un vrai arbitrage pendant
+les trente premières années.
+
+## Ce qui reste
+
+- **P2 — le rang mondial** : les stratégies finissent 5e ou 6e, jamais n° 1, même avec 500 M€ de marge cumulée.
+  C'est le prochain chantier (comment le rang est calculé, et ce qui permet de devenir n° 1).
+- Années sans décision après 1985 : environ 1 sur 5 pour ADAPTÉE (57 / 276) — à surveiller, plus prioritaire.
 - Constats n° 2 (Robuste), n° 3 (fréquence sans enveloppe) et n° 5 (piste Fiabilité) : non traités.
 
 ## Tests

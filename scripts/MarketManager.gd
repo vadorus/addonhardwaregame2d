@@ -296,6 +296,9 @@ func reset():
 	competitors = {}
 	for sector in GameData.SECTORS.keys():
 		competitors[sector] = _make_competitors(str(sector))
+	# C3 (02/10) : vider AVANT de recalculer — is_segment_available() lit known_segments ; sans ce vidage,
+	# une nouvelle partie lancée après une longue partie gardait tous les marchés ouverts dès 1971.
+	known_segments = []
 	known_segments = available_segment_keys()
 	for segment_value in known_segments:
 		var segment := str(segment_value)
@@ -419,6 +422,13 @@ func is_segment_available(segment: String) -> bool:
 	if TimeManager.year < int(need.historical_year) - MAX_EARLY_NEED_YEARS:
 		return false
 	return TimeManager.year >= int(need.historical_year) or market_technology_signal() >= float(need.tech_trigger)
+
+## Un besoin ne peut pas exister plus de MAX_EARLY_NEED_YEARS avant sa date historique, quoi qu'il arrive.
+func _too_early_to_exist(segment: String) -> bool:
+	if not MARKET_NEEDS.has(segment):
+		return true
+	var need: Dictionary = MARKET_NEEDS[segment]
+	return int(need.historical_year) > 1971 and TimeManager.year < int(need.historical_year) - MAX_EARLY_NEED_YEARS
 
 func available_segment_keys() -> Array:
 	var result: Array = []
@@ -2741,6 +2751,9 @@ func load_state(state: Dictionary):
 	market_events = state.get("market_events", []).duplicate(true)
 	market_threats = state.get("market_threats", []).duplicate(true)
 	known_segments = state.get("known_segments", []).duplicate(true)
+	# Migration C3 (02/10) : une partie commencée après une longue partie héritait de tous les marchés dès 1971.
+	# On retire ceux qui n'ont pas encore pu émerger (plus de MAX_EARLY_NEED_YEARS avant leur date historique).
+	known_segments = known_segments.filter(func(seg): return not _too_early_to_exist(str(seg)))
 	if known_segments.is_empty():
 		known_segments = available_segment_keys()
 	_next_contract_id = int(state.get("next_contract_id", 1))
