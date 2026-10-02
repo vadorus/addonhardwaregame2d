@@ -145,7 +145,8 @@ static func sales_reasons(product: Dictionary) -> Dictionary:
 		["rival_pressure_multiplier", "Rival plus récent"],
 		["company_scale_fit", "Équipe trop petite pour ce marché"],
 		["attack_multiplier", "Offensives et rachats"],
-		["late_game_multiplier", "Événements du marché"]
+		["late_game_multiplier", "Événements du marché"],
+		["technology_multiplier", "Technologie dépassée"]
 	]
 	for candidate_value in candidates:
 		var candidate: Array = candidate_value

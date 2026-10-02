@@ -77,6 +77,11 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 		"SAFE":
 			design.frequency_ghz = float(base.frequency_ghz) * 1.08
 			design.tdp_w = int(base.tdp_w)
+			# C3 / P0 : « sûr » veut dire un procédé éprouvé, pas un procédé périmé. Très en retard, la prudence
+			# rattrape l'état de l'art à deux crans du plus fin disponible.
+			var safe_node := _finest_node(manufacturing_score, miniaturization_score, 2)
+			if CPU_DESIGN.NODE_ORDER.find(safe_node) > CPU_DESIGN.NODE_ORDER.find(int(base.node_nm)) + 1:
+				_retarget_node(design, base, safe_node, 1.0, context)
 		"BOLD":
 			design.frequency_ghz = float(base.frequency_ghz) * 1.55
 			design.tdp_w = int(base.tdp_w) + maxi(2, int(round(float(base.tdp_w) * 0.35)))
@@ -87,18 +92,20 @@ static func _design_for(archetype: String, base: Dictionary, context: Dictionary
 					design.cache_mb = 1.0 / 1024.0
 				else:
 					design.cache_mb = float(base.cache_mb) * 1.45
-			design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
-			if int(design.node_nm) != int(base.node_nm):
-				var next_profile: Dictionary = CPU_DESIGN.node_profile(int(design.node_nm))
-				var next_reference_ghz := float(next_profile.get("reference_mhz", 1.0)) / 1000.0
-				design.frequency_ghz = maxf(float(design.frequency_ghz), next_reference_ghz * 1.30)
+			# C3 / P0 : l'audace vise le procédé le plus fin que la recherche permet (avant : un seul cran par génération,
+			# si bien qu'en 2005 une équipe capable du 3 nm proposait encore du 1,5 µm).
+			var bold_node := _finest_node(manufacturing_score, miniaturization_score, 0)
+			if CPU_DESIGN.NODE_ORDER.find(bold_node) > CPU_DESIGN.NODE_ORDER.find(int(base.node_nm)):
+				_retarget_node(design, base, bold_node, 1.30, context)
 		_:
 			design.frequency_ghz = float(base.frequency_ghz) * 1.24
 			design.tdp_w = int(base.tdp_w) + maxi(1, int(round(float(base.tdp_w) * 0.15)))
-			if capability >= 68.0:
-				design.node_nm = _next_advanced_node(int(base.node_nm), manufacturing_score, miniaturization_score)
+			# C3 / P0 : l'équilibre rattrape l'état de l'art avec un procédé éprouvé (un cran sous le plus fin disponible).
+			var balanced_node := _finest_node(manufacturing_score, miniaturization_score, 1)
+			if CPU_DESIGN.NODE_ORDER.find(balanced_node) > CPU_DESIGN.NODE_ORDER.find(int(base.node_nm)):
+				_retarget_node(design, base, balanced_node, 1.10, context)
 			if capability >= 64.0 and architecture_capability >= 52.0 and int(base.cores) < 2:
-				design.cores = int(base.cores) + 1
+				design.cores = maxi(int(design.cores), int(base.cores) + 1)
 	_apply_segment(design, str(context.get("segment", "EMBEDDED")), archetype)
 	_apply_focus(design, str(context.get("focus", "BALANCED")), archetype, capability, architecture_capability, layout_score)
 	_apply_sav_lesson_to_design(design, archetype, context)
@@ -198,6 +205,29 @@ static func _apply_sav_lesson_to_design(design: Dictionary, archetype: String, c
 	else:
 		var reliability_frequency_factor := 0.96 if archetype == "SAFE" else 0.985
 		design.frequency_ghz = float(design.frequency_ghz) * reliability_frequency_factor
+## Le procédé le plus fin disponible, moins `back` crans (jamais en dessous du premier).
+static func _finest_node(manufacturing_score: float, miniaturization_score: float, back: int) -> int:
+	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
+	var best := 0
+	for node_value in nodes:
+		best = maxi(best, CPU_DESIGN.NODE_ORDER.find(int(node_value)))
+	return int(CPU_DESIGN.NODE_ORDER[maxi(best - back, 0)])
+
+## Passe la conception sur un autre procédé en gardant son ambition relative (fréquence, cœurs et cache par rapport
+## à la référence du procédé) et une enveloppe électrique suffisante.
+static func _retarget_node(design: Dictionary, base: Dictionary, node_nm: int, ambition: float, context: Dictionary) -> void:
+	var old_ref := maxf(float(CPU_DESIGN.node_profile(int(base.node_nm)).get("reference_mhz", 1.0)), 0.001)
+	var ref: Dictionary = CPU_DESIGN.node_profile(node_nm)
+	var ratio := float(base.frequency_ghz) * 1000.0 / old_ref
+	design.node_nm = node_nm
+	design.frequency_ghz = float(ref.get("reference_mhz", 1.0)) / 1000.0 * clampf(ratio * ambition, 0.9, 1.6)
+	design.cores = maxi(int(design.cores), int(round(float(ref.get("core_reference", 1.0)))))
+	design.cache_mb = maxf(float(design.cache_mb), float(ref.get("cache_reference_kb", 0.0)) / 1024.0)
+	var capabilities_value = context.get("cpu_capabilities", {})
+	var capabilities: Dictionary = capabilities_value if typeof(capabilities_value) == TYPE_DICTIONARY else {}
+	var required := float(CPU_DESIGN.evaluate(design, capabilities).get("required_tdp", 1.0))
+	design.tdp_w = maxi(int(design.tdp_w), int(ceil(required * 1.1)))
+
 static func _next_advanced_node(node_nm: int, manufacturing_score: float, miniaturization_score: float) -> int:
 	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
 	var index := nodes.find(node_nm)

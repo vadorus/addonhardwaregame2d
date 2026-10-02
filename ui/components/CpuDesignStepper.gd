@@ -15,6 +15,7 @@ const CHIP := preload("res://ui/ChipPreview.gd")
 const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
 const IMPACT := preload("res://scripts/ImpactPreview.gd")
 const CHIPS := preload("res://ui/components/ImpactChips.gd")
+const TECH_LAG := preload("res://scripts/TechnologyLag.gd")
 
 const WOOD := Color("3b2b1e")
 const AMBER := Color("d9822b")
@@ -547,6 +548,13 @@ func _build_goal_step() -> void:
 	box.add_child(UI.muted_label("%s  •  %d cœur(s)  •  %s  •  %s  •  %s  •  %d W" % [
 		str(architecture().short), cores, CPU_DESIGN.format_frequency(current_design()),
 		CPU_DESIGN.format_cache(current_design()), CPU_DESIGN.node_label(node_nm), tdp_w], 13))
+	var lag_text := TECH_LAG.summary(MarketManager.technology_lag(node_nm, arch_id))
+	if lag_text != "":
+		var lag_label := UI.label(lag_text, 13)
+		lag_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var behind := int(MarketManager.technology_lag(node_nm, arch_id).get("node_steps", 0)) > TECH_LAG.NODE_GRACE_STEPS or int(MarketManager.technology_lag(node_nm, arch_id).get("arch_steps", 0)) > 0
+		lag_label.add_theme_color_override("font_color", BAD_TEXT if behind else GOOD_TEXT)
+		box.add_child(lag_label)
 	var progress := progress_text()
 	if progress != "":
 		var progress_label := UI.label(progress, 13)
@@ -785,6 +793,10 @@ func impact_snapshot() -> Dictionary:
 	var sourcing := GameData.sourcing_profile("INTERNAL")
 	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", budget, sourcing, 0, 0, evaluation, str(current_spec().get("segment", segment)))
 	var adjustments := architecture_adjustments()
+	# C3 / P0 : retard (ou avance) face à l'état de l'art — compté exactement comme au lancement.
+	var lag := MarketManager.technology_lag(node_nm, arch_id)
+	for lag_key in ["performance", "innovation", "efficiency", "reliability"]:
+		adjustments[lag_key] = float(adjustments.get(lag_key, 0.0)) + float(lag.get(lag_key, 0.0))
 	# L'objectif choisi pousse son critère pendant le développement (Robuste → fiabilité, Performant → performance…).
 	var focus_metric := str((GameData.FOCUS_OPTIONS.get(str((PROFILES[profile] as Dictionary).focus), {}) as Dictionary).get("metric", ""))
 	if adjustments.has(focus_metric):

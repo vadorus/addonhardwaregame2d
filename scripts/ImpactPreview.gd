@@ -21,13 +21,14 @@ static func focus_bonus(design_value: float) -> float:
 	return maxf(target - design_value, 0.0) * FOCUS_WEIGHT
 
 ## Ce que l'on retient d'une conception pour la comparer à une autre.
-## adjustments : bonus / malus connus d'avance (architecture : usure, première puce, tick / tock, équipes).
+## adjustments : bonus / malus connus d'avance (architecture : usure, première puce, tick / tock, équipes ;
+## retard technologique face à l'état de l'art).
 static func snapshot(evaluation: Dictionary, months: int, monthly_cost: int = 0, adjustments: Dictionary = {}) -> Dictionary:
 	return {
 		"performance":clampf(float(evaluation.get("performance", 0.0)) + float(adjustments.get("performance", 0.0)), 0.0, 100.0),
 		"reliability":clampf(float(evaluation.get("reliability", 0.0)) + float(adjustments.get("reliability", 0.0)), 0.0, 100.0),
 		"efficiency":clampf(float(evaluation.get("efficiency", 0.0)) + float(adjustments.get("efficiency", 0.0)), 0.0, 100.0),
-		"innovation":float(evaluation.get("innovation", 0.0)),
+		"innovation":clampf(float(evaluation.get("innovation", 0.0)) + float(adjustments.get("innovation", 0.0)), 0.0, 100.0),
 		"deficit":float(evaluation.get("power_deficit_ratio", 0.0)),
 		"heat":maxf(float(evaluation.get("required_tdp", 0.0)), 0.0),
 		"unit_cost":int(evaluation.get("unit_cost", 0)),

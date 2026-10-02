@@ -1332,6 +1332,14 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 		for adjusted_metric in adjustments.keys():
 			metrics[adjusted_metric] = clampf(float(metrics.get(adjusted_metric, 50.0)) + float(adjustments[adjusted_metric]), 20.0, 98.0)
 	if str(project.sector) == "CPU":
+		# C3 / P0 : un CPU se juge face à l'état de l'art (procédé des rivaux, architecture la plus récente).
+		var lag_design: Dictionary = project.get("cpu_design", {})
+		if typeof(lag_design) == TYPE_DICTIONARY and not lag_design.is_empty():
+			var lag := MarketManager.technology_lag(int(lag_design.get("node_nm", 10000)), str(project.get("architecture_id", "")))
+			project["technology_lag"] = lag
+			for lag_metric in ["performance", "innovation", "efficiency", "reliability"]:
+				metrics[lag_metric] = clampf(float(metrics.get(lag_metric, 50.0)) + float(lag.get(lag_metric, 0.0)), 15.0, 98.0)
+	if str(project.sector) == "CPU":
 		var depth_bonus := team_quality_bonus(str(project.get("segment", MarketManager.default_segment())))
 		project["team_quality_bonus"] = depth_bonus
 		for metric_key in metrics.keys():

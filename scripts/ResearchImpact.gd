@@ -55,7 +55,11 @@ static func measure(design: Dictionary, tech_gain: float = 0.0) -> Dictionary:
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
 	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", CONCEPT_BUDGET * 3, {}, 0, 0, evaluation, "")
 	var bonus := tech_gain * TECH_WEIGHT
-	return IMPACT.snapshot(evaluation, int(estimate.get("months", 0)), 0, {"performance":bonus, "efficiency":bonus, "reliability":bonus})
+	# C3 / P0 : le CPU se juge face à l'état de l'art (procédé des rivaux, architecture la plus récente).
+	var lag := MarketManager.technology_lag(int(design.get("node_nm", 10000)), ArchitectureManager.latest_id())
+	return IMPACT.snapshot(evaluation, int(estimate.get("months", 0)), 0, {
+		"performance":bonus + float(lag.performance), "efficiency":bonus + float(lag.efficiency),
+		"reliability":bonus + float(lag.reliability), "innovation":float(lag.innovation)})
 
 ## Fiche complète d'un nœud de l'arbre (ResearchTree.lanes) : {chips, scope, route, done}.
 static func preview(lane_id: String, node: Dictionary) -> Dictionary:

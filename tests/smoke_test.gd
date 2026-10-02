@@ -1757,6 +1757,12 @@ func _ready() -> void:
 		_fail(research_impact_error)
 		return
 	print("[CI] Fiche d'impact recherche : effet sur le prochain CPU et chemin fidèle (Concept, chercheur) OK")
+	await get_tree().process_frame
+	var lag_error: String = (load("res://tests/scenarios/TechnologyLagScenario.gd") as Script).call("run", self)
+	if lag_error != "":
+		_fail(lag_error)
+		return
+	print("[CI] C3/P0 retard technologique : notes, ventes, architecture et propositions de l'équipe OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)

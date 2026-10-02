@@ -8,6 +8,7 @@ const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const RIVAL_LIFE := preload("res://scripts/RivalLife.gd")
 const STRATEGIC := preload("res://scripts/StrategicMarkets.gd")
 const LATE_GAME := preload("res://scripts/LateGameEvents.gd")
+const TECH_LAG := preload("res://scripts/TechnologyLag.gd")
 
 # Les dates sont des repères historiques, pas des verrous rigides :
 # une partie technologiquement en avance peut faire émerger un besoin plus tôt.
@@ -34,6 +35,34 @@ func era_technology_ceiling(year: int = -1) -> float:
 ## Freine une progression qui approche le plafond de l'époque (0 au plafond).
 func era_gain_factor(current: float) -> float:
 	return clampf((era_technology_ceiling() - current) / ERA_CEILING_SOFT_SPAN, 0.0, 1.0)
+
+## C3 / P0 : l'état de l'art du procédé = le plus fin utilisé par un rival CPU ;
+## sans rival (bac à sable, tests isolés) : le plus fin procédé que l'époque permet.
+func state_of_the_art_node() -> int:
+	var best := -1
+	for comp_value in competitors.get("CPU", []):
+		best = maxi(best, CPU_DESIGN.NODE_ORDER.find(int((comp_value as Dictionary).get("node_nm", 10000))))
+	if best < 0:
+		var ceiling := era_technology_ceiling()
+		best = 0
+		for i in range(CPU_DESIGN.NODE_ORDER.size()):
+			if float(CPU_DESIGN.node_profile(int(CPU_DESIGN.NODE_ORDER[i])).get("unlock", 0.0)) <= ceiling + 0.001:
+				best = i
+	return int(CPU_DESIGN.NODE_ORDER[best])
+
+## C3 / P0 : un CPU du joueur dépassé par l'état de l'art se vend moins (1.0 = à jour).
+func product_technology_factor(product: Dictionary) -> float:
+	if str(product.get("sector", "CPU")) != "CPU" or str(product.get("company", "")) != CompanyManager.company_name:
+		return 1.0
+	var design_value = product.get("cpu_design", {})
+	if typeof(design_value) != TYPE_DICTIONARY or (design_value as Dictionary).is_empty():
+		return 1.0
+	return TECH_LAG.demand_factor(technology_lag(int((design_value as Dictionary).get("node_nm", 10000)), str(product.get("architecture_id", ""))))
+
+## C3 / P0 : ajustements « retard technologique » d'un CPU du joueur (voir scripts/TechnologyLag.gd).
+func technology_lag(node_nm: int, arch_id: String = "") -> Dictionary:
+	var latest := ArchitectureManager.latest_id()
+	return TECH_LAG.adjustments(node_nm, state_of_the_art_node(), arch_id if arch_id != "" else latest, latest)
 
 const MARKET_NEEDS := {
 	"CALCULATOR":{"historical_year":1971,"tech_trigger":0.0,"base_units":9000,"price_factor":0.72,"growth":0.020,"description":"Calculatrices, terminaux simples et logique programmable à bas coût."},
@@ -988,7 +1017,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var scale_fit := company_scale_fit(target) if str(product.get("company", "")) == CompanyManager.company_name else 1.0
 	var attack_multiplier := attack_demand_factor(product) * RIVAL_LIFE.acquisition_demand_factor(product) * CompanyManager.SUBSIDIARIES.captive_demand_factor(product)
 	var late_game_multiplier := LATE_GAME.player_demand_factor(product)
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier * late_game_multiplier)))
+	var technology_multiplier := product_technology_factor(product)
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier * late_game_multiplier * technology_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -1002,7 +1032,7 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit,"attack_multiplier":attack_multiplier,
-		"late_game_multiplier":late_game_multiplier
+		"late_game_multiplier":late_game_multiplier,"technology_multiplier":technology_multiplier
 	}
 
 ## Lot M (Claude, 29/09) : sonde 40 ans — une entreprise de 8 à 10 personnes atteignait 1 milliard d'euros
