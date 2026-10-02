@@ -96,3 +96,25 @@ Le « cash non contraignant » (1979 STANDARD ; au plus tard 1978 ACCESSIBLE) es
 financiers explicites du probe et une marge annuelle positive jusqu'en 2030. Pour prouver le mois exact, crochet souhaité :
 journaliser toute décision candidate refusée pour trésorerie avec `action`, `cash requis`, `cash disponible` ; idem pour compter
 les épisodes SalesAdvisor actionnables. Aucun crochet n'a été ajouté dans ce lot, conformément au brief.
+
+## Ce qu'il faut régler en premier — sans le faire ici
+
+**P0 — rendre le progrès technique économiquement utile.** En STANDARD, EN RETARD finit avec **+5,9 à +11,9 %** de marge
+face à ADAPTÉE tout en restant 10 µm/4 bits ; ADAPTÉE finit pourtant à 250–350 nm + Multicœur
+(6 graines / STANDARD / eff0871). CA cumulé moyen quasi identique : 3 733,3 M€ R contre 3 729,5 M€ A,
+mais dépenses 1 368,1 M€ R contre 1 547,9 M€ A : l'ancien procédé économise ~179,8 M€ sans vraie pénalité de demande.
+En ACCESSIBLE le défaut empire : **+20,0 à +22,5 %**, avec CA moyen 4 378,8 M€ R contre 3 888,3 M€ A
+et dépenses 1 216,9 M€ R contre 1 279,2 M€ A (6 graines / ACCESSIBLE / eff0871).
+À régler d'abord : avantage réel des procédés/architectures modernes et/ou obsolescence commerciale des anciens, puis leurs coûts.
+
+Cela confirme directement le constat d'impact **#4** (gravure plus fine non récompensée) et rend critique le **#1** :
+une architecture 4 bits reste commercialement viable jusqu'en 2030 alors que les axes Vitesse/Énergie/Fiabilité ne nourrissent aucun calcul.
+Les constats **#2 Robuste**, **#3 fréquence sans enveloppe** et **#5 R&D Fiabilité** ne sont pas isolés par C3 : ne pas prétendre les valider ici.
+Ils doivent être testés/réglés après P0, idéalement par comparaisons contrôlées à marché, équipe et procédé identiques.
+
+**P1 — recréer une contrainte après le premier succès.** Proxy cash libre dès 1979 STANDARD et ≤1978 ACCESSIBLE ;
+100 M€ dès 1983 / 1981 (6 graines par mode / eff0871), puis les années sans décision rapportent davantage en moyenne.
+Il faut ensuite régler coûts de croissance, investissements et risques tardifs pour que l'argent redevienne un arbitrage.
+
+**P2 — revoir la progression mondiale.** Malgré 2,1–3,2 Md€ de marge cumulée, les stratégies finissent rang 4–6 selon la graine ;
+les rares n°1 sont temporaires (313133/625919 STANDARD ; 521657 ACCESSIBLE / eff0871). La carrière économique et le rang divergent trop.
