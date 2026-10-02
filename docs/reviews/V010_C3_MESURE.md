@@ -55,3 +55,26 @@ Années sans décision + marge positive communes aux 6 graines :
 - EN RETARD : **2001, 2002, 2005, 2006, 2009, 2013, 2016, 2017, 2020, 2021, 2024, 2025, 2028** ;
 - FIGÉE : **1982, 1996, 2000, 2004, 2008, 2012, 2021, 2025, 2029**
 (6 graines / STANDARD / eff0871).
+
+## ACCESSIBLE — confirmation
+
+| Source (graine / mode / commit) | FIGÉE marge cumulée 2030 | ADAPTÉE | EN RETARD | Trésorerie 1990 A / R |
+|---|---:|---:|---:|---:|
+| 104729 / ACCESSIBLE / eff0871 | 11,19 M€ | 2 600,16 M€ | 3 120,68 M€ | 490,0 / 514,6 M€ |
+| 208877 / ACCESSIBLE / eff0871 | 12,05 M€ | 2 594,01 M€ | 3 177,56 M€ | 499,0 / 526,0 M€ |
+| 313133 / ACCESSIBLE / eff0871 | 12,45 M€ | 2 600,59 M€ | 3 158,62 M€ | 496,3 / 522,7 M€ |
+| 417401 / ACCESSIBLE / eff0871 | 11,71 M€ | 2 604,46 M€ | 3 153,33 M€ | 486,9 / 516,2 M€ |
+| 521657 / ACCESSIBLE / eff0871 | 12,17 M€ | 2 641,79 M€ | 3 180,78 M€ | 493,3 / 518,6 M€ |
+| 625919 / ACCESSIBLE / eff0871 | 11,71 M€ | 2 613,30 M€ | 3 179,94 M€ | 490,2 / 524,4 M€ |
+
+ADAPTÉE bat FIGÉE **6/6**, mais EN RETARD bat ADAPTÉE **6/6** avec **+20,0 à +22,5 %** de marge cumulée
+(6 graines / ACCESSIBLE / eff0871). Moyennes : 2 609,1 M€ contre 3 161,8 M€.
+La trésorerie dépasse **100 M€ dès 1981 dans 6/6 graines** pour A et R ; le proxy financier cesse de contraindre
+au plus tard en **1978 dans 12/12 runs A/R** (1977 sur certaines graines ; 6 graines / ACCESSIBLE / eff0871).
+
+Rang mondial : seul 521657 atteint n°1, pour ADAPTÉE et EN RETARD en **1981**, puis les deux retombent hors n°1 en **1983** ;
+FIGÉE n'est jamais n°1 et les cinq autres graines A/R non plus (521657 / ACCESSIBLE / eff0871 ; autres graines / même source).
+Donc aucune stratégie ne reste n°1 sans agir.
+
+Aucun `BLOCKER`, aucune faillite et aucune erreur Godot sur les 18 runs ACCESSIBLE ; bilan total : **36/36 carrières jusqu'en 2030**
+(6 graines × 3 stratégies × 2 modes / eff0871).
