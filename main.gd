@@ -2391,7 +2391,7 @@ func _flush_unlock_notice() -> void:
 		return
 	var labels := ", ".join(_pending_unlock_labels)
 	_pending_unlock_labels.clear()
-	status_label.text = "Nora : nouvelle fonction disponible — %s." % labels
+	# Le toast suffit : ne pas remplacer le bandeau permanent qui décrit l’action en cours.
 	notify("Nouvelle fonction disponible : %s" % labels, "unlock")
 	SoundManager.play("unlock")
 

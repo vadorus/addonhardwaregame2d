@@ -91,7 +91,7 @@ func _ready() -> void:
 				get_tree().quit(1)
 				return
 			for card in [project, feedback, tasks]:
-				if full_marker.get_rect().intersects((card as Control).get_rect()):
+				if (card as Control).visible and full_marker.get_rect().intersects((card as Control).get_rect()):
 					push_error("Unlocked garage marker %s hidden under a HUD card at %s" % [full_marker.get_meta("zone_name", "?"), dimensions])
 					get_tree().quit(1)
 					return

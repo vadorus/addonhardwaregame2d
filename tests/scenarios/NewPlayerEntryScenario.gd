@@ -163,6 +163,14 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: simulation did not start when the first CPU entered development"
+	if feedback_panel.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.10 entry: stale company-announcement card returned during first development"
+	if not status_line.text.contains("entre en développement"):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.10 entry: unlock toast replaced the useful project status line"
 
 	# V0.7: a normal month-end is a ticker, not a forced modal/pause.
 	TimeManager.time_scale = 2.0

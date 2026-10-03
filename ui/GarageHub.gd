@@ -1023,7 +1023,9 @@ func _refresh_gameplay_overlays() -> void:
 	_refresh_objectives()
 	# Pré-lancement : les actualités restent dans Presse. Le garage garde seulement Nora et le projet.
 	if _feedback_panel != null:
-		_feedback_panel.visible = CompanyManager.created and _onboarding_stage != "FIRST_IDEA"
+		var opening_news_only := not MediaManager.news.is_empty() and str((MediaManager.news[0] as Dictionary).get("headline", "")) == "Une nouvelle société technologique entre sur le marché."
+		var has_feedback := not CompanyManager.alerts.is_empty() or (not MediaManager.news.is_empty() and not opening_news_only)
+		_feedback_panel.visible = CompanyManager.created and _tutorial_step() == 0 and has_feedback
 
 	if _feedback_label != null:
 		if not MediaManager.news.is_empty():
