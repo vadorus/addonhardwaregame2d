@@ -6,12 +6,15 @@ signal software_changed
 signal software_launched(product)
 
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
+const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const LAUNCH_MASTERY_CAP := 2
 
 var families: Dictionary = {}
 var projects: Array = []
 var products: Array = []
 var reveals: Array = []
+var activities: Array = []
+var completed_activities := 0
 var _next_id := 1
 
 func reset() -> void:
@@ -21,11 +24,13 @@ func reset() -> void:
 	projects = []
 	products = []
 	reveals = []
+	activities = []
+	completed_activities = 0
 	_next_id = 1
 	software_changed.emit()
 
 func _new_family_state(family_id: String) -> Dictionary:
-	return {"open":TimeManager.year >= int(CAT.family(family_id).get("unlock_year", 9999)), "mastery":0, "launches":0}
+	return {"open":TimeManager.year >= int(CAT.family(family_id).get("unlock_year", 9999)), "mastery":0, "launches":0, "activity_xp":0, "activities_done":0}
 func family_state(family_id: String) -> Dictionary:
 	if not families.has(family_id):
 		families[family_id] = _new_family_state(family_id)
@@ -73,6 +78,41 @@ func _check_unlocks() -> void:
 			continue
 		family_state(family_id)["open"] = true
 		CompanyManager.add_alert("Nouveau domaine software : %s. %s" % [CAT.family_label(family_id), str(CAT.family(family_id).get("pitch", ""))])
+
+func available_activities() -> Array:
+	return ACTIVITY.available(TimeManager.year)
+
+func active_activity() -> Dictionary:
+	return activities[0] if not activities.is_empty() else {}
+
+func can_start_activity(activity_id: String) -> Dictionary:
+	var data := ACTIVITY.data(activity_id)
+	if data.is_empty() or TimeManager.year < int(data.get("from", 9999)):
+		return {"ok":false, "reason":"Cette activité n'est pas encore disponible."}
+	if not activities.is_empty():
+		return {"ok":false, "reason":"Une activité courte est déjà en cours."}
+	var family_id := str(data.get("family", "UTILITY"))
+	if not is_open(family_id):
+		return {"ok":false, "reason":"Le domaine Software correspondant n'est pas encore ouvert."}
+	var first_month := int(data.get("monthly_cost", 0))
+	if not Economy.can_afford(first_month, "Activité software"):
+		return {"ok":false, "reason":"Trésorerie insuffisante pour démarrer cette activité."}
+	return {"ok":true, "reason":""}
+
+func start_activity(activity_id: String) -> bool:
+	if not bool(can_start_activity(activity_id).get("ok", false)):
+		return false
+	var data := ACTIVITY.data(activity_id)
+	activities.append({"id":activity_id, "family":str(data.get("family", "UTILITY")), "months_done":0})
+	software_changed.emit()
+	return true
+
+func _gain_activity_xp(family_id: String, amount: int) -> void:
+	var state := family_state(family_id)
+	state["activity_xp"] = int(state.get("activity_xp", 0)) + maxi(amount, 0)
+	while int(state.activity_xp) >= 100 and int(state.mastery) < CAT.MAX_MASTERY:
+		state["activity_xp"] = int(state.activity_xp) - 100
+		state["mastery"] = int(state.mastery) + 1
 
 func preview(family_id: String, levels: Dictionary, price_mode: String) -> Dictionary:
 	var months := CAT.dev_months(family_id, levels)
@@ -166,18 +206,44 @@ func _process_sales() -> void:
 			product["revenue_last"] = revenue; product["support_last"] = support; product["margin_last"] = revenue - support
 			Economy.add_income(revenue, "Licences software — %s" % CAT.family_label(family_id))
 			Economy.add_expense(support, "Support software — %s" % CAT.family_label(family_id))
+func _process_activities() -> void:
+	for value in activities.duplicate():
+		var current: Dictionary = value
+		var data := ACTIVITY.data(str(current.get("id", "")))
+		if data.is_empty():
+			activities.erase(current)
+			continue
+		var cost := int(data.get("monthly_cost", 0))
+		if cost > 0:
+			Economy.add_expense(cost, "Activité software — %s" % ACTIVITY.label(str(current.id)))
+		current["months_done"] = int(current.get("months_done", 0)) + 1
+		if int(current.months_done) < int(data.get("months", 1)):
+			continue
+		activities.erase(current)
+		var payout := int(data.get("payout", 0))
+		if payout > 0:
+			Economy.add_income(payout, "Contrat software — %s" % ACTIVITY.label(str(current.id)))
+		var family_id := str(current.get("family", "UTILITY"))
+		_gain_activity_xp(family_id, int(data.get("xp", 0)))
+		var state := family_state(family_id)
+		state["activities_done"] = int(state.get("activities_done", 0)) + 1
+		completed_activities += 1
+		CompanyManager.change_reputation((data.get("reputation", {}) as Dictionary))
+		CompanyManager.add_alert("Activité Software terminée : %s." % ACTIVITY.label(str(current.id)))
+
 func process_month() -> void:
 	if not CompanyManager.created: return
 	_check_unlocks()
+	_process_activities()
 	_process_projects()
 	_process_sales()
 	software_changed.emit()
 
 func active_departments() -> Array:
-	return ["Développement"] if not projects.is_empty() else []
+	return ["Développement"] if not projects.is_empty() or not activities.is_empty() else []
 
 func get_state() -> Dictionary:
-	return {"families":families, "projects":projects, "products":products, "reveals":reveals, "next_id":_next_id}
+	return {"families":families, "projects":projects, "products":products, "reveals":reveals, "activities":activities, "completed_activities":completed_activities, "next_id":_next_id}
 
 func load_state(state: Dictionary) -> void:
 	reset()
@@ -189,5 +255,7 @@ func load_state(state: Dictionary) -> void:
 	projects = state.get("projects", []).duplicate(true)
 	products = state.get("products", []).duplicate(true)
 	reveals = state.get("reveals", []).duplicate(true)
+	activities = state.get("activities", []).duplicate(true)
+	completed_activities = int(state.get("completed_activities", 0))
 	_next_id = int(state.get("next_id", projects.size() + products.size() + 1))
 	software_changed.emit()
