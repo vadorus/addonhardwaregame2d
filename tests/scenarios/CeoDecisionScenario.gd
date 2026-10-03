@@ -61,9 +61,11 @@ static func _run_in_game(game: Control) -> String:
 	var focus: Dictionary = garage.call("focus_decision")
 	if not str(focus.get("context", "")).begins_with("CEO:"):
 		return "CEO decision: garage focus does not route to the decision card (%s)" % str(focus)
+	if str(focus.get("label", "")) != "Traiter la décision":
+		return "CEO decision: garage primary action is not compact (%s)" % str(focus.get("label", ""))
 	game.call("_on_dashboard_navigation", int(focus.get("tab", 1)), str(focus.get("context", "")))
 	if not bool(game.call("ceo_decision_visible")):
-		return "CEO decision: « Traiter : … » did not open the decision card"
+		return "CEO decision: compact primary action did not open the decision card"
 	if tabs.current_tab != 0:
 		return "CEO decision: the card should open over the garage, not switch tab"
 	if TimeManager.time_scale != 0.0:

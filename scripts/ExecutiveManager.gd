@@ -955,7 +955,7 @@ func get_ceo_decisions() -> Array:
 			"id":"FINANCE:LOAN",
 			"category":"FINANCEMENT",
 			"severity":74.0,
-			"title":"Nora a vu la banque",
+			"title":"Trésorerie basse — prêt disponible",
 			"text":"Moins de 6 mois de trésorerie : un prêt de %d € est possible." % int(GarageBusiness.loan_terms().get("amount", 0)),
 			"recommendation":"Un prêt donne de l'air jusqu'au lancement ; il se rembourse chaque mois.",
 			"target_tab":0,

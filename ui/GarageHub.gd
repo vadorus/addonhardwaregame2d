@@ -857,7 +857,7 @@ func _compute_focus() -> Dictionary:
 	return {
 		"kind":"ceo",
 		"zone":str(CATEGORY_ZONE.get(category, "Bureau du fondateur")),
-		"label":_short("Traiter : %s" % title, 34),
+		"label":"Traiter la décision",
 		"tab":int(best.get("target_tab", 1)),
 		# « CEO:<id> » : main.gd ouvre la carte de décision au lieu de l'onglet brut.
 		"context":"CEO:%s" % str(best.get("id", "")),
