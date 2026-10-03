@@ -111,6 +111,16 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: opening garage did not enter the first-idea onboarding stage"
+	var feedback_panel: Control = garage.get("_feedback_panel")
+	if feedback_panel == null or feedback_panel.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.10 entry: news card should stay hidden until the first CPU project begins"
+	var feed: Control = game.get("notification_feed")
+	if feed != null and int(feed.call("toast_count")) != 0:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.10 entry: opening press toast still masks the first action"
 
 	if TimeManager.time_scale != 0.0:
 		game.queue_free()

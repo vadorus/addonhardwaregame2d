@@ -2175,7 +2175,7 @@ func _start_new_game():
 		"MINIMAL":
 			status_label.text = "Garage prêt. L'établi ouvre la conception CPU ; tous les réglages sont disponibles."
 		_:
-			status_label.text = "Nora : touchez l'établi ou « Nouveau projet CPU » pour commencer."
+			status_label.text = "Départ dans le garage • temps en pause."
 	_refresh_all()
 	_start_music_for_current_year()
 
@@ -3031,6 +3031,9 @@ func notify(text: String, kind: String = "info", tab: int = -1) -> void:
 
 func _on_news_changed() -> void:
 	if MediaManager.news.is_empty() or not CompanyManager.created:
+		return
+	# Le message de création existe déjà dans Presse : ne pas masquer le premier geste du joueur avec un toast.
+	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
 		return
 	var item: Dictionary = MediaManager.news[0]
 	if item.has("review_score"):

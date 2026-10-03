@@ -1021,6 +1021,9 @@ func _refresh_gameplay_overlays() -> void:
 	if _tasks_label != null:
 		_tasks_label.text = _nora_message()
 	_refresh_objectives()
+	# Pré-lancement : les actualités restent dans Presse. Le garage garde seulement Nora et le projet.
+	if _feedback_panel != null:
+		_feedback_panel.visible = CompanyManager.created and _onboarding_stage != "FIRST_IDEA"
 
 	if _feedback_label != null:
 		if not MediaManager.news.is_empty():
@@ -1118,7 +1121,7 @@ func set_onboarding_stage(stage: String) -> void:
 	if _room_title != null and _room_subtitle != null:
 		if stage == "FIRST_IDEA":
 			_room_title.text = "Votre premier garage"
-			_room_subtitle.text = "Touchez l'établi pour commencer"
+			_room_subtitle.text = "1971 • tout commence ici"
 		else:
 			_room_title.text = str(ExecutiveManager.workplace_data().get("name", "Garage aménagé"))
 			_update_focus()
