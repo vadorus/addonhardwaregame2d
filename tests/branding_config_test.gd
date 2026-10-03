@@ -2,13 +2,15 @@ extends SceneTree
 
 const MAIN_ICON := "res://assets/branding/tech_empire_icon.svg"
 const PLAY_ICON := "res://assets/branding/play_store_icon.png"
+const WINDOWS_ICON := "res://assets/branding/tech_empire_windows.ico"
 
 func _init() -> void:
 	var failures: Array[String] = []
 	_check(ProjectSettings.get_setting("application/config/icon", "") == MAIN_ICON, "project icon is not Tech Empire", failures)
-	for path in [MAIN_ICON, PLAY_ICON, "res://assets/branding/tech_empire_adaptive_foreground.svg", "res://assets/branding/tech_empire_adaptive_background.svg", "res://assets/branding/tech_empire_adaptive_monochrome.svg"]:
+	for path in [MAIN_ICON, PLAY_ICON, WINDOWS_ICON, "res://assets/branding/tech_empire_adaptive_foreground.svg", "res://assets/branding/tech_empire_adaptive_background.svg", "res://assets/branding/tech_empire_adaptive_monochrome.svg"]:
 		_check(FileAccess.file_exists(path), "missing branding asset: %s" % path, failures)
 	var export_text := FileAccess.get_file_as_string("res://export_presets.cfg")
+	_check(export_text.contains("application/icon=\"%s\"" % WINDOWS_ICON), "Windows export icon is not configured", failures)
 	_check(export_text.count("launcher_icons/main_192x192=\"%s\"" % MAIN_ICON) == 2, "main Android icon must be configured in APK and AAB presets", failures)
 	_check(export_text.count("launcher_icons/adaptive_foreground_432x432") == 2, "adaptive foreground missing from an Android preset", failures)
 	_check(export_text.count("launcher_icons/adaptive_background_432x432") == 2, "adaptive background missing from an Android preset", failures)
