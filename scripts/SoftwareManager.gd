@@ -8,6 +8,8 @@ signal software_launched(product)
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
+const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
+const SOFTWARE_COCKPIT_AXES := ["features", "usability", "stability", "performance"]
 const LAUNCH_MASTERY_CAP := 2
 
 var families: Dictionary = {}
@@ -192,7 +194,10 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 		"status":"DEVELOPMENT",
 		"incident_done":false,
 		"pending_decision":{},
-		"polish_pending":false
+		"polish_pending":false,
+		"cockpit_priorities":PROJECT_COCKPIT.balanced(SOFTWARE_COCKPIT_AXES),
+		"cockpit_influence":{"features":0.0, "usability":0.0, "stability":0.0, "performance":0.0},
+		"cockpit_months":0
 	}
 	_next_id += 1
 	projects.append(project)
@@ -205,6 +210,63 @@ func project_by_id(project_id: String) -> Dictionary:
 		if str(project.get("id", "")) == project_id:
 			return project
 	return {}
+
+func active_development_project() -> Dictionary:
+	for value in projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) == "DEVELOPMENT" and str(project.get("kind", "")) == "UTILITY_SLICE":
+			return project
+	return {}
+
+func project_cockpit_priorities(project_id: String) -> Dictionary:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("kind", "")) != "UTILITY_SLICE":
+		return {}
+	return PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
+
+func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta: int) -> bool:
+	if not SOFTWARE_COCKPIT_AXES.has(axis_id):
+		return false
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("kind", "")) != "UTILITY_SLICE":
+		return false
+	if str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	project["cockpit_priorities"] = PROJECT_COCKPIT.adjust(
+		project.get("cockpit_priorities", {}),
+		SOFTWARE_COCKPIT_AXES,
+		axis_id,
+		delta
+	)
+	software_changed.emit()
+	return true
+
+func _apply_software_cockpit_month(project: Dictionary) -> void:
+	if str(project.get("kind", "")) != "UTILITY_SLICE":
+		return
+	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
+	project["cockpit_priorities"] = priorities
+	var influence: Dictionary = project.get("cockpit_influence", {})
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0
+	project["cockpit_influence"] = influence
+	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
+
+	var metrics: Dictionary = project.get("metrics", {})
+	var bias := PROJECT_COCKPIT.month_bias(priorities, SOFTWARE_COCKPIT_AXES, 1.2)
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)), 10.0, 98.0)
+	project["metrics"] = metrics
+	project["levels"] = _utility_levels_from_metrics(metrics)
+
+	var stability_priority := int(priorities.get("stability", 25))
+	var feature_priority := int(priorities.get("features", 25))
+	if stability_priority >= 40 and int(project.get("bugs", 0)) > 0:
+		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 1)
+	if feature_priority >= 45:
+		project["bugs"] = int(project.get("bugs", 0)) + 1
 
 func pending_project_decision() -> Dictionary:
 	for value in projects:
@@ -475,6 +537,8 @@ func _process_projects() -> void:
 
 		Economy.add_expense(int(project.get("monthly_cost", 0)), "Développement software — %s" % CAT.family_label(str(project.family)))
 		project["months_done"] = int(project.get("months_done", 0)) + 1
+		if kind == "UTILITY_SLICE":
+			_apply_software_cockpit_month(project)
 
 		if kind in ["PATCH", "UPDATE"] and int(project.get("months_done", 0)) >= int(project.get("months_total", 1)):
 			projects.erase(project)

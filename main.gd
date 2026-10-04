@@ -32,7 +32,9 @@ var setup_title_box: VBoxContainer
 var setup_creation_box: VBoxContainer
 var first_cpu_workshop: Control
 var software_workshop: Control
+var project_cockpit: Control
 var _software_resume_scale := 0.0
+var _project_cockpit_resume_scale := 0.0
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
@@ -452,9 +454,10 @@ func _build_ui():
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
 	_build_software_workshop_layer()
+	_build_project_cockpit_layer()
 	_build_launch_moment_layer()
 	# Modal screens must draw above the raised room markers and HUD.
-	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, software_workshop, launch_layer]:
+	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, software_workshop, project_cockpit, launch_layer]:
 		overlay.z_index = 100
 
 func _create_dashboard_tab():
@@ -468,6 +471,9 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if context == "PROJECT_COCKPIT":
+		_open_project_cockpit()
+		return
 	if context in ["SOFTWARE", "PROJECT_CHOICE"]:
 		_open_software_workshop()
 		return
@@ -1414,6 +1420,47 @@ func _build_first_cpu_workshop_layer() -> void:
 	cpu_stepper.connect("cancel_requested", _close_cpu_stepper)
 	cpu_stepper.z_index = 100
 	add_child(cpu_stepper)
+
+func _build_project_cockpit_layer() -> void:
+	var cockpit_script: Script = load("res://ui/ProjectCockpit.gd")
+	project_cockpit = cockpit_script.new() as Control
+	project_cockpit.connect("close_requested", _close_project_cockpit)
+	project_cockpit.connect("cpu_decision_requested", _project_cockpit_to_cpu_decision)
+	project_cockpit.connect("software_requested", _project_cockpit_to_software)
+	add_child(project_cockpit)
+	ResearchManager.projects_changed.connect(func():
+		if project_cockpit != null and project_cockpit.visible:
+			project_cockpit.call_deferred("refresh")
+	)
+	SoftwareManager.software_changed.connect(func():
+		if project_cockpit != null and project_cockpit.visible:
+			project_cockpit.call_deferred("refresh")
+	)
+
+func _open_project_cockpit() -> void:
+	if project_cockpit == null or not CompanyManager.created:
+		return
+	_project_cockpit_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	project_cockpit.call("open")
+	SoundManager.play("open")
+	JUICE.fade_in(project_cockpit, 0.2)
+	status_label.text = "Pilotage : répartissez l'effort de vos équipes entre les priorités du projet."
+
+func _close_project_cockpit() -> void:
+	if project_cockpit != null:
+		project_cockpit.call("close")
+	TimeManager.time_scale = _project_cockpit_resume_scale
+	SoundManager.play("close")
+	_refresh_all()
+
+func _project_cockpit_to_cpu_decision() -> void:
+	_close_project_cockpit()
+	_on_dashboard_navigation(3, "PROJECT_DECISION")
+
+func _project_cockpit_to_software() -> void:
+	_close_project_cockpit()
+	_open_software_workshop()
 
 func _build_software_workshop_layer() -> void:
 	var workshop_script: Script = load("res://ui/SoftwareWorkshop.gd")
