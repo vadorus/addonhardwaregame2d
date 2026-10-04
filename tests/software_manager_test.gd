@@ -19,6 +19,13 @@ func _ready() -> void:
 	var polished_terms := manager.activity_terms("AUTOMATION", "POLISHED")
 	_check(int(fast_terms.get("months", 0)) < int(polished_terms.get("months", 0)), "contract approach does not change delivery time", failures)
 	_check(int(fast_terms.get("xp", 0)) < int(polished_terms.get("xp", 0)), "polished contract should teach more than fast delivery", failures)
+	_check(
+		float(fast_terms.get("xp", 0)) / float(maxi(int(fast_terms.get("months", 1)), 1))
+		< float(polished_terms.get("xp", 0)) / float(maxi(int(polished_terms.get("months", 1)), 1)),
+		"fast contracts are still dominant for Software XP per month",
+		failures
+	)
+	_check(int(fast_terms.get("net", 0)) > int(polished_terms.get("net", 0)), "fast contracts should favor short-term cash over polished work", failures)
 	var before_activity := Economy.money
 	_check(manager.start_activity("BUGFIX"), "short software activity did not start", failures)
 	_check(not manager.start_activity("AUTOMATION"), "a second short activity should wait for the first", failures)

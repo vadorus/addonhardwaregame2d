@@ -420,12 +420,14 @@ func _show_activities() -> void:
 			var terms := SoftwareManager.activity_terms(activity_id, approach_id)
 			var check := SoftwareManager.can_start_activity(activity_id, approach_id)
 			var button := Button.new()
-			button.text = "%s\n%d mois • net %s €" % [
+			button.text = "%s\n%d mois • net %s €\nXP %d • %s" % [
 				PLAY.approach_label(approach_id),
 				int(terms.get("months", 1)),
-				UI.money(int(terms.get("net", 0)))
+				UI.money(int(terms.get("net", 0))),
+				int(terms.get("xp", 0)),
+				str(PLAY.approach(approach_id).get("risk_label", ""))
 			]
-			button.custom_minimum_size = Vector2(185, 60)
+			button.custom_minimum_size = Vector2(185, 78)
 			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			LOOK.button_style(button, approach_id == "BALANCED" and bool(check.get("ok", false)))
 			button.disabled = not bool(check.get("ok", false))

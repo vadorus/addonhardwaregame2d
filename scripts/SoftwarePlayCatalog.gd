@@ -18,10 +18,11 @@ const APPROACHES := {
 		"label": "Rapide",
 		"months_delta": -1,
 		"cost_factor": 0.85,
-		"payout_factor": 0.95,
-		"xp_factor": 0.75,
-		"reputation_factor": 0.65,
-		"bug_pressure": 12
+		"payout_factor": 1.00,
+		"xp_factor": 0.35,
+		"reputation_factor": 0.55,
+		"bug_pressure": 12,
+		"risk_label": "risque élevé"
 	},
 	"BALANCED": {
 		"label": "Équilibré",
@@ -30,16 +31,18 @@ const APPROACHES := {
 		"payout_factor": 1.0,
 		"xp_factor": 1.0,
 		"reputation_factor": 1.0,
-		"bug_pressure": 5
+		"bug_pressure": 5,
+		"risk_label": "risque normal"
 	},
 	"POLISHED": {
 		"label": "Soigné",
 		"months_delta": 1,
 		"cost_factor": 1.10,
 		"payout_factor": 1.05,
-		"xp_factor": 1.30,
-		"reputation_factor": 1.35,
-		"bug_pressure": 0
+		"xp_factor": 2.40,
+		"reputation_factor": 1.50,
+		"bug_pressure": 0,
+		"risk_label": "risque faible"
 	}
 }
 
