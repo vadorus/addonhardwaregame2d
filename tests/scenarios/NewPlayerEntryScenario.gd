@@ -112,7 +112,29 @@ static func run(host: Node) -> String:
 	if software_choice == null or not software_choice.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "Garage primary action does not open the Hardware / Software choice"
+		return "Garage primary action does not open the project choice"
+	if str(software_choice.call("current_view_name")) != "PROJECT_CHOICE":
+		game.queue_free()
+		_restore(snapshot)
+		return "Project choice opens directly on Software details instead of branch choice"
+	if software_choice.get("_family_select") != null:
+		game.queue_free()
+		_restore(snapshot)
+		return "Software product settings are visible before the player chooses Software and Create a product"
+	software_choice.call("_show_software_choice")
+	if str(software_choice.call("current_view_name")) != "SOFTWARE_CHOICE":
+		game.queue_free()
+		_restore(snapshot)
+		return "Software branch does not expose contracts versus product choice"
+	if software_choice.get("_family_select") != null:
+		game.queue_free()
+		_restore(snapshot)
+		return "Product settings leak into the Software choice screen"
+	software_choice.call("_show_product")
+	if str(software_choice.call("current_view_name")) != "PRODUCT" or software_choice.get("_family_select") == null:
+		game.queue_free()
+		_restore(snapshot)
+		return "Product settings are not deferred until Software then Create a product"
 	game.call("_close_software_workshop")
 	if str(garage.get("_onboarding_stage")) != "FIRST_IDEA":
 		game.queue_free()

@@ -154,9 +154,9 @@ static func run(host: Node) -> String:
 	if not bool(garage_hub.call("context_menu_visible")) or str(garage_hub.call("selected_zone")) != "Établi CPU":
 		garage_hub.queue_free()
 		return "Refreshing garage state closes the player's selected workbench menu"
-	if not opening_actions.has("Hardware — nouveau processeur") or not opening_actions.has("Software — activités & produits") or not opening_actions.has("Conception Hardware avancée"):
+	if not opening_actions.has("Processeur") or not opening_actions.has("Logiciel") or not opening_actions.has("Conception CPU avancée"):
 		garage_hub.queue_free()
-		return "Garage project menu does not expose Hardware and Software as explicit first choices"
+		return "Garage project menu does not expose Processeur and Logiciel as explicit first choices"
 	garage_hub.call("close_context_menu")
 	garage_hub.call("set_onboarding_stage", "NORMAL")
 	garage_hub.call("set_progression", {"QG":true,"LAB":true,"COMPANY":false,"TEAM":true,"PRODUCTS":false,"MARKET":false,"PRESS":false})
@@ -177,9 +177,9 @@ static func run(host: Node) -> String:
 	ProductionManager.jobs = []
 	ProductManager.products = []
 	garage_hub.call("set_onboarding_stage", "FIRST_IDEA")
-	if int(garage_hub.call("_tutorial_step")) != 1 or not str(garage_hub.call("nora_message")).begins_with("Départ") or not str(garage_hub.call("nora_message")).contains("Hardware") or not str(garage_hub.call("nora_message")).contains("Software"):
+	if int(garage_hub.call("_tutorial_step")) != 1 or not str(garage_hub.call("nora_message")).begins_with("Départ") or not str(garage_hub.call("nora_message")).contains("Processeur") or not str(garage_hub.call("nora_message")).contains("Logiciel"):
 		garage_hub.queue_free()
-		return "G2: Nora does not present Hardware and Software as the two garage starting paths"
+		return "G2: Nora does not present Processeur and Logiciel as the two garage starting paths"
 	ResearchManager.projects = [{"id":"G2-CI","name":"CPU tutoriel","status":"DEVELOPMENT","phase_index":0,"phase_progress":10.0}]
 	garage_hub.call("set_onboarding_stage", "NORMAL")
 	if int(garage_hub.call("_tutorial_step")) != 2:

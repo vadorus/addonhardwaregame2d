@@ -1435,7 +1435,7 @@ func _open_software_workshop() -> void:
 	software_workshop.call("open")
 	SoundManager.play("open")
 	JUICE.fade_in(software_workshop, 0.2)
-	status_label.text = "Software : petits contrats pour apprendre, ou vrais produits à construire sur la durée."
+	status_label.text = "Nouveau projet : choisissez Processeur ou Logiciel."
 
 func _close_software_workshop() -> void:
 	if software_workshop != null:

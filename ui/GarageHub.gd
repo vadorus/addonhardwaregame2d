@@ -740,15 +740,15 @@ func _base_zone_actions(zone_name: String) -> Array:
 		"Établi CPU":
 			if ResearchManager.projects.is_empty():
 				return [
-					{"label":"Hardware — nouveau processeur","tab":3,"context":"HARDWARE_CPU","enabled":true},
-					{"label":"Software — activités & produits","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
-					{"label":"Conception Hardware avancée","tab":3,"context":"Réglages avancés","enabled":true}
+					{"label":"Processeur","tab":3,"context":"HARDWARE_CPU","enabled":true},
+					{"label":"Logiciel","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
+					{"label":"Conception CPU avancée","tab":3,"context":"Réglages avancés","enabled":true}
 				]
 			return [
-				{"label":"Hardware — nouveau processeur","tab":3,"context":"NOUVEAU_CPU","enabled":true},
-				{"label":"Software — activités & produits","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
+				{"label":"Nouveau processeur","tab":3,"context":"NOUVEAU_CPU","enabled":true},
+				{"label":"Logiciel","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
 				{"label":"Continuer le projet CPU","tab":3,"context":"","enabled":true},
-				{"label":"Conception & R&D Hardware","tab":3,"context":"Réglages avancés","enabled":true}
+				{"label":"Conception & R&D CPU","tab":3,"context":"Réglages avancés","enabled":true}
 			]
 		"Banc de test":
 			if _has_pending_project_decision():
@@ -776,7 +776,7 @@ func _base_zone_actions(zone_name: String) -> Array:
 func _zone_context_text(zone_name: String) -> String:
 	match zone_name:
 		"Établi CPU":
-			return "Point de départ des projets : choisissez Hardware pour vos processeurs, ou Software pour les activités et produits logiciels."
+			return "Point de départ des projets : choisissez Processeur ou Logiciel."
 		"Banc de test":
 			return "Les prototypes, mesures et validations apparaissent ici quand le projet atteint les phases concernées."
 		"Tableau de planification":
@@ -923,7 +923,7 @@ func _nora_message() -> String:
 	if not CompanyManager.created and decision_source.is_null():
 		return "Créez votre entreprise pour commencer."
 	if _onboarding_stage == "FIRST_IDEA":
-		return "Départ • Touchez l'établi (repère vert) : choisissez Hardware pour concevoir un CPU, ou Software pour commencer par de petits contrats et construire votre savoir-faire."
+		return "Départ • Touchez l'établi (repère vert), puis choisissez Processeur ou Logiciel."
 	if not _focus.is_empty():
 		var message := "%s : passez par %s." % [str(_focus.get("title", "")), _focus_where()]
 		var advice := str(_focus.get("advice", ""))
@@ -1037,8 +1037,8 @@ func _refresh_gameplay_overlays() -> void:
 	else:
 		_project_kicker.text = "Votre premier projet"
 		_refresh_phase_strip(-1)
-		_project_title.text = "Hardware ou Software ?"
-		_project_stage.text = "Choisissez votre première activité depuis l'établi."
+		_project_title.text = "Processeur ou Logiciel ?"
+		_project_stage.text = "Touchez Nouveau projet pour choisir votre branche."
 		_project_progress.value = 0.0
 
 	if _tasks_label != null:
