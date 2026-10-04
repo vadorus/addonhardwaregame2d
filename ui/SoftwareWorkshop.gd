@@ -23,6 +23,8 @@ var _price_select: OptionButton
 var _name_edit: LineEdit
 var _settings_box: VBoxContainer
 var _setting_controls: Dictionary = {}
+var _target_select: OptionButton
+var _feature_checks: Dictionary = {}
 var _project_preview: Label
 var _project_start: Button
 
@@ -186,19 +188,178 @@ func _show_software_choice() -> void:
 func _add_compact_status() -> void:
 	var activity := SoftwareManager.active_activity()
 	if not activity.is_empty():
-		var data := ACTIVITY.data(str(activity.get("id", "")))
-		_content.add_child(UI.muted_label("En cours : %s • mois %d/%d" % [
-			ACTIVITY.label(str(activity.get("id", ""))),
+		var activity_id := str(activity.get("id", ""))
+		var approach_id := str(activity.get("approach", "BALANCED"))
+		var terms := SoftwareManager.activity_terms(activity_id, approach_id)
+		_content.add_child(UI.muted_label("Contrat en cours : %s • %s • mois %d/%d" % [
+			ACTIVITY.label(activity_id),
+			PLAY.approach_label(approach_id),
 			int(activity.get("months_done", 0)),
-			int(data.get("months", 1))
+			int(terms.get("months", 1))
 		], 12))
+
 	if not SoftwareManager.projects.is_empty():
 		var project: Dictionary = SoftwareManager.projects[0]
-		_content.add_child(UI.muted_label("Produit en développement : %s • mois %d/%d" % [
-			str(project.get("name", "Produit Software")),
-			int(project.get("months_done", 0)),
-			int(project.get("months_total", 1))
+		var status := str(project.get("status", "DEVELOPMENT"))
+		if status == "DECISION":
+			var decision: Dictionary = project.get("pending_decision", {})
+			var card := UI.card(UI.APP_PANEL_ALT, 12, 12)
+			_content.add_child(card)
+			var box := VBoxContainer.new()
+			box.add_theme_constant_override("separation", 6)
+			card.add_child(box)
+			box.add_child(UI.eyebrow("DÉCISION REQUISE"))
+			box.add_child(UI.label(str(decision.get("title", "Problème de développement")), 17))
+			var text_label := UI.muted_label(str(decision.get("text", "")), 12)
+			text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(text_label)
+			var actions := HBoxContainer.new()
+			actions.add_theme_constant_override("separation", 8)
+			box.add_child(actions)
+			var rewrite := Button.new()
+			rewrite.text = "Réécrire\n+1 mois, moins de bugs"
+			rewrite.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			LOOK.button_style(rewrite, true)
+			rewrite.pressed.connect(_resolve_project_decision.bind(str(project.get("id", "")), "REWRITE"))
+			actions.add_child(rewrite)
+			var cut := Button.new()
+			cut.text = "Retirer la fonction\nmoins ambitieux"
+			cut.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cut.disabled = (project.get("features", []) as Array).size() <= 2
+			LOOK.button_style(cut)
+			cut.pressed.connect(_resolve_project_decision.bind(str(project.get("id", "")), "CUT"))
+			actions.add_child(cut)
+			var quick := Button.new()
+			quick.text = "Corriger vite\nplus de risque"
+			quick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			LOOK.button_style(quick)
+			quick.pressed.connect(_resolve_project_decision.bind(str(project.get("id", "")), "QUICK_FIX"))
+			actions.add_child(quick)
+		elif status == "REVIEW":
+			var card := UI.card(UI.APP_PANEL_ALT, 12, 12)
+			_content.add_child(card)
+			var box := VBoxContainer.new()
+			box.add_theme_constant_override("separation", 6)
+			card.add_child(box)
+			box.add_child(UI.eyebrow("PRÊT À SORTIR"))
+			box.add_child(UI.label(str(project.get("name", "Produit Software")), 17))
+			var metrics: Dictionary = project.get("metrics", {})
+			box.add_child(UI.muted_label("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Compat./perf. %.0f • bugs %d" % [
+				float(metrics.get("features", 0.0)),
+				float(metrics.get("usability", 0.0)),
+				float(metrics.get("stability", 0.0)),
+				float(metrics.get("performance", 0.0)),
+				int(project.get("bugs", 0))
+			], 11))
+			var actions := HBoxContainer.new()
+			actions.add_theme_constant_override("separation", 8)
+			box.add_child(actions)
+			for release_choice in ["RELEASE", "BETA", "DELAY"]:
+				var button := Button.new()
+				button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				match release_choice:
+					"RELEASE": button.text = "Sortir maintenant"
+					"BETA": button.text = "Faire une bêta\n+1 mois de tests"
+					"DELAY": button.text = "Repousser\n+1 mois de finition"
+				LOOK.button_style(button, release_choice == "BETA")
+				button.pressed.connect(_choose_release.bind(str(project.get("id", "")), release_choice))
+				actions.add_child(button)
+		elif status == "BETA":
+			_content.add_child(UI.muted_label("Bêta en cours : %s • tests utilisateurs ce mois-ci." % str(project.get("name", "Produit Software")), 12))
+		else:
+			_content.add_child(UI.muted_label("Produit en développement : %s • mois %d/%d" % [
+				str(project.get("name", "Produit Software")),
+				int(project.get("months_done", 0)),
+				int(project.get("months_total", 1))
+			], 12))
+
+	var active := SoftwareManager.active_products()
+	if not active.is_empty():
+		var product: Dictionary = active[0]
+		var version := "%d.%d.%d" % [
+			int(product.get("version_major", 1)),
+			int(product.get("version_minor", 0)),
+			int(product.get("version_patch", 0))
+		]
+		_content.add_child(UI.muted_label("En vente : %s v%s • %s licences ce mois • bugs connus %d" % [
+			str(product.get("name", "Produit Software")),
+			version,
+			UI.money(int(product.get("licenses_last", 0))),
+			int(product.get("bugs_known", 0))
 		], 12))
+		if str(product.get("kind", "")) == "UTILITY_SLICE" and SoftwareManager.project_for("UTILITY").is_empty():
+			var maintenance := UI.card(UI.APP_PANEL, 10, 10)
+			_content.add_child(maintenance)
+			var maintenance_box := VBoxContainer.new()
+			maintenance_box.add_theme_constant_override("separation", 6)
+			maintenance.add_child(maintenance_box)
+			maintenance_box.add_child(UI.eyebrow("FAIRE VIVRE LE PRODUIT"))
+			var actions := HBoxContainer.new()
+			actions.add_theme_constant_override("separation", 8)
+			maintenance_box.add_child(actions)
+
+			var patch_check := SoftwareManager.can_start_patch(str(product.get("id", "")))
+			var patch := Button.new()
+			patch.text = "Correctif\n1 mois"
+			patch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			patch.disabled = not bool(patch_check.get("ok", false))
+			patch.tooltip_text = str(patch_check.get("reason", ""))
+			LOOK.button_style(patch, bool(patch_check.get("ok", false)))
+			patch.pressed.connect(_start_patch.bind(str(product.get("id", ""))))
+			actions.add_child(patch)
+
+			var update_features := SoftwareManager.available_update_features(str(product.get("id", "")))
+			if not update_features.is_empty():
+				var update_select := OptionButton.new()
+				update_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				update_select.custom_minimum_size.y = 48
+				for feature_value in update_features:
+					var feature_id := str(feature_value)
+					update_select.add_item(str(PLAY.utility_feature(feature_id).get("label", feature_id)))
+					update_select.set_item_metadata(update_select.item_count - 1, feature_id)
+				actions.add_child(update_select)
+				var update := Button.new()
+				update.text = "Mise à jour\nnouvelle fonction"
+				update.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				LOOK.button_style(update)
+				update.pressed.connect(_start_selected_update.bind(str(product.get("id", "")), update_select))
+				actions.add_child(update)
+
+func _start_patch(product_id: String) -> void:
+	if SoftwareManager.start_patch(product_id):
+		status_changed.emit("Correctif Software lancé.")
+		work_started.emit("PROJECT")
+	else:
+		var check := SoftwareManager.can_start_patch(product_id)
+		status_changed.emit(str(check.get("reason", "Correctif impossible.")))
+	_show_software_choice()
+
+func _start_selected_update(product_id: String, select: OptionButton) -> void:
+	var feature_id := UI.option_meta(select)
+	if SoftwareManager.start_update(product_id, feature_id):
+		status_changed.emit("Mise à jour Software lancée : %s." % str(PLAY.utility_feature(feature_id).get("label", feature_id)))
+		work_started.emit("PROJECT")
+	else:
+		var check := SoftwareManager.can_start_update(product_id, feature_id)
+		status_changed.emit(str(check.get("reason", "Mise à jour impossible.")))
+	_show_software_choice()
+
+func _resolve_project_decision(project_id: String, choice: String) -> void:
+	if SoftwareManager.resolve_project_decision(project_id, choice):
+		status_changed.emit("Décision Software appliquée.")
+	else:
+		status_changed.emit("Cette décision n'est plus disponible.")
+	_show_software_choice()
+
+func _choose_release(project_id: String, choice: String) -> void:
+	if SoftwareManager.choose_release(project_id, choice):
+		match choice:
+			"RELEASE": status_changed.emit("Produit Software commercialisé.")
+			"BETA": status_changed.emit("Bêta lancée pour un mois.")
+			"DELAY": status_changed.emit("Sortie repoussée d'un mois pour finition.")
+	else:
+		status_changed.emit("Cette décision de sortie n'est plus disponible.")
+	_show_software_choice()
 
 func _show_activities() -> void:
 	_mode = ViewMode.ACTIVITIES
@@ -372,13 +533,53 @@ func _rebuild_settings() -> void:
 		_settings_box.remove_child(child)
 		child.queue_free()
 	_setting_controls = {}
+	_feature_checks = {}
+	_target_select = null
 	var family_id := UI.option_meta(_family_select)
 	if family_id == "":
 		return
 	var state := SoftwareManager.family_state(family_id)
-	_settings_box.add_child(UI.muted_label("Maîtrise %d/5 • %d activité(s) terminée(s)" % [
+	_settings_box.add_child(UI.muted_label("Maîtrise %d/5 • %d contrat(s) terminé(s)" % [
 		int(state.get("mastery", 0)), int(state.get("activities_done", 0))
 	], 12))
+
+	if family_id == "UTILITY":
+		_settings_box.add_child(UI.eyebrow("PUBLIC CIBLE"))
+		_target_select = OptionButton.new()
+		_target_select.custom_minimum_size.y = 46
+		for target_value in PLAY.UTILITY_TARGET_ORDER:
+			var target_id := str(target_value)
+			_target_select.add_item(PLAY.utility_target_label(target_id))
+			_target_select.set_item_metadata(_target_select.item_count - 1, target_id)
+		UI.select_meta(_target_select, "HOME")
+		_target_select.item_selected.connect(func(_index): _refresh_product_preview())
+		_settings_box.add_child(_target_select)
+
+		_settings_box.add_child(UI.eyebrow("FONCTIONNALITÉS • 2 À 4"))
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 6)
+		_settings_box.add_child(grid)
+		var default_count := 0
+		for feature_value in PLAY.UTILITY_FEATURE_ORDER:
+			var feature_id := str(feature_value)
+			var feature := PLAY.utility_feature(feature_id)
+			var check := CheckBox.new()
+			check.text = str(feature.get("label", feature_id))
+			check.custom_minimum_size = Vector2(300, 44)
+			check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			check.tooltip_text = "%d mois de complexité • risque bugs %d" % [
+				int(feature.get("months", 1)), int(feature.get("bugs", 0))
+			]
+			if default_count < 2:
+				check.button_pressed = true
+				default_count += 1
+			check.toggled.connect(func(_pressed): _refresh_product_preview())
+			grid.add_child(check)
+			_feature_checks[feature_id] = check
+		return
+
 	for setting_value in CAT.settings_of(family_id):
 		var setting_id := str(setting_value)
 		var data := CAT.setting(family_id, setting_id)
@@ -398,6 +599,14 @@ func _rebuild_settings() -> void:
 		row.add_child(control)
 		_setting_controls[setting_id] = control
 
+func _utility_features() -> Array:
+	var result: Array = []
+	for feature_value in PLAY.UTILITY_FEATURE_ORDER:
+		var feature_id := str(feature_value)
+		if _feature_checks.has(feature_id) and (_feature_checks[feature_id] as CheckBox).button_pressed:
+			result.append(feature_id)
+	return result
+
 func _levels() -> Dictionary:
 	var levels := {}
 	for key_value in _setting_controls.keys():
@@ -411,12 +620,43 @@ func _refresh_product_preview() -> void:
 	var family_id := UI.option_meta(_family_select)
 	if family_id == "":
 		return
-	var levels := _levels()
 	var price_mode := UI.option_meta(_price_select)
+	var lines: Array[String] = []
+
+	if family_id == "UTILITY":
+		var features := _utility_features()
+		var target_id := UI.option_meta(_target_select) if _target_select != null else "HOME"
+		var preview := SoftwareManager.utility_preview(features, target_id, price_mode)
+		var check := SoftwareManager.can_start_utility(features, target_id)
+		var metrics: Dictionary = preview.get("metrics", {})
+		lines.append("%s • %d fonctionnalité(s)" % [PLAY.utility_target_label(target_id), features.size()])
+		lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
+			int(preview.get("months", 0)),
+			UI.money(int(preview.get("monthly_cost", 0))),
+			UI.money(int(preview.get("total_cost", 0)))
+		])
+		lines.append("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performances %.0f" % [
+			float(metrics.get("features", 0.0)),
+			float(metrics.get("usability", 0.0)),
+			float(metrics.get("stability", 0.0)),
+			float(metrics.get("performance", 0.0))
+		])
+		lines.append("Bugs estimés %d • licence %.0f € • qualité %.0f/100" % [
+			int(preview.get("bugs", 0)),
+			float(preview.get("price", 0.0)),
+			float(preview.get("quality", 0.0))
+		])
+		if not bool(check.get("ok", false)):
+			lines.append(str(check.get("reason", "")))
+		_project_preview.text = "\n".join(lines)
+		_project_start.disabled = not bool(check.get("ok", false))
+		LOOK.button_style(_project_start, bool(check.get("ok", false)))
+		return
+
+	var levels := _levels()
 	var preview := SoftwareManager.preview(family_id, levels, price_mode)
 	var check := SoftwareManager.can_start(family_id, levels)
 	var state := SoftwareManager.family_state(family_id)
-	var lines: Array[String] = []
 	lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
 		int(preview.get("months", 0)),
 		UI.money(int(preview.get("monthly_cost", 0))),
@@ -438,8 +678,21 @@ func _start_product() -> void:
 	if family_id == "":
 		return
 	var name := _name_edit.text.strip_edges()
-	var levels := _levels()
 	var price_mode := UI.option_meta(_price_select)
+	if family_id == "UTILITY":
+		var features := _utility_features()
+		var target_id := UI.option_meta(_target_select) if _target_select != null else "HOME"
+		if SoftwareManager.start_utility_project(features, target_id, price_mode, name):
+			status_changed.emit("Utilitaire lancé en développement.")
+			work_started.emit("PROJECT")
+			_show_software_choice()
+		else:
+			var utility_check := SoftwareManager.can_start_utility(features, target_id)
+			status_changed.emit(str(utility_check.get("reason", "Impossible de lancer cet utilitaire.")))
+		_refresh_product_preview()
+		return
+
+	var levels := _levels()
 	if SoftwareManager.start_project(family_id, levels, price_mode, name):
 		status_changed.emit("Produit Software lancé.")
 		work_started.emit("PROJECT")

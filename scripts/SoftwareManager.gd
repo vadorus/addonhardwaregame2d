@@ -141,6 +141,280 @@ func _gain_skills(activity_data: Dictionary, total_xp: int) -> void:
 		var gain := maxi(1, int(round(float(total_xp) * float(weights[skill_id]))))
 		skills[skill_id] = skill_xp(skill_id) + gain
 
+func _utility_levels_from_metrics(metrics: Dictionary) -> Dictionary:
+	var levels := {}
+	for axis in ["features", "usability", "stability", "performance"]:
+		levels[axis] = clampi(int(round(3.0 + (float(metrics.get(axis, 50.0)) - 50.0) / 15.0)), 1, 5)
+	return levels
+
+func utility_preview(feature_ids: Array, target_id: String, price_mode: String = "MARKET") -> Dictionary:
+	var plan := PLAY.utility_plan(feature_ids, target_id, skills)
+	plan["price"] = CAT.license_price("UTILITY", price_mode)
+	return plan
+
+func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictionary:
+	if not is_open("UTILITY"):
+		return {"ok":false, "reason":"Les utilitaires ne sont pas encore disponibles."}
+	if not project_for("UTILITY").is_empty():
+		return {"ok":false, "reason":"Un utilitaire est déjà en développement."}
+	var chosen := PLAY.utility_feature_ids(feature_ids)
+	if chosen.size() < 2:
+		return {"ok":false, "reason":"Choisissez au moins 2 fonctionnalités."}
+	if chosen.size() > 4:
+		return {"ok":false, "reason":"Dans le garage, limitez la première version à 4 fonctionnalités."}
+	if not PLAY.UTILITY_TARGETS.has(target_id):
+		return {"ok":false, "reason":"Public cible inconnu."}
+	var plan := PLAY.utility_plan(chosen, target_id, skills)
+	if not Economy.can_afford(int(plan.get("monthly_cost", 0)) * 2, "Développement software"):
+		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les deux premiers mois."}
+	return {"ok":true, "reason":""}
+
+func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "") -> bool:
+	if not bool(can_start_utility(feature_ids, target_id).get("ok", false)):
+		return false
+	if not CAT.PRICE_MODES.has(price_mode):
+		price_mode = "MARKET"
+	var plan := utility_preview(feature_ids, target_id, price_mode)
+	var project := {
+		"id":"SW-%03d" % _next_id,
+		"kind":"UTILITY_SLICE",
+		"family":"UTILITY",
+		"name":product_name.strip_edges() if product_name.strip_edges() != "" else next_name("UTILITY"),
+		"target":target_id,
+		"features":(plan.get("features", []) as Array).duplicate(),
+		"levels":(plan.get("levels", {}) as Dictionary).duplicate(true),
+		"metrics":(plan.get("metrics", {}) as Dictionary).duplicate(true),
+		"bugs":int(plan.get("bugs", 0)),
+		"price_mode":price_mode,
+		"months_total":int(plan.get("months", 1)),
+		"months_done":0,
+		"monthly_cost":int(plan.get("monthly_cost", 0)),
+		"status":"DEVELOPMENT",
+		"incident_done":false,
+		"pending_decision":{},
+		"polish_pending":false
+	}
+	_next_id += 1
+	projects.append(project)
+	software_changed.emit()
+	return true
+
+func project_by_id(project_id: String) -> Dictionary:
+	for value in projects:
+		var project: Dictionary = value
+		if str(project.get("id", "")) == project_id:
+			return project
+	return {}
+
+func pending_project_decision() -> Dictionary:
+	for value in projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) == "DECISION":
+			return project
+	return {}
+
+func ready_software_project() -> Dictionary:
+	for value in projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) == "REVIEW":
+			return project
+	return {}
+
+func resolve_project_decision(project_id: String, choice: String) -> bool:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "DECISION":
+		return false
+	var decision: Dictionary = project.get("pending_decision", {})
+	var feature_id := str(decision.get("feature_id", ""))
+	match choice:
+		"REWRITE":
+			project["months_total"] = int(project.get("months_total", 1)) + 1
+			project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 5)
+			var metrics: Dictionary = project.get("metrics", {})
+			metrics["stability"] = clampf(float(metrics.get("stability", 50.0)) + 6.0, 0.0, 100.0)
+			project["levels"] = _utility_levels_from_metrics(metrics)
+		"CUT":
+			var features: Array = (project.get("features", []) as Array).duplicate()
+			if features.size() <= 2 or not features.has(feature_id):
+				return false
+			features.erase(feature_id)
+			var plan := PLAY.utility_plan(features, str(project.get("target", "HOME")), skills)
+			project["features"] = features
+			project["metrics"] = (plan.get("metrics", {}) as Dictionary).duplicate(true)
+			project["levels"] = (plan.get("levels", {}) as Dictionary).duplicate(true)
+			project["bugs"] = int(plan.get("bugs", 0))
+			project["monthly_cost"] = int(plan.get("monthly_cost", project.get("monthly_cost", 0)))
+			project["months_total"] = maxi(int(project.get("months_done", 0)) + 1, int(plan.get("months", 1)))
+		"QUICK_FIX":
+			project["bugs"] = int(project.get("bugs", 0)) + 6
+			var metrics: Dictionary = project.get("metrics", {})
+			metrics["stability"] = clampf(float(metrics.get("stability", 50.0)) - 4.0, 0.0, 100.0)
+			project["levels"] = _utility_levels_from_metrics(metrics)
+		_:
+			return false
+	project["pending_decision"] = {}
+	project["status"] = "DEVELOPMENT"
+	software_changed.emit()
+	return true
+
+func choose_release(project_id: String, choice: String) -> bool:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "REVIEW":
+		return false
+	match choice:
+		"RELEASE":
+			projects.erase(project)
+			_launch(project)
+		"BETA":
+			project["status"] = "BETA"
+			project["beta_months_done"] = 0
+			CompanyManager.add_alert("Bêta ouverte pour %s : encore un mois de tests." % str(project.get("name", "le logiciel")))
+		"DELAY":
+			project["status"] = "DEVELOPMENT"
+			project["months_total"] = int(project.get("months_total", 1)) + 1
+			project["polish_pending"] = true
+		_:
+			return false
+	software_changed.emit()
+	return true
+
+func product_by_id(product_id: String) -> Dictionary:
+	for value in products:
+		var product: Dictionary = value
+		if str(product.get("id", "")) == product_id:
+			return product
+	return {}
+
+func can_start_patch(product_id: String) -> Dictionary:
+	var product := product_by_id(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "ACTIVE":
+		return {"ok":false, "reason":"Produit Software introuvable."}
+	if str(product.get("kind", "")) != "UTILITY_SLICE":
+		return {"ok":false, "reason":"Les correctifs jouables sont encore réservés aux utilitaires."}
+	if not project_for(str(product.get("family", "UTILITY"))).is_empty():
+		return {"ok":false, "reason":"L'équipe Software travaille déjà sur cette famille."}
+	if int(product.get("bugs_known", 0)) <= 0:
+		return {"ok":false, "reason":"Aucun bug connu ne justifie un correctif."}
+	var cost := 1800 + int(product.get("bugs_known", 0)) * 40
+	if not Economy.can_afford(cost, "Correctif software"):
+		return {"ok":false, "reason":"Trésorerie insuffisante pour préparer le correctif."}
+	return {"ok":true, "reason":""}
+
+func start_patch(product_id: String) -> bool:
+	if not bool(can_start_patch(product_id).get("ok", false)):
+		return false
+	var product := product_by_id(product_id)
+	var cost := 1800 + int(product.get("bugs_known", 0)) * 40
+	projects.append({
+		"id":"SW-%03d" % _next_id,
+		"kind":"PATCH",
+		"family":str(product.get("family", "UTILITY")),
+		"product_id":product_id,
+		"name":"Correctif %s" % str(product.get("name", "Produit")),
+		"months_total":1,
+		"months_done":0,
+		"monthly_cost":cost,
+		"status":"DEVELOPMENT"
+	})
+	_next_id += 1
+	software_changed.emit()
+	return true
+
+func available_update_features(product_id: String) -> Array:
+	var product := product_by_id(product_id)
+	if product.is_empty() or str(product.get("kind", "")) != "UTILITY_SLICE":
+		return []
+	var current: Array = product.get("features", [])
+	var result: Array = []
+	for feature_value in PLAY.UTILITY_FEATURE_ORDER:
+		var feature_id := str(feature_value)
+		if not current.has(feature_id):
+			result.append(feature_id)
+	return result
+
+func can_start_update(product_id: String, feature_id: String) -> Dictionary:
+	var product := product_by_id(product_id)
+	if product.is_empty() or str(product.get("status", "")) != "ACTIVE":
+		return {"ok":false, "reason":"Produit Software introuvable."}
+	if str(product.get("kind", "")) != "UTILITY_SLICE":
+		return {"ok":false, "reason":"Les mises à jour jouables sont encore réservées aux utilitaires."}
+	if not available_update_features(product_id).has(feature_id):
+		return {"ok":false, "reason":"Cette fonctionnalité est déjà présente ou indisponible."}
+	if not project_for(str(product.get("family", "UTILITY"))).is_empty():
+		return {"ok":false, "reason":"L'équipe Software travaille déjà sur cette famille."}
+	var feature := PLAY.utility_feature(feature_id)
+	var monthly_cost := 2400 + int(round(float(feature.get("cost", 1000)) * 0.45))
+	if not Economy.can_afford(monthly_cost * 2, "Mise à jour software"):
+		return {"ok":false, "reason":"Trésorerie insuffisante pour lancer cette mise à jour."}
+	return {"ok":true, "reason":""}
+
+func start_update(product_id: String, feature_id: String) -> bool:
+	if not bool(can_start_update(product_id, feature_id).get("ok", false)):
+		return false
+	var product := product_by_id(product_id)
+	var feature := PLAY.utility_feature(feature_id)
+	var months := 2 + maxi(int(feature.get("months", 1)) - 1, 0)
+	var monthly_cost := 2400 + int(round(float(feature.get("cost", 1000)) * 0.45))
+	projects.append({
+		"id":"SW-%03d" % _next_id,
+		"kind":"UPDATE",
+		"family":str(product.get("family", "UTILITY")),
+		"product_id":product_id,
+		"feature_id":feature_id,
+		"name":"Mise à jour %s" % str(product.get("name", "Produit")),
+		"months_total":months,
+		"months_done":0,
+		"monthly_cost":monthly_cost,
+		"status":"DEVELOPMENT"
+	})
+	_next_id += 1
+	software_changed.emit()
+	return true
+
+func _complete_maintenance(project: Dictionary) -> void:
+	var product := product_by_id(str(project.get("product_id", "")))
+	if product.is_empty():
+		return
+	match str(project.get("kind", "")):
+		"PATCH":
+			var before := int(product.get("bugs_known", 0))
+			product["bugs_known"] = maxi(0, before - maxi(4, int(ceil(float(before) * 0.65))))
+			product["version_patch"] = int(product.get("version_patch", 0)) + 1
+			var metrics: Dictionary = product.get("metrics", {})
+			metrics["stability"] = clampf(float(metrics.get("stability", 50.0)) + 2.0, 0.0, 100.0)
+			product["levels"] = _utility_levels_from_metrics(metrics)
+			skills["reliability"] = skill_xp("reliability") + 6
+			skills["development"] = skill_xp("development") + 3
+			CompanyManager.change_reputation({"reliability":0.05, "support":0.04})
+			CompanyManager.add_alert("Correctif publié pour %s." % str(product.get("name", "le logiciel")))
+		"UPDATE":
+			var feature_id := str(project.get("feature_id", ""))
+			var features: Array = (product.get("features", []) as Array).duplicate()
+			if not features.has(feature_id):
+				features.append(feature_id)
+			var plan := PLAY.utility_plan(features, str(product.get("target", "HOME")), skills)
+			product["features"] = features
+			product["metrics"] = (plan.get("metrics", {}) as Dictionary).duplicate(true)
+			product["levels"] = (plan.get("levels", {}) as Dictionary).duplicate(true)
+			product["bugs_known"] = int(product.get("bugs_known", 0)) + maxi(1, int(ceil(float(PLAY.utility_feature(feature_id).get("bugs", 0)) * 0.50)))
+			product["version_minor"] = int(product.get("version_minor", 0)) + 1
+			product["version_patch"] = 0
+			product["launch_f"] = CAT.year_f(TimeManager.year, TimeManager.month)
+			var quality := 0.0
+			for score in (product.get("metrics", {}) as Dictionary).values():
+				quality += float(score)
+			product["quality_launch"] = quality / maxf(float((product.get("metrics", {}) as Dictionary).size()), 1.0)
+			var gains := PLAY.utility_skill_gains([feature_id])
+			for skill_value in gains.keys():
+				var skill_id := str(skill_value)
+				skills[skill_id] = skill_xp(skill_id) + int(gains[skill_id])
+			CompanyManager.change_reputation({"innovation":0.06, "support":0.03})
+			CompanyManager.add_alert("Mise à jour %d.%d publiée pour %s." % [
+				int(product.get("version_major", 1)),
+				int(product.get("version_minor", 0)),
+				str(product.get("name", "le logiciel"))
+			])
+
 func preview(family_id: String, levels: Dictionary, price_mode: String) -> Dictionary:
 	var months := CAT.dev_months(family_id, levels)
 	var monthly := CAT.dev_monthly_cost(family_id, levels, TimeManager.year)
@@ -180,11 +454,64 @@ func start_project(family_id: String, levels: Dictionary, price_mode: String = "
 func _process_projects() -> void:
 	for value in projects.duplicate():
 		var project: Dictionary = value
+		var kind := str(project.get("kind", "LEGACY"))
+		var status := str(project.get("status", "DEVELOPMENT"))
+		if status in ["DECISION", "REVIEW"]:
+			continue
+
+		if status == "BETA":
+			var beta_cost := int(round(float(project.get("monthly_cost", 0)) * 0.60))
+			Economy.add_expense(beta_cost, "Bêta software — %s" % str(project.get("name", "Produit")))
+			project["beta_months_done"] = int(project.get("beta_months_done", 0)) + 1
+			if int(project.get("beta_months_done", 0)) >= 1:
+				var bugs := int(project.get("bugs", 0))
+				project["bugs"] = maxi(0, bugs - maxi(5, int(ceil(float(bugs) * 0.45))))
+				var beta_metrics: Dictionary = project.get("metrics", {})
+				beta_metrics["stability"] = clampf(float(beta_metrics.get("stability", 50.0)) + 5.0, 0.0, 100.0)
+				project["levels"] = _utility_levels_from_metrics(beta_metrics)
+				project["status"] = "REVIEW"
+				CompanyManager.add_alert("Bêta terminée : %s est prêt pour une nouvelle décision de sortie." % str(project.get("name", "le logiciel")))
+			continue
+
 		Economy.add_expense(int(project.get("monthly_cost", 0)), "Développement software — %s" % CAT.family_label(str(project.family)))
 		project["months_done"] = int(project.get("months_done", 0)) + 1
-		if int(project.months_done) >= int(project.get("months_total", 1)):
+
+		if kind in ["PATCH", "UPDATE"] and int(project.get("months_done", 0)) >= int(project.get("months_total", 1)):
 			projects.erase(project)
-			_launch(project)
+			_complete_maintenance(project)
+			continue
+
+		if kind == "UTILITY_SLICE" and not bool(project.get("incident_done", false)) and int(project.get("months_total", 1)) >= 3:
+			var midpoint := maxi(1, int(ceil(float(project.get("months_total", 1)) / 2.0)))
+			if int(project.get("months_done", 0)) >= midpoint:
+				var risky_feature := PLAY.utility_riskiest_feature(project.get("features", []))
+				var feature_label := str(PLAY.utility_feature(risky_feature).get("label", "une fonctionnalité"))
+				project["pending_decision"] = {
+					"feature_id": risky_feature,
+					"title": "%s pose problème" % feature_label,
+					"text": "Les tests révèlent trop de défauts. Réécrire prend du temps, retirer la fonction réduit l'ambition, corriger vite augmente le risque de bugs."
+				}
+				project["incident_done"] = true
+				project["status"] = "DECISION"
+				CompanyManager.add_alert("Décision Software requise sur %s." % str(project.get("name", "le projet")))
+				continue
+
+		if int(project.get("months_done", 0)) < int(project.get("months_total", 1)):
+			continue
+
+		if kind == "UTILITY_SLICE":
+			if bool(project.get("polish_pending", false)):
+				project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 5)
+				var polish_metrics: Dictionary = project.get("metrics", {})
+				polish_metrics["stability"] = clampf(float(polish_metrics.get("stability", 50.0)) + 4.0, 0.0, 100.0)
+				project["levels"] = _utility_levels_from_metrics(polish_metrics)
+				project["polish_pending"] = false
+			project["status"] = "REVIEW"
+			CompanyManager.add_alert("%s est terminé : choisissez bêta, sortie ou report." % str(project.get("name", "Le logiciel")))
+			continue
+
+		projects.erase(project)
+		_launch(project)
 
 func _launch(project: Dictionary) -> void:
 	var family_id := str(project.family)
@@ -192,12 +519,32 @@ func _launch(project: Dictionary) -> void:
 	var product_mastery := mastery(family_id)
 	var scores := CAT.axis_scores(family_id, project.levels, product_mastery, now, now)
 	var quality := 0.0
-	for score in scores.values(): quality += float(score)
-	quality /= maxf(float(scores.size()), 1.0)
+	var explicit_metrics: Dictionary = project.get("metrics", {})
+	if not explicit_metrics.is_empty():
+		for score in explicit_metrics.values():
+			quality += float(score)
+		quality /= maxf(float(explicit_metrics.size()), 1.0)
+	else:
+		for score in scores.values():
+			quality += float(score)
+		quality /= maxf(float(scores.size()), 1.0)
 	var product := {"id":str(project.id), "family":family_id, "name":str(project.name),
 		"levels":project.levels.duplicate(), "price_mode":str(project.price_mode), "price":CAT.license_price(family_id, str(project.price_mode)),
 		"mastery":product_mastery, "launch_f":now, "quality_launch":quality, "status":"ACTIVE",
 		"licenses_last":0, "licenses_total":0, "installed_users":0, "revenue_last":0, "support_last":0, "margin_last":0}
+	if str(project.get("kind", "")) == "UTILITY_SLICE":
+		product["kind"] = "UTILITY_SLICE"
+		product["target"] = str(project.get("target", "HOME"))
+		product["features"] = (project.get("features", []) as Array).duplicate()
+		product["metrics"] = explicit_metrics.duplicate(true)
+		product["bugs_known"] = int(project.get("bugs", 0))
+		product["version_major"] = 1
+		product["version_minor"] = 0
+		product["version_patch"] = 0
+		var gains := PLAY.utility_skill_gains(product["features"])
+		for skill_value in gains.keys():
+			var skill_id := str(skill_value)
+			skills[skill_id] = skill_xp(skill_id) + int(gains[skill_id])
 	products.append(product)
 	var state := family_state(family_id)
 	state["launches"] = int(state.get("launches", 0)) + 1
@@ -221,6 +568,9 @@ func _process_sales() -> void:
 			quality /= maxf(float(scores.size()), 1.0)
 			var price_penalty := CAT.price_factor(str(product.price_mode)) - 1.0
 			var weight := maxf(0.2, 1.0 + (quality - 50.0) / 25.0 - price_penalty)
+			if str(product.get("kind", "")) == "UTILITY_SLICE":
+				var bug_penalty := clampf(1.0 - float(product.get("bugs_known", 0)) / 80.0, 0.55, 1.0)
+				weight *= bug_penalty
 			weights.append(weight); total_weight += weight
 		var player_share := clampf(0.08 + CompanyManager.get_brand_score() / 500.0, 0.08, 0.30)
 		for i in range(active.size()):
