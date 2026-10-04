@@ -7,7 +7,7 @@ const SAVE_PATH := "user://tech_empire_save.json"
 const TEMP_SAVE_PATH := "user://tech_empire_save.json.tmp"
 const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SLOT_COUNT := 3 # emplacements manuels 1..3
-const SAVE_VERSION := 29
+const SAVE_VERSION := 30
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 const TEST_ROOT := "user://ci_tests/"
 
@@ -83,6 +83,7 @@ func save_to_slot(slot: int, quiet: bool = false) -> bool:
 		"architectures":ArchitectureManager.get_state(),
 		"garage_business":GarageBusiness.get_state(),
 		"components":ComponentManager.get_state(),
+		"software":SoftwareManager.get_state(),
 		"objectives":Objectives.get_state()
 	}
 	if not _write_atomic(JSON.stringify(state), slot_path(slot), _slot_temp(slot), _slot_backup(slot)):
@@ -137,6 +138,8 @@ func load_from_slot(slot: int) -> bool:
 	GarageBusiness.load_state(state.get("garage_business", {}))
 	# V0.10 / Gammes : absent des anciennes parties -> marchés fermés, ouverts au prochain mois si leur date est passée.
 	ComponentManager.load_state(state.get("components", {}))
+	# Branche Software : absente des anciennes parties -> état neuf selon l'année chargée.
+	SoftwareManager.load_state(state.get("software", {}))
 	# Lot C : tout en dernier (les objectifs lisent l'état de tous les systèmes).
 	Objectives.load_state(state.get("objectives", {}))
 	save_completed.emit(true, "Partie chargée.")

@@ -27,6 +27,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 	ArchitectureManager.reset()
 	GarageBusiness.reset()
 	ComponentManager.reset()
+	SoftwareManager.reset()
 	Objectives.reset()
 
 func process_month_end() -> Dictionary:
@@ -50,9 +51,13 @@ func process_month_end() -> Dictionary:
 	for dept in ComponentManager.active_departments():
 		if not active.has(dept):
 			active.append(dept)
+	for dept in SoftwareManager.active_departments():
+		if not active.has(dept):
+			active.append(dept)
 	PersonnelManager.process_month(active)
 	ExecutiveManager.process_month()
 	ResearchManager.process_month()
+	SoftwareManager.process_month()
 	FoundryManager.process_month()
 	ProductionManager.process_month()
 	ProductManager.process_month()
