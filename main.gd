@@ -31,6 +31,8 @@ var setup_panel: PanelContainer
 var setup_title_box: VBoxContainer
 var setup_creation_box: VBoxContainer
 var first_cpu_workshop: Control
+var software_workshop: Control
+var _software_resume_scale := 0.0
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
@@ -449,9 +451,10 @@ func _build_ui():
 	_build_game_over_layer()
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
+	_build_software_workshop_layer()
 	_build_launch_moment_layer()
 	# Modal screens must draw above the raised room markers and HUD.
-	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, launch_layer]:
+	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, software_workshop, launch_layer]:
 		overlay.z_index = 100
 
 func _create_dashboard_tab():
@@ -465,6 +468,12 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if context in ["SOFTWARE", "PROJECT_CHOICE"]:
+		_open_software_workshop()
+		return
+	if context == "HARDWARE_CPU":
+		_show_first_cpu_workshop()
+		return
 	if context.begins_with("CEO:") and open_ceo_decision(context.substr(4)):
 		return
 	if context.begins_with("CEO:"):
@@ -1405,6 +1414,58 @@ func _build_first_cpu_workshop_layer() -> void:
 	cpu_stepper.connect("cancel_requested", _close_cpu_stepper)
 	cpu_stepper.z_index = 100
 	add_child(cpu_stepper)
+
+func _build_software_workshop_layer() -> void:
+	var workshop_script: Script = load("res://ui/SoftwareWorkshop.gd")
+	software_workshop = workshop_script.new() as Control
+	software_workshop.connect("close_requested", _close_software_workshop)
+	software_workshop.connect("hardware_requested", _software_to_hardware)
+	software_workshop.connect("status_changed", func(message: String):
+		status_label.text = message
+		_refresh_all()
+	)
+	software_workshop.connect("work_started", _on_software_work_started)
+	add_child(software_workshop)
+
+func _open_software_workshop() -> void:
+	if software_workshop == null or not CompanyManager.created:
+		return
+	_software_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	software_workshop.call("open")
+	SoundManager.play("open")
+	JUICE.fade_in(software_workshop, 0.2)
+	status_label.text = "Software : petits contrats pour apprendre, ou vrais produits à construire sur la durée."
+
+func _close_software_workshop() -> void:
+	if software_workshop != null:
+		software_workshop.call("close")
+	TimeManager.time_scale = _software_resume_scale
+	SoundManager.play("close")
+	_refresh_all()
+
+func _software_to_hardware() -> void:
+	if software_workshop != null:
+		software_workshop.call("close")
+	TimeManager.time_scale = _software_resume_scale
+	var active_cpu_project := false
+	for project_value in ResearchManager.projects:
+		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
+			active_cpu_project = true
+			break
+	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
+		_show_first_cpu_workshop()
+	elif active_cpu_project:
+		_show_tab(3)
+		status_label.text = "Hardware : votre projet CPU est ouvert dans le laboratoire."
+	else:
+		open_cpu_stepper()
+
+func _on_software_work_started(_kind: String) -> void:
+	# Si le joueur choisit Software avant son premier CPU, ce choix doit pouvoir faire avancer le temps.
+	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
+		_software_resume_scale = 1.0
+	_refresh_all()
 
 func open_cpu_stepper() -> void:
 	if cpu_stepper == null:

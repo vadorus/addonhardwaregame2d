@@ -103,10 +103,17 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.6 room-first entry still overlays text buttons on the room"
-	if str(garage.call("primary_action_text")) != "+ Nouveau projet CPU" or not bool(garage.call("primary_action_enabled")):
+	if str(garage.call("primary_action_text")) != "+ Nouveau projet" or not bool(garage.call("primary_action_enabled")):
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.8 garage-first entry does not expose one clear primary action"
+		return "Garage-first entry does not expose one clear project-choice action"
+	game.call("_on_dashboard_navigation", 0, "PROJECT_CHOICE")
+	var software_choice: Control = game.get("software_workshop")
+	if software_choice == null or not software_choice.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "Garage primary action does not open the Hardware / Software choice"
+	game.call("_close_software_workshop")
 	if str(garage.get("_onboarding_stage")) != "FIRST_IDEA":
 		game.queue_free()
 		_restore(snapshot)

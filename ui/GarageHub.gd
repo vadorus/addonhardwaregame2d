@@ -16,6 +16,7 @@ const BLUE := Color("d9822b")
 const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
 const GARAGE_SOUND := preload("res://ui/GarageSound.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
+const SOFTWARE_ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const WORKPLACE_ART := WORKPLACE.ART
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
@@ -739,13 +740,15 @@ func _base_zone_actions(zone_name: String) -> Array:
 		"Établi CPU":
 			if ResearchManager.projects.is_empty():
 				return [
-					{"label":"Nouveau processeur","tab":3,"context":"Établi CPU","enabled":true},
-					{"label":"Conception avancée","tab":3,"context":"Réglages avancés","enabled":true}
+					{"label":"Hardware — nouveau processeur","tab":3,"context":"HARDWARE_CPU","enabled":true},
+					{"label":"Software — activités & produits","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
+					{"label":"Conception Hardware avancée","tab":3,"context":"Réglages avancés","enabled":true}
 				]
 			return [
-				{"label":"Nouveau processeur","tab":3,"context":"NOUVEAU_CPU","enabled":true},
+				{"label":"Hardware — nouveau processeur","tab":3,"context":"NOUVEAU_CPU","enabled":true},
+				{"label":"Software — activités & produits","tab":0,"context":"SOFTWARE","enabled":SoftwareManager.any_open()},
 				{"label":"Continuer le projet CPU","tab":3,"context":"","enabled":true},
-				{"label":"Conception & R&D avancées","tab":3,"context":"Réglages avancés","enabled":true}
+				{"label":"Conception & R&D Hardware","tab":3,"context":"Réglages avancés","enabled":true}
 			]
 		"Banc de test":
 			if _has_pending_project_decision():
@@ -773,7 +776,7 @@ func _base_zone_actions(zone_name: String) -> Array:
 func _zone_context_text(zone_name: String) -> String:
 	match zone_name:
 		"Établi CPU":
-			return "Ici, vous imaginez et concevez vos processeurs. Le menu évoluera avec les compétences de l'entreprise."
+			return "Point de départ des projets : choisissez Hardware pour vos processeurs, ou Software pour les activités et produits logiciels."
 		"Banc de test":
 			return "Les prototypes, mesures et validations apparaissent ici quand le projet atteint les phases concernées."
 		"Tableau de planification":
@@ -920,7 +923,7 @@ func _nora_message() -> String:
 	if not CompanyManager.created and decision_source.is_null():
 		return "Créez votre entreprise pour commencer."
 	if _onboarding_stage == "FIRST_IDEA":
-		return "Étape 1/3 • Premier CPU : touchez l'établi (repère vert), choisissez un marché et lancez votre projet."
+		return "Départ • Touchez l'établi (repère vert) : choisissez Hardware pour concevoir un CPU, ou Software pour commencer par de petits contrats et construire votre savoir-faire."
 	if not _focus.is_empty():
 		var message := "%s : passez par %s." % [str(_focus.get("title", "")), _focus_where()]
 		var advice := str(_focus.get("advice", ""))
@@ -982,6 +985,8 @@ func _refresh_gameplay_overlays() -> void:
 			ready_product = value
 		elif str(value.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
 			launched_product = value
+	var active_software_project: Dictionary = SoftwareManager.projects[0] if not SoftwareManager.projects.is_empty() else {}
+	var active_software_activity: Dictionary = SoftwareManager.active_activity()
 
 	if not active_project.is_empty():
 		_project_kicker.text = "Projet en cours"
@@ -1011,15 +1016,51 @@ func _refresh_gameplay_overlays() -> void:
 		_project_title.text = str(launched_product.get("name", "CPU lancé"))
 		_project_stage.text = "Sur le marché • %s ventes ce mois" % str(launched_product.get("last_month_sales", 0))
 		_project_progress.value = 100.0
+	elif not active_software_project.is_empty():
+		_project_kicker.text = "Projet Software"
+		_refresh_phase_strip(-1)
+		_project_title.text = str(active_software_project.get("name", "Produit Software"))
+		var sw_done := int(active_software_project.get("months_done", 0))
+		var sw_total := maxi(int(active_software_project.get("months_total", 1)), 1)
+		_project_stage.text = "Développement Software • mois %d/%d" % [sw_done, sw_total]
+		_project_progress.value = clampf(float(sw_done) / float(sw_total) * 100.0, 0.0, 100.0)
+	elif not active_software_activity.is_empty():
+		_project_kicker.text = "Activité Software"
+		_refresh_phase_strip(-1)
+		var sw_activity_id := str(active_software_activity.get("id", ""))
+		var sw_data := SOFTWARE_ACTIVITY.data(sw_activity_id)
+		var sw_done := int(active_software_activity.get("months_done", 0))
+		var sw_total := maxi(int(sw_data.get("months", 1)), 1)
+		_project_title.text = SOFTWARE_ACTIVITY.label(sw_activity_id)
+		_project_stage.text = "Petit contrat • mois %d/%d" % [sw_done, sw_total]
+		_project_progress.value = clampf(float(sw_done) / float(sw_total) * 100.0, 0.0, 100.0)
 	else:
 		_project_kicker.text = "Votre premier projet"
 		_refresh_phase_strip(-1)
-		_project_title.text = "Imaginez votre premier CPU"
-		_project_stage.text = "Choisissez une cible et lancez votre projet."
+		_project_title.text = "Hardware ou Software ?"
+		_project_stage.text = "Choisissez votre première activité depuis l'établi."
 		_project_progress.value = 0.0
 
 	if _tasks_label != null:
-		_tasks_label.text = _nora_message()
+		var nora_text := _nora_message()
+		var software_lines: Array[String] = []
+		if not active_software_activity.is_empty():
+			var activity_id := str(active_software_activity.get("id", ""))
+			var activity_data := SOFTWARE_ACTIVITY.data(activity_id)
+			software_lines.append("%s %d/%d mois" % [
+				SOFTWARE_ACTIVITY.label(activity_id),
+				int(active_software_activity.get("months_done", 0)),
+				int(activity_data.get("months", 1))
+			])
+		if not active_software_project.is_empty():
+			software_lines.append("%s %d/%d mois" % [
+				str(active_software_project.get("name", "Produit Software")),
+				int(active_software_project.get("months_done", 0)),
+				int(active_software_project.get("months_total", 1))
+			])
+		if not software_lines.is_empty():
+			nora_text += "\nSoftware en parallèle : " + " • ".join(software_lines)
+		_tasks_label.text = nora_text
 	_refresh_objectives()
 	# Pré-lancement : les actualités restent dans Presse. Le garage garde seulement Nora et le projet.
 	if _feedback_panel != null:
@@ -1105,10 +1146,9 @@ func _refresh_primary_action() -> void:
 		_primary_action.text = "L'équipe travaille…"
 		_primary_action.disabled = true
 	else:
-		_primary_action.text = "+ Nouveau projet CPU"
-		# V0.9 : après le premier CPU, le bouton ouvre la conception en étapes.
-		if not ResearchManager.projects.is_empty():
-			_primary_action.set_meta("context", "NOUVEAU_CPU")
+		_primary_action.text = "+ Nouveau projet"
+		_primary_action.set_meta("tab", 0)
+		_primary_action.set_meta("context", "PROJECT_CHOICE")
 	call_deferred("_layout_zones")
 
 func set_progression(unlocks: Dictionary) -> void:
