@@ -9,6 +9,7 @@ const UI := preload("res://ui/UiKit.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
+const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 
 enum ViewMode { PROJECT_CHOICE, SOFTWARE_CHOICE, ACTIVITIES, PRODUCT }
 
@@ -209,17 +210,26 @@ func _show_activities() -> void:
 
 	var current := SoftwareManager.active_activity()
 	if not current.is_empty():
-		var current_data := ACTIVITY.data(str(current.get("id", "")))
+		var current_id := str(current.get("id", ""))
+		var approach_id := str(current.get("approach", "BALANCED"))
+		var terms := SoftwareManager.activity_terms(current_id, approach_id)
 		var running := UI.card(UI.APP_PANEL_ALT, 12, 12)
 		var running_box := VBoxContainer.new()
 		running.add_child(running_box)
 		running_box.add_child(UI.eyebrow("EN COURS"))
-		running_box.add_child(UI.label(ACTIVITY.label(str(current.get("id", ""))), 17))
-		running_box.add_child(UI.muted_label("Mois %d/%d" % [
+		running_box.add_child(UI.label(ACTIVITY.label(current_id), 17))
+		running_box.add_child(UI.muted_label("%s • mois %d/%d" % [
+			PLAY.approach_label(approach_id),
 			int(current.get("months_done", 0)),
-			int(current_data.get("months", 1))
+			int(terms.get("months", 1))
 		], 12))
 		_content.add_child(running)
+
+	var skill_parts: Array[String] = []
+	for skill_value in PLAY.SKILL_ORDER:
+		var skill_id := str(skill_value)
+		skill_parts.append("%s %d XP" % [PLAY.skill_label(skill_id), SoftwareManager.skill_xp(skill_id)])
+	_content.add_child(UI.muted_label("Savoir-faire : " + " • ".join(skill_parts), 11))
 
 	for activity_value in SoftwareManager.available_activities():
 		var activity_id := str(activity_value)
@@ -240,32 +250,44 @@ func _show_activities() -> void:
 		var pitch := UI.muted_label(str(data.get("pitch", "")), 12)
 		pitch.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(pitch)
-		box.add_child(UI.muted_label("%d mois • coût %s €/mois • paiement %s € • net %s € • XP %d" % [
-			int(data.get("months", 1)),
-			UI.money(int(data.get("monthly_cost", 0))),
-			UI.money(int(data.get("payout", 0))),
-			UI.money(ACTIVITY.net_reward(activity_id)),
-			int(data.get("xp", 0))
-		], 11))
 
-		var check := SoftwareManager.can_start_activity(activity_id)
-		var button := Button.new()
-		button.text = "Démarrer"
-		LOOK.button_style(button, bool(check.get("ok", false)))
-		button.disabled = not bool(check.get("ok", false))
-		button.tooltip_text = str(check.get("reason", ""))
-		button.pressed.connect(_start_activity.bind(activity_id))
-		box.add_child(button)
+		var approaches := HBoxContainer.new()
+		approaches.add_theme_constant_override("separation", 8)
+		box.add_child(approaches)
+		for approach_value in PLAY.APPROACH_ORDER:
+			var approach_id := str(approach_value)
+			var terms := SoftwareManager.activity_terms(activity_id, approach_id)
+			var check := SoftwareManager.can_start_activity(activity_id, approach_id)
+			var button := Button.new()
+			button.text = "%s\n%d mois • net %s €" % [
+				PLAY.approach_label(approach_id),
+				int(terms.get("months", 1)),
+				UI.money(int(terms.get("net", 0)))
+			]
+			button.custom_minimum_size = Vector2(185, 60)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			LOOK.button_style(button, approach_id == "BALANCED" and bool(check.get("ok", false)))
+			button.disabled = not bool(check.get("ok", false))
+			button.tooltip_text = "Coût %s €/mois • paiement %s € • XP %d%s" % [
+				UI.money(int(terms.get("monthly_cost", 0))),
+				UI.money(int(terms.get("payout", 0))),
+				int(terms.get("xp", 0)),
+				(" • " + str(check.get("reason", ""))) if button.disabled else ""
+			]
+			button.pressed.connect(_start_activity.bind(activity_id, approach_id))
+			approaches.add_child(button)
 
 	UI.prepare_touch_scroll_children(_content)
 
-func _start_activity(activity_id: String) -> void:
-	if SoftwareManager.start_activity(activity_id):
-		status_changed.emit("Activité Software lancée : %s." % ACTIVITY.label(activity_id))
+func _start_activity(activity_id: String, approach_id: String = "BALANCED") -> void:
+	if SoftwareManager.start_activity(activity_id, approach_id):
+		status_changed.emit("Contrat Software lancé : %s (%s)." % [
+			ACTIVITY.label(activity_id), PLAY.approach_label(approach_id)
+		])
 		work_started.emit("ACTIVITY")
 	else:
-		var check := SoftwareManager.can_start_activity(activity_id)
-		status_changed.emit(str(check.get("reason", "Impossible de démarrer cette activité.")))
+		var check := SoftwareManager.can_start_activity(activity_id, approach_id)
+		status_changed.emit(str(check.get("reason", "Impossible de démarrer ce contrat.")))
 	_show_activities()
 
 func _show_product() -> void:

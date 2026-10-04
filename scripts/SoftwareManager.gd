@@ -7,6 +7,7 @@ signal software_launched(product)
 
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
+const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 const LAUNCH_MASTERY_CAP := 2
 
 var families: Dictionary = {}
@@ -15,6 +16,7 @@ var products: Array = []
 var reveals: Array = []
 var activities: Array = []
 var completed_activities := 0
+var skills: Dictionary = {}
 var _next_id := 1
 
 func reset() -> void:
@@ -26,6 +28,7 @@ func reset() -> void:
 	reveals = []
 	activities = []
 	completed_activities = 0
+	skills = PLAY.empty_skills()
 	_next_id = 1
 	software_changed.emit()
 
@@ -85,25 +88,39 @@ func available_activities() -> Array:
 func active_activity() -> Dictionary:
 	return activities[0] if not activities.is_empty() else {}
 
-func can_start_activity(activity_id: String) -> Dictionary:
+func activity_terms(activity_id: String, approach_id: String = "BALANCED") -> Dictionary:
+	return PLAY.contract_terms(ACTIVITY.data(activity_id), approach_id)
+
+func skill_xp(skill_id: String) -> int:
+	return int(skills.get(skill_id, 0))
+
+func can_start_activity(activity_id: String, approach_id: String = "BALANCED") -> Dictionary:
 	var data := ACTIVITY.data(activity_id)
 	if data.is_empty() or TimeManager.year < int(data.get("from", 9999)):
 		return {"ok":false, "reason":"Cette activité n'est pas encore disponible."}
+	if not PLAY.APPROACHES.has(approach_id):
+		return {"ok":false, "reason":"Approche de travail inconnue."}
 	if not activities.is_empty():
 		return {"ok":false, "reason":"Une activité courte est déjà en cours."}
 	var family_id := str(data.get("family", "UTILITY"))
 	if not is_open(family_id):
 		return {"ok":false, "reason":"Le domaine Software correspondant n'est pas encore ouvert."}
-	var first_month := int(data.get("monthly_cost", 0))
+	var terms := activity_terms(activity_id, approach_id)
+	var first_month := int(terms.get("monthly_cost", 0))
 	if not Economy.can_afford(first_month, "Activité software"):
 		return {"ok":false, "reason":"Trésorerie insuffisante pour démarrer cette activité."}
 	return {"ok":true, "reason":""}
 
-func start_activity(activity_id: String) -> bool:
-	if not bool(can_start_activity(activity_id).get("ok", false)):
+func start_activity(activity_id: String, approach_id: String = "BALANCED") -> bool:
+	if not bool(can_start_activity(activity_id, approach_id).get("ok", false)):
 		return false
 	var data := ACTIVITY.data(activity_id)
-	activities.append({"id":activity_id, "family":str(data.get("family", "UTILITY")), "months_done":0})
+	activities.append({
+		"id":activity_id,
+		"family":str(data.get("family", "UTILITY")),
+		"approach":approach_id,
+		"months_done":0
+	})
 	software_changed.emit()
 	return true
 
@@ -113,6 +130,16 @@ func _gain_activity_xp(family_id: String, amount: int) -> void:
 	while int(state.activity_xp) >= 100 and int(state.mastery) < CAT.MAX_MASTERY:
 		state["activity_xp"] = int(state.activity_xp) - 100
 		state["mastery"] = int(state.mastery) + 1
+
+func _gain_skills(activity_data: Dictionary, total_xp: int) -> void:
+	var weights: Dictionary = activity_data.get("skills", {})
+	if weights.is_empty():
+		skills["development"] = skill_xp("development") + maxi(total_xp, 0)
+		return
+	for skill_id_value in weights.keys():
+		var skill_id := str(skill_id_value)
+		var gain := maxi(1, int(round(float(total_xp) * float(weights[skill_id]))))
+		skills[skill_id] = skill_xp(skill_id) + gain
 
 func preview(family_id: String, levels: Dictionary, price_mode: String) -> Dictionary:
 	var months := CAT.dev_months(family_id, levels)
@@ -209,27 +236,42 @@ func _process_sales() -> void:
 func _process_activities() -> void:
 	for value in activities.duplicate():
 		var current: Dictionary = value
-		var data := ACTIVITY.data(str(current.get("id", "")))
+		var activity_id := str(current.get("id", ""))
+		var data := ACTIVITY.data(activity_id)
 		if data.is_empty():
 			activities.erase(current)
 			continue
-		var cost := int(data.get("monthly_cost", 0))
+		var approach_id := str(current.get("approach", "BALANCED"))
+		var terms := activity_terms(activity_id, approach_id)
+		var cost := int(terms.get("monthly_cost", 0))
 		if cost > 0:
-			Economy.add_expense(cost, "Activité software — %s" % ACTIVITY.label(str(current.id)))
+			Economy.add_expense(cost, "Activité software — %s" % ACTIVITY.label(activity_id))
 		current["months_done"] = int(current.get("months_done", 0)) + 1
-		if int(current.months_done) < int(data.get("months", 1)):
+		if int(current.months_done) < int(terms.get("months", 1)):
 			continue
 		activities.erase(current)
-		var payout := int(data.get("payout", 0))
+		var payout := int(terms.get("payout", 0))
 		if payout > 0:
-			Economy.add_income(payout, "Contrat software — %s" % ACTIVITY.label(str(current.id)))
+			Economy.add_income(payout, "Contrat software — %s" % ACTIVITY.label(activity_id))
 		var family_id := str(current.get("family", "UTILITY"))
-		_gain_activity_xp(family_id, int(data.get("xp", 0)))
+		var gained_xp := int(terms.get("xp", data.get("xp", 0)))
+		_gain_activity_xp(family_id, gained_xp)
+		_gain_skills(data, gained_xp)
 		var state := family_state(family_id)
 		state["activities_done"] = int(state.get("activities_done", 0)) + 1
 		completed_activities += 1
-		CompanyManager.change_reputation((data.get("reputation", {}) as Dictionary))
-		CompanyManager.add_alert("Activité Software terminée : %s." % ACTIVITY.label(str(current.id)))
+
+		var rep_changes := {}
+		var rep_factor := float(terms.get("reputation_factor", 1.0))
+		for key_value in (data.get("reputation", {}) as Dictionary).keys():
+			var key := str(key_value)
+			rep_changes[key] = float((data.get("reputation", {}) as Dictionary)[key]) * rep_factor
+		if int(terms.get("bug_pressure", 0)) >= 10:
+			rep_changes["reliability"] = float(rep_changes.get("reliability", 0.0)) - 0.08
+		CompanyManager.change_reputation(rep_changes)
+		CompanyManager.add_alert("Contrat Software terminé : %s (%s)." % [
+			ACTIVITY.label(activity_id), PLAY.approach_label(approach_id)
+		])
 
 func process_month() -> void:
 	if not CompanyManager.created: return
@@ -243,7 +285,16 @@ func active_departments() -> Array:
 	return ["Développement"] if not projects.is_empty() or not activities.is_empty() else []
 
 func get_state() -> Dictionary:
-	return {"families":families, "projects":projects, "products":products, "reveals":reveals, "activities":activities, "completed_activities":completed_activities, "next_id":_next_id}
+	return {
+		"families":families,
+		"projects":projects,
+		"products":products,
+		"reveals":reveals,
+		"activities":activities,
+		"completed_activities":completed_activities,
+		"skills":skills,
+		"next_id":_next_id
+	}
 
 func load_state(state: Dictionary) -> void:
 	reset()
@@ -257,5 +308,9 @@ func load_state(state: Dictionary) -> void:
 	reveals = state.get("reveals", []).duplicate(true)
 	activities = state.get("activities", []).duplicate(true)
 	completed_activities = int(state.get("completed_activities", 0))
+	var saved_skills = state.get("skills", {})
+	if typeof(saved_skills) == TYPE_DICTIONARY:
+		for skill_id in PLAY.SKILL_ORDER:
+			skills[str(skill_id)] = int((saved_skills as Dictionary).get(str(skill_id), skills.get(str(skill_id), 0)))
 	_next_id = int(state.get("next_id", projects.size() + products.size() + 1))
 	software_changed.emit()
