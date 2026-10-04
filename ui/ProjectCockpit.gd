@@ -155,6 +155,9 @@ func _build_cpu_card(project: Dictionary) -> void:
 		str(GameData.PHASES[phase_index]),
 		int(project.get("months_spent", 0))
 	])
+	var phase_tip := UI.muted_label(_cpu_phase_tip(phase_index), 11)
+	phase_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(phase_tip)
 
 	var pending = project.get("pending_decision", {})
 	if typeof(pending) == TYPE_DICTIONARY and not (pending as Dictionary).is_empty():
@@ -192,7 +195,11 @@ func _build_software_card(project: Dictionary) -> void:
 	var done := int(project.get("months_done", 0))
 	var total := maxi(int(project.get("months_total", 1)), 1)
 	var status := str(project.get("status", "DEVELOPMENT"))
-	_progress(box, float(done) / float(total) * 100.0, "État : %s • mois %d/%d" % [_software_status(status), done, total])
+	var software_phase := SoftwareManager.software_cockpit_phase(project) if str(project.get("kind", "")) == "UTILITY_SLICE" else ""
+	var progress_text := "État : %s • mois %d/%d" % [_software_status(status), done, total]
+	if status == "DEVELOPMENT" and software_phase != "":
+		progress_text += " • %s" % _software_phase_label(software_phase)
+	_progress(box, float(done) / float(total) * 100.0, progress_text)
 
 	var metrics: Dictionary = project.get("metrics", {})
 	var metric_line := UI.muted_label("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performance %.0f • Bugs %d" % [
@@ -237,7 +244,14 @@ func _build_software_card(project: Dictionary) -> void:
 			_adjust_software.bind(str(project.get("id", "")), axis_id, 5)
 		)
 
+	var phase_weights := SoftwareManager.software_cockpit_phase_weights(project)
 	var month_impact := COCKPIT.month_bias(priorities, SoftwareManager.SOFTWARE_COCKPIT_AXES, 1.2)
+	for axis_value in SoftwareManager.SOFTWARE_COCKPIT_AXES:
+		var impact_axis := str(axis_value)
+		month_impact[impact_axis] = float(month_impact.get(impact_axis, 0.0)) * float(phase_weights.get(impact_axis, 1.0))
+	var phase_hint := UI.muted_label(_software_phase_tip(software_phase), 11)
+	phase_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(phase_hint)
 	var impact_label := UI.muted_label("Effet du prochain mois : " + _impact_text(month_impact, SoftwareManager.SOFTWARE_COCKPIT_AXES, false), 11)
 	impact_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(impact_label)
@@ -270,6 +284,30 @@ func _impact_text(impact: Dictionary, axes: Array, cpu := false) -> String:
 	if parts.is_empty():
 		return "répartition équilibrée, aucun biais particulier."
 	return " • ".join(parts) + (" sur le résultat final." if cpu else " point(s) sur les indicateurs.")
+
+func _cpu_phase_tip(phase_index: int) -> String:
+	match phase_index:
+		0: return "Concept : l'innovation a le plus de levier. Les choix très techniques porteront davantage dans les phases suivantes."
+		1: return "Architecture : performance et efficacité ont beaucoup de levier. C'est ici que les grands compromis du CPU se dessinent."
+		2: return "Prototype : performance et fiabilité deviennent concrètes. Pousser trop tard l'innovation rapporte moins."
+		3: return "Alpha : la fiabilité prend de l'importance ; c'est le bon moment pour corriger ce qui a été trop ambitieux."
+		4: return "Bêta : fiabilité et efficacité dominent. Les changements d'orientation tardifs coûtent en potentiel."
+		5: return "Validation : la fiabilité a le plus fort levier. La performance brute est désormais beaucoup plus difficile à rattraper."
+	return ""
+
+func _software_phase_label(phase: String) -> String:
+	match phase:
+		"PLANNING": return "Planification"
+		"BUILD": return "Construction"
+		"STABILIZE": return "Stabilisation"
+	return phase.capitalize()
+
+func _software_phase_tip(phase: String) -> String:
+	match phase:
+		"PLANNING": return "Planification : l'ergonomie et le choix des fonctions ont le plus de poids."
+		"BUILD": return "Construction : les fonctions et l'optimisation progressent vite, mais une course aux fonctions peut créer des bugs."
+		"STABILIZE": return "Stabilisation : les tests et l'optimisation ont le plus de poids. Ajouter trop de fonctions maintenant augmente fortement le risque."
+	return ""
 
 func _software_status(status: String) -> String:
 	match status:

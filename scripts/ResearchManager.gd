@@ -15,6 +15,14 @@ signal research_changed
 signal research_event_created(event)
 
 const CPU_COCKPIT_AXES := ["performance", "efficiency", "reliability", "innovation"]
+const CPU_COCKPIT_PHASE_WEIGHTS := {
+	0: {"performance":0.75, "efficiency":0.80, "reliability":0.65, "innovation":1.55},
+	1: {"performance":1.40, "efficiency":1.25, "reliability":0.90, "innovation":1.00},
+	2: {"performance":1.20, "efficiency":1.10, "reliability":1.25, "innovation":0.75},
+	3: {"performance":1.00, "efficiency":1.05, "reliability":1.40, "innovation":0.60},
+	4: {"performance":0.90, "efficiency":1.20, "reliability":1.50, "innovation":0.50},
+	5: {"performance":0.70, "efficiency":1.00, "reliability":1.65, "innovation":0.35}
+}
 
 const CPU_RESEARCH_DOMAIN_ORDER := ["ARCHITECTURE", "EFFICIENCY", "RELIABILITY"]
 const RESEARCH_TEAMS := preload("res://scripts/ResearchTeams.gd")
@@ -1101,15 +1109,21 @@ func cpu_cockpit_final_impact(project: Dictionary) -> Dictionary:
 	var average := cpu_cockpit_average_priorities(project)
 	return PROJECT_COCKPIT.month_bias(average, CPU_COCKPIT_AXES, 6.0)
 
+func cpu_cockpit_phase_weights(project: Dictionary) -> Dictionary:
+	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+	return (CPU_COCKPIT_PHASE_WEIGHTS.get(phase_index, {}) as Dictionary).duplicate(true)
+
 func _apply_cpu_cockpit_month(project: Dictionary) -> void:
 	if str(project.get("sector", "")) != "CPU":
 		return
 	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), CPU_COCKPIT_AXES)
 	project["cockpit_priorities"] = priorities
+	var phase_weights := cpu_cockpit_phase_weights(project)
 	var influence: Dictionary = project.get("cockpit_influence", {})
 	for axis_value in CPU_COCKPIT_AXES:
 		var axis := str(axis_value)
-		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0
+		var leverage := float(phase_weights.get(axis, 1.0))
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
 	project["cockpit_influence"] = influence
 	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
 

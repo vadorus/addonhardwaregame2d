@@ -30,6 +30,13 @@ func _ready() -> void:
 	var cpu_id := str(cpu.get("id", ""))
 	var sw_id := str(sw.get("id", ""))
 
+	var concept_weights := ResearchManager.cpu_cockpit_phase_weights(cpu)
+	_check(float(concept_weights.get("innovation", 0.0)) > float(concept_weights.get("performance", 0.0)),
+		"CPU Concept phase does not give innovation extra leverage", failures)
+	var stabilize_weights: Dictionary = SoftwareManager.SOFTWARE_COCKPIT_PHASE_WEIGHTS.get("STABILIZE", {})
+	_check(float(stabilize_weights.get("stability", 0.0)) > float(stabilize_weights.get("features", 0.0)),
+		"Software stabilization does not shift leverage toward tests/stability", failures)
+
 	_check(ResearchManager.adjust_project_cockpit_priority(cpu_id, "performance", 20), "CPU priority adjustment failed", failures)
 	_check(SoftwareManager.adjust_project_cockpit_priority(sw_id, "stability", 20), "Software priority adjustment failed", failures)
 

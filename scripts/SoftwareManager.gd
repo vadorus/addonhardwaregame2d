@@ -10,6 +10,11 @@ const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
 const SOFTWARE_COCKPIT_AXES := ["features", "usability", "stability", "performance"]
+const SOFTWARE_COCKPIT_PHASE_WEIGHTS := {
+	"PLANNING": {"features":1.20, "usability":1.45, "stability":0.80, "performance":0.65},
+	"BUILD": {"features":1.45, "usability":1.00, "stability":0.80, "performance":1.15},
+	"STABILIZE": {"features":0.50, "usability":0.90, "stability":1.65, "performance":1.25}
+}
 const LAUNCH_MASTERY_CAP := 2
 
 var families: Dictionary = {}
@@ -241,15 +246,31 @@ func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta:
 	software_changed.emit()
 	return true
 
+func software_cockpit_phase(project: Dictionary) -> String:
+	var total := maxi(int(project.get("months_total", 1)), 1)
+	var done := clampi(int(project.get("months_done", 0)), 0, total)
+	var ratio := float(done) / float(total)
+	if ratio <= 0.25:
+		return "PLANNING"
+	if ratio < 0.75:
+		return "BUILD"
+	return "STABILIZE"
+
+func software_cockpit_phase_weights(project: Dictionary) -> Dictionary:
+	return (SOFTWARE_COCKPIT_PHASE_WEIGHTS.get(software_cockpit_phase(project), {}) as Dictionary).duplicate(true)
+
 func _apply_software_cockpit_month(project: Dictionary) -> void:
 	if str(project.get("kind", "")) != "UTILITY_SLICE":
 		return
 	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
 	project["cockpit_priorities"] = priorities
+	var phase := software_cockpit_phase(project)
+	var phase_weights := software_cockpit_phase_weights(project)
 	var influence: Dictionary = project.get("cockpit_influence", {})
 	for axis_value in SOFTWARE_COCKPIT_AXES:
 		var axis := str(axis_value)
-		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0
+		var leverage := float(phase_weights.get(axis, 1.0))
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
 	project["cockpit_influence"] = influence
 	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
 
@@ -257,16 +278,21 @@ func _apply_software_cockpit_month(project: Dictionary) -> void:
 	var bias := PROJECT_COCKPIT.month_bias(priorities, SOFTWARE_COCKPIT_AXES, 1.2)
 	for axis_value in SOFTWARE_COCKPIT_AXES:
 		var axis := str(axis_value)
-		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)), 10.0, 98.0)
+		var leverage := float(phase_weights.get(axis, 1.0))
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)) * leverage, 10.0, 98.0)
 	project["metrics"] = metrics
 	project["levels"] = _utility_levels_from_metrics(metrics)
 
 	var stability_priority := int(priorities.get("stability", 25))
 	var feature_priority := int(priorities.get("features", 25))
-	if stability_priority >= 40 and int(project.get("bugs", 0)) > 0:
+	if phase == "STABILIZE" and stability_priority >= 35 and int(project.get("bugs", 0)) > 0:
+		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 2)
+	elif stability_priority >= 40 and int(project.get("bugs", 0)) > 0:
 		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 1)
-	if feature_priority >= 45:
+	if phase == "BUILD" and feature_priority >= 45:
 		project["bugs"] = int(project.get("bugs", 0)) + 1
+	elif phase == "STABILIZE" and feature_priority >= 45:
+		project["bugs"] = int(project.get("bugs", 0)) + 2
 
 func pending_project_decision() -> Dictionary:
 	for value in projects:
