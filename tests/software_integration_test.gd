@@ -1,14 +1,30 @@
 extends Node
 
+const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+
 func _ready() -> void:
 	var failures: Array[String] = []
 	SaveManager.use_test_folder()
 	SaveManager.delete_slot(3)
 	SimulationManager.reset_all("Software Integration CI", "CPU", "STANDARD")
 	_check(SoftwareManager.is_open("UTILITY"), "software autoload was not reset with the simulation", failures)
+	var cpu_started := ResearchManager.start_project(
+		"Parallel CPU", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 35000,
+		CPU_DESIGN.default_design()
+	)
+	_check(cpu_started, "could not start CPU alongside software activity", failures)
+	var cpu_before := 0.0
+	if not ResearchManager.projects.is_empty():
+		cpu_before = float((ResearchManager.projects[0] as Dictionary).get("phase_progress", 0.0))
 	_check(SoftwareManager.start_activity("AUTOMATION"), "could not start integrated software activity", failures)
 	SimulationManager.process_month_end()
 	var running := SoftwareManager.active_activity()
+	var cpu_after := cpu_before
+	var cpu_phase := 0
+	if not ResearchManager.projects.is_empty():
+		cpu_after = float((ResearchManager.projects[0] as Dictionary).get("phase_progress", cpu_before))
+		cpu_phase = int((ResearchManager.projects[0] as Dictionary).get("phase_index", 0))
+	_check(cpu_after > cpu_before or cpu_phase > 0, "CPU did not advance during the same month as Software", failures)
 	_check(not running.is_empty(), "two-month activity ended after one integrated month", failures)
 	_check(int(running.get("months_done", 0)) == 1, "integrated month did not advance software activity", failures)
 	_check(SaveManager.save_to_slot(3, true), "could not save integrated software state", failures)
