@@ -115,65 +115,70 @@ func _go_back() -> void:
 		ViewMode.ACTIVITIES, ViewMode.PRODUCT:
 			_show_software_choice()
 
-func _choice_card(title: String, subtitle: String, action: String, primary := false) -> Button:
+func _choice_card(title: String, subtitle: String) -> Button:
 	var button := Button.new()
-	button.text = "%s\n%s\n\n%s" % [title, subtitle, action]
+	button.text = "%s\n%s" % [title, subtitle]
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size = Vector2(0, 150)
+	button.custom_minimum_size = Vector2(0, 170)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	LOOK.button_style(button, primary)
-	button.add_theme_font_size_override("font_size", 17)
+	LOOK.button_style(button)
+	button.add_theme_font_size_override("font_size", 18)
 	return button
 
 func _show_project_choice() -> void:
 	_mode = ViewMode.PROJECT_CHOICE
 	_title.text = "Quel projet voulez-vous lancer ?"
 	_subtitle.text = "Choisissez d'abord la branche. Les réglages viendront ensuite."
-	_back_button.text = "Garage"
+	_back_button.visible = false
 	_clear_content()
 
-	var hardware := _choice_card(
+	var choices := HBoxContainer.new()
+	choices.add_theme_constant_override("separation", 14)
+	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content.add_child(choices)
+
+	var processor := _choice_card(
 		"Processeur",
-		"Concevoir une nouvelle génération de CPU.",
-		"Continuer en Hardware",
-		true
+		"Concevoir une nouvelle génération de CPU."
 	)
-	hardware.pressed.connect(func(): hardware_requested.emit())
-	_content.add_child(hardware)
+	processor.pressed.connect(func(): hardware_requested.emit())
+	choices.add_child(processor)
 
 	var software := _choice_card(
 		"Logiciel",
-		"Travailler sur des contrats ou créer vos propres logiciels.",
-		"Continuer en Software"
+		"Réaliser des contrats ou créer vos propres logiciels."
 	)
 	software.disabled = not SoftwareManager.any_open()
 	software.pressed.connect(_show_software_choice)
-	_content.add_child(software)
+	choices.add_child(software)
 
 func _show_software_choice() -> void:
 	_mode = ViewMode.SOFTWARE_CHOICE
 	_title.text = "Logiciel"
 	_subtitle.text = "Que voulez-vous faire ?"
+	_back_button.visible = true
 	_back_button.text = "Projets"
 	_clear_content()
 
+	var choices := HBoxContainer.new()
+	choices.add_theme_constant_override("separation", 14)
+	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content.add_child(choices)
+
 	var contracts := _choice_card(
 		"Petits contrats",
-		"Missions courtes pour gagner un peu d'argent, de l'XP et de la maîtrise.",
-		"Voir les contrats",
-		true
+		"Missions courtes pour gagner un peu d'argent, de l'XP et de la maîtrise."
 	)
 	contracts.pressed.connect(_show_activities)
-	_content.add_child(contracts)
+	choices.add_child(contracts)
 
 	var product := _choice_card(
 		"Créer un produit",
-		"Développer un logiciel qui sera vendu et maintenu dans la durée.",
-		"Choisir un produit"
+		"Développer un logiciel vendu et maintenu dans la durée."
 	)
 	product.pressed.connect(_show_product)
-	_content.add_child(product)
+	choices.add_child(product)
 
 	_add_compact_status()
 
@@ -198,6 +203,7 @@ func _show_activities() -> void:
 	_mode = ViewMode.ACTIVITIES
 	_title.text = "Petits contrats"
 	_subtitle.text = "Choisissez une mission. Une seule peut être active à la fois."
+	_back_button.visible = true
 	_back_button.text = "Logiciel"
 	_clear_content()
 
@@ -266,6 +272,7 @@ func _show_product() -> void:
 	_mode = ViewMode.PRODUCT
 	_title.text = "Créer un produit logiciel"
 	_subtitle.text = "Choisissez d'abord le type de logiciel, puis réglez uniquement ce produit."
+	_back_button.visible = true
 	_back_button.text = "Logiciel"
 	_clear_content()
 	_build_product_controls()
