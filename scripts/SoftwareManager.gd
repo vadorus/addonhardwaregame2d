@@ -206,7 +206,9 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 		"cockpit_months":0,
 		"cockpit_interactive":player_controlled,
 		"cockpit_directive_pending":PROJECT_DIRECTIVES.software_milestone("PLANNING") if player_controlled else {},
-		"cockpit_directive_history":[]
+		"cockpit_directive_history":[],
+		"cockpit_last_choice":"",
+		"cockpit_last_outcome":""
 	}
 	_next_id += 1
 	projects.append(project)
@@ -310,31 +312,48 @@ func resolve_software_directive(project_id: String, option_id: String) -> bool:
 	var option := PROJECT_DIRECTIVES.option_for(pending, option_id)
 	if option.is_empty():
 		return false
+	var phase := software_cockpit_phase(project)
+	var cost_once := maxi(int(option.get("cost_once", 0)), 0)
+	var delay_months := maxi(int(option.get("delay_months", 0)), 0)
+	if cost_once > 0 and not Economy.can_afford(cost_once, "Décision Software — %s" % str(project.get("name", "Logiciel"))):
+		return false
 	var metrics: Dictionary = project.get("metrics", {})
+	var outcome_parts: Array[String] = []
+	var labels := {"features":"fonctions", "usability":"ergonomie", "stability":"stabilité", "performance":"performance"}
 	for axis_value in SOFTWARE_COCKPIT_AXES:
 		var axis := str(axis_value)
-		metrics[axis] = clampf(
-			float(metrics.get(axis, 50.0)) + float((option.get("metrics", {}) as Dictionary).get(axis, 0.0)),
-			10.0,
-			98.0
-		)
+		var delta := float((option.get("metrics", {}) as Dictionary).get(axis, 0.0))
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + delta, 10.0, 98.0)
+		if absf(delta) >= 0.05:
+			outcome_parts.append("%s %+.1f" % [str(labels.get(axis, axis)), delta])
 	project["metrics"] = metrics
 	project["levels"] = _utility_levels_from_metrics(metrics)
-	project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(option.get("bugs", 0)))
-	var phase := software_cockpit_phase(project)
+	var bugs_delta := int(option.get("bugs", 0))
+	project["bugs"] = maxi(0, int(project.get("bugs", 0)) + bugs_delta)
+	if bugs_delta != 0:
+		outcome_parts.append("bugs %+d" % bugs_delta)
+	if cost_once > 0:
+		Economy.add_expense(cost_once, "Décision Software — %s" % str(project.get("name", "Logiciel")))
+		outcome_parts.append("coût %d €" % cost_once)
+	if delay_months > 0:
+		project["months_total"] = int(project.get("months_total", 1)) + delay_months
+		outcome_parts.append("+%d mois" % delay_months)
+	var label := str(option.get("label", option_id))
+	var outcome := "%s — %s" % [label, " • ".join(outcome_parts)] if not outcome_parts.is_empty() else label
+	project["cockpit_last_choice"] = label
+	project["cockpit_last_outcome"] = outcome
 	var history: Array = project.get("cockpit_directive_history", [])
 	history.append({
 		"phase":phase,
 		"option_id":option_id,
-		"label":str(option.get("label", option_id))
+		"label":label,
+		"cost":cost_once,
+		"delay_months":delay_months,
+		"outcome":outcome
 	})
 	project["cockpit_directive_history"] = history
 	project["cockpit_directive_pending"] = {}
-	CompanyManager.add_alert("%s : orientation %s — %s." % [
-		str(project.get("name", "Logiciel")),
-		phase.to_lower(),
-		str(option.get("label", option_id))
-	])
+	CompanyManager.add_alert("%s : %s." % [str(project.get("name", "Logiciel")), outcome])
 	software_changed.emit()
 	return true
 
@@ -393,14 +412,21 @@ func resolve_project_decision(project_id: String, choice: String) -> bool:
 		return false
 	var decision: Dictionary = project.get("pending_decision", {})
 	var feature_id := str(decision.get("feature_id", ""))
+	var feature_label := str(PLAY.utility_feature(feature_id).get("label", feature_id))
+	var bugs_before := int(project.get("bugs", 0))
+	var decision_outcome := ""
+	var choice_label := ""
 	match choice:
 		"REWRITE":
+			choice_label = "Réécrire proprement"
 			project["months_total"] = int(project.get("months_total", 1)) + 1
 			project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 5)
 			var metrics: Dictionary = project.get("metrics", {})
 			metrics["stability"] = clampf(float(metrics.get("stability", 50.0)) + 6.0, 0.0, 100.0)
 			project["levels"] = _utility_levels_from_metrics(metrics)
+			decision_outcome = "%s — stabilité +6 • bugs %+d • +1 mois" % [choice_label, int(project.get("bugs", 0)) - bugs_before]
 		"CUT":
+			choice_label = "Retirer la fonction"
 			var features: Array = (project.get("features", []) as Array).duplicate()
 			if features.size() <= 2 or not features.has(feature_id):
 				return false
@@ -413,16 +439,22 @@ func resolve_project_decision(project_id: String, choice: String) -> bool:
 			project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(plan.get("bugs", 0)) - int(old_plan.get("bugs", 0)))
 			project["monthly_cost"] = int(plan.get("monthly_cost", project.get("monthly_cost", 0)))
 			project["months_total"] = maxi(3, maxi(int(project.get("months_done", 0)) + 1, int(plan.get("months", 1))))
+			decision_outcome = "%s — %s supprimé • bugs %+d • planning recalculé" % [choice_label, feature_label, int(project.get("bugs", 0)) - bugs_before]
 		"QUICK_FIX":
+			choice_label = "Corriger vite"
 			project["bugs"] = int(project.get("bugs", 0)) + 6
 			var metrics: Dictionary = project.get("metrics", {})
 			metrics["stability"] = clampf(float(metrics.get("stability", 50.0)) - 4.0, 0.0, 100.0)
 			project["levels"] = _utility_levels_from_metrics(metrics)
+			decision_outcome = "%s — stabilité -4 • bugs +6 • aucun retard" % choice_label
 		_:
 			return false
+	project["cockpit_last_choice"] = choice_label
+	project["cockpit_last_outcome"] = decision_outcome
 	project["pending_decision"] = {}
 	project["status"] = "DEVELOPMENT"
 	_ensure_software_directive(project)
+	CompanyManager.add_alert("%s : %s." % [str(project.get("name", "Logiciel")), decision_outcome])
 	software_changed.emit()
 	return true
 
@@ -449,11 +481,15 @@ func choose_release(project_id: String, choice: String) -> bool:
 		"BETA":
 			project["status"] = "BETA"
 			project["beta_months_done"] = 0
+			project["cockpit_last_choice"] = "Ouvrir une bêta"
+			project["cockpit_last_outcome"] = "Bêta ouverte — +1 mois de tests • bugs réduits avant la prochaine revue"
 			CompanyManager.add_alert("Bêta ouverte pour %s : encore un mois de tests." % str(project.get("name", "le logiciel")))
 		"DELAY":
 			project["status"] = "DEVELOPMENT"
 			project["months_total"] = int(project.get("months_total", 1)) + 1
 			project["polish_pending"] = true
+			project["cockpit_last_choice"] = "Repousser la sortie"
+			project["cockpit_last_outcome"] = "Sortie repoussée — +1 mois • stabilité +4 • jusqu'à 5 bugs corrigés"
 		_:
 			return false
 	software_changed.emit()

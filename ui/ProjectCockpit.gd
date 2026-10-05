@@ -211,6 +211,12 @@ func _directive_effect_text(option: Dictionary, kind: String) -> String:
 		var bugs := int(option.get("bugs", 0))
 		if bugs != 0:
 			parts.append("Bugs %+d" % bugs)
+	var cost_once := maxi(int(option.get("cost_once", 0)), 0)
+	if cost_once > 0:
+		parts.append("Coût %d €" % cost_once)
+	var delay_months := maxi(int(option.get("delay_months", 0)), 0)
+	if delay_months > 0:
+		parts.append("+%d mois" % delay_months)
 	return " • ".join(parts) if not parts.is_empty() else "Effet neutre"
 
 func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: String, project_id: String) -> void:
@@ -239,8 +245,12 @@ func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: St
 			_directive_effect_text(option, kind)
 		]
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(210, 108)
+		button.custom_minimum_size = Vector2(210, 124)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var option_cost := maxi(int(option.get("cost_once", 0)), 0)
+		button.disabled = option_cost > 0 and Economy.money < option_cost
+		if button.disabled:
+			button.text += "\nFonds insuffisants"
 		LOOK.button_style(button)
 		if kind == "CPU":
 			button.pressed.connect(_choose_cpu_directive.bind(project_id, str(option.get("id", ""))))
@@ -258,6 +268,20 @@ func _directive_history_line(history: Array) -> String:
 			parts.append("%s : %s" % [phase, label])
 	return " • ".join(parts)
 
+func _build_last_outcome(box: VBoxContainer, project: Dictionary) -> void:
+	var outcome := str(project.get("cockpit_last_outcome", "")).strip_edges()
+	if outcome == "":
+		return
+	var panel := UI.card(Color("edf7ef"), 10, 10)
+	box.add_child(panel)
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	panel.add_child(inner)
+	inner.add_child(UI.eyebrow("CONSÉQUENCE DU DERNIER CHOIX"))
+	var message := UI.muted_label(outcome, 11)
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inner.add_child(message)
+
 func _build_cpu_card(project: Dictionary) -> void:
 	var box := _project_card("PROCESSEUR", str(project.get("name", "Projet CPU")))
 	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
@@ -272,6 +296,7 @@ func _build_cpu_card(project: Dictionary) -> void:
 	var phase_tip := UI.muted_label(_cpu_phase_tip(phase_index), 11)
 	phase_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(phase_tip)
+	_build_last_outcome(box, project)
 
 	var directive := ResearchManager.cpu_pending_directive(project)
 	if not directive.is_empty():
@@ -345,6 +370,7 @@ func _build_software_card(project: Dictionary) -> void:
 	], 11)
 	metric_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(metric_line)
+	_build_last_outcome(box, project)
 
 	var sw_directive := SoftwareManager.software_pending_directive(project)
 	if status == "DEVELOPMENT" and not sw_directive.is_empty():

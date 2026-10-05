@@ -842,12 +842,15 @@ func _compute_focus() -> Dictionary:
 	if _has_pending_project_decision():
 		return {"kind":"project", "zone":"Banc de test", "label":"Décision prototype / validation", "tab":3, "context":"PROJECT_DECISION", "title":"Le prototype attend votre décision", "category":"PROTOTYPE"}
 	var active_cpu := ResearchManager.active_cpu_project()
-	if not active_cpu.is_empty() and not ResearchManager.cpu_pending_directive(active_cpu).is_empty():
-		return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le CPU attend votre orientation de phase", "category":"PROJET"}
+	if not active_cpu.is_empty():
+		var cpu_directive := ResearchManager.cpu_pending_directive(active_cpu)
+		if not cpu_directive.is_empty():
+			return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":str(cpu_directive.get("title", "Le CPU attend votre orientation de phase")), "category":"PROJET"}
 	if not SoftwareManager.projects.is_empty():
 		var active_sw: Dictionary = SoftwareManager.projects[0]
-		if not SoftwareManager.software_pending_directive(active_sw).is_empty():
-			return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le logiciel attend votre orientation de phase", "category":"PROJET"}
+		var sw_directive := SoftwareManager.software_pending_directive(active_sw)
+		if not sw_directive.is_empty():
+			return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":str(sw_directive.get("title", "Le logiciel attend votre orientation de phase")), "category":"PROJET"}
 	if not SoftwareManager.pending_project_decision().is_empty():
 		return {"kind":"project", "zone":"Établi CPU", "label":"Décision logiciel", "tab":0, "context":"SOFTWARE", "title":"Le projet Software attend votre arbitrage", "category":"PROJET"}
 	if not SoftwareManager.ready_software_project().is_empty():
@@ -1017,7 +1020,11 @@ func _refresh_parallel_project_trackers(cpu_project: Dictionary, software_projec
 		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
 		var cpu_detail := str(GameData.PHASES[phase_index])
 		if not ResearchManager.cpu_pending_directive(cpu_project).is_empty():
-			cpu_detail = "Choix de conception requis"
+			cpu_detail = "⚠ Choix de conception requis"
+		elif not (cpu_project.get("pending_decision", {}) as Dictionary).is_empty():
+			cpu_detail = "⚠ Revue CPU requise"
+		elif str(cpu_project.get("cockpit_last_choice", "")) != "":
+			cpu_detail += " • " + str(cpu_project.get("cockpit_last_choice", ""))
 		_add_project_tracker(
 			"CPU • " + str(cpu_project.get("name", "Projet CPU")),
 			cpu_detail,
@@ -1030,7 +1037,11 @@ func _refresh_parallel_project_trackers(cpu_project: Dictionary, software_projec
 		var sw_status := str(software_project.get("status", "DEVELOPMENT"))
 		var sw_detail := "%s • %d/%d" % [sw_status.capitalize(), sw_done, sw_total]
 		if not SoftwareManager.software_pending_directive(software_project).is_empty():
-			sw_detail = "Choix de conception requis"
+			sw_detail = "⚠ Choix de conception requis"
+		elif sw_status in ["DECISION", "REVIEW"]:
+			sw_detail = "⚠ Décision joueur requise"
+		elif str(software_project.get("cockpit_last_choice", "")) != "":
+			sw_detail += " • " + str(software_project.get("cockpit_last_choice", ""))
 		_add_project_tracker(
 			"Logiciel • " + str(software_project.get("name", "Produit Software")),
 			sw_detail,
@@ -1091,7 +1102,8 @@ func _refresh_gameplay_overlays() -> void:
 		if _phase_row != null:
 			_phase_row.visible = false
 		_project_title.text = "%d projets actifs" % tracker_count
-		_project_stage.text = "CPU et Logiciel avancent en même temps. Pilotez la répartition de travail de chaque équipe."
+		var parallel_blocked := not ResearchManager.cpu_pending_directive(active_project).is_empty() or not (active_project.get("pending_decision", {}) as Dictionary).is_empty() or not SoftwareManager.software_pending_directive(active_software_project).is_empty() or str(active_software_project.get("status", "")) in ["DECISION", "REVIEW"]
+		_project_stage.text = "⚠ Une décision attend votre choix — temps en pause." if parallel_blocked else "CPU et Logiciel avancent en même temps. Pilotez la répartition de travail de chaque équipe."
 	elif not active_project.is_empty():
 		_project_kicker.text = "Projet en cours"
 		var phase_index := clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
@@ -1100,7 +1112,14 @@ func _refresh_gameplay_overlays() -> void:
 		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
 		_project_title.text = str(active_project.get("name", "Projet CPU"))
 		# Un seul pourcentage à l'écran : la barre (avancement global). La ligne dit l'étape.
-		_project_stage.text = "Étape %d/%d : %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
+		if not ResearchManager.cpu_pending_directive(active_project).is_empty():
+			_project_stage.text = "⚠ Choix de conception requis — temps en pause"
+		elif not (active_project.get("pending_decision", {}) as Dictionary).is_empty():
+			_project_stage.text = "⚠ Revue CPU requise — temps en pause"
+		else:
+			_project_stage.text = "Étape %d/%d : %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
+			if str(active_project.get("cockpit_last_choice", "")) != "":
+				_project_stage.text += " • Dernier choix : " + str(active_project.get("cockpit_last_choice", ""))
 		_project_progress.value = overall
 	elif not active_job.is_empty():
 		_project_kicker.text = "Industrialisation"
@@ -1126,7 +1145,15 @@ func _refresh_gameplay_overlays() -> void:
 		_project_title.text = str(active_software_project.get("name", "Produit Software"))
 		var sw_done := int(active_software_project.get("months_done", 0))
 		var sw_total := maxi(int(active_software_project.get("months_total", 1)), 1)
-		_project_stage.text = "Développement Software • mois %d/%d" % [sw_done, sw_total]
+		var sw_status := str(active_software_project.get("status", "DEVELOPMENT"))
+		if not SoftwareManager.software_pending_directive(active_software_project).is_empty():
+			_project_stage.text = "⚠ Choix Software requis — temps en pause"
+		elif sw_status in ["DECISION", "REVIEW"]:
+			_project_stage.text = "⚠ Décision Software requise — temps en pause"
+		else:
+			_project_stage.text = "%s • mois %d/%d" % [SoftwareManager.software_cockpit_phase(active_software_project).capitalize() if sw_status == "DEVELOPMENT" else sw_status.capitalize(), sw_done, sw_total]
+			if str(active_software_project.get("cockpit_last_choice", "")) != "":
+				_project_stage.text += " • Dernier choix : " + str(active_software_project.get("cockpit_last_choice", ""))
 		_project_progress.value = clampf(float(sw_done) / float(sw_total) * 100.0, 0.0, 100.0)
 	elif not active_software_activity.is_empty():
 		_project_kicker.text = "Activité Software"

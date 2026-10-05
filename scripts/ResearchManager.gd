@@ -1040,7 +1040,9 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		"cockpit_interactive":sector == "CPU" and player_controlled,
 		"cockpit_directive_pending":PROJECT_DIRECTIVES.cpu_milestone(0) if sector == "CPU" and player_controlled else {},
 		"cockpit_directive_history":[],
-		"cockpit_directive_impact":{"performance":0.0, "efficiency":0.0, "reliability":0.0, "innovation":0.0}
+		"cockpit_directive_impact":{"performance":0.0, "efficiency":0.0, "reliability":0.0, "innovation":0.0},
+		"cockpit_last_choice":"",
+		"cockpit_last_outcome":""
 	}
 	if approach != "INTERNAL":
 		var signed_contract := SupplierManager.sign_contract(project_id, approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
@@ -1173,21 +1175,43 @@ func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
 		var option := PROJECT_DIRECTIVES.option_for(pending, option_id)
 		if option.is_empty():
 			return false
+		var cost_once := maxi(int(option.get("cost_once", 0)), 0)
+		var delay_months := maxi(int(option.get("delay_months", 0)), 0)
+		if cost_once > 0 and not Economy.can_afford(cost_once, "Décision de développement — %s" % str(project.get("name", "CPU"))):
+			return false
 		var impact: Dictionary = project.get("cockpit_directive_impact", {})
+		var outcome_parts: Array[String] = []
+		var labels := {"performance":"performance", "efficiency":"efficacité", "reliability":"fiabilité", "innovation":"innovation"}
 		for axis_value in CPU_COCKPIT_AXES:
 			var axis := str(axis_value)
-			impact[axis] = float(impact.get(axis, 0.0)) + float((option.get("impact", {}) as Dictionary).get(axis, 0.0))
+			var delta := float((option.get("impact", {}) as Dictionary).get(axis, 0.0))
+			impact[axis] = float(impact.get(axis, 0.0)) + delta
+			if absf(delta) >= 0.05:
+				outcome_parts.append("%s %+.1f" % [str(labels.get(axis, axis)), delta])
 		project["cockpit_directive_impact"] = impact
+		if cost_once > 0:
+			Economy.add_expense(cost_once, "Décision de développement — %s" % str(project.get("name", "CPU")))
+			outcome_parts.append("coût %d €" % cost_once)
+		if delay_months > 0:
+			project["decision_delay_months_remaining"] = int(project.get("decision_delay_months_remaining", 0)) + delay_months
+			outcome_parts.append("+%d mois" % delay_months)
+		var label := str(option.get("label", option_id))
+		var outcome := "%s — %s" % [label, " • ".join(outcome_parts)] if not outcome_parts.is_empty() else label
+		project["cockpit_last_choice"] = label
+		project["cockpit_last_outcome"] = outcome
 		var history: Array = project.get("cockpit_directive_history", [])
 		history.append({
 			"phase_index":int(project.get("phase_index", 0)),
 			"phase":str(GameData.PHASES[clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)]),
 			"option_id":option_id,
-			"label":str(option.get("label", option_id))
+			"label":label,
+			"cost":cost_once,
+			"delay_months":delay_months,
+			"outcome":outcome
 		})
 		project["cockpit_directive_history"] = history
 		project["cockpit_directive_pending"] = {}
-		CompanyManager.add_alert("%s : orientation choisie — %s." % [str(project.get("name", "CPU")), str(option.get("label", option_id))])
+		CompanyManager.add_alert("%s : %s." % [str(project.get("name", "CPU")), outcome])
 		projects_changed.emit()
 		return true
 	return false
@@ -1437,12 +1461,15 @@ func resolve_project_decision(project_id: String, choice_id: String) -> bool:
 		if history.size() > 12:
 			history.pop_back()
 		project["decision_history"] = history
+		var choice_label := str(selected_option.get("label", choice_id))
+		var choice_description := str(selected_option.get("description", "")).strip_edges()
+		var outcome := choice_label + (" — " + choice_description if choice_description != "" else "")
+		if cost > 0:
+			outcome += " Coût immédiat : %d €." % cost
+		project["cockpit_last_choice"] = choice_label
+		project["cockpit_last_outcome"] = outcome
 		project["pending_decision"] = {}
-		CompanyManager.add_alert("%s : %s — %s." % [
-			str(project.get("name", "CPU")),
-			str(decision.get("category", "arbitrage")).to_lower(),
-			str(selected_option.get("label", choice_id))
-		])
+		CompanyManager.add_alert("%s : %s." % [str(project.get("name", "CPU")), outcome])
 		if bool(effect.get("complete_project", false)):
 			var validation_metrics_value = project.get("validation_metrics", {})
 			if typeof(validation_metrics_value) != TYPE_DICTIONARY or validation_metrics_value.is_empty():
