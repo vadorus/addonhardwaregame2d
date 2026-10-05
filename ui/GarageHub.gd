@@ -62,6 +62,7 @@ var _project_panel: PanelContainer
 var _project_title: Label
 var _project_stage: Label
 var _project_progress: ProgressBar
+var _parallel_projects_box: VBoxContainer
 var _phase_labels: Array[Label] = []
 var _phase_badges: Array[Control] = []
 var _project_kicker: Label
@@ -304,6 +305,10 @@ func _build_gameplay_overlays() -> void:
 	_project_progress.add_theme_stylebox_override("background", _panel_style(Color("efe3d0"), Color("dcc8a8"), 9, 0))
 	_project_progress.add_theme_stylebox_override("fill", _panel_style(BLUE, BLUE, 9, 0))
 	project_box.add_child(_project_progress)
+	_parallel_projects_box = VBoxContainer.new()
+	_parallel_projects_box.add_theme_constant_override("separation", 5)
+	_parallel_projects_box.visible = false
+	project_box.add_child(_parallel_projects_box)
 	_primary_action = Button.new()
 	_primary_action.custom_minimum_size = Vector2(250, 46)
 	_primary_action.add_theme_font_size_override("font_size", 16)
@@ -525,7 +530,7 @@ func _layout_zones() -> void:
 	if _project_panel != null:
 		# Écran bas (téléphone, petite fenêtre) : on retire la frise d'étapes pour libérer le décor.
 		if _phase_row != null:
-			var want_phases := size.y >= 560.0
+			var want_phases := size.y >= 560.0 and (_project_progress == null or _project_progress.visible)
 			if _phase_row.visible != want_phases:
 				_phase_row.visible = want_phases
 		var project_w := clampf(size.x * 0.29, 300.0, 370.0)
@@ -836,6 +841,17 @@ func _short(text: String, max_chars: int) -> String:
 func _compute_focus() -> Dictionary:
 	if _has_pending_project_decision():
 		return {"kind":"project", "zone":"Banc de test", "label":"Décision prototype / validation", "tab":3, "context":"PROJECT_DECISION", "title":"Le prototype attend votre décision", "category":"PROTOTYPE"}
+	var active_cpu := ResearchManager.active_cpu_project()
+	if not active_cpu.is_empty() and not ResearchManager.cpu_pending_directive(active_cpu).is_empty():
+		return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le CPU attend votre orientation de phase", "category":"PROJET"}
+	if not SoftwareManager.projects.is_empty():
+		var active_sw: Dictionary = SoftwareManager.projects[0]
+		if not SoftwareManager.software_pending_directive(active_sw).is_empty():
+			return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le logiciel attend votre orientation de phase", "category":"PROJET"}
+	if not SoftwareManager.pending_project_decision().is_empty():
+		return {"kind":"project", "zone":"Établi CPU", "label":"Décision logiciel", "tab":0, "context":"SOFTWARE", "title":"Le projet Software attend votre arbitrage", "category":"PROJET"}
+	if not SoftwareManager.ready_software_project().is_empty():
+		return {"kind":"project", "zone":"Établi CPU", "label":"Décider de la sortie", "tab":0, "context":"SOFTWARE", "title":"Le logiciel est prêt : bêta, sortie ou report", "category":"PROJET"}
 	if _has_pending_production_route():
 		return {"kind":"project", "zone":"Stock & production", "label":"Choisir la fabrication", "tab":4, "context":"Production", "title":"L'industrialisation attend votre choix de fabrication", "category":"PRODUCTION"}
 	if _has_ready_product_to_launch():
@@ -933,7 +949,7 @@ func _nora_message() -> String:
 	for value in ResearchManager.projects:
 		if str(value.get("status", "")) == "DEVELOPMENT":
 			var phase_index := clampi(int(value.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
-			return "Étape 2/3 • Développement : %s est en phase %s. Lancez le temps ▶▶ ; je vous préviens quand une vraie décision arrive." % [str(value.get("name", "le projet")), str(GameData.PHASES[phase_index]).to_lower()]
+			return "Étape 2/3 • Développement : %s est en phase %s. Ouvrez « Piloter les projets » pour répartir l'effort de l'équipe ; vos choix s'accumulent chaque mois." % [str(value.get("name", "le projet")), str(GameData.PHASES[phase_index]).to_lower()]
 	for job_value in ProductionManager.get_active_jobs():
 		return "Étape 3/3 • Industrialisation : %s avance (%.0f %%). Ensuite, il ne restera qu'à le lancer sur le marché." % [str(job_value.get("name", "votre CPU")), float(job_value.get("progress", 0.0))]
 	for product_value in ProductManager.products:
@@ -959,6 +975,81 @@ func _apply_attention_style(button: Button) -> void:
 	hint.shadow_size = 10
 	button.add_theme_stylebox_override("normal", hint)
 	button.add_theme_stylebox_override("focus", hint)
+
+func _add_project_tracker(title: String, detail: String, progress_value: float) -> void:
+	if _parallel_projects_box == null:
+		return
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	_parallel_projects_box.add_child(row)
+	var heading := HBoxContainer.new()
+	row.add_child(heading)
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.add_theme_font_size_override("font_size", 12)
+	title_label.add_theme_color_override("font_color", INK)
+	heading.add_child(title_label)
+	var detail_label := Label.new()
+	detail_label.text = detail
+	detail_label.add_theme_font_size_override("font_size", 10)
+	detail_label.add_theme_color_override("font_color", MUTED)
+	heading.add_child(detail_label)
+	var bar := ProgressBar.new()
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = clampf(progress_value, 0.0, 100.0)
+	bar.show_percentage = true
+	bar.custom_minimum_size.y = 14
+	bar.add_theme_font_size_override("font_size", 9)
+	row.add_child(bar)
+
+func _refresh_parallel_project_trackers(cpu_project: Dictionary, software_project: Dictionary, software_activity: Dictionary) -> int:
+	if _parallel_projects_box == null:
+		return 0
+	for child in _parallel_projects_box.get_children():
+		_parallel_projects_box.remove_child(child)
+		child.queue_free()
+	var count := 0
+	if not cpu_project.is_empty():
+		var phase_index := clampi(int(cpu_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		var phase_progress := float(cpu_project.get("phase_progress", 0.0))
+		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		var cpu_detail := str(GameData.PHASES[phase_index])
+		if not ResearchManager.cpu_pending_directive(cpu_project).is_empty():
+			cpu_detail = "Choix de conception requis"
+		_add_project_tracker(
+			"CPU • " + str(cpu_project.get("name", "Projet CPU")),
+			cpu_detail,
+			overall
+		)
+		count += 1
+	if not software_project.is_empty():
+		var sw_done := int(software_project.get("months_done", 0))
+		var sw_total := maxi(int(software_project.get("months_total", 1)), 1)
+		var sw_status := str(software_project.get("status", "DEVELOPMENT"))
+		var sw_detail := "%s • %d/%d" % [sw_status.capitalize(), sw_done, sw_total]
+		if not SoftwareManager.software_pending_directive(software_project).is_empty():
+			sw_detail = "Choix de conception requis"
+		_add_project_tracker(
+			"Logiciel • " + str(software_project.get("name", "Produit Software")),
+			sw_detail,
+			clampf(float(sw_done) / float(sw_total) * 100.0, 0.0, 100.0)
+		)
+		count += 1
+	elif not software_activity.is_empty():
+		var activity_id := str(software_activity.get("id", ""))
+		var activity_data := SOFTWARE_ACTIVITY.data(activity_id)
+		var activity_done := int(software_activity.get("months_done", 0))
+		var activity_total := maxi(int(activity_data.get("months", 1)), 1)
+		_add_project_tracker(
+			"Contrat • " + SOFTWARE_ACTIVITY.label(activity_id),
+			"%d/%d mois" % [activity_done, activity_total],
+			clampf(float(activity_done) / float(activity_total) * 100.0, 0.0, 100.0)
+		)
+		count += 1
+	_parallel_projects_box.visible = count >= 2
+	return count
 
 func _refresh_gameplay_overlays() -> void:
 	if _project_title == null or _project_stage == null or _project_progress == null:
@@ -987,8 +1078,21 @@ func _refresh_gameplay_overlays() -> void:
 			launched_product = value
 	var active_software_project: Dictionary = SoftwareManager.projects[0] if not SoftwareManager.projects.is_empty() else {}
 	var active_software_activity: Dictionary = SoftwareManager.active_activity()
+	var tracker_count := _refresh_parallel_project_trackers(active_project, active_software_project, active_software_activity)
+	var dual_development := not active_project.is_empty() and not active_software_project.is_empty()
+	var software_parallel_to_production := not active_job.is_empty() and not active_software_project.is_empty()
+	if _parallel_projects_box != null and software_parallel_to_production:
+		_parallel_projects_box.visible = true
+	_project_progress.visible = not dual_development
 
-	if not active_project.is_empty():
+	if dual_development:
+		_project_kicker.text = "Projets en parallèle"
+		_refresh_phase_strip(-1)
+		if _phase_row != null:
+			_phase_row.visible = false
+		_project_title.text = "%d projets actifs" % tracker_count
+		_project_stage.text = "CPU et Logiciel avancent en même temps. Pilotez la répartition de travail de chaque équipe."
+	elif not active_project.is_empty():
 		_project_kicker.text = "Projet en cours"
 		var phase_index := clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		_refresh_phase_strip(0 if phase_index < 2 else (1 if phase_index == 2 else 2))
@@ -1141,10 +1245,10 @@ func _refresh_primary_action() -> void:
 		_primary_action.text = str(_focus.get("label", "Traiter la décision"))
 		_primary_action.set_meta("tab", int(_focus.get("tab", 3)))
 		_primary_action.set_meta("context", str(_focus.get("context", "")))
-	elif _has_active_project():
-		# Rien à décider : on ne montre pas un faux bouton grisé qui répète la carte.
-		_primary_action.text = "L'équipe travaille…"
-		_primary_action.disabled = true
+	elif _has_active_project() or not SoftwareManager.projects.is_empty():
+		_primary_action.text = "Piloter les projets"
+		_primary_action.set_meta("tab", 0)
+		_primary_action.set_meta("context", "PROJECT_COCKPIT")
 	else:
 		_primary_action.text = "+ Nouveau projet"
 		_primary_action.set_meta("tab", 0)

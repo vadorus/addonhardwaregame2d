@@ -15,7 +15,6 @@ const UI := preload("res://ui/UiKit.gd")
 ## Postes du décor : un jeu de postes par palier de locaux (V0.10 K1, ui/WorkplaceArt.gd).
 const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
 const INTERACTIONS := preload("res://scripts/Interactions.gd")
-const POINT_KINDS := [["Perf", Color("d9822b")], ["Énergie", Color("2f9e6a")], ["Fiabilité", Color("7a57c2")]]
 
 var art_rect := Rect2()
 var project_target := Vector2.ZERO   # où volent les bulles de points (carte projet)
@@ -105,7 +104,7 @@ func refresh() -> void:
 	if key != _last_staff_key:
 		_last_staff_key = key
 		_rebuild_members()
-	var active := _has_active_work()
+	var active := _has_active_work() and TimeManager.time_scale > 0.0
 	# Qui veut vous parler ? (« ! » au-dessus de la tête) ; un client en visite attend à la porte.
 	var talkers := {}
 	var visitor_key := ""
@@ -120,6 +119,7 @@ func refresh() -> void:
 		(member as Control).set("alert", talkers.has(str(member.get("member_id"))))
 	# Un nouveau CPU lancé : toute l'équipe fait la fête.
 	var launches := ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "LAUNCHED").size()
+	launches += SoftwareManager.active_products().size()
 	if _last_launch_count >= 0 and launches > _last_launch_count:
 		_celebrate_time = 5.0
 	_last_launch_count = launches
@@ -209,10 +209,29 @@ func _place_members() -> void:
 		move_child(ordered[i], i)
 
 func _has_active_work() -> bool:
+	return not _work_cues().is_empty()
+
+func _work_cues() -> Array:
+	var cues: Array = []
 	for project_value in ResearchManager.projects:
-		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
-			return true
-	return not ProductionManager.get_active_jobs().is_empty()
+		var project: Dictionary = project_value
+		if str(project.get("status", "")) == "DEVELOPMENT" and ResearchManager.cpu_pending_directive(project).is_empty() and (project.get("pending_decision", {}) as Dictionary).is_empty():
+			var phase := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+			cues.append([str(GameData.PHASES[phase]), Color("d9822b")])
+	for value in SoftwareManager.projects:
+		var project: Dictionary = value
+		if str(project.get("status", "DEVELOPMENT")) in ["DEVELOPMENT", "BETA"] and SoftwareManager.software_pending_directive(project).is_empty():
+			var phase := SoftwareManager.software_cockpit_phase(project)
+			var label := "Conception" if phase == "PLANNING" else "Code" if phase == "BUILD" else "Tests"
+			if str(project.get("kind", "")) in ["PATCH", "UPDATE"] or str(project.get("status", "")) == "BETA":
+				label = "Correctif" if str(project.get("kind", "")) == "PATCH" else "Tests" if str(project.get("status", "")) == "BETA" else "Mise à jour"
+			cues.append([label, Color("3f7f8c")])
+	if not SoftwareManager.activities.is_empty():
+		cues.append(["Contrat", Color("3f7f8c")])
+	for value in ProductionManager.get_active_jobs():
+		if bool((value as Dictionary).get("route_selected", false)):
+			cues.append(["Fabrication", Color("2f9e6a")])
+	return cues
 
 func _process(delta: float) -> void:
 	if _celebrate_time > 0.0:
@@ -227,6 +246,9 @@ func _process(delta: float) -> void:
 			_bubble.visible = false
 			_card.visible = false
 	var speed := TimeManager.time_scale
+	var active := speed > 0.0 and _has_active_work()
+	for member in _members:
+		member.set("working", active and str(member.get("pose")) == "SIT")
 	if speed <= 0.0 or not is_visible_in_tree() or _members.is_empty():
 		return
 	_chat_timer -= delta
@@ -242,11 +264,14 @@ func _process(delta: float) -> void:
 			if not workers.is_empty():
 				_spawn_point(workers[randi() % workers.size()])
 
-## Petite bulle de points qui monte vers la carte projet.
+## Activity animation, never invented metric gains.
 func _spawn_point(member: Control) -> void:
-	var kind: Array = POINT_KINDS[randi() % POINT_KINDS.size()]
+	var cues := _work_cues()
+	if cues.is_empty():
+		return
+	var kind: Array = cues[randi() % cues.size()]
 	var pill := Label.new()
-	pill.text = "+%d %s" % [randi_range(1, 3), str(kind[0])]
+	pill.text = str(kind[0])
 	pill.add_theme_font_size_override("font_size", 12)
 	pill.add_theme_color_override("font_color", Color.WHITE)
 	pill.add_theme_stylebox_override("normal", UI.stylebox(kind[1], 10, 0, kind[1], 4))
@@ -347,6 +372,13 @@ func line_for(member: Control) -> String:
 		if not best.is_empty():
 			return "Encore %.0f points en %s et on débloque « %s ». Regardez l'arbre de recherche !" % [ceilf(best_gap), best_lane, str(best.title)]
 		return "La recherche avance bien."
+	for value in SoftwareManager.projects:
+		var project: Dictionary = value
+		if not SoftwareManager.software_pending_directive(project).is_empty():
+			return "%s attend votre orientation. Ouvrez Piloter les projets." % str(project.get("name", "Le logiciel"))
+		if str(project.get("status", "")) in ["DECISION", "REVIEW"]:
+			return "%s attend votre choix dans l'atelier Logiciel." % str(project.get("name", "Le logiciel"))
+		return "On travaille sur %s : mois %d/%d." % [str(project.get("name", "le logiciel")), int(project.get("months_done", 0)), int(project.get("months_total", 1))]
 	for project_value in ResearchManager.projects:
 		var project: Dictionary = project_value
 		if str(project.get("status", "")) == "DEVELOPMENT":

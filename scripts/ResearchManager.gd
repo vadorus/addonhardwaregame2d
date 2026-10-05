@@ -5,6 +5,8 @@ const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 const DEVELOPMENT_GATES := preload("res://scripts/DevelopmentGates.gd")
 const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
 const CPU_MARKET_LEARNING := preload("res://scripts/CpuMarketLearning.gd")
+const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
+const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
 
 signal projects_changed
 signal generation_proposals_changed(proposals)
@@ -12,6 +14,16 @@ signal phase_report_created(project, report)
 signal project_completed(project)
 signal research_changed
 signal research_event_created(event)
+
+const CPU_COCKPIT_AXES := ["performance", "efficiency", "reliability", "innovation"]
+const CPU_COCKPIT_PHASE_WEIGHTS := {
+	0: {"performance":0.75, "efficiency":0.80, "reliability":0.65, "innovation":1.55},
+	1: {"performance":1.40, "efficiency":1.25, "reliability":0.90, "innovation":1.00},
+	2: {"performance":1.20, "efficiency":1.10, "reliability":1.25, "innovation":0.75},
+	3: {"performance":1.00, "efficiency":1.05, "reliability":1.40, "innovation":0.60},
+	4: {"performance":0.90, "efficiency":1.20, "reliability":1.50, "innovation":0.50},
+	5: {"performance":0.70, "efficiency":1.00, "reliability":1.65, "innovation":0.35}
+}
 
 const CPU_RESEARCH_DOMAIN_ORDER := ["ARCHITECTURE", "EFFICIENCY", "RELIABILITY"]
 const RESEARCH_TEAMS := preload("res://scripts/ResearchTeams.gd")
@@ -891,7 +903,7 @@ func internal_research_monthly_base_cost(intensity: int) -> int:
 func quoted_internal_research_monthly_cost(intensity: int, category: String = "Recherche fondamentale CPU") -> int:
 	return Economy.quoted_expense(internal_research_monthly_base_cost(intensity), category)
 
-func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE") -> bool:
+func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE", player_controlled: bool = false) -> bool:
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return false
 	var market_segment := segment
@@ -1021,7 +1033,14 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			"confidence":development_confidence(),
 			"capacity_factor":development_capacity_factor()
 		} if sector == "CPU" else {},
-		"complexity":float(design_estimate.get("complexity", 50.0))
+		"complexity":float(design_estimate.get("complexity", 50.0)),
+		"cockpit_priorities":PROJECT_COCKPIT.balanced(CPU_COCKPIT_AXES) if sector == "CPU" else {},
+		"cockpit_influence":{"performance":0.0, "efficiency":0.0, "reliability":0.0, "innovation":0.0} if sector == "CPU" else {},
+		"cockpit_months":0,
+		"cockpit_interactive":sector == "CPU" and player_controlled,
+		"cockpit_directive_pending":PROJECT_DIRECTIVES.cpu_milestone(0) if sector == "CPU" and player_controlled else {},
+		"cockpit_directive_history":[],
+		"cockpit_directive_impact":{"performance":0.0, "efficiency":0.0, "reliability":0.0, "innovation":0.0}
 	}
 	if approach != "INTERNAL":
 		var signed_contract := SupplierManager.sign_contract(project_id, approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
@@ -1044,6 +1063,135 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	projects_changed.emit()
 	return true
 
+func active_cpu_project() -> Dictionary:
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("sector", "")) == "CPU" and str(project.get("status", "")) == "DEVELOPMENT":
+			return project
+	return {}
+
+func project_cockpit_priorities(project_id: String) -> Dictionary:
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("id", "")) != project_id:
+			continue
+		if str(project.get("sector", "")) != "CPU":
+			return {}
+		return PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), CPU_COCKPIT_AXES)
+	return {}
+
+func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta: int) -> bool:
+	if not CPU_COCKPIT_AXES.has(axis_id):
+		return false
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("id", "")) != project_id:
+			continue
+		if str(project.get("sector", "")) != "CPU" or str(project.get("status", "")) != "DEVELOPMENT":
+			return false
+		project["cockpit_priorities"] = PROJECT_COCKPIT.adjust(
+			project.get("cockpit_priorities", {}),
+			CPU_COCKPIT_AXES,
+			axis_id,
+			delta
+		)
+		projects_changed.emit()
+		return true
+	return false
+
+func cpu_cockpit_average_priorities(project: Dictionary) -> Dictionary:
+	var months := maxi(int(project.get("cockpit_months", 0)), 0)
+	if months <= 0:
+		return PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), CPU_COCKPIT_AXES)
+	var influence: Dictionary = project.get("cockpit_influence", {})
+	var average := {}
+	for axis_value in CPU_COCKPIT_AXES:
+		var axis := str(axis_value)
+		average[axis] = int(round(float(influence.get(axis, 0.0)) / float(months) * 100.0))
+	return PROJECT_COCKPIT.normalize(average, CPU_COCKPIT_AXES)
+
+func cpu_cockpit_final_impact(project: Dictionary) -> Dictionary:
+	var average := cpu_cockpit_average_priorities(project)
+	return PROJECT_COCKPIT.month_bias(average, CPU_COCKPIT_AXES, 6.0)
+
+func cpu_cockpit_phase_weights(project: Dictionary) -> Dictionary:
+	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+	return (CPU_COCKPIT_PHASE_WEIGHTS.get(phase_index, {}) as Dictionary).duplicate(true)
+
+func _apply_cpu_cockpit_month(project: Dictionary) -> void:
+	if str(project.get("sector", "")) != "CPU":
+		return
+	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), CPU_COCKPIT_AXES)
+	project["cockpit_priorities"] = priorities
+	var phase_weights := cpu_cockpit_phase_weights(project)
+	var influence: Dictionary = project.get("cockpit_influence", {})
+	for axis_value in CPU_COCKPIT_AXES:
+		var axis := str(axis_value)
+		var leverage := float(phase_weights.get(axis, 1.0))
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
+	project["cockpit_influence"] = influence
+	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
+
+func cpu_pending_directive(project: Dictionary) -> Dictionary:
+	var value = project.get("cockpit_directive_pending", {})
+	if typeof(value) != TYPE_DICTIONARY:
+		return {}
+	return (value as Dictionary).duplicate(true)
+
+func _cpu_has_directive_for_phase(project: Dictionary, phase_index: int) -> bool:
+	for value in project.get("cockpit_directive_history", []):
+		var entry: Dictionary = value
+		if int(entry.get("phase_index", -1)) == phase_index:
+			return true
+	return false
+
+func _ensure_cpu_directive(project: Dictionary) -> bool:
+	if not bool(project.get("cockpit_interactive", false)):
+		return false
+	var pending := cpu_pending_directive(project)
+	if not pending.is_empty():
+		return true
+	var phase_index := int(project.get("phase_index", 0))
+	if _cpu_has_directive_for_phase(project, phase_index):
+		return false
+	var milestone := PROJECT_DIRECTIVES.cpu_milestone(phase_index)
+	if milestone.is_empty():
+		return false
+	project["cockpit_directive_pending"] = milestone
+	CompanyManager.add_alert("%s : une orientation de phase est requise avant de poursuivre." % str(project.get("name", "CPU")))
+	projects_changed.emit()
+	return true
+
+func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
+	for project_value in projects:
+		var project: Dictionary = project_value
+		if str(project.get("id", "")) != project_id or str(project.get("status", "")) != "DEVELOPMENT":
+			continue
+		var pending := cpu_pending_directive(project)
+		if pending.is_empty():
+			return false
+		var option := PROJECT_DIRECTIVES.option_for(pending, option_id)
+		if option.is_empty():
+			return false
+		var impact: Dictionary = project.get("cockpit_directive_impact", {})
+		for axis_value in CPU_COCKPIT_AXES:
+			var axis := str(axis_value)
+			impact[axis] = float(impact.get(axis, 0.0)) + float((option.get("impact", {}) as Dictionary).get(axis, 0.0))
+		project["cockpit_directive_impact"] = impact
+		var history: Array = project.get("cockpit_directive_history", [])
+		history.append({
+			"phase_index":int(project.get("phase_index", 0)),
+			"phase":str(GameData.PHASES[clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)]),
+			"option_id":option_id,
+			"label":str(option.get("label", option_id))
+		})
+		project["cockpit_directive_history"] = history
+		project["cockpit_directive_pending"] = {}
+		CompanyManager.add_alert("%s : orientation choisie — %s." % [str(project.get("name", "CPU")), str(option.get("label", option_id))])
+		projects_changed.emit()
+		return true
+	return false
+
 func process_month():
 	_process_continuous_research()
 	_process_concept_programs()
@@ -1056,6 +1204,8 @@ func process_month():
 func _process_project_month(project: Dictionary):
 	var pending_decision_value = project.get("pending_decision", {})
 	if typeof(pending_decision_value) == TYPE_DICTIONARY and not pending_decision_value.is_empty():
+		return
+	if str(project.get("sector", "")) == "CPU" and _ensure_cpu_directive(project):
 		return
 	var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
@@ -1133,6 +1283,7 @@ func _process_project_month(project: Dictionary):
 		progress *= float(ArchitectureManager.MODE_SPEED.get(str(project.get("arch_mode", "NEW_LINE")), 1.0))
 	project.phase_progress = float(project.phase_progress) + progress
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
+	_apply_cpu_cockpit_month(project)
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
 	technologies[specialization] = tech
 	raise_technology(specialization, knowledge_gain)
@@ -1141,6 +1292,8 @@ func _process_project_month(project: Dictionary):
 	if float(project.phase_progress) >= 100.0:
 		project.phase_progress = float(project.phase_progress) - 100.0
 		_complete_phase(project, team, tech, budget_ratio)
+		if str(project.get("status", "")) == "DEVELOPMENT":
+			_ensure_cpu_directive(project)
 
 func _apply_project_remediation_transfer(project: Dictionary):
 	if bool(project.get("remediation_transfer_applied", false)):
@@ -1353,6 +1506,18 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 		metrics.performance = clampf(float(metrics.performance) + 3.0, 0.0, 100.0)
 		metrics.reliability = clampf(float(metrics.reliability) + 3.0, 0.0, 100.0)
 		metrics.ecosystem = clampf(float(metrics.ecosystem) + 5.0, 0.0, 100.0)
+	if str(project.sector) == "CPU":
+		var cockpit_impact := cpu_cockpit_final_impact(project)
+		project["cockpit_final_impact"] = cockpit_impact.duplicate(true)
+		var directive_impact: Dictionary = project.get("cockpit_directive_impact", {})
+		for cockpit_axis_value in CPU_COCKPIT_AXES:
+			var cockpit_axis := str(cockpit_axis_value)
+			metrics[cockpit_axis] = clampf(
+				float(metrics.get(cockpit_axis, 50.0))
+				+ float(cockpit_impact.get(cockpit_axis, 0.0))
+				+ float(directive_impact.get(cockpit_axis, 0.0)),
+				15.0, 98.0
+			)
 	return metrics
 
 func _complete_project(project: Dictionary, metrics: Dictionary):

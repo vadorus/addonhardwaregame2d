@@ -8,6 +8,14 @@ signal software_launched(product)
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
+const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
+const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
+const SOFTWARE_COCKPIT_AXES := ["features", "usability", "stability", "performance"]
+const SOFTWARE_COCKPIT_PHASE_WEIGHTS := {
+	"PLANNING": {"features":1.20, "usability":1.45, "stability":0.80, "performance":0.65},
+	"BUILD": {"features":1.45, "usability":1.00, "stability":0.80, "performance":1.15},
+	"STABILIZE": {"features":0.50, "usability":0.90, "stability":1.65, "performance":1.25}
+}
 const LAUNCH_MASTERY_CAP := 2
 
 var families: Dictionary = {}
@@ -169,7 +177,7 @@ func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictio
 		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les deux premiers mois."}
 	return {"ok":true, "reason":""}
 
-func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "") -> bool:
+func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "", player_controlled: bool = false) -> bool:
 	if not bool(can_start_utility(feature_ids, target_id).get("ok", false)):
 		return false
 	if not CAT.PRICE_MODES.has(price_mode):
@@ -186,13 +194,19 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 		"metrics":(plan.get("metrics", {}) as Dictionary).duplicate(true),
 		"bugs":int(plan.get("bugs", 0)),
 		"price_mode":price_mode,
-		"months_total":int(plan.get("months", 1)),
+		"months_total":maxi(3, int(plan.get("months", 1))) if player_controlled else int(plan.get("months", 1)),
 		"months_done":0,
 		"monthly_cost":int(plan.get("monthly_cost", 0)),
 		"status":"DEVELOPMENT",
 		"incident_done":false,
 		"pending_decision":{},
-		"polish_pending":false
+		"polish_pending":false,
+		"cockpit_priorities":PROJECT_COCKPIT.balanced(SOFTWARE_COCKPIT_AXES),
+		"cockpit_influence":{"features":0.0, "usability":0.0, "stability":0.0, "performance":0.0},
+		"cockpit_months":0,
+		"cockpit_interactive":player_controlled,
+		"cockpit_directive_pending":PROJECT_DIRECTIVES.software_milestone("PLANNING") if player_controlled else {},
+		"cockpit_directive_history":[]
 	}
 	_next_id += 1
 	projects.append(project)
@@ -205,6 +219,159 @@ func project_by_id(project_id: String) -> Dictionary:
 		if str(project.get("id", "")) == project_id:
 			return project
 	return {}
+
+func active_development_project() -> Dictionary:
+	for value in projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) == "DEVELOPMENT" and str(project.get("kind", "")) == "UTILITY_SLICE":
+			return project
+	return {}
+
+func project_cockpit_priorities(project_id: String) -> Dictionary:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("kind", "")) != "UTILITY_SLICE":
+		return {}
+	return PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
+
+func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta: int) -> bool:
+	if not SOFTWARE_COCKPIT_AXES.has(axis_id):
+		return false
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("kind", "")) != "UTILITY_SLICE":
+		return false
+	if str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	project["cockpit_priorities"] = PROJECT_COCKPIT.adjust(
+		project.get("cockpit_priorities", {}),
+		SOFTWARE_COCKPIT_AXES,
+		axis_id,
+		delta
+	)
+	software_changed.emit()
+	return true
+
+func software_cockpit_phase(project: Dictionary) -> String:
+	var total := maxi(int(project.get("months_total", 1)), 3)
+	var done := clampi(int(project.get("months_done", 0)), 0, total)
+	var phase_index := 0
+	if done >= maxi(1, int(floor(float(total) * 0.25))):
+		phase_index = 1
+	if done >= mini(total - 1, int(ceil(float(total) * 0.75))):
+		phase_index = 2
+	var phases := ["PLANNING", "BUILD", "STABILIZE"]
+	# A rewrite or a delay cannot take an already chosen phase backwards.
+	for value in project.get("cockpit_directive_history", []):
+		phase_index = maxi(phase_index, phases.find(str((value as Dictionary).get("phase", ""))))
+	return phases[phase_index]
+
+func software_cockpit_phase_weights(project: Dictionary) -> Dictionary:
+	return (SOFTWARE_COCKPIT_PHASE_WEIGHTS.get(software_cockpit_phase(project), {}) as Dictionary).duplicate(true)
+
+func software_pending_directive(project: Dictionary) -> Dictionary:
+	var value = project.get("cockpit_directive_pending", {})
+	if typeof(value) != TYPE_DICTIONARY:
+		return {}
+	return (value as Dictionary).duplicate(true)
+
+func _software_has_directive_for_phase(project: Dictionary, phase: String) -> bool:
+	for value in project.get("cockpit_directive_history", []):
+		var entry: Dictionary = value
+		if str(entry.get("phase", "")) == phase:
+			return true
+	return false
+
+func _ensure_software_directive(project: Dictionary) -> bool:
+	if not bool(project.get("cockpit_interactive", false)):
+		return false
+	var pending := software_pending_directive(project)
+	if not pending.is_empty():
+		return true
+	var phase := software_cockpit_phase(project)
+	if _software_has_directive_for_phase(project, phase):
+		return false
+	var milestone := PROJECT_DIRECTIVES.software_milestone(phase)
+	if milestone.is_empty():
+		return false
+	project["cockpit_directive_pending"] = milestone
+	CompanyManager.add_alert("%s : choisissez l'orientation de la phase %s." % [
+		str(project.get("name", "Logiciel")),
+		phase.to_lower()
+	])
+	software_changed.emit()
+	return true
+
+func resolve_software_directive(project_id: String, option_id: String) -> bool:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	var pending := software_pending_directive(project)
+	if pending.is_empty():
+		return false
+	var option := PROJECT_DIRECTIVES.option_for(pending, option_id)
+	if option.is_empty():
+		return false
+	var metrics: Dictionary = project.get("metrics", {})
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		metrics[axis] = clampf(
+			float(metrics.get(axis, 50.0)) + float((option.get("metrics", {}) as Dictionary).get(axis, 0.0)),
+			10.0,
+			98.0
+		)
+	project["metrics"] = metrics
+	project["levels"] = _utility_levels_from_metrics(metrics)
+	project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(option.get("bugs", 0)))
+	var phase := software_cockpit_phase(project)
+	var history: Array = project.get("cockpit_directive_history", [])
+	history.append({
+		"phase":phase,
+		"option_id":option_id,
+		"label":str(option.get("label", option_id))
+	})
+	project["cockpit_directive_history"] = history
+	project["cockpit_directive_pending"] = {}
+	CompanyManager.add_alert("%s : orientation %s — %s." % [
+		str(project.get("name", "Logiciel")),
+		phase.to_lower(),
+		str(option.get("label", option_id))
+	])
+	software_changed.emit()
+	return true
+
+func _apply_software_cockpit_month(project: Dictionary) -> void:
+	if str(project.get("kind", "")) != "UTILITY_SLICE":
+		return
+	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
+	project["cockpit_priorities"] = priorities
+	var phase := software_cockpit_phase(project)
+	var phase_weights := software_cockpit_phase_weights(project)
+	var influence: Dictionary = project.get("cockpit_influence", {})
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		var leverage := float(phase_weights.get(axis, 1.0))
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
+	project["cockpit_influence"] = influence
+	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
+
+	var metrics: Dictionary = project.get("metrics", {})
+	var bias := PROJECT_COCKPIT.month_bias(priorities, SOFTWARE_COCKPIT_AXES, 1.2)
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		var leverage := float(phase_weights.get(axis, 1.0))
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)) * leverage, 10.0, 98.0)
+	project["metrics"] = metrics
+	project["levels"] = _utility_levels_from_metrics(metrics)
+
+	var stability_priority := int(priorities.get("stability", 25))
+	var feature_priority := int(priorities.get("features", 25))
+	if phase == "STABILIZE" and stability_priority >= 35 and int(project.get("bugs", 0)) > 0:
+		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 2)
+	elif stability_priority >= 40 and int(project.get("bugs", 0)) > 0:
+		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 1)
+	if phase == "BUILD" and feature_priority >= 45:
+		project["bugs"] = int(project.get("bugs", 0)) + 1
+	elif phase == "STABILIZE" and feature_priority >= 45:
+		project["bugs"] = int(project.get("bugs", 0)) + 2
 
 func pending_project_decision() -> Dictionary:
 	for value in projects:
@@ -237,14 +404,15 @@ func resolve_project_decision(project_id: String, choice: String) -> bool:
 			var features: Array = (project.get("features", []) as Array).duplicate()
 			if features.size() <= 2 or not features.has(feature_id):
 				return false
+			var old_features := features.duplicate()
 			features.erase(feature_id)
 			var plan := PLAY.utility_plan(features, str(project.get("target", "HOME")), skills)
+			_rebase_utility_metrics(project, old_features, features)
+			var old_plan := PLAY.utility_plan(old_features, str(project.get("target", "HOME")), skills)
 			project["features"] = features
-			project["metrics"] = (plan.get("metrics", {}) as Dictionary).duplicate(true)
-			project["levels"] = (plan.get("levels", {}) as Dictionary).duplicate(true)
-			project["bugs"] = int(plan.get("bugs", 0))
+			project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(plan.get("bugs", 0)) - int(old_plan.get("bugs", 0)))
 			project["monthly_cost"] = int(plan.get("monthly_cost", project.get("monthly_cost", 0)))
-			project["months_total"] = maxi(int(project.get("months_done", 0)) + 1, int(plan.get("months", 1)))
+			project["months_total"] = maxi(3, maxi(int(project.get("months_done", 0)) + 1, int(plan.get("months", 1))))
 		"QUICK_FIX":
 			project["bugs"] = int(project.get("bugs", 0)) + 6
 			var metrics: Dictionary = project.get("metrics", {})
@@ -254,8 +422,21 @@ func resolve_project_decision(project_id: String, choice: String) -> bool:
 			return false
 	project["pending_decision"] = {}
 	project["status"] = "DEVELOPMENT"
+	_ensure_software_directive(project)
 	software_changed.emit()
 	return true
+
+func _rebase_utility_metrics(subject: Dictionary, old_features: Array, new_features: Array) -> void:
+	var target := str(subject.get("target", "HOME"))
+	var old_plan := PLAY.utility_plan(old_features, target, skills)
+	var new_plan := PLAY.utility_plan(new_features, target, skills)
+	var metrics: Dictionary = subject.get("metrics", {}).duplicate(true)
+	for axis in SOFTWARE_COCKPIT_AXES:
+		var before := float((old_plan.get("metrics", {}) as Dictionary).get(axis, 50.0))
+		var after := float((new_plan.get("metrics", {}) as Dictionary).get(axis, 50.0))
+		metrics[axis] = clampf(float(metrics.get(axis, before)) + after - before, 10.0, 98.0)
+	subject["metrics"] = metrics
+	subject["levels"] = _utility_levels_from_metrics(metrics)
 
 func choose_release(project_id: String, choice: String) -> bool:
 	var project := project_by_id(project_id)
@@ -390,12 +571,11 @@ func _complete_maintenance(project: Dictionary) -> void:
 		"UPDATE":
 			var feature_id := str(project.get("feature_id", ""))
 			var features: Array = (product.get("features", []) as Array).duplicate()
+			var old_features := features.duplicate()
 			if not features.has(feature_id):
 				features.append(feature_id)
-			var plan := PLAY.utility_plan(features, str(product.get("target", "HOME")), skills)
+			_rebase_utility_metrics(product, old_features, features)
 			product["features"] = features
-			product["metrics"] = (plan.get("metrics", {}) as Dictionary).duplicate(true)
-			product["levels"] = (plan.get("levels", {}) as Dictionary).duplicate(true)
 			product["bugs_known"] = int(product.get("bugs_known", 0)) + maxi(1, int(ceil(float(PLAY.utility_feature(feature_id).get("bugs", 0)) * 0.50)))
 			product["version_minor"] = int(product.get("version_minor", 0)) + 1
 			product["version_patch"] = 0
@@ -473,7 +653,12 @@ func _process_projects() -> void:
 				CompanyManager.add_alert("Bêta terminée : %s est prêt pour une nouvelle décision de sortie." % str(project.get("name", "le logiciel")))
 			continue
 
+		if kind == "UTILITY_SLICE" and status == "DEVELOPMENT" and _ensure_software_directive(project):
+			continue
+
 		Economy.add_expense(int(project.get("monthly_cost", 0)), "Développement software — %s" % CAT.family_label(str(project.family)))
+		if kind == "UTILITY_SLICE":
+			_apply_software_cockpit_month(project)
 		project["months_done"] = int(project.get("months_done", 0)) + 1
 
 		if kind in ["PATCH", "UPDATE"] and int(project.get("months_done", 0)) >= int(project.get("months_total", 1)):
@@ -497,6 +682,8 @@ func _process_projects() -> void:
 				continue
 
 		if int(project.get("months_done", 0)) < int(project.get("months_total", 1)):
+			if kind == "UTILITY_SLICE":
+				_ensure_software_directive(project)
 			continue
 
 		if kind == "UTILITY_SLICE":
@@ -537,6 +724,7 @@ func _launch(project: Dictionary) -> void:
 		product["target"] = str(project.get("target", "HOME"))
 		product["features"] = (project.get("features", []) as Array).duplicate()
 		product["metrics"] = explicit_metrics.duplicate(true)
+		product["cockpit_directive_history"] = (project.get("cockpit_directive_history", []) as Array).duplicate(true)
 		product["bugs_known"] = int(project.get("bugs", 0))
 		product["version_major"] = 1
 		product["version_minor"] = 0
@@ -566,6 +754,18 @@ func _process_sales() -> void:
 			var quality := 0.0
 			for score in scores.values(): quality += float(score)
 			quality /= maxf(float(scores.size()), 1.0)
+			if str(product.get("kind", "")) == "UTILITY_SLICE" and not (product.get("metrics", {}) as Dictionary).is_empty():
+				var target_data: Dictionary = (CAT.SEGMENTS.get(family_id, {}) as Dictionary).get(str(product.get("target", "HOME")), {})
+				var target_weights: Dictionary = target_data.get("weights", {})
+				quality = 0.0
+				var quality_weight := 0.0
+				for axis in SOFTWARE_COCKPIT_AXES:
+					var axis_weight := float(target_weights.get(axis, 0.25))
+					quality += float((product.get("metrics", {}) as Dictionary).get(axis, 50.0)) * axis_weight
+					quality_weight += axis_weight
+				quality /= maxf(quality_weight, 0.001)
+				var aging := float(CAT.family(family_id).get("aging_per_year", 0.35)) * maxf(0.0, now - float(product.launch_f)) * CAT.POINTS_PER_LEVEL
+				quality = clampf(quality - aging, 3.0, 99.0)
 			var price_penalty := CAT.price_factor(str(product.price_mode)) - 1.0
 			var weight := maxf(0.2, 1.0 + (quality - 50.0) / 25.0 - price_penalty)
 			if str(product.get("kind", "")) == "UTILITY_SLICE":
@@ -573,9 +773,12 @@ func _process_sales() -> void:
 				weight *= bug_penalty
 			weights.append(weight); total_weight += weight
 		var player_share := clampf(0.08 + CompanyManager.get_brand_score() / 500.0, 0.08, 0.30)
+		# One external offer competes for a finite reachable market. At weight 1,
+		# a single product keeps the original share; quality/price/bugs affect demand.
+		var reachable_market := market * minf(player_share * 2.0, 0.60)
 		for i in range(active.size()):
 			var product: Dictionary = active[i]
-			var licenses := int(round(market * player_share * float(weights[i]) / maxf(total_weight, 0.001)))
+			var licenses := int(floor(reachable_market * float(weights[i]) / (1.0 + total_weight)))
 			var revenue := int(round(float(licenses) * float(product.price)))
 			product["installed_users"] = int(product.installed_users) + licenses
 			var support := CAT.support_monthly_cost(family_id, int(product.installed_users))

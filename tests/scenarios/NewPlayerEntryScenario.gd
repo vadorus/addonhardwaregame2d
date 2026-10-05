@@ -201,6 +201,17 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "V0.10 entry: unlock toast replaced the useful project status line"
 
+	# A required Concept choice blocks speed; an ordinary month remains non-blocking.
+	game.call("_request_time_scale", 2.0)
+	if TimeManager.time_scale != 0.0:
+		game.queue_free()
+		_restore(snapshot)
+		return "R1 entry: time bypasses the first Concept directive"
+	var first_project := ResearchManager.active_cpu_project()
+	if not ResearchManager.resolve_cpu_directive(str(first_project.get("id", "")), "BOLD"):
+		game.queue_free()
+		_restore(snapshot)
+		return "R1 entry: first Concept directive could not be resolved"
 	# V0.7: a normal month-end is a ticker, not a forced modal/pause.
 	TimeManager.time_scale = 2.0
 	game.call("_on_month_closed", {

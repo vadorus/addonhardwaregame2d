@@ -32,7 +32,9 @@ var setup_title_box: VBoxContainer
 var setup_creation_box: VBoxContainer
 var first_cpu_workshop: Control
 var software_workshop: Control
+var project_cockpit: Control
 var _software_resume_scale := 0.0
+var _project_cockpit_resume_scale := 0.0
 var month_layer: Control
 var month_panel: PanelContainer
 var month_report_label: Label
@@ -244,6 +246,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_back_request()
 
 func _process(_delta):
+	if CompanyManager.created and TimeManager.time_scale > 0.0:
+		var blocker := _blocking_company_decision()
+		if not blocker.is_empty():
+			TimeManager.time_scale = 0.0
+			status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
 	for button in speed_buttons:
 		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
 	if CompanyManager.created:
@@ -452,9 +459,10 @@ func _build_ui():
 	_build_research_event_layer()
 	_build_first_cpu_workshop_layer()
 	_build_software_workshop_layer()
+	_build_project_cockpit_layer()
 	_build_launch_moment_layer()
 	# Modal screens must draw above the raised room markers and HUD.
-	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, software_workshop, launch_layer]:
+	for overlay in [setup_layer, month_layer, game_over_layer, research_event_layer, first_cpu_workshop, software_workshop, project_cockpit, launch_layer]:
 		overlay.z_index = 100
 
 func _create_dashboard_tab():
@@ -468,6 +476,9 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if context == "PROJECT_COCKPIT":
+		_open_project_cockpit()
+		return
 	if context in ["SOFTWARE", "PROJECT_CHOICE"]:
 		_open_software_workshop()
 		return
@@ -1415,6 +1426,47 @@ func _build_first_cpu_workshop_layer() -> void:
 	cpu_stepper.z_index = 100
 	add_child(cpu_stepper)
 
+func _build_project_cockpit_layer() -> void:
+	var cockpit_script: Script = load("res://ui/ProjectCockpit.gd")
+	project_cockpit = cockpit_script.new() as Control
+	project_cockpit.connect("close_requested", _close_project_cockpit)
+	project_cockpit.connect("cpu_decision_requested", _project_cockpit_to_cpu_decision)
+	project_cockpit.connect("software_requested", _project_cockpit_to_software)
+	add_child(project_cockpit)
+	ResearchManager.projects_changed.connect(func():
+		if project_cockpit != null and project_cockpit.visible:
+			project_cockpit.call_deferred("refresh")
+	)
+	SoftwareManager.software_changed.connect(func():
+		if project_cockpit != null and project_cockpit.visible:
+			project_cockpit.call_deferred("refresh")
+	)
+
+func _open_project_cockpit() -> void:
+	if project_cockpit == null or not CompanyManager.created:
+		return
+	_project_cockpit_resume_scale = TimeManager.time_scale
+	TimeManager.time_scale = 0.0
+	project_cockpit.call("open")
+	SoundManager.play("open")
+	JUICE.fade_in(project_cockpit, 0.2)
+	status_label.text = "Pilotage : répartissez l'effort de vos équipes entre les priorités du projet."
+
+func _close_project_cockpit() -> void:
+	if project_cockpit != null:
+		project_cockpit.call("close")
+	_request_time_scale(_project_cockpit_resume_scale)
+	SoundManager.play("close")
+	_refresh_all()
+
+func _project_cockpit_to_cpu_decision() -> void:
+	_close_project_cockpit()
+	_on_dashboard_navigation(3, "PROJECT_DECISION")
+
+func _project_cockpit_to_software() -> void:
+	_close_project_cockpit()
+	_open_software_workshop()
+
 func _build_software_workshop_layer() -> void:
 	var workshop_script: Script = load("res://ui/SoftwareWorkshop.gd")
 	software_workshop = workshop_script.new() as Control
@@ -1440,7 +1492,7 @@ func _open_software_workshop() -> void:
 func _close_software_workshop() -> void:
 	if software_workshop != null:
 		software_workshop.call("close")
-	TimeManager.time_scale = _software_resume_scale
+	_request_time_scale(_software_resume_scale)
 	SoundManager.play("close")
 	_refresh_all()
 
@@ -1498,7 +1550,8 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
 	var ok := ResearchManager.start_project(str(spec.get("name", "Nova CPU")), "CPU",
 		str(spec.get("segment", MarketManager.default_segment())), "INTERNAL", str(spec.get("focus", "BALANCED")),
-		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")))
+		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")),
+		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
 	if not ok:
 		SoundManager.play("error")
 		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
@@ -1581,7 +1634,8 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 		design,
 		{},
 		{},
-		str(spec.get("application", "GENERAL"))
+		str(spec.get("application", "GENERAL")),
+		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true
 	)
 	if not ok:
 		if first_cpu_workshop != null:
@@ -2307,6 +2361,19 @@ func _breakdown(data: Dictionary) -> String:
 	return "\n".join(lines)
 
 func _blocking_company_decision() -> Dictionary:
+	for value in ResearchManager.projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) == "DEVELOPMENT" and not ResearchManager.cpu_pending_directive(project).is_empty():
+			return {"type":"PHASE_DIRECTIVE", "tab":0,
+				"message":"Nora : le CPU attend une orientation. Temps en pause — ouvrez Piloter les projets."}
+	for value in SoftwareManager.projects:
+		var project: Dictionary = value
+		if not SoftwareManager.software_pending_directive(project).is_empty():
+			return {"type":"PHASE_DIRECTIVE", "tab":0,
+				"message":"Nora : le logiciel attend une orientation. Temps en pause — ouvrez Piloter les projets."}
+		if str(project.get("status", "")) in ["DECISION", "REVIEW"]:
+			return {"type":"SOFTWARE_DECISION", "tab":0,
+				"message":"Nora : le logiciel attend votre choix. Temps en pause — ouvrez le projet Logiciel."}
 	var project_decisions := ResearchManager.get_pending_project_decisions()
 	if not project_decisions.is_empty():
 		var decision: Dictionary = project_decisions[0]
@@ -2512,7 +2579,7 @@ func _start_project():
 	if _meta(rd_approach) != "INTERNAL" and not bool(proposal.get("accepted", false)):
 		status_label.text = "Le partenaire refuse ces conditions. %s" % str(proposal.get("counter_text", "Ajustez le contrat."))
 		return
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term):
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term, true):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""
