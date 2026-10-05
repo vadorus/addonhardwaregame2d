@@ -66,6 +66,23 @@ func _ready() -> void:
 		"Software stability priority did not change the live product", failures)
 	_check(int(sw.get("bugs", 0)) <= sw_bugs_before, "Software stability focus increased bugs", failures)
 
+	var research_snapshot := ResearchManager.get_state().duplicate(true)
+	var software_snapshot := SoftwareManager.get_state().duplicate(true)
+	var saved_cpu_priorities := ResearchManager.project_cockpit_priorities(cpu_id).duplicate(true)
+	var saved_sw_priorities := SoftwareManager.project_cockpit_priorities(sw_id).duplicate(true)
+	var saved_cpu_months := int(cpu.get("cockpit_months", 0))
+	var saved_sw_months := int(sw.get("cockpit_months", 0))
+	ResearchManager.reset("CPU")
+	SoftwareManager.reset()
+	ResearchManager.load_state(research_snapshot)
+	SoftwareManager.load_state(software_snapshot)
+	cpu = ResearchManager.active_cpu_project()
+	sw = SoftwareManager.active_development_project()
+	_check(ResearchManager.project_cockpit_priorities(cpu_id) == saved_cpu_priorities, "CPU cockpit priorities were lost after save/load state round-trip", failures)
+	_check(SoftwareManager.project_cockpit_priorities(sw_id) == saved_sw_priorities, "Software cockpit priorities were lost after save/load state round-trip", failures)
+	_check(int(cpu.get("cockpit_months", 0)) == saved_cpu_months, "CPU cockpit history was lost after save/load state round-trip", failures)
+	_check(int(sw.get("cockpit_months", 0)) == saved_sw_months, "Software cockpit history was lost after save/load state round-trip", failures)
+
 	var garage := GARAGE.new() as Control
 	add_child(garage)
 	garage.call("_refresh_gameplay_overlays")
