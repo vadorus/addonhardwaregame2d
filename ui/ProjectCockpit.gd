@@ -144,6 +144,37 @@ func _priority_row(box: VBoxContainer, label: String, value: int, minus_call: Ca
 	plus.pressed.connect(plus_call)
 	row.add_child(plus)
 
+func _directive_effect_text(option: Dictionary, kind: String) -> String:
+	var parts: Array[String] = []
+	if kind == "CPU":
+		var impact: Dictionary = option.get("impact", {})
+		var labels := {
+			"performance":"Perf.",
+			"efficiency":"Effic.",
+			"reliability":"Fiab.",
+			"innovation":"Innov."
+		}
+		for axis in ["performance", "efficiency", "reliability", "innovation"]:
+			var value := float(impact.get(axis, 0.0))
+			if absf(value) >= 0.05:
+				parts.append("%s %+.1f" % [str(labels[axis]), value])
+	else:
+		var metrics: Dictionary = option.get("metrics", {})
+		var labels := {
+			"features":"Fonct.",
+			"usability":"Ergo.",
+			"stability":"Stab.",
+			"performance":"Perf."
+		}
+		for axis in ["features", "usability", "stability", "performance"]:
+			var value := float(metrics.get(axis, 0.0))
+			if absf(value) >= 0.05:
+				parts.append("%s %+.1f" % [str(labels[axis]), value])
+		var bugs := int(option.get("bugs", 0))
+		if bugs != 0:
+			parts.append("Bugs %+d" % bugs)
+	return " • ".join(parts) if not parts.is_empty() else "Effet neutre"
+
 func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: String, project_id: String) -> void:
 	var panel := UI.card(UI.APP_PANEL_ALT, 12, 12)
 	box.add_child(panel)
@@ -163,12 +194,14 @@ func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: St
 		var option: Dictionary = value
 		var button := Button.new()
 		button.text = "%s
+%s
 %s" % [
 			str(option.get("label", "Choix")),
-			str(option.get("pitch", ""))
+			str(option.get("pitch", "")),
+			_directive_effect_text(option, kind)
 		]
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(210, 86)
+		button.custom_minimum_size = Vector2(210, 108)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		LOOK.button_style(button)
 		if kind == "CPU":

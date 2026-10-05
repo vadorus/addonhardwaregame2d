@@ -1080,6 +1080,9 @@ func _refresh_gameplay_overlays() -> void:
 	var active_software_activity: Dictionary = SoftwareManager.active_activity()
 	var tracker_count := _refresh_parallel_project_trackers(active_project, active_software_project, active_software_activity)
 	var dual_development := not active_project.is_empty() and not active_software_project.is_empty()
+	var software_parallel_to_production := not active_job.is_empty() and not active_software_project.is_empty()
+	if _parallel_projects_box != null and software_parallel_to_production:
+		_parallel_projects_box.visible = true
 	_project_progress.visible = not dual_development
 
 	if dual_development:
