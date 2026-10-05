@@ -144,6 +144,49 @@ func _priority_row(box: VBoxContainer, label: String, value: int, minus_call: Ca
 	plus.pressed.connect(plus_call)
 	row.add_child(plus)
 
+func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: String, project_id: String) -> void:
+	var panel := UI.card(UI.APP_PANEL_ALT, 12, 12)
+	box.add_child(panel)
+	var prompt := VBoxContainer.new()
+	prompt.add_theme_constant_override("separation", 7)
+	panel.add_child(prompt)
+	prompt.add_child(UI.eyebrow("CHOIX DE PHASE REQUIS"))
+	prompt.add_child(UI.label(str(directive.get("title", "Orientation du projet")), 17))
+	var question := UI.muted_label(str(directive.get("question", "")), 12)
+	question.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	prompt.add_child(question)
+
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	prompt.add_child(actions)
+	for value in directive.get("options", []):
+		var option: Dictionary = value
+		var button := Button.new()
+		button.text = "%s
+%s" % [
+			str(option.get("label", "Choix")),
+			str(option.get("pitch", ""))
+		]
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.custom_minimum_size = Vector2(210, 86)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		LOOK.button_style(button)
+		if kind == "CPU":
+			button.pressed.connect(_choose_cpu_directive.bind(project_id, str(option.get("id", ""))))
+		else:
+			button.pressed.connect(_choose_software_directive.bind(project_id, str(option.get("id", ""))))
+		actions.add_child(button)
+
+func _directive_history_line(history: Array) -> String:
+	var parts: Array[String] = []
+	for value in history:
+		var entry: Dictionary = value
+		var phase := str(entry.get("phase", "")).capitalize()
+		var label := str(entry.get("label", ""))
+		if phase != "" and label != "":
+			parts.append("%s : %s" % [phase, label])
+	return " • ".join(parts)
+
 func _build_cpu_card(project: Dictionary) -> void:
 	var box := _project_card("PROCESSEUR", str(project.get("name", "Projet CPU")))
 	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
@@ -158,6 +201,11 @@ func _build_cpu_card(project: Dictionary) -> void:
 	var phase_tip := UI.muted_label(_cpu_phase_tip(phase_index), 11)
 	phase_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(phase_tip)
+
+	var directive := ResearchManager.cpu_pending_directive(project)
+	if not directive.is_empty():
+		_build_directive_prompt(box, directive, "CPU", str(project.get("id", "")))
+		return
 
 	var pending = project.get("pending_decision", {})
 	if typeof(pending) == TYPE_DICTIONARY and not (pending as Dictionary).is_empty():
@@ -189,6 +237,11 @@ func _build_cpu_card(project: Dictionary) -> void:
 	var impact_label := UI.muted_label(impact_text, 11)
 	impact_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(impact_label)
+	var cpu_history := _directive_history_line(project.get("cockpit_directive_history", []))
+	if cpu_history != "":
+		var history_label := UI.muted_label("Décisions : " + cpu_history, 10)
+		history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(history_label)
 
 func _build_software_card(project: Dictionary) -> void:
 	var box := _project_card("LOGICIEL", str(project.get("name", "Produit Software")))
@@ -211,6 +264,11 @@ func _build_software_card(project: Dictionary) -> void:
 	], 11)
 	metric_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(metric_line)
+
+	var sw_directive := SoftwareManager.software_pending_directive(project)
+	if status == "DEVELOPMENT" and not sw_directive.is_empty():
+		_build_directive_prompt(box, sw_directive, "SOFTWARE", str(project.get("id", "")))
+		return
 
 	if status in ["DECISION", "REVIEW", "BETA"]:
 		var action := Button.new()
@@ -255,6 +313,19 @@ func _build_software_card(project: Dictionary) -> void:
 	var impact_label := UI.muted_label("Effet du prochain mois : " + _impact_text(month_impact, SoftwareManager.SOFTWARE_COCKPIT_AXES, false), 11)
 	impact_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(impact_label)
+	var sw_history := _directive_history_line(project.get("cockpit_directive_history", []))
+	if sw_history != "":
+		var history_label := UI.muted_label("Décisions : " + sw_history, 10)
+		history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(history_label)
+
+func _choose_cpu_directive(project_id: String, option_id: String) -> void:
+	if ResearchManager.resolve_cpu_directive(project_id, option_id):
+		refresh()
+
+func _choose_software_directive(project_id: String, option_id: String) -> void:
+	if SoftwareManager.resolve_software_directive(project_id, option_id):
+		refresh()
 
 func _adjust_cpu(project_id: String, axis_id: String, delta: int) -> void:
 	if ResearchManager.adjust_project_cockpit_priority(project_id, axis_id, delta):

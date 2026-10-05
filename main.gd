@@ -1545,7 +1545,8 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
 	var ok := ResearchManager.start_project(str(spec.get("name", "Nova CPU")), "CPU",
 		str(spec.get("segment", MarketManager.default_segment())), "INTERNAL", str(spec.get("focus", "BALANCED")),
-		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")))
+		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")),
+		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
 	if not ok:
 		SoundManager.play("error")
 		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
@@ -1628,7 +1629,8 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 		design,
 		{},
 		{},
-		str(spec.get("application", "GENERAL"))
+		str(spec.get("application", "GENERAL")),
+		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true
 	)
 	if not ok:
 		if first_cpu_workshop != null:
@@ -2559,7 +2561,7 @@ func _start_project():
 	if _meta(rd_approach) != "INTERNAL" and not bool(proposal.get("accepted", false)):
 		status_label.text = "Le partenaire refuse ces conditions. %s" % str(proposal.get("counter_text", "Ajustez le contrat."))
 		return
-	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term):
+	if ResearchManager.start_project(name, "CPU", _meta(rd_segment), _meta(rd_approach), _meta(rd_focus), int(rd_budget.value), design, generation_plan, remediation, application_key, supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term, true):
 		rd_name.text = ""
 		var plan_text := " • plan %s" % str(generation_plan.get("title", "")) if not generation_plan.is_empty() else ""
 		var remediation_text := " • solution technique +%d mois" % int(remediation.get("extra_months", 0)) if not remediation.is_empty() else ""

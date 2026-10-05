@@ -684,7 +684,7 @@ func _start_product() -> void:
 	if family_id == "UTILITY":
 		var features := _utility_features()
 		var target_id := UI.option_meta(_target_select) if _target_select != null else "HOME"
-		if SoftwareManager.start_utility_project(features, target_id, price_mode, name):
+		if SoftwareManager.start_utility_project(features, target_id, price_mode, name, true):
 			status_changed.emit("Utilitaire lancé en développement.")
 			work_started.emit("PROJECT")
 			_show_software_choice()

@@ -15,12 +15,13 @@ func _ready() -> void:
 		"INTERNAL",
 		"BALANCED",
 		35000,
-		CPU_DESIGN.default_design()
+		CPU_DESIGN.default_design(),
+		{}, {}, "GENERAL", "", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true
 	)
 	_check(cpu_ok, "could not start CPU project", failures)
 
 	var features := ["FILE_MANAGER", "BACKUP", "SIMPLE_UI"]
-	var sw_ok := SoftwareManager.start_utility_project(features, "HOME", "MARKET", "Cockpit Tools")
+	var sw_ok := SoftwareManager.start_utility_project(features, "HOME", "MARKET", "Cockpit Tools", true)
 	_check(sw_ok, "could not start Software project beside CPU", failures)
 
 	var cpu := ResearchManager.active_cpu_project()
@@ -29,6 +30,24 @@ func _ready() -> void:
 
 	var cpu_id := str(cpu.get("id", ""))
 	var sw_id := str(sw.get("id", ""))
+	_check(not ResearchManager.cpu_pending_directive(cpu).is_empty(), "player CPU did not stop for its Concept directive", failures)
+	_check(not SoftwareManager.software_pending_directive(sw).is_empty(), "player Software did not stop for its Planning directive", failures)
+
+	SimulationManager.process_month_end()
+	cpu = ResearchManager.active_cpu_project()
+	sw = SoftwareManager.active_development_project()
+	_check(int(cpu.get("cockpit_months", 0)) == 0, "CPU advanced before the player chose a phase directive", failures)
+	_check(int(sw.get("cockpit_months", 0)) == 0, "Software advanced before the player chose a phase directive", failures)
+
+	var sw_stability_before_directive := float((sw.get("metrics", {}) as Dictionary).get("stability", 0.0))
+	var sw_bugs_before_directive := int(sw.get("bugs", 0))
+	_check(ResearchManager.resolve_cpu_directive(cpu_id, "BOLD"), "CPU Concept directive could not be resolved", failures)
+	_check(SoftwareManager.resolve_software_directive(sw_id, "SOLID"), "Software Planning directive could not be resolved", failures)
+	cpu = ResearchManager.active_cpu_project()
+	sw = SoftwareManager.active_development_project()
+	_check(float((cpu.get("cockpit_directive_impact", {}) as Dictionary).get("innovation", 0.0)) > 0.0, "CPU directive has no real metric impact", failures)
+	_check(float((sw.get("metrics", {}) as Dictionary).get("stability", 0.0)) > sw_stability_before_directive, "Software directive did not change live stability", failures)
+	_check(int(sw.get("bugs", 0)) < sw_bugs_before_directive, "Software robust directive did not reduce bugs", failures)
 
 	var concept_weights := ResearchManager.cpu_cockpit_phase_weights(cpu)
 	_check(float(concept_weights.get("innovation", 0.0)) > float(concept_weights.get("performance", 0.0)),

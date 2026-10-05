@@ -841,6 +841,13 @@ func _short(text: String, max_chars: int) -> String:
 func _compute_focus() -> Dictionary:
 	if _has_pending_project_decision():
 		return {"kind":"project", "zone":"Banc de test", "label":"Décision prototype / validation", "tab":3, "context":"PROJECT_DECISION", "title":"Le prototype attend votre décision", "category":"PROTOTYPE"}
+	var active_cpu := ResearchManager.active_cpu_project()
+	if not active_cpu.is_empty() and not ResearchManager.cpu_pending_directive(active_cpu).is_empty():
+		return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le CPU attend votre orientation de phase", "category":"PROJET"}
+	if not SoftwareManager.projects.is_empty():
+		var active_sw: Dictionary = SoftwareManager.projects[0]
+		if not SoftwareManager.software_pending_directive(active_sw).is_empty():
+			return {"kind":"project", "zone":"Établi CPU", "label":"Choix de conception", "tab":0, "context":"PROJECT_COCKPIT", "title":"Le logiciel attend votre orientation de phase", "category":"PROJET"}
 	if not SoftwareManager.pending_project_decision().is_empty():
 		return {"kind":"project", "zone":"Établi CPU", "label":"Décision logiciel", "tab":0, "context":"SOFTWARE", "title":"Le projet Software attend votre arbitrage", "category":"PROJET"}
 	if not SoftwareManager.ready_software_project().is_empty():
@@ -1008,9 +1015,12 @@ func _refresh_parallel_project_trackers(cpu_project: Dictionary, software_projec
 		var phase_index := clampi(int(cpu_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		var phase_progress := float(cpu_project.get("phase_progress", 0.0))
 		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		var cpu_detail := str(GameData.PHASES[phase_index])
+		if not ResearchManager.cpu_pending_directive(cpu_project).is_empty():
+			cpu_detail = "Choix de conception requis"
 		_add_project_tracker(
 			"CPU • " + str(cpu_project.get("name", "Projet CPU")),
-			str(GameData.PHASES[phase_index]),
+			cpu_detail,
 			overall
 		)
 		count += 1
@@ -1019,6 +1029,8 @@ func _refresh_parallel_project_trackers(cpu_project: Dictionary, software_projec
 		var sw_total := maxi(int(software_project.get("months_total", 1)), 1)
 		var sw_status := str(software_project.get("status", "DEVELOPMENT"))
 		var sw_detail := "%s • %d/%d" % [sw_status.capitalize(), sw_done, sw_total]
+		if not SoftwareManager.software_pending_directive(software_project).is_empty():
+			sw_detail = "Choix de conception requis"
 		_add_project_tracker(
 			"Logiciel • " + str(software_project.get("name", "Produit Software")),
 			sw_detail,

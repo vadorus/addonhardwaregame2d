@@ -9,6 +9,7 @@ const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
+const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
 const SOFTWARE_COCKPIT_AXES := ["features", "usability", "stability", "performance"]
 const SOFTWARE_COCKPIT_PHASE_WEIGHTS := {
 	"PLANNING": {"features":1.20, "usability":1.45, "stability":0.80, "performance":0.65},
@@ -176,7 +177,7 @@ func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictio
 		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les deux premiers mois."}
 	return {"ok":true, "reason":""}
 
-func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "") -> bool:
+func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "", player_controlled: bool = false) -> bool:
 	if not bool(can_start_utility(feature_ids, target_id).get("ok", false)):
 		return false
 	if not CAT.PRICE_MODES.has(price_mode):
@@ -202,7 +203,10 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 		"polish_pending":false,
 		"cockpit_priorities":PROJECT_COCKPIT.balanced(SOFTWARE_COCKPIT_AXES),
 		"cockpit_influence":{"features":0.0, "usability":0.0, "stability":0.0, "performance":0.0},
-		"cockpit_months":0
+		"cockpit_months":0,
+		"cockpit_interactive":player_controlled,
+		"cockpit_directive_pending":PROJECT_DIRECTIVES.software_milestone("PLANNING") if player_controlled else {},
+		"cockpit_directive_history":[]
 	}
 	_next_id += 1
 	projects.append(project)
@@ -258,6 +262,77 @@ func software_cockpit_phase(project: Dictionary) -> String:
 
 func software_cockpit_phase_weights(project: Dictionary) -> Dictionary:
 	return (SOFTWARE_COCKPIT_PHASE_WEIGHTS.get(software_cockpit_phase(project), {}) as Dictionary).duplicate(true)
+
+func software_pending_directive(project: Dictionary) -> Dictionary:
+	var value = project.get("cockpit_directive_pending", {})
+	if typeof(value) != TYPE_DICTIONARY:
+		return {}
+	return (value as Dictionary).duplicate(true)
+
+func _software_has_directive_for_phase(project: Dictionary, phase: String) -> bool:
+	for value in project.get("cockpit_directive_history", []):
+		var entry: Dictionary = value
+		if str(entry.get("phase", "")) == phase:
+			return true
+	return false
+
+func _ensure_software_directive(project: Dictionary) -> bool:
+	if not bool(project.get("cockpit_interactive", false)):
+		return false
+	var pending := software_pending_directive(project)
+	if not pending.is_empty():
+		return true
+	var phase := software_cockpit_phase(project)
+	if _software_has_directive_for_phase(project, phase):
+		return false
+	var milestone := PROJECT_DIRECTIVES.software_milestone(phase)
+	if milestone.is_empty():
+		return false
+	project["cockpit_directive_pending"] = milestone
+	CompanyManager.add_alert("%s : choisissez l'orientation de la phase %s." % [
+		str(project.get("name", "Logiciel")),
+		phase.to_lower()
+	])
+	software_changed.emit()
+	return true
+
+func resolve_software_directive(project_id: String, option_id: String) -> bool:
+	var project := project_by_id(project_id)
+	if project.is_empty() or str(project.get("status", "")) != "DEVELOPMENT":
+		return false
+	var pending := software_pending_directive(project)
+	if pending.is_empty():
+		return false
+	var option := PROJECT_DIRECTIVES.option_for(pending, option_id)
+	if option.is_empty():
+		return false
+	var metrics: Dictionary = project.get("metrics", {})
+	for axis_value in SOFTWARE_COCKPIT_AXES:
+		var axis := str(axis_value)
+		metrics[axis] = clampf(
+			float(metrics.get(axis, 50.0)) + float((option.get("metrics", {}) as Dictionary).get(axis, 0.0)),
+			10.0,
+			98.0
+		)
+	project["metrics"] = metrics
+	project["levels"] = _utility_levels_from_metrics(metrics)
+	project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(option.get("bugs", 0)))
+	var phase := software_cockpit_phase(project)
+	var history: Array = project.get("cockpit_directive_history", [])
+	history.append({
+		"phase":phase,
+		"option_id":option_id,
+		"label":str(option.get("label", option_id))
+	})
+	project["cockpit_directive_history"] = history
+	project["cockpit_directive_pending"] = {}
+	CompanyManager.add_alert("%s : orientation %s — %s." % [
+		str(project.get("name", "Logiciel")),
+		phase.to_lower(),
+		str(option.get("label", option_id))
+	])
+	software_changed.emit()
+	return true
 
 func _apply_software_cockpit_month(project: Dictionary) -> void:
 	if str(project.get("kind", "")) != "UTILITY_SLICE":
@@ -559,6 +634,9 @@ func _process_projects() -> void:
 				project["levels"] = _utility_levels_from_metrics(beta_metrics)
 				project["status"] = "REVIEW"
 				CompanyManager.add_alert("Bêta terminée : %s est prêt pour une nouvelle décision de sortie." % str(project.get("name", "le logiciel")))
+			continue
+
+		if kind == "UTILITY_SLICE" and status == "DEVELOPMENT" and _ensure_software_directive(project):
 			continue
 
 		Economy.add_expense(int(project.get("monthly_cost", 0)), "Développement software — %s" % CAT.family_label(str(project.family)))
