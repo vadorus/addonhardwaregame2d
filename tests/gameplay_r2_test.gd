@@ -12,6 +12,7 @@ func _ready() -> void:
 	Economy.money = 1000000
 	_test_cpu_consequence()
 	_test_software_consequence_and_ui()
+	_test_legacy_personnel_migration()
 	if failures.is_empty():
 		print("[CI] Gameplay R2 test passed")
 		get_tree().quit(0)
@@ -82,6 +83,36 @@ func _test_software_consequence_and_ui() -> void:
 
 	garage.queue_free()
 	cockpit.queue_free()
+
+func _test_legacy_personnel_migration() -> void:
+	SimulationManager.reset_all("Legacy personnel R2 CI", "CPU", "STANDARD")
+	Economy.money = 1000000
+	var company_state := CompanyManager.get_state().duplicate(true)
+	var saved_departments: Dictionary = (company_state.get("departments", {}) as Dictionary).duplicate(true)
+	(saved_departments["Développement"] as Dictionary)["cohesion"] = 41.0
+	(saved_departments["Développement"] as Dictionary)["leader_id"] = "EMP-0002"
+	saved_departments["D├®veloppement"] = {"leader_id":"", "autonomy":"SUPERVISED", "cohesion":45.8}
+	company_state["departments"] = saved_departments
+	CompanyManager.load_state(company_state)
+	_check(not CompanyManager.departments.has("D├®veloppement"), "legacy duplicate company department was not removed")
+	_check(is_equal_approx(float((CompanyManager.departments["Développement"] as Dictionary).get("cohesion", 0.0)), 45.8), "department migration lost accumulated cohesion")
+	_check(str((CompanyManager.departments["Développement"] as Dictionary).get("leader_id", "")) == "EMP-0002", "department migration lost the development leader")
+	var personnel_state := PersonnelManager.get_state().duplicate(true)
+	var corrupted := 0
+	for emp_value in personnel_state.get("staff", []):
+		var emp: Dictionary = emp_value
+		if str(emp.get("specialization", "")) in ["product", "validation"]:
+			emp["department"] = "D├®veloppement"
+			corrupted += 1
+	PersonnelManager.load_state(personnel_state)
+	_check(corrupted >= 2, "legacy migration test did not prepare development employees")
+	_check(ResearchManager.get_development_team_size() >= 2, "legacy mojibake department still hides CPU developers")
+	var ok := ResearchManager.start_project(
+		"Second CPU", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 45000,
+		CPU_DESIGN.default_design(), {}, {}, "GENERAL", "", "BALANCED", "STANDARD",
+		"NONE", "SHARED", "NONE", true
+	)
+	_check(ok, "second CPU is still blocked after legacy personnel migration: " + ResearchManager.last_start_project_error)
 
 func _tree_has_text(node: Node, needle: String) -> bool:
 	if node is Label and str((node as Label).text).contains(needle):

@@ -1554,7 +1554,8 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
 	if not ok:
 		SoundManager.play("error")
-		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
+		var reason := str(ResearchManager.last_start_project_error).strip_edges()
+		cpu_stepper.call("show_error", reason if reason != "" else "Le projet ne peut pas démarrer avec cette configuration.")
 		return
 	# V0.9 : gamme (nouvelle ou suite) + architecture + modèles choisis, reliés au projet.
 	var arch_id := str(spec.get("architecture_id", ArchitectureManager.latest_id()))
