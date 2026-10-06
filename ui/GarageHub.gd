@@ -60,6 +60,7 @@ var _context_title: Label
 var _context_subtitle: Label
 var _context_actions: VBoxContainer
 var _primary_action: Button
+var _new_project_action: Button
 var _project_panel: PanelContainer
 var _project_title: Label
 var _project_stage: Label
@@ -322,15 +323,27 @@ func _build_gameplay_overlays() -> void:
 	_parallel_projects_box.visible = false
 	project_box.add_child(_parallel_projects_box)
 	_primary_action = Button.new()
-	_primary_action.custom_minimum_size = Vector2(250, 46)
-	_primary_action.add_theme_font_size_override("font_size", 16)
+	_primary_action.custom_minimum_size = Vector2(150, 48)
+	_primary_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_primary_action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_primary_action.add_theme_font_size_override("font_size", 14)
 	_primary_action.add_theme_color_override("font_color", Color.WHITE)
 	_primary_action.add_theme_stylebox_override("normal", _panel_style(Color("10aa4f"), Color("0d9244"), 12, 8))
 	_primary_action.add_theme_stylebox_override("hover", _panel_style(Color("16bd5e"), Color("0d9244"), 12, 8))
 	_primary_action.add_theme_stylebox_override("pressed", _panel_style(Color("07823b"), Color("086830"), 12, 8))
 	_primary_action.focus_mode = Control.FOCUS_NONE
 	_primary_action.pressed.connect(_run_primary_action)
-	project_shell.add_child(_primary_action)
+	var project_actions := HBoxContainer.new()
+	project_actions.add_theme_constant_override("separation", 8)
+	project_shell.add_child(project_actions)
+	project_actions.add_child(_primary_action)
+	_new_project_action = Button.new()
+	_new_project_action.text = "Nouveau\nprojet"
+	_new_project_action.custom_minimum_size = Vector2(106, 48)
+	_new_project_action.add_theme_font_size_override("font_size", 13)
+	_new_project_action.pressed.connect(func(): zone_requested.emit(0, "PROJECT_CHOICE"))
+	_new_project_action.visible = false
+	project_actions.add_child(_new_project_action)
 
 	_tasks_panel = PanelContainer.new()
 	_tasks_panel.z_index = 15
@@ -567,7 +580,7 @@ func _layout_zones() -> void:
 		var details := _project_scroll.get_child(0) as Control
 		var fixed_height := _project_panel.get_theme_stylebox("panel").get_minimum_size().y
 		if _primary_action.visible:
-			fixed_height += _primary_action.get_combined_minimum_size().y
+			fixed_height += (_primary_action.get_parent() as Control).get_combined_minimum_size().y
 			fixed_height += (_project_scroll.get_parent() as VBoxContainer).get_theme_constant("separation")
 		var project_bottom := size.y - 14.0
 		if _feedback_panel != null and _feedback_panel.visible:
@@ -1054,6 +1067,7 @@ func _refresh_parallel_project_trackers(_cpu_project: Dictionary, _software_proj
 		_parallel_projects_box.remove_child(child)
 		child.queue_free()
 	var rows := PRESENTATION.rows()
+	_new_project_action.visible = not rows.is_empty()
 	for row in rows:
 		_add_project_tracker(("CPU" if str(row.kind) == "CPU" else "Contrat" if str(row.kind) == "CONTRACT" else "Logiciel") + " • " + str(row.name), str(row.detail), float(row.progress), str(row.context))
 	_parallel_projects_box.visible = rows.size() >= 2

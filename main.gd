@@ -1507,16 +1507,8 @@ func _software_to_hardware() -> void:
 	if software_workshop != null:
 		software_workshop.call("close")
 	TimeManager.time_scale = _software_resume_scale
-	var active_cpu_project := false
-	for project_value in ResearchManager.projects:
-		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
-			active_cpu_project = true
-			break
 	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
 		_show_first_cpu_workshop()
-	elif active_cpu_project:
-		_show_tab(3)
-		status_label.text = "Hardware : votre projet CPU est ouvert dans le laboratoire."
 	else:
 		open_cpu_stepper()
 

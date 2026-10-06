@@ -25,6 +25,13 @@ func _ready() -> void:
 	game = (load("res://main.tscn") as PackedScene).instantiate() as Control
 	add_child(game)
 	await settle()
+	game.call("_open_software_workshop")
+	await capture("p0p1-new-project-choice")
+	game.call("_close_software_workshop")
+	game.call("open_cpu_stepper")
+	game.get("cpu_stepper").call("go_to_step", 4)
+	await capture("p0p1-cpu-budget")
+	game.call("_close_cpu_stepper")
 	ResearchManager.start_project("Nova 2", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 35000,
 		CPU_DESIGN.default_design(), {}, {}, "GENERAL", "", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
 	SoftwareManager.start_utility_project(["FILE_MANAGER", "SIMPLE_UI"], "HOME", "MARKET", "Atelier Tools", true)
