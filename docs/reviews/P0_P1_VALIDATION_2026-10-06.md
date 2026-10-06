@@ -20,16 +20,24 @@ préexistante a été conservée, isolée et testée ; voir `P0_P1_RC2_BASELINE.
 
 ## Preuves PC
 
-Treize suites ont passé aux étapes concernées : `project_finance_test`,
+Quinze suites ont passé aux étapes concernées : `project_finance_test`,
 `second_cpu_budget_test`, `save_clock_lifecycle_test`, `complete_experience_test`,
 `software_manager_test`, `software_gameplay_test`, `software_integration_test`,
 `complete_layout_test`, `garage_layout_test`, `workshop_layout_test`,
-`project_cockpit_test`, `gameplay_r2_test` et `smoke_test`.
+`project_cockpit_test`, `gameplay_r2_test`, `smoke_test`, `branding_config_test`
+et `balance_ceiling_test`.
 
 Les derniers changements d'interface ont été contrôlés par les suites de mise
 en page et le contrôle général. Le dernier message de refus fournisseur a été
 contrôlé par import, démarrage, test financier et contrôle général. Ces contrôles
 vérifient aussi l'absence d'erreurs de script, au-delà du code de sortie.
+
+Les exports GitHub ont réussi lors du premier passage. Le contrôle Godot a
+détecté une attente de version 0.10.0 restée dans le test de configuration ;
+elle est mise à jour pour la RC1. Les tests de configuration et de plafonds
+économiques ont ensuite passé localement, avec import, démarrage et contrôle
+général relancés. Le résultat de la nouvelle exécution GitHub doit être vérifié
+sur la demande de fusion ; la réussite locale ne le remplace pas.
 
 Le test financier couvre 36 mois de ventes/support, suspension et reprise,
 expiration, seuil exact et seuil moins un euro dans les trois difficultés,
