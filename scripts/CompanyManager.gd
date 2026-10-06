@@ -206,6 +206,36 @@ func add_alert(text: String):
 		alerts.pop_back()
 	alert_created.emit(text)
 
+static func _normalize_department_key(department: String) -> String:
+	var clean := department.strip_edges()
+	if clean == "Développement" or clean.to_lower().contains("veloppement"):
+		return "Développement"
+	return clean
+
+static func _migrate_departments(saved: Dictionary) -> Dictionary:
+	var migrated: Dictionary = {}
+	for raw_key in saved.keys():
+		var canonical := _normalize_department_key(str(raw_key))
+		var value = saved.get(raw_key, {})
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var incoming: Dictionary = (value as Dictionary).duplicate(true)
+		if not migrated.has(canonical):
+			migrated[canonical] = incoming
+			continue
+		var current: Dictionary = migrated[canonical]
+		var current_leader := str(current.get("leader_id", ""))
+		var incoming_leader := str(incoming.get("leader_id", ""))
+		if current_leader == "" and incoming_leader != "":
+			current["leader_id"] = incoming_leader
+		# Les deux clés ont parfois vécu quelques mois en parallèle. Garder la
+		# meilleure cohésion évite de jeter la progression acquise par l'équipe.
+		current["cohesion"] = maxf(float(current.get("cohesion", 0.0)), float(incoming.get("cohesion", 0.0)))
+		if str(current.get("autonomy", "")) == "":
+			current["autonomy"] = str(incoming.get("autonomy", "SUPERVISED"))
+		migrated[canonical] = current
+	return migrated
+
 func get_state() -> Dictionary:
 	return {
 		"company_name":company_name,"founded_year":founded_year,"starting_sector":starting_sector,
@@ -230,7 +260,8 @@ func load_state(state: Dictionary):
 		)
 		if not migrated_policies.is_empty():
 			policies = migrated_policies
-	departments = state.get("departments", departments).duplicate(true)
+	var saved_departments = state.get("departments", departments)
+	departments = _migrate_departments(saved_departments if typeof(saved_departments) == TYPE_DICTIONARY else {})
 	if not departments.has("Développement"):
 		departments["Développement"] = {"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0}
 	subsidiaries = state.get("subsidiaries", []).duplicate(true)

@@ -138,7 +138,25 @@ func hire_candidate() -> bool:
 	return true
 
 ## 29/09 : les recrues gardaient leur étiquette « Candidat R&D » une fois embauchées.
+static func normalize_department(department: String) -> String:
+	var clean := department.strip_edges()
+	if clean in ["R&D", "Développement", "Production", "Marketing", "Support", "Finance"]:
+		return clean
+	var lower := clean.to_lower()
+	# Anciennes sauvegardes Android : "Développement" a parfois été enregistré
+	# après un double décodage UTF-8 (ex. "D├®veloppement"). La fin ASCII
+	# reste intacte, ce qui permet une migration sûre vers le libellé canonique.
+	if lower.contains("veloppement"):
+		return "Développement"
+	if lower in ["r&d", "rd"]:
+		return "R&D"
+	for canonical in ["Production", "Marketing", "Support", "Finance"]:
+		if lower == canonical.to_lower():
+			return canonical
+	return clean
+
 static func role_for_department(department: String) -> String:
+	department = normalize_department(department)
 	match department:
 		"R&D": return "Chercheur R&D"
 		"Développement": return "Ingénieur développement"
@@ -193,10 +211,11 @@ func _legacy_profile(emp: Dictionary) -> Dictionary:
 	}
 
 func team_attribute(department: String, attribute: String) -> float:
+	department = normalize_department(department)
 	var total := 0.0
 	var count := 0
 	for emp in staff:
-		if str(emp.get("department", "")) != department:
+		if normalize_department(str(emp.get("department", ""))) != department:
 			continue
 		var profile: Dictionary = emp.get("profile", {})
 		total += float(profile.get(attribute, 50.0))
@@ -292,9 +311,10 @@ func average_morale() -> float:
 	return total / float(staff.size())
 
 func team_score(department: String, specialization: String = "") -> float:
+	department = normalize_department(department)
 	var members: Array = []
 	for emp in staff:
-		if str(emp.department) == department:
+		if normalize_department(str(emp.get("department", ""))) == department:
 			members.append(emp)
 	if members.is_empty():
 		return 20.0
@@ -379,9 +399,10 @@ func management_profile(employee_id: String, sector: String = "CPU") -> Dictiona
 	}
 
 func count_department(department: String) -> int:
+	department = normalize_department(department)
 	var count := 0
 	for emp in staff:
-		if str(emp.get("department", "")) == department:
+		if normalize_department(str(emp.get("department", ""))) == department:
 			count += 1
 	return count
 
@@ -406,6 +427,7 @@ func _grow_junior(emp: Dictionary) -> void:
 		CompanyManager.add_alert("%s a fini sa montée en compétence : %d." % [str(emp.get("name", "")), int(emp.skill)])
 
 func move_employee(employee_id: String, department: String):
+	department = normalize_department(department)
 	for emp in staff:
 		if str(emp.id) == employee_id:
 			emp.department = department
@@ -424,6 +446,7 @@ func load_state(state: Dictionary):
 	founding_stage_open = bool(state.get("founding_stage_open", true))
 	var migrated_development_leader := ""
 	for emp in staff:
+		emp["department"] = normalize_department(str(emp.get("department", "")))
 		if not emp.has("founding_member"):
 			emp["founding_member"] = str(emp.get("name", "")) in ["Camille Durand", "Samira Lefèvre", "Noah Leroy"]
 		if not emp.has("profile") or typeof(emp.get("profile", {})) != TYPE_DICTIONARY:
@@ -438,7 +461,12 @@ func load_state(state: Dictionary):
 	if CompanyManager.departments.has("Développement") and str(CompanyManager.departments["Développement"].get("leader_id", "")) == "" and migrated_development_leader != "":
 		CompanyManager.departments["Développement"]["leader_id"] = migrated_development_leader
 	candidate = state.get("candidate", {}).duplicate(true)
+	if not candidate.is_empty():
+		candidate["department"] = normalize_department(str(candidate.get("department", "")))
 	shortlist = (state.get("shortlist", []) as Array).duplicate(true)
+	for shortlist_value in shortlist:
+		var shortlist_candidate: Dictionary = shortlist_value
+		shortlist_candidate["department"] = normalize_department(str(shortlist_candidate.get("department", "")))
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
