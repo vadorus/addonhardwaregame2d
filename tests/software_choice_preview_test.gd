@@ -112,6 +112,10 @@ func test_choices(mode: String) -> void:
 	check(is_equal_approx(float(chip(changes, "productivity").get("delta", -99999.0)), float(basic_after.scores.productivity) - float(basic_before.scores.productivity)), "basic family score differs from manager preview")
 	check(is_equal_approx(float(chip(changes, "total_cost").get("delta", -99999.0)), float(basic_after.total_cost) - float(basic_before.total_cost)), "basic family funding differs from manager preview")
 	check(chip(changes, "bugs").is_empty(), "basic families show bugs that the simulation does not estimate")
+	(node.get("_comparison_keep") as Button).pressed.emit()
+	(controls.productivity as SpinBox).value = 3
+	var reference: Label = (node.get("_comparison_box") as VBoxContainer).get_child(1)
+	check(reference.text.contains("Productivité 4"), "saved reference displays the current levels instead of the pinned levels")
 	node.queue_free()
 	await settle()
 

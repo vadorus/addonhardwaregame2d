@@ -716,6 +716,13 @@ func _refresh_comparison() -> void:
 		var names: Array[String] = []
 		for feature_id in _comparison_choice.get("features", []): names.append(str(PLAY.utility_feature(str(feature_id)).get("label", feature_id)))
 		description = "%s • %s" % [PLAY.utility_target_label(str(_comparison_choice.get("target", "HOME"))), ", ".join(names)]
+	else:
+		var levels: Dictionary = _comparison_choice.get("levels", {})
+		var names: Array[String] = []
+		for axis_value in CAT.settings_of(str(_comparison_choice.family)):
+			var axis := str(axis_value)
+			names.append("%s %d" % [str(CAT.setting(str(_comparison_choice.family), axis).get("label", axis)), int(levels.get(axis, 3))])
+		description += " • " + ", ".join(names)
 	var reference := UI.rich_label("Par rapport à la version %s : %s • %s." % ["gardée" if _comparison_pinned else "de départ", description, str((CAT.PRICE_MODES.get(str(_comparison_choice.get("price_mode", "MARKET")), {}) as Dictionary).get("label", ""))])
 	_comparison_box.add_child(reference)
 	_comparison_box.add_child(CHIPS.flow(comparison_chips(), "Écarts estimés :", 13))
