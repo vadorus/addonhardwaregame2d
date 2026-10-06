@@ -13,6 +13,7 @@ const PRESENTATION := preload("res://scripts/ProjectPresentation.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 const IMPACT := preload("res://scripts/ImpactPreview.gd")
 const CHIPS := preload("res://ui/components/ImpactChips.gd")
+const BRIEF := preload("res://ui/components/ProjectBrief.gd")
 
 enum ViewMode { PROJECT_CHOICE, SOFTWARE_CHOICE, ACTIVITIES, PRODUCT }
 
@@ -34,6 +35,13 @@ var _comparison_box: VBoxContainer
 var _comparison_keep: Button
 var _comparison_choice: Dictionary = {}
 var _comparison_pinned := false
+var _product_footer: VBoxContainer
+var _product_brief: Control
+var _product_details: VBoxContainer
+var _details_toggle: Button
+var _funding_summary: Label
+var _estimate_note: Label
+var _scroll: ScrollContainer
 
 func _ready() -> void:
 	color = Color(0.025, 0.055, 0.10, 0.78)
@@ -100,6 +108,7 @@ func _build_shell() -> void:
 	header.add_child(close_button)
 
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	UI.configure_touch_scroll(scroll)
@@ -109,8 +118,13 @@ func _build_shell() -> void:
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 12)
 	scroll.add_child(_content)
+	_product_footer = VBoxContainer.new()
+	_product_footer.add_theme_constant_override("separation", 7)
+	_product_footer.visible = false
+	shell.add_child(_product_footer)
 
 func _clear_content() -> void:
+	_product_footer.visible = false
 	for child in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
@@ -519,6 +533,10 @@ func _show_product() -> void:
 	UI.prepare_touch_scroll_children(_content)
 
 func _build_product_controls() -> void:
+	for child in _product_footer.get_children():
+		_product_footer.remove_child(child)
+		child.queue_free()
+	_product_footer.visible = true
 	var family_label := UI.eyebrow("TYPE DE LOGICIEL")
 	_content.add_child(family_label)
 	_family_select = OptionButton.new()
@@ -553,25 +571,76 @@ func _build_product_controls() -> void:
 	_settings_box.add_theme_constant_override("separation", 7)
 	_content.add_child(_settings_box)
 
+	_product_details = VBoxContainer.new()
+	_product_details.add_theme_constant_override("separation", 8)
+	_product_details.visible = false
+	_content.add_child(_product_details)
 	_project_preview = UI.rich_label()
-	_content.add_child(_project_preview)
+	_product_details.add_child(_project_preview)
 
 	_comparison_box = VBoxContainer.new()
 	_comparison_box.add_theme_constant_override("separation", 6)
-	_content.add_child(_comparison_box)
+	_product_details.add_child(_comparison_box)
 	_comparison_keep = Button.new()
 	_comparison_keep.text = "Garder cette version pour comparer"
 	_comparison_keep.custom_minimum_size.y = 48
 	_comparison_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	LOOK.button_style(_comparison_keep)
 	_comparison_keep.pressed.connect(_keep_comparison)
-	_content.add_child(_comparison_keep)
+	_product_details.add_child(_comparison_keep)
+
+	_product_brief = BRIEF.new()
+	_product_footer.add_child(_product_brief)
+	_estimate_note = LOOK.muted_label("Estimations hors salaires, locaux et décisions payantes pendant le développement.", 12)
+	_estimate_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_product_footer.add_child(_estimate_note)
+	_funding_summary = LOOK.label("", 13)
+	_funding_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_product_footer.add_child(_funding_summary)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	_product_footer.add_child(actions)
+	_details_toggle = Button.new()
+	_details_toggle.text = "Chiffres et comparaison"
+	_details_toggle.toggle_mode = true
+	_details_toggle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_details_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	LOOK.button_style(_details_toggle)
+	_details_toggle.toggled.connect(_toggle_product_details)
+	actions.add_child(_details_toggle)
 
 	_project_start = Button.new()
 	_project_start.text = "Lancer le développement"
+	_project_start.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_project_start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	LOOK.button_style(_project_start, true)
 	_project_start.pressed.connect(_start_product)
-	_content.add_child(_project_start)
+	actions.add_child(_project_start)
+
+func _toggle_product_details(expanded: bool) -> void:
+	_product_details.visible = expanded
+	_details_toggle.text = "Masquer les détails" if expanded else "Chiffres et comparaison"
+	if expanded: _reveal_product_details.call_deferred()
+
+func _reveal_product_details() -> void:
+	await get_tree().process_frame
+	if is_instance_valid(_product_details) and _product_details.visible:
+		_scroll.ensure_control_visible(_product_details)
+
+func _refresh_product_brief(preview: Dictionary, check: Dictionary) -> void:
+	var months := int(preview.get("calendar_months", -1))
+	var cost := UI.money(int(preview.get("monthly_cash_cost", 0))) + " €/mois"
+	if months >= 0: cost += "\n~%s € au total" % UI.money(int(preview.get("total_cost", 0)))
+	_product_brief.call("update_estimates", cost,
+		"~%d mois" % months if months >= 0 else "Sans équipe disponible",
+		"Qualité ~%.0f/100" % float(preview.get("quality", 0.0)))
+	_estimate_note.text = "Estimations hors salaires, locaux, choix de phase payants et bêta." if UI.option_meta(_family_select) == "UTILITY" else "Estimations hors salaires, locaux et maintenance future."
+	_funding_summary.text = "Disponible : %s €" % UI.money(Economy.money)
+	if check.has("required_cash"):
+		_funding_summary.text += " • minimum au départ : %s € (%d mois)" % [UI.money(int(check.required_cash)), int(check.months)]
+	if not bool(check.get("ok", false)):
+		_funding_summary.text += "\n" + str(check.get("reason", "Lancement indisponible."))
+	_funding_summary.add_theme_color_override("font_color", LOOK.INK if bool(check.get("ok", false)) else Color("b3261e"))
 
 func _refresh_family_options() -> void:
 	if _family_select == null:
@@ -587,6 +656,9 @@ func _refresh_family_options() -> void:
 	if _family_select.item_count == 0:
 		_project_start.disabled = true
 		_project_preview.text = "Aucun domaine Software disponible cette année."
+		_funding_summary.text = "Aucun domaine logiciel disponible cette année."
+		_funding_summary.add_theme_color_override("font_color", Color("b3261e"))
+		_comparison_keep.disabled = true
 		return
 	if keep != "":
 		UI.select_meta(_family_select, keep)
@@ -769,6 +841,7 @@ func _refresh_product_preview() -> void:
 		if not bool(check.get("ok", false)):
 			lines.append(str(check.get("reason", "")))
 		_project_preview.text = "\n".join(lines)
+		_refresh_product_brief(preview, check)
 		_project_start.disabled = not bool(check.get("ok", false))
 		LOOK.button_style(_project_start, bool(check.get("ok", false)))
 		_refresh_comparison()
@@ -789,6 +862,7 @@ func _refresh_product_preview() -> void:
 	if not bool(check.get("ok", false)):
 		lines.append(str(check.get("reason", "")))
 	_project_preview.text = "\n".join(lines)
+	_refresh_product_brief(preview, check)
 	_project_start.disabled = not bool(check.get("ok", false))
 	LOOK.button_style(_project_start, bool(check.get("ok", false)))
 	_refresh_comparison()

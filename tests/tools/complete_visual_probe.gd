@@ -32,10 +32,11 @@ func _ready() -> void:
 	var checks: Dictionary = software_workshop.get("_feature_checks")
 	(checks.AUTOMATION as CheckBox).button_pressed = true
 	(checks.SIMPLE_UI as CheckBox).button_pressed = true
+	(software_workshop.get("_details_toggle") as Button).button_pressed = true
 	await settle()
 	var software_content: Control = software_workshop.get("_content")
 	var software_scroll: ScrollContainer = software_content.get_parent()
-	software_scroll.scroll_vertical = int(software_workshop.get("_project_preview").position.y)
+	software_scroll.ensure_control_visible(software_workshop.get("_comparison_keep"))
 	await capture("device-tycoon-software-comparison")
 	game.call("_close_software_workshop")
 	game.call("open_cpu_stepper")

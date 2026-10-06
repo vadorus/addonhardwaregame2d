@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Tech Empire V0.11.1 RC2"
+config/name="Tech Empire V0.11.1 RC3"
 run/main_scene="uid://e28phl1nvy5i"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="TechEmpire"

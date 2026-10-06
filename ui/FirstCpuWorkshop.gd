@@ -8,6 +8,7 @@ const UI := preload("res://ui/UiKit.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_ADVICE := preload("res://scripts/CpuAdvice.gd")
+const BRIEF := preload("res://ui/components/ProjectBrief.gd")
 
 const BRIEFS := [
 	{
@@ -90,6 +91,10 @@ var _step_label: Label
 var _year_label: Label
 var _scroll: ScrollContainer
 var _launch_button: Button
+var _project_brief: Control
+var _preview_panel: PanelContainer
+var _details_toggle: Button
+var _launch_cash_label: Label
 
 func _ready() -> void:
 	color = Color(0.025, 0.055, 0.10, 0.74)
@@ -242,6 +247,11 @@ func _build() -> void:
 	config_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
+	_project_brief = BRIEF.new()
+	_config_view.add_child(_project_brief)
+	var estimate_note := LOOK.muted_label("Estimations de développement, hors salaires, locaux et industrialisation.", 12)
+	estimate_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_config_view.add_child(estimate_note)
 
 	_config_columns = GridContainer.new()
 	_config_columns.columns = 2
@@ -389,11 +399,26 @@ func _build() -> void:
 	advisor_box.add_child(_advisor_label)
 	right_column.add_child(advisor_panel)
 
+	_details_toggle = Button.new()
+	_details_toggle.text = "Voir les estimations détaillées"
+	_details_toggle.toggle_mode = true
+	_details_toggle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	LOOK.button_style(_details_toggle)
+	left_column.add_child(_details_toggle)
 	var preview_panel := LOOK.card(Color("faf0e0"), 12, 12)
+	_preview_panel = preview_panel
+	preview_panel.visible = false
+	_details_toggle.toggled.connect(func(expanded):
+		_preview_panel.visible = expanded
+		_details_toggle.text = "Masquer les estimations" if expanded else "Voir les estimations détaillées"
+	)
 	_preview_label = LOOK.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_panel.add_child(_preview_label)
 	left_column.add_child(preview_panel)
+	_launch_cash_label = LOOK.muted_label("", 12)
+	_launch_cash_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	left_column.add_child(_launch_cash_label)
 
 	_error_label = LOOK.label("", 13)
 	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -420,6 +445,7 @@ func select_brief(key: String) -> void:
 		if str(brief.get("id", "")) != key:
 			continue
 		_selected_brief = brief.duplicate(true)
+		_details_toggle.button_pressed = false
 		_selected_key = key
 		_step_label.text = "✓  Objectif     ›     2  Projet"
 		_scroll.scroll_vertical = 0
@@ -537,6 +563,14 @@ func _refresh_preview() -> void:
 
 	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("focus", "BALANCED")))
 	var detail_level := int(advice.get("level", 0))
+	var monthly := ResearchManager.quoted_development_monthly_cost("INTERNAL", int(_budget.value), GameData.sourcing_profile("INTERNAL"))
+	var brief_months := int(estimate.get("months", 0))
+	var duration := "%d–%d mois" % [maxi(brief_months - 2, 1), brief_months + 3] if detail_level <= 0 else "~%d mois" % brief_months
+	var focus_metric := "efficiency" if str(_selected_brief.get("focus", "")) == "EFFICIENCY" else "reliability" if str(_selected_brief.get("focus", "")) == "RELIABILITY" else "performance"
+	var promise := "%s %s" % [str({"efficiency":"Efficacité", "reliability":"Fiabilité", "performance":"Performance"}[focus_metric]), _qualitative_metric(float(evaluation.get(focus_metric, 0.0)))]
+	var program_cost := int(estimate.get("program_cost", 0))
+	var program_text := "~%s–%s € au total" % [UI.money(int(round(float(program_cost) * 0.78))), UI.money(int(round(float(program_cost) * 1.28)))] if detail_level <= 0 else "~%s € au total" % UI.money(program_cost)
+	_project_brief.call("update_estimates", "~%s €/mois\n%s" % [UI.money(monthly), program_text], duration, promise)
 	if _cache_field_root != null:
 		_cache_field_root.visible = detail_level >= 1
 	if _advisor_label != null:
@@ -559,7 +593,6 @@ func _refresh_preview() -> void:
 			_qualitative_metric(float(evaluation.get("reliability", 0.0)))
 		]
 		var months := int(estimate.get("months", 0))
-		var program_cost := int(estimate.get("program_cost", 0))
 		timing_text = "Développement probablement %d–%d mois • budget programme ~%s–%s €" % [
 			maxi(months - 2, 1),
 			months + 3,
@@ -618,6 +651,7 @@ func _refresh_preview() -> void:
 	var launch_cash := ExecutiveManager.launch_cash_projection(int(estimate.get("months", 8)) + 4,
 		ResearchManager.quoted_development_monthly_cost("INTERNAL", int(_budget.value), GameData.sourcing_profile("INTERNAL")))
 	_preview_label.text += "\n" + ExecutiveManager.launch_cash_text(launch_cash)
+	_launch_cash_label.text = ExecutiveManager.launch_cash_text(launch_cash)
 	_update_slider_labels()
 
 func _qualitative_metric(value: float) -> String:
