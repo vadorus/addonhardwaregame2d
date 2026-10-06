@@ -3,6 +3,7 @@ extends Node
 ## Aucun coût de fabrication physique : le coût récurrent vient du support logiciel.
 
 signal software_changed
+signal work_event(event)
 signal software_launched(product)
 
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
@@ -97,12 +98,25 @@ func active_activity() -> Dictionary:
 	return activities[0] if not activities.is_empty() else {}
 
 func activity_terms(activity_id: String, approach_id: String = "BALANCED") -> Dictionary:
-	return PLAY.contract_terms(ACTIVITY.data(activity_id), approach_id)
+	var terms := PLAY.contract_terms(ACTIVITY.data(activity_id), approach_id)
+	var current: Dictionary = active_activity()
+	var task := {"id":"ACT:" + activity_id, "kind":"SOFTWARE", "need":1.0}
+	var allocation := PersonnelManager.allocation_for(task)
+	var rate := float(allocation.get("factor", 0.0))
+	var done := float(current.get("work_done", current.get("months_done", 0))) if str(current.get("id", "")) == activity_id else 0.0
+	terms["assigned"] = float(allocation.get("assigned", 0.0))
+	terms["progress"] = done / maxf(float(terms.get("months", 1)), 1.0) * 100.0
+	terms["calendar_months"] = int(ceil(maxf(0.0, float(terms.get("months", 1)) - done) / rate)) if rate > 0.0001 else -1
+	terms["monthly_cash_cost"] = Economy.quoted_expense(int(terms.get("monthly_cost", 0)), "Activité software")
+	terms["net_estimate"] = int(terms.get("payout", 0)) - int(terms.monthly_cash_cost) * maxi(int(terms.calendar_months), 0) - (int(current.get("spent", 0)) if str(current.get("id", "")) == activity_id else 0)
+	return terms
 
 func skill_xp(skill_id: String) -> int:
 	return int(skills.get(skill_id, 0))
 
 func can_start_activity(activity_id: String, approach_id: String = "BALANCED") -> Dictionary:
+	if PersonnelManager.count_department("Développement") <= 0:
+		return {"ok":false, "reason":"Affectez au moins une personne au Développement avant de démarrer."}
 	var data := ACTIVITY.data(activity_id)
 	if data.is_empty() or TimeManager.year < int(data.get("from", 9999)):
 		return {"ok":false, "reason":"Cette activité n'est pas encore disponible."}
@@ -115,9 +129,12 @@ func can_start_activity(activity_id: String, approach_id: String = "BALANCED") -
 		return {"ok":false, "reason":"Le domaine Software correspondant n'est pas encore ouvert."}
 	var terms := activity_terms(activity_id, approach_id)
 	var first_month := int(terms.get("monthly_cost", 0))
-	if not Economy.can_afford(first_month, "Activité software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour démarrer cette activité."}
-	return {"ok":true, "reason":""}
+	return _funding_check(first_month, 1, "Activité software")
+
+func _funding_check(monthly_base: int, months: int, category: String) -> Dictionary:
+	var quote := Economy.project_funding_quote(monthly_base, months, category)
+	quote["reason"] = "" if bool(quote.ok) else "Trésorerie insuffisante : %d € disponibles, %d € requis (%d mois à %d €), il manque %d €." % [int(quote.treasury), int(quote.required_cash), months, int(quote.monthly_cash), int(quote.shortfall)]
+	return quote
 
 func start_activity(activity_id: String, approach_id: String = "BALANCED") -> bool:
 	if not bool(can_start_activity(activity_id, approach_id).get("ok", false)):
@@ -158,9 +175,45 @@ func _utility_levels_from_metrics(metrics: Dictionary) -> Dictionary:
 func utility_preview(feature_ids: Array, target_id: String, price_mode: String = "MARKET") -> Dictionary:
 	var plan := PLAY.utility_plan(feature_ids, target_id, skills)
 	plan["price"] = CAT.license_price("UTILITY", price_mode)
+	var forecast := work_preview({"id":"SW-PREVIEW", "kind":"UTILITY_SLICE", "months_total":maxi(3, int(plan.get("months", 3)))})
+	plan["calendar_months"] = int(forecast.get("remaining", 0))
+	plan["monthly_cash_cost"] = Economy.quoted_expense(int(plan.get("monthly_cost", 0)), "Développement software")
+	plan["total_cost"] = int(plan.monthly_cash_cost) * maxi(int(plan.calendar_months), 0)
+	plan["assigned"] = float(forecast.get("assigned", 0.0))
 	return plan
 
+func work_preview(project: Dictionary) -> Dictionary:
+	var task := PersonnelManager.software_task(project)
+	var allocation := PersonnelManager.allocation_for(task)
+	var rate := float(allocation.get("factor", 0.0))
+	var done := float(project.get("work_done", project.get("months_done", 0)))
+	var total := float(project.get("months_total", 1))
+	if str(project.get("status", "")) == "BETA":
+		done = float(project.get("beta_work_done", 0.0))
+		total = 1.0
+	return {"assigned":float(allocation.get("assigned", 0.0)), "rate":rate,
+		"remaining":int(ceil(maxf(0.0, total - done) / rate)) if rate > 0.0001 else -1,
+		"progress":clampf(done / maxf(total, 1.0) * 100.0, 0.0, 100.0)}
+
+func _advance_work(project: Dictionary, rate: float) -> float:
+	var before := float(project.get("work_done", project.get("months_done", 0)))
+	var total := float(project.get("months_total", 1))
+	var limit := total
+	if bool(project.get("cockpit_interactive", false)):
+		var phase := software_cockpit_phase(project)
+		if phase == "PLANNING":
+			limit = float(maxi(1, int(floor(total * 0.25))))
+		elif phase == "BUILD":
+			limit = float(mini(int(total) - 1, int(ceil(total * 0.75))))
+	var after := minf(limit, before + rate)
+	project["work_done"] = after
+	project["months_done"] = int(floor(after + 0.0001))
+	project["elapsed_months"] = int(project.get("elapsed_months", 0)) + 1
+	return maxf(0.0, after - before)
+
 func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictionary:
+	if PersonnelManager.count_department("Développement") <= 0:
+		return {"ok":false, "reason":"Affectez au moins une personne au Développement avant de démarrer."}
 	if not is_open("UTILITY"):
 		return {"ok":false, "reason":"Les utilitaires ne sont pas encore disponibles."}
 	if not project_for("UTILITY").is_empty():
@@ -173,9 +226,7 @@ func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictio
 	if not PLAY.UTILITY_TARGETS.has(target_id):
 		return {"ok":false, "reason":"Public cible inconnu."}
 	var plan := PLAY.utility_plan(chosen, target_id, skills)
-	if not Economy.can_afford(int(plan.get("monthly_cost", 0)) * 2, "Développement software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les deux premiers mois."}
-	return {"ok":true, "reason":""}
+	return _funding_check(int(plan.get("monthly_cost", 0)), 2, "Développement software")
 
 func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "", player_controlled: bool = false) -> bool:
 	if not bool(can_start_utility(feature_ids, target_id).get("ok", false)):
@@ -196,6 +247,10 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 		"price_mode":price_mode,
 		"months_total":maxi(3, int(plan.get("months", 1))) if player_controlled else int(plan.get("months", 1)),
 		"months_done":0,
+		"work_done":0.0,
+		"elapsed_months":0,
+		"spent":0,
+		"spend_tracking_complete":true,
 		"monthly_cost":int(plan.get("monthly_cost", 0)),
 		"status":"DEVELOPMENT",
 		"incident_done":false,
@@ -254,7 +309,7 @@ func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta:
 
 func software_cockpit_phase(project: Dictionary) -> String:
 	var total := maxi(int(project.get("months_total", 1)), 3)
-	var done := clampi(int(project.get("months_done", 0)), 0, total)
+	var done := clampf(float(project.get("work_done", project.get("months_done", 0))), 0.0, float(total))
 	var phase_index := 0
 	if done >= maxi(1, int(floor(float(total) * 0.25))):
 		phase_index = 1
@@ -334,7 +389,8 @@ func resolve_software_directive(project_id: String, option_id: String) -> bool:
 		outcome_parts.append("bugs %+d" % bugs_delta)
 	if cost_once > 0:
 		Economy.add_expense(cost_once, "Décision Software — %s" % str(project.get("name", "Logiciel")))
-		outcome_parts.append("coût %d €" % cost_once)
+		project["spent"] = int(project.get("spent", 0)) + Economy.quoted_expense(cost_once, "Décision Software")
+		outcome_parts.append("coût %d €" % Economy.quoted_expense(cost_once, "Décision Software"))
 	if delay_months > 0:
 		project["months_total"] = int(project.get("months_total", 1)) + delay_months
 		outcome_parts.append("+%d mois" % delay_months)
@@ -357,7 +413,7 @@ func resolve_software_directive(project_id: String, option_id: String) -> bool:
 	software_changed.emit()
 	return true
 
-func _apply_software_cockpit_month(project: Dictionary) -> void:
+func _apply_software_cockpit_month(project: Dictionary, effort: float = 1.0) -> void:
 	if str(project.get("kind", "")) != "UTILITY_SLICE":
 		return
 	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), SOFTWARE_COCKPIT_AXES)
@@ -368,7 +424,7 @@ func _apply_software_cockpit_month(project: Dictionary) -> void:
 	for axis_value in SOFTWARE_COCKPIT_AXES:
 		var axis := str(axis_value)
 		var leverage := float(phase_weights.get(axis, 1.0))
-		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage * effort
 	project["cockpit_influence"] = influence
 	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
 
@@ -377,12 +433,16 @@ func _apply_software_cockpit_month(project: Dictionary) -> void:
 	for axis_value in SOFTWARE_COCKPIT_AXES:
 		var axis := str(axis_value)
 		var leverage := float(phase_weights.get(axis, 1.0))
-		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)) * leverage, 10.0, 98.0)
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(bias.get(axis, 0.0)) * leverage * effort, 10.0, 98.0)
 	project["metrics"] = metrics
 	project["levels"] = _utility_levels_from_metrics(metrics)
 
 	var stability_priority := int(priorities.get("stability", 25))
 	var feature_priority := int(priorities.get("features", 25))
+	project["test_effort"] = float(project.get("test_effort", 0.0)) + effort
+	if float(project.test_effort) < 1.0:
+		return
+	project["test_effort"] = float(project.test_effort) - 1.0
 	if phase == "STABILIZE" and stability_priority >= 35 and int(project.get("bugs", 0)) > 0:
 		project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 2)
 	elif stability_priority >= 40 and int(project.get("bugs", 0)) > 0:
@@ -481,6 +541,7 @@ func choose_release(project_id: String, choice: String) -> bool:
 		"BETA":
 			project["status"] = "BETA"
 			project["beta_months_done"] = 0
+			project["beta_work_done"] = 0.0
 			project["cockpit_last_choice"] = "Ouvrir une bêta"
 			project["cockpit_last_outcome"] = "Bêta ouverte — +1 mois de tests • bugs réduits avant la prochaine revue"
 			CompanyManager.add_alert("Bêta ouverte pour %s : encore un mois de tests." % str(project.get("name", "le logiciel")))
@@ -513,9 +574,7 @@ func can_start_patch(product_id: String) -> Dictionary:
 	if int(product.get("bugs_known", 0)) <= 0:
 		return {"ok":false, "reason":"Aucun bug connu ne justifie un correctif."}
 	var cost := 1800 + int(product.get("bugs_known", 0)) * 40
-	if not Economy.can_afford(cost, "Correctif software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour préparer le correctif."}
-	return {"ok":true, "reason":""}
+	return _funding_check(cost, 1, "Correctif software")
 
 func start_patch(product_id: String) -> bool:
 	if not bool(can_start_patch(product_id).get("ok", false)):
@@ -561,9 +620,7 @@ func can_start_update(product_id: String, feature_id: String) -> Dictionary:
 		return {"ok":false, "reason":"L'équipe Software travaille déjà sur cette famille."}
 	var feature := PLAY.utility_feature(feature_id)
 	var monthly_cost := 2400 + int(round(float(feature.get("cost", 1000)) * 0.45))
-	if not Economy.can_afford(monthly_cost * 2, "Mise à jour software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour lancer cette mise à jour."}
-	return {"ok":true, "reason":""}
+	return _funding_check(monthly_cost, 2, "Mise à jour software")
 
 func start_update(product_id: String, feature_id: String) -> bool:
 	if not bool(can_start_update(product_id, feature_id).get("ok", false)):
@@ -592,6 +649,7 @@ func _complete_maintenance(project: Dictionary) -> void:
 	var product := product_by_id(str(project.get("product_id", "")))
 	if product.is_empty():
 		return
+	product["maintenance_spent"] = int(product.get("maintenance_spent", 0)) + int(project.get("spent", 0))
 	match str(project.get("kind", "")):
 		"PATCH":
 			var before := int(product.get("bugs_known", 0))
@@ -638,8 +696,12 @@ func preview(family_id: String, levels: Dictionary, price_mode: String) -> Dicti
 	var quality := 0.0
 	for score in scores.values(): quality += float(score)
 	quality /= maxf(float(scores.size()), 1.0)
-	return {"months":months, "monthly_cost":monthly, "total_cost":monthly * months, "price":CAT.license_price(family_id, price_mode), "quality":quality, "scores":scores}
+	var forecast := work_preview({"id":"SW-PREVIEW", "months_total":months})
+	var cash_cost := Economy.quoted_expense(monthly, "Développement software")
+	return {"months":months, "calendar_months":int(forecast.remaining), "monthly_cost":monthly, "monthly_cash_cost":cash_cost, "total_cost":cash_cost * maxi(int(forecast.remaining), 0), "price":CAT.license_price(family_id, price_mode), "quality":quality, "scores":scores}
 func can_start(family_id: String, levels: Dictionary) -> Dictionary:
+	if PersonnelManager.count_department("Développement") <= 0:
+		return {"ok":false, "reason":"Affectez au moins une personne au Développement avant de démarrer."}
 	if not is_open(family_id):
 		return {"ok":false, "reason":"Ce domaine software n'est pas encore ouvert."}
 	if not project_for(family_id).is_empty():
@@ -649,9 +711,7 @@ func can_start(family_id: String, levels: Dictionary) -> Dictionary:
 		if level < 1 or level > max_level(family_id):
 			return {"ok":false, "reason":"Ambition trop élevée pour l'expérience de l'équipe."}
 	var monthly := CAT.dev_monthly_cost(family_id, levels, TimeManager.year)
-	if not Economy.can_afford(monthly * 2, "Développement software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les premiers mois."}
-	return {"ok":true, "reason":""}
+	return _funding_check(monthly, 2, "Développement software")
 
 func start_project(family_id: String, levels: Dictionary, price_mode: String = "MARKET", product_name: String = "") -> bool:
 	if not bool(can_start(family_id, levels).get("ok", false)):
@@ -674,12 +734,20 @@ func _process_projects() -> void:
 		var status := str(project.get("status", "DEVELOPMENT"))
 		if status in ["DECISION", "REVIEW"]:
 			continue
+		var forecast := work_preview(project)
+		var rate := float(forecast.get("rate", 0.0))
+		project["assigned_engineers"] = float(forecast.get("assigned", 0.0))
+		if rate <= 0.0:
+			continue
 
 		if status == "BETA":
 			var beta_cost := int(round(float(project.get("monthly_cost", 0)) * 0.60))
 			Economy.add_expense(beta_cost, "Bêta software — %s" % str(project.get("name", "Produit")))
+			project["spent"] = int(project.get("spent", 0)) + Economy.quoted_expense(beta_cost, "Bêta software")
+			work_event.emit({"kind":"SOFTWARE", "id":str(project.id), "text":"Tests utilisateurs : +%.0f %%" % (rate * 100.0)})
 			project["beta_months_done"] = int(project.get("beta_months_done", 0)) + 1
-			if int(project.get("beta_months_done", 0)) >= 1:
+			project["beta_work_done"] = float(project.get("beta_work_done", 0.0)) + rate
+			if float(project.get("beta_work_done", 0.0)) >= 1.0:
 				var bugs := int(project.get("bugs", 0))
 				project["bugs"] = maxi(0, bugs - maxi(5, int(ceil(float(bugs) * 0.45))))
 				var beta_metrics: Dictionary = project.get("metrics", {})
@@ -692,10 +760,24 @@ func _process_projects() -> void:
 		if kind == "UTILITY_SLICE" and status == "DEVELOPMENT" and _ensure_software_directive(project):
 			continue
 
-		Economy.add_expense(int(project.get("monthly_cost", 0)), "Développement software — %s" % CAT.family_label(str(project.family)))
+		var monthly_cost := int(project.get("monthly_cost", 0))
+		Economy.add_expense(monthly_cost, "Développement software — %s" % CAT.family_label(str(project.family)))
+		project["spent"] = int(project.get("spent", 0)) + Economy.quoted_expense(monthly_cost, "Développement software")
+		var before_work := float(project.get("work_done", project.get("months_done", 0)))
+		var effort := _advance_work(project, rate)
+		var bugs_before := int(project.get("bugs", 0))
 		if kind == "UTILITY_SLICE":
-			_apply_software_cockpit_month(project)
-		project["months_done"] = int(project.get("months_done", 0)) + 1
+			# Use the phase at the start of this work, then expose the next checkpoint.
+			var after_work := float(project.work_done)
+			project["work_done"] = before_work
+			_apply_software_cockpit_month(project, effort)
+			project["work_done"] = after_work
+		var event := {"kind":"SOFTWARE", "id":str(project.id), "name":str(project.get("name", "Logiciel")),
+			"text":"Avancement +%.0f %%" % (effort / maxf(float(project.get("months_total", 1)), 1.0) * 100.0)}
+		if int(project.get("bugs", 0)) < bugs_before:
+			event["text"] = "%d défauts corrigés" % (bugs_before - int(project.get("bugs", 0)))
+		project["work_last"] = str(event.text)
+		work_event.emit(event)
 
 		if kind in ["PATCH", "UPDATE"] and int(project.get("months_done", 0)) >= int(project.get("months_total", 1)):
 			projects.erase(project)
@@ -705,6 +787,13 @@ func _process_projects() -> void:
 		if kind == "UTILITY_SLICE" and not bool(project.get("incident_done", false)) and int(project.get("months_total", 1)) >= 3:
 			var midpoint := maxi(1, int(ceil(float(project.get("months_total", 1)) / 2.0)))
 			if int(project.get("months_done", 0)) >= midpoint:
+				project["incident_done"] = true
+				var stability := float((project.get("metrics", {}) as Dictionary).get("stability", 50.0))
+				if int(project.get("bugs", 0)) < 10 and stability >= 55.0:
+					project["cockpit_last_outcome"] = "Tests internes validés : la préparation a évité un incident."
+					CompanyManager.add_alert(str(project.name) + " : tests validés, aucun incident bloquant.")
+					_ensure_software_directive(project)
+					continue
 				var risky_feature := PLAY.utility_riskiest_feature(project.get("features", []))
 				var feature_label := str(PLAY.utility_feature(risky_feature).get("label", "une fonctionnalité"))
 				project["pending_decision"] = {
@@ -754,7 +843,9 @@ func _launch(project: Dictionary) -> void:
 	var product := {"id":str(project.id), "family":family_id, "name":str(project.name),
 		"levels":project.levels.duplicate(), "price_mode":str(project.price_mode), "price":CAT.license_price(family_id, str(project.price_mode)),
 		"mastery":product_mastery, "launch_f":now, "quality_launch":quality, "status":"ACTIVE",
-		"licenses_last":0, "licenses_total":0, "installed_users":0, "revenue_last":0, "support_last":0, "margin_last":0}
+		"licenses_last":0, "licenses_total":0, "installed_users":0, "supported_users":0,
+		"support_cohorts":CAT.support_cohorts({"licenses_total":0}, TimeManager.year, TimeManager.month),
+		"revenue_last":0, "support_last":0, "margin_last":0}
 	if str(project.get("kind", "")) == "UTILITY_SLICE":
 		product["kind"] = "UTILITY_SLICE"
 		product["target"] = str(project.get("target", "HOME"))
@@ -769,14 +860,26 @@ func _launch(project: Dictionary) -> void:
 		for skill_value in gains.keys():
 			var skill_id := str(skill_value)
 			skills[skill_id] = skill_xp(skill_id) + int(gains[skill_id])
+	product["development_spent"] = int(project.get("spent", 0))
+	product["spend_tracking_complete"] = bool(project.get("spend_tracking_complete", false))
+	product["margin_total"] = 0
 	products.append(product)
 	var state := family_state(family_id)
 	state["launches"] = int(state.get("launches", 0)) + 1
 	if product_mastery < LAUNCH_MASTERY_CAP: state["mastery"] = product_mastery + 1
 	reveals.append(str(product.id))
+	CompanyManager.add_alert("%s v1.0 est sorti : %d bugs connus, qualité %.0f/100. Premier bilan des licences au prochain mois." % [str(product.name), int(product.get("bugs_known", 0)), quality])
 	software_launched.emit(product)
 func _process_sales() -> void:
 	var now := CAT.year_f(TimeManager.year, TimeManager.month)
+	# Age all licences, including suspended products, before this month's sales.
+	for product_value in products:
+		var product: Dictionary = product_value
+		var cohorts := CAT.support_cohorts(product, TimeManager.year, TimeManager.month)
+		cohorts.pop_front()
+		cohorts.append(0)
+		product["support_cohorts"] = cohorts
+		product["supported_users"] = CAT.supported_licenses(cohorts)
 	for family_value in CAT.FAMILY_ORDER:
 		var family_id := str(family_value)
 		var active := active_products(family_id)
@@ -807,6 +910,8 @@ func _process_sales() -> void:
 			if str(product.get("kind", "")) == "UTILITY_SLICE":
 				var bug_penalty := clampf(1.0 - float(product.get("bugs_known", 0)) / 80.0, 0.55, 1.0)
 				weight *= bug_penalty
+			product["quality_live"] = quality
+			product["demand_weight"] = weight
 			weights.append(weight); total_weight += weight
 		var player_share := clampf(0.08 + CompanyManager.get_brand_score() / 500.0, 0.08, 0.30)
 		# One external offer competes for a finite reachable market. At weight 1,
@@ -817,11 +922,18 @@ func _process_sales() -> void:
 			var licenses := int(floor(reachable_market * float(weights[i]) / (1.0 + total_weight)))
 			var revenue := int(round(float(licenses) * float(product.price)))
 			product["installed_users"] = int(product.installed_users) + licenses
-			var support := CAT.support_monthly_cost(family_id, int(product.installed_users))
+			var cohorts: Array = product.support_cohorts
+			cohorts[CAT.SUPPORT_MONTHS - 1] = licenses
+			product["supported_users"] = CAT.supported_licenses(cohorts)
+			var support_raw := CAT.support_monthly_cost(family_id, int(product.supported_users))
+			var support := Economy.quoted_expense(support_raw, "Support software")
 			product["licenses_last"] = licenses; product["licenses_total"] = int(product.licenses_total) + licenses
 			product["revenue_last"] = revenue; product["support_last"] = support; product["margin_last"] = revenue - support
+			product["margin_total"] = int(product.get("margin_total", 0)) + revenue - support
+			product["market_months"] = int(product.get("market_months", 0)) + 1
+			product["feedback"] = product_feedback(product)
 			Economy.add_income(revenue, "Licences software — %s" % CAT.family_label(family_id))
-			Economy.add_expense(support, "Support software — %s" % CAT.family_label(family_id))
+			Economy.add_expense(support_raw, "Support software — %s" % CAT.family_label(family_id))
 func _process_activities() -> void:
 	for value in activities.duplicate():
 		var current: Dictionary = value
@@ -832,10 +944,17 @@ func _process_activities() -> void:
 			continue
 		var approach_id := str(current.get("approach", "BALANCED"))
 		var terms := activity_terms(activity_id, approach_id)
+		var rate := float(PersonnelManager.allocation_for({"id":"ACT:" + activity_id, "kind":"SOFTWARE", "need":1.0}).get("factor", 0.0))
+		if rate <= 0.0:
+			continue
 		var cost := int(terms.get("monthly_cost", 0))
 		if cost > 0:
 			Economy.add_expense(cost, "Activité software — %s" % ACTIVITY.label(activity_id))
-		current["months_done"] = int(current.get("months_done", 0)) + 1
+		current["spent"] = int(current.get("spent", 0)) + Economy.quoted_expense(cost, "Activité software")
+		current["work_done"] = float(current.get("work_done", current.get("months_done", 0))) + rate
+		current["months_done"] = int(floor(float(current.work_done) + 0.0001))
+		current["elapsed_months"] = int(current.get("elapsed_months", 0)) + 1
+		work_event.emit({"kind":"SOFTWARE", "id":"ACT:" + activity_id, "text":"Contrat : +%.0f %%" % (rate / maxf(float(terms.get("months", 1)), 1.0) * 100.0)})
 		if int(current.months_done) < int(terms.get("months", 1)):
 			continue
 		activities.erase(current)
@@ -894,6 +1013,9 @@ func load_state(state: Dictionary) -> void:
 		families[str(family_id)] = merged
 	projects = state.get("projects", []).duplicate(true)
 	products = state.get("products", []).duplicate(true)
+	for product in products:
+		product["support_cohorts"] = CAT.support_cohorts(product, TimeManager.year, TimeManager.month)
+		product["supported_users"] = CAT.supported_licenses(product.support_cohorts)
 	reveals = state.get("reveals", []).duplicate(true)
 	activities = state.get("activities", []).duplicate(true)
 	completed_activities = int(state.get("completed_activities", 0))
@@ -903,3 +1025,45 @@ func load_state(state: Dictionary) -> void:
 			skills[str(skill_id)] = int((saved_skills as Dictionary).get(str(skill_id), skills.get(str(skill_id), 0)))
 	_next_id = int(state.get("next_id", projects.size() + products.size() + 1))
 	software_changed.emit()
+
+func set_product_price(product_id: String, price_mode: String) -> bool:
+	if not CAT.PRICE_MODES.has(price_mode):
+		return false
+	for value in products:
+		var product: Dictionary = value
+		if str(product.get("id", "")) == product_id:
+			product["price_mode"] = price_mode
+			product["price"] = CAT.license_price(str(product.family), price_mode)
+			software_changed.emit()
+			return true
+	return false
+
+func set_product_active(product_id: String, active: bool) -> bool:
+	for value in products:
+		var product: Dictionary = value
+		if str(product.get("id", "")) == product_id:
+			if not active and projects.any(func(p): return str(p.get("product_id", "")) == product_id):
+				return false
+			product["status"] = "ACTIVE" if active else "RETIRED"
+			product["licenses_last"] = 0
+			product["revenue_last"] = 0
+			product["support_last"] = 0
+			product["margin_last"] = 0
+			software_changed.emit()
+			return true
+	return false
+
+func product_feedback(product: Dictionary) -> String:
+	if str(product.get("status", "")) != "ACTIVE":
+		return "Catalogue suspendu : aucune nouvelle vente ni charge de support. Reprise possible."
+	if int(product.get("market_months", 0)) == 0:
+		return "Premiers résultats disponibles au prochain bilan mensuel."
+	if int(product.get("bugs_known", 0)) >= 10:
+		return "Les défauts freinent la demande. Un correctif améliore la confiance et les ventes."
+	if int(product.get("margin_last", 0)) < 0:
+		return "Le support coûte plus que les ventes. Revoyez le prix ou préparez une nouvelle version."
+	if float(product.get("quality_live", 50.0)) < 45.0:
+		return "Le produit vieillit face aux alternatives. Une mise à jour peut renforcer son intérêt."
+	if str(product.get("price_mode", "")) == "PREMIUM":
+		return "Le tarif premium rapporte plus par licence et réduit la demande. Comparez la marge au prochain mois."
+	return "Le produit trouve son public. Les résultats dépendent de sa qualité, du prix, des bugs et de la concurrence."

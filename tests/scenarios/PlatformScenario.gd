@@ -61,6 +61,7 @@ static func run(host: Node) -> String:
 	viewport.add_child(game)
 	game.call("_start_new_game")
 	game.call("_on_month_closed", {"month":1, "year":1971, "result":0, "money":Economy.money})
+	await host.get_tree().process_frame
 	if not FileAccess.file_exists(SaveManager.save_path()):
 		viewport.queue_free()
 		return "Closing a month did not autosave the game"

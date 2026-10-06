@@ -22,7 +22,7 @@ static func flow(chip_list: Array, prefix: String = "", font_size: int = 12) -> 
 	for chip_value in chip_list:
 		var chip: Dictionary = chip_value
 		var label := UI.label(str(chip.text), font_size)
-		label.add_theme_color_override("font_color", GOOD_TEXT if bool(chip.good) else BAD_TEXT)
+		label.add_theme_color_override("font_color", UI.APP_MUTED if bool(chip.get("neutral", false)) else GOOD_TEXT if bool(chip.good) else BAD_TEXT)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(label)
 	return row

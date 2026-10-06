@@ -3,6 +3,8 @@ extends Node
 const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 
 func _ready() -> void:
+	SaveManager.use_test_folder()
+	SaveManager.writes_enabled = false
 	_LIVE_THEME.override = "NONE"
 	# PC 16:9, Pixel 20:9, téléphone 16:9 et tablette 4:3 avec interface agrandie (x1.2), ultra-large 21:9.
 	for dimensions in [Vector2i(1616, 720), Vector2i(1280, 720), Vector2i(1067, 600), Vector2i(1333, 600), Vector2i(1067, 800), Vector2i(1706, 720)]:

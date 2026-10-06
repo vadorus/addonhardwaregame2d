@@ -10,6 +10,9 @@ var shortlist: Array = []
 var _next_id := 1
 var founding_stage_open := true
 var rng := RandomNumberGenerator.new()
+const WORK_ALLOCATION := preload("res://scripts/WorkAllocation.gd")
+var development_focus := "BALANCED"
+var _month_workforce: Dictionary = {}
 
 const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
 const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon","Laurent","Michel","Leroy","Dubois","Robert"]
@@ -18,6 +21,8 @@ func _ready():
 	rng.seed = 1947
 
 func reset(starting_sector: String):
+	development_focus = "BALANCED"
+	_month_workforce = {}
 	staff = []
 	shortlist = []
 	_next_id = 1
@@ -430,9 +435,13 @@ func move_employee(employee_id: String, department: String):
 			return
 
 func get_state() -> Dictionary:
-	return {"staff":staff,"candidate":candidate,"shortlist":shortlist,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
+	return {"staff":staff,"candidate":candidate,"shortlist":shortlist,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state),"development_focus":development_focus}
 
 func load_state(state: Dictionary):
+	development_focus = str(state.get("development_focus", "BALANCED"))
+	if development_focus not in ["BALANCED", "CPU", "SOFTWARE"]:
+		development_focus = "BALANCED"
+	_month_workforce = {}
 	staff = state.get("staff", []).duplicate(true)
 	founding_stage_open = bool(state.get("founding_stage_open", true))
 	var migrated_development_leader := ""
@@ -463,3 +472,55 @@ func load_state(state: Dictionary):
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	_refresh_founding_stage()
 	staff_changed.emit()
+
+func set_development_focus(focus: String) -> bool:
+	if focus not in ["BALANCED", "CPU", "SOFTWARE"]:
+		return false
+	development_focus = focus
+	staff_changed.emit()
+	return true
+
+func development_tasks() -> Array:
+	var tasks: Array = []
+	for value in ResearchManager.projects:
+		var project: Dictionary = value
+		if str(project.get("status", "")) != "DEVELOPMENT" or not ResearchManager.cpu_pending_directive(project).is_empty() or not (project.get("pending_decision", {}) as Dictionary).is_empty():
+			continue
+		tasks.append({"id":str(project.id), "kind":"CPU", "need":2.0})
+	for value in SoftwareManager.projects:
+		var project: Dictionary = value
+		if str(project.get("status", "DEVELOPMENT")) not in ["DEVELOPMENT", "BETA"] or not SoftwareManager.software_pending_directive(project).is_empty():
+			continue
+		tasks.append(software_task(project))
+	for value in SoftwareManager.activities:
+		var activity: Dictionary = value
+		tasks.append({"id":"ACT:" + str(activity.id), "kind":"SOFTWARE", "need":1.0})
+	return tasks
+
+func software_task(project: Dictionary) -> Dictionary:
+	var light := str(project.get("kind", "")) in ["PATCH", "UPDATE"] or str(project.get("status", "")) == "BETA"
+	return {"id":str(project.get("id", "SW-PREVIEW")), "kind":"SOFTWARE", "need":1.0 if light else 2.0}
+
+func development_workforce(extra_task: Dictionary = {}) -> Dictionary:
+	if extra_task.is_empty() and not _month_workforce.is_empty():
+		return _month_workforce.duplicate(true)
+	var tasks := development_tasks()
+	if not extra_task.is_empty() and not tasks.any(func(task): return str(task.id) == str(extra_task.id)):
+		tasks.append(extra_task)
+	return WORK_ALLOCATION.plan(float(count_department("Développement")), tasks, development_focus)
+
+func allocation_for(task: Dictionary) -> Dictionary:
+	var workforce := development_workforce()
+	var entry: Dictionary = (workforce.get("allocations", {}) as Dictionary).get(str(task.id), {})
+	if entry.is_empty() and not _month_workforce.is_empty():
+		return {"assigned":0.0, "factor":0.0}
+	if entry.is_empty():
+		workforce = development_workforce(task)
+		entry = (workforce.get("allocations", {}) as Dictionary).get(str(task.id), {})
+	return entry
+
+func begin_development_month() -> void:
+	_month_workforce = development_workforce()
+
+func end_development_month() -> void:
+	_month_workforce = {}

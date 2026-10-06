@@ -9,7 +9,11 @@ const UI := preload("res://ui/UiKit.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
+const PRESENTATION := preload("res://scripts/ProjectPresentation.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
+const IMPACT := preload("res://scripts/ImpactPreview.gd")
+const CHIPS := preload("res://ui/components/ImpactChips.gd")
+const BRIEF := preload("res://ui/components/ProjectBrief.gd")
 
 enum ViewMode { PROJECT_CHOICE, SOFTWARE_CHOICE, ACTIVITIES, PRODUCT }
 
@@ -27,6 +31,17 @@ var _target_select: OptionButton
 var _feature_checks: Dictionary = {}
 var _project_preview: Label
 var _project_start: Button
+var _comparison_box: VBoxContainer
+var _comparison_keep: Button
+var _comparison_choice: Dictionary = {}
+var _comparison_pinned := false
+var _product_footer: VBoxContainer
+var _product_brief: Control
+var _product_details: VBoxContainer
+var _details_toggle: Button
+var _funding_summary: Label
+var _estimate_note: Label
+var _scroll: ScrollContainer
 
 func _ready() -> void:
 	color = Color(0.025, 0.055, 0.10, 0.78)
@@ -57,7 +72,6 @@ func _build_shell() -> void:
 	add_child(margin)
 
 	var panel := LOOK.card(Color("fffaf1"), 20, 20)
-	panel.custom_minimum_size = Vector2(820, 0)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(panel)
@@ -94,6 +108,7 @@ func _build_shell() -> void:
 	header.add_child(close_button)
 
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	UI.configure_touch_scroll(scroll)
@@ -103,8 +118,13 @@ func _build_shell() -> void:
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 12)
 	scroll.add_child(_content)
+	_product_footer = VBoxContainer.new()
+	_product_footer.add_theme_constant_override("separation", 7)
+	_product_footer.visible = false
+	shell.add_child(_product_footer)
 
 func _clear_content() -> void:
+	_product_footer.visible = false
 	for child in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
@@ -198,9 +218,13 @@ func _add_compact_status() -> void:
 			int(terms.get("months", 1))
 		], 12))
 
-	if not SoftwareManager.projects.is_empty():
-		var project: Dictionary = SoftwareManager.projects[0]
+	for project_value in SoftwareManager.projects:
+		var project: Dictionary = project_value
 		var status := str(project.get("status", "DEVELOPMENT"))
+		var project_row := PRESENTATION.software(project)
+		var project_heading := UI.muted_label(str(project.name) + " • " + str(project_row.detail), 12)
+		project_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_content.add_child(project_heading)
 		if status == "DECISION":
 			var decision: Dictionary = project.get("pending_decision", {})
 			var card := UI.card(UI.APP_PANEL_ALT, 12, 12)
@@ -259,8 +283,8 @@ func _add_compact_status() -> void:
 				button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				match release_choice:
 					"RELEASE": button.text = "Sortir maintenant"
-					"BETA": button.text = "Faire une bêta\n+1 mois de tests"
-					"DELAY": button.text = "Repousser\n+1 mois de finition"
+					"BETA": button.text = "Faire une bêta\n+1 mois de travail de tests"
+					"DELAY": button.text = "Repousser\n+1 mois de travail de finition"
 				LOOK.button_style(button, release_choice == "BETA")
 				button.pressed.connect(_choose_release.bind(str(project.get("id", "")), release_choice))
 				actions.add_child(button)
@@ -273,20 +297,64 @@ func _add_compact_status() -> void:
 				int(project.get("months_total", 1))
 			], 12))
 
-	var active := SoftwareManager.active_products()
-	if not active.is_empty():
-		var product: Dictionary = active[0]
+	for product_value in SoftwareManager.products:
+		var product: Dictionary = product_value
 		var version := "%d.%d.%d" % [
 			int(product.get("version_major", 1)),
 			int(product.get("version_minor", 0)),
 			int(product.get("version_patch", 0))
 		]
-		_content.add_child(UI.muted_label("En vente : %s v%s • %s licences ce mois • bugs connus %d" % [
+		_content.add_child(UI.muted_label("Catalogue : %s v%s • %s licences ce mois • bugs connus %d" % [
 			str(product.get("name", "Produit Software")),
 			version,
 			UI.money(int(product.get("licenses_last", 0))),
 			int(product.get("bugs_known", 0))
 		], 12))
+		var commercial := UI.card(UI.APP_PANEL, 12, 12)
+		_content.add_child(commercial)
+		var commercial_box := VBoxContainer.new()
+		commercial_box.add_theme_constant_override("separation", 6)
+		commercial.add_child(commercial_box)
+		commercial_box.add_child(UI.eyebrow("VOTRE LOGICIEL EST SORTI" if int(product.get("market_months", 0)) == 0 and str(product.get("status", "")) == "ACTIVE" else "BILAN DU PRODUIT"))
+		commercial_box.add_child(UI.label(str(product.get("name", "Logiciel")) + " • v" + version, 17))
+		var figures := UI.muted_label("Prix actuel %.0f €\nDernier mois de ventes : recettes %d € • support payé %d € • marge %d €\nMarge cumulée %d € • développement investi %d €" % [float(product.get("price", 0)), int(product.get("revenue_last", 0)), int(product.get("support_last", 0)), int(product.get("margin_last", 0)), int(product.get("margin_total", 0)), int(product.get("development_spent", 0))], 12)
+		figures.text += "\nLicences sous support : %s (ventes des %d derniers mois) • cumul vendu : %s" % [UI.money(int(product.get("supported_users", 0))), CAT.SUPPORT_MONTHS, UI.money(int(product.get("licenses_total", 0)))]
+		var support_quote := Economy.quoted_expense(CAT.support_monthly_cost(str(product.get("family", "UTILITY")), int(product.get("supported_users", 0))), "Support software") if str(product.get("status", "")) == "ACTIVE" else 0
+		figures.text += "\nBarème actuel pour cette base : ~%s €/mois, avant nouvelles ventes et expiration des licences." % UI.money(support_quote)
+		figures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		commercial_box.add_child(figures)
+		if not bool(product.get("spend_tracking_complete", false)):
+			commercial_box.add_child(UI.muted_label("Suivi de l'investissement partiel pour cette ancienne partie.", 11))
+		commercial_box.add_child(UI.muted_label("Maintenance investie : %d €" % int(product.get("maintenance_spent", 0)), 11))
+		var orientations: Array[String] = []
+		for choice in product.get("cockpit_directive_history", []): orientations.append(str(choice.get("label", "")))
+		if not orientations.is_empty():
+			var history := UI.muted_label("Votre orientation : " + " → ".join(orientations), 11)
+			history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			commercial_box.add_child(history)
+		var feedback := UI.muted_label(SoftwareManager.product_feedback(product), 12)
+		feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		commercial_box.add_child(feedback)
+		var commerce_actions := HBoxContainer.new()
+		commerce_actions.add_theme_constant_override("separation", 8)
+		commercial_box.add_child(commerce_actions)
+		var price_select := OptionButton.new()
+		price_select.custom_minimum_size = Vector2(190, 44)
+		price_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		for mode in ["LOW", "MARKET", "PREMIUM"]:
+			price_select.add_item(str(CAT.PRICE_MODES[mode].get("label", mode)))
+			price_select.set_item_metadata(price_select.item_count - 1, mode)
+		UI.select_meta(price_select, str(product.get("price_mode", "MARKET")))
+		price_select.item_selected.connect(_change_live_price.bind(str(product.id), price_select))
+		commerce_actions.add_child(price_select)
+		var retire := Button.new()
+		var is_active := str(product.get("status", "")) == "ACTIVE"
+		retire.text = "Suspendre le catalogue" if is_active else "Remettre en vente"
+		retire.custom_minimum_size.y = 44
+		retire.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		LOOK.button_style(retire)
+		retire.pressed.connect(_toggle_product.bind(str(product.id), not is_active))
+		commerce_actions.add_child(retire)
 		if str(product.get("kind", "")) == "UTILITY_SLICE" and SoftwareManager.project_for("UTILITY").is_empty():
 			var maintenance := UI.card(UI.APP_PANEL, 10, 10)
 			_content.add_child(maintenance)
@@ -300,7 +368,7 @@ func _add_compact_status() -> void:
 
 			var patch_check := SoftwareManager.can_start_patch(str(product.get("id", "")))
 			var patch := Button.new()
-			patch.text = "Correctif\n1 mois"
+			patch.text = "Correctif\n1 mois de travail"
 			patch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			patch.disabled = not bool(patch_check.get("ok", false))
 			patch.tooltip_text = str(patch_check.get("reason", ""))
@@ -355,8 +423,8 @@ func _choose_release(project_id: String, choice: String) -> void:
 	if SoftwareManager.choose_release(project_id, choice):
 		match choice:
 			"RELEASE": status_changed.emit("Produit Software commercialisé.")
-			"BETA": status_changed.emit("Bêta lancée pour un mois.")
-			"DELAY": status_changed.emit("Sortie repoussée d'un mois pour finition.")
+			"BETA": status_changed.emit("Bêta lancée : un mois de travail de tests, réparti selon l’équipe disponible.")
+			"DELAY": status_changed.emit("Un mois de travail de finition ajouté au planning.")
 	else:
 		status_changed.emit("Cette décision de sortie n'est plus disponible.")
 	_show_software_choice()
@@ -420,10 +488,10 @@ func _show_activities() -> void:
 			var terms := SoftwareManager.activity_terms(activity_id, approach_id)
 			var check := SoftwareManager.can_start_activity(activity_id, approach_id)
 			var button := Button.new()
-			button.text = "%s\n%d mois • net %s €\nXP %d • %s" % [
+			button.text = "%s\n~%d mois • net estimé %s €\nXP %d • %s" % [
 				PLAY.approach_label(approach_id),
-				int(terms.get("months", 1)),
-				UI.money(int(terms.get("net", 0))),
+				int(terms.get("calendar_months", 1)),
+				UI.money(int(terms.get("net_estimate", 0))),
 				int(terms.get("xp", 0)),
 				str(PLAY.approach(approach_id).get("risk_label", ""))
 			]
@@ -432,7 +500,7 @@ func _show_activities() -> void:
 			LOOK.button_style(button, approach_id == "BALANCED" and bool(check.get("ok", false)))
 			button.disabled = not bool(check.get("ok", false))
 			button.tooltip_text = "Coût %s €/mois • paiement %s € • XP %d%s" % [
-				UI.money(int(terms.get("monthly_cost", 0))),
+				UI.money(int(terms.get("monthly_cash_cost", terms.get("monthly_cost", 0)))),
 				UI.money(int(terms.get("payout", 0))),
 				int(terms.get("xp", 0)),
 				(" • " + str(check.get("reason", ""))) if button.disabled else ""
@@ -465,6 +533,10 @@ func _show_product() -> void:
 	UI.prepare_touch_scroll_children(_content)
 
 func _build_product_controls() -> void:
+	for child in _product_footer.get_children():
+		_product_footer.remove_child(child)
+		child.queue_free()
+	_product_footer.visible = true
 	var family_label := UI.eyebrow("TYPE DE LOGICIEL")
 	_content.add_child(family_label)
 	_family_select = OptionButton.new()
@@ -477,6 +549,7 @@ func _build_product_controls() -> void:
 	_content.add_child(name_label)
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Nom du produit (facultatif)"
+	_name_edit.max_length = 48
 	_name_edit.custom_minimum_size.y = 46
 	LOOK.input_style(_name_edit)
 	_content.add_child(_name_edit)
@@ -498,14 +571,76 @@ func _build_product_controls() -> void:
 	_settings_box.add_theme_constant_override("separation", 7)
 	_content.add_child(_settings_box)
 
+	_product_details = VBoxContainer.new()
+	_product_details.add_theme_constant_override("separation", 8)
+	_product_details.visible = false
+	_content.add_child(_product_details)
 	_project_preview = UI.rich_label()
-	_content.add_child(_project_preview)
+	_product_details.add_child(_project_preview)
+
+	_comparison_box = VBoxContainer.new()
+	_comparison_box.add_theme_constant_override("separation", 6)
+	_product_details.add_child(_comparison_box)
+	_comparison_keep = Button.new()
+	_comparison_keep.text = "Garder cette version pour comparer"
+	_comparison_keep.custom_minimum_size.y = 48
+	_comparison_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	LOOK.button_style(_comparison_keep)
+	_comparison_keep.pressed.connect(_keep_comparison)
+	_product_details.add_child(_comparison_keep)
+
+	_product_brief = BRIEF.new()
+	_product_footer.add_child(_product_brief)
+	_estimate_note = LOOK.muted_label("Estimations hors salaires, locaux et décisions payantes pendant le développement.", 12)
+	_estimate_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_product_footer.add_child(_estimate_note)
+	_funding_summary = LOOK.label("", 13)
+	_funding_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_product_footer.add_child(_funding_summary)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	_product_footer.add_child(actions)
+	_details_toggle = Button.new()
+	_details_toggle.text = "Chiffres et comparaison"
+	_details_toggle.toggle_mode = true
+	_details_toggle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_details_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	LOOK.button_style(_details_toggle)
+	_details_toggle.toggled.connect(_toggle_product_details)
+	actions.add_child(_details_toggle)
 
 	_project_start = Button.new()
 	_project_start.text = "Lancer le développement"
+	_project_start.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_project_start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	LOOK.button_style(_project_start, true)
 	_project_start.pressed.connect(_start_product)
-	_content.add_child(_project_start)
+	actions.add_child(_project_start)
+
+func _toggle_product_details(expanded: bool) -> void:
+	_product_details.visible = expanded
+	_details_toggle.text = "Masquer les détails" if expanded else "Chiffres et comparaison"
+	if expanded: _reveal_product_details.call_deferred()
+
+func _reveal_product_details() -> void:
+	await get_tree().process_frame
+	if is_instance_valid(_product_details) and _product_details.visible:
+		_scroll.ensure_control_visible(_product_details)
+
+func _refresh_product_brief(preview: Dictionary, check: Dictionary) -> void:
+	var months := int(preview.get("calendar_months", -1))
+	var cost := UI.money(int(preview.get("monthly_cash_cost", 0))) + " €/mois"
+	if months >= 0: cost += "\n~%s € au total" % UI.money(int(preview.get("total_cost", 0)))
+	_product_brief.call("update_estimates", cost,
+		"~%d mois" % months if months >= 0 else "Sans équipe disponible",
+		"Qualité ~%.0f/100" % float(preview.get("quality", 0.0)))
+	_estimate_note.text = "Estimations hors salaires, locaux, choix de phase payants et bêta." if UI.option_meta(_family_select) == "UTILITY" else "Estimations hors salaires, locaux et maintenance future."
+	_funding_summary.text = "Disponible : %s €" % UI.money(Economy.money)
+	if check.has("required_cash"):
+		_funding_summary.text += " • minimum au départ : %s € (%d mois)" % [UI.money(int(check.required_cash)), int(check.months)]
+	if not bool(check.get("ok", false)):
+		_funding_summary.text += "\n" + str(check.get("reason", "Lancement indisponible."))
+	_funding_summary.add_theme_color_override("font_color", LOOK.INK if bool(check.get("ok", false)) else Color("b3261e"))
 
 func _refresh_family_options() -> void:
 	if _family_select == null:
@@ -521,6 +656,9 @@ func _refresh_family_options() -> void:
 	if _family_select.item_count == 0:
 		_project_start.disabled = true
 		_project_preview.text = "Aucun domaine Software disponible cette année."
+		_funding_summary.text = "Aucun domaine logiciel disponible cette année."
+		_funding_summary.add_theme_color_override("font_color", Color("b3261e"))
+		_comparison_keep.disabled = true
 		return
 	if keep != "":
 		UI.select_meta(_family_select, keep)
@@ -528,6 +666,8 @@ func _refresh_family_options() -> void:
 
 func _on_family_changed() -> void:
 	_rebuild_settings()
+	_comparison_choice = _product_choice()
+	_comparison_pinned = false
 	_refresh_product_preview()
 
 func _rebuild_settings() -> void:
@@ -616,33 +756,83 @@ func _levels() -> Dictionary:
 		levels[key] = int((_setting_controls[key] as SpinBox).value)
 	return levels
 
+func _product_choice() -> Dictionary:
+	return {"family":UI.option_meta(_family_select), "price_mode":UI.option_meta(_price_select),
+		"features":_utility_features(), "target":UI.option_meta(_target_select) if _target_select != null else "HOME", "levels":_levels()}
+
+func _choice_preview(choice: Dictionary) -> Dictionary:
+	var family_id := str(choice.get("family", ""))
+	if family_id == "UTILITY":
+		return SoftwareManager.utility_preview(choice.get("features", []), str(choice.get("target", "HOME")), str(choice.get("price_mode", "MARKET")))
+	var preview := SoftwareManager.preview(family_id, choice.get("levels", {}), str(choice.get("price_mode", "MARKET")))
+	preview["assigned"] = float(SoftwareManager.work_preview({"id":"SW-PREVIEW", "months_total":int(preview.get("months", 1))}).get("assigned", 0.0))
+	return preview
+
+func comparison_chips() -> Array:
+	if _comparison_choice.is_empty():
+		return []
+	return IMPACT.software_chips(_choice_preview(_comparison_choice), _choice_preview(_product_choice()), str(_comparison_choice.family))
+
+func _keep_comparison() -> void:
+	_comparison_choice = _product_choice().duplicate(true)
+	_comparison_pinned = true
+	_refresh_product_preview()
+
+func _refresh_comparison() -> void:
+	for child in _comparison_box.get_children():
+		_comparison_box.remove_child(child)
+		child.queue_free()
+	_comparison_box.add_child(UI.eyebrow("CE QUE VOS CHOIX CHANGENT"))
+	var description := CAT.family_label(str(_comparison_choice.get("family", "")))
+	if str(_comparison_choice.get("family", "")) == "UTILITY":
+		var names: Array[String] = []
+		for feature_id in _comparison_choice.get("features", []): names.append(str(PLAY.utility_feature(str(feature_id)).get("label", feature_id)))
+		description = "%s • %s" % [PLAY.utility_target_label(str(_comparison_choice.get("target", "HOME"))), ", ".join(names)]
+	else:
+		var levels: Dictionary = _comparison_choice.get("levels", {})
+		var names: Array[String] = []
+		for axis_value in CAT.settings_of(str(_comparison_choice.family)):
+			var axis := str(axis_value)
+			names.append("%s %d" % [str(CAT.setting(str(_comparison_choice.family), axis).get("label", axis)), int(levels.get(axis, 3))])
+		description += " • " + ", ".join(names)
+	var reference := UI.rich_label("Par rapport à la version %s : %s • %s." % ["gardée" if _comparison_pinned else "de départ", description, str((CAT.PRICE_MODES.get(str(_comparison_choice.get("price_mode", "MARKET")), {}) as Dictionary).get("label", ""))])
+	_comparison_box.add_child(reference)
+	_comparison_box.add_child(CHIPS.flow(comparison_chips(), "Écarts estimés :", 13))
+	_comparison_box.add_child(UI.rich_label("Le prix modifie aussi la demande. Ces estimations ne garantissent ni ventes ni marge ; les décisions pendant le développement peuvent les faire évoluer."))
+	var feature_count := (_product_choice().features as Array).size()
+	_comparison_keep.disabled = str(_comparison_choice.get("family", "")) == "" or (str(_comparison_choice.family) == "UTILITY" and (feature_count < 2 or feature_count > 4))
+
+func _development_text(preview: Dictionary) -> String:
+	var months := int(preview.get("calendar_months", -1))
+	var monthly := UI.money(int(preview.get("monthly_cash_cost", 0)))
+	if months < 0:
+		return "Durée et coût total non estimables sans équipe disponible • %s € par mois de travail." % monthly
+	return "~%d mois avec cette équipe • %s €/mois • budget estimé %s €\nÉquipe prévue : %.1f développeur(s), partagée avec les autres projets." % [months, monthly, UI.money(int(preview.get("total_cost", 0))), float(preview.get("assigned", 0.0))]
+
 func _refresh_product_preview() -> void:
 	if _family_select == null or _project_preview == null:
 		return
 	var family_id := UI.option_meta(_family_select)
 	if family_id == "":
 		return
-	var price_mode := UI.option_meta(_price_select)
 	var lines: Array[String] = []
 
 	if family_id == "UTILITY":
 		var features := _utility_features()
 		var target_id := UI.option_meta(_target_select) if _target_select != null else "HOME"
-		var preview := SoftwareManager.utility_preview(features, target_id, price_mode)
+		var preview := _choice_preview(_product_choice())
 		var check := SoftwareManager.can_start_utility(features, target_id)
 		var metrics: Dictionary = preview.get("metrics", {})
 		lines.append("%s • %d fonctionnalité(s)" % [PLAY.utility_target_label(target_id), features.size()])
-		lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-			int(preview.get("months", 0)),
-			UI.money(int(preview.get("monthly_cost", 0))),
-			UI.money(int(preview.get("total_cost", 0)))
-		])
+		lines.append(_development_text(preview))
 		lines.append("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performances %.0f" % [
 			float(metrics.get("features", 0.0)),
 			float(metrics.get("usability", 0.0)),
 			float(metrics.get("stability", 0.0)),
 			float(metrics.get("performance", 0.0))
 		])
+		lines.append("Budget hors salaires, choix de phase payants et bêta.")
+		lines.append(_funding_text(check))
 		lines.append("Bugs estimés %d • licence %.0f € • qualité %.0f/100" % [
 			int(preview.get("bugs", 0)),
 			float(preview.get("price", 0.0)),
@@ -651,29 +841,36 @@ func _refresh_product_preview() -> void:
 		if not bool(check.get("ok", false)):
 			lines.append(str(check.get("reason", "")))
 		_project_preview.text = "\n".join(lines)
+		_refresh_product_brief(preview, check)
 		_project_start.disabled = not bool(check.get("ok", false))
 		LOOK.button_style(_project_start, bool(check.get("ok", false)))
+		_refresh_comparison()
 		return
 
 	var levels := _levels()
-	var preview := SoftwareManager.preview(family_id, levels, price_mode)
+	var preview := _choice_preview(_product_choice())
 	var check := SoftwareManager.can_start(family_id, levels)
 	var state := SoftwareManager.family_state(family_id)
-	lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-		int(preview.get("months", 0)),
-		UI.money(int(preview.get("monthly_cost", 0))),
-		UI.money(int(preview.get("total_cost", 0)))
-	])
+	lines.append(_development_text(preview))
 	lines.append("Licence %.0f € • qualité estimée %.0f/100 • XP %d/100" % [
 		float(preview.get("price", 0.0)),
 		float(preview.get("quality", 0.0)),
 		int(state.get("activity_xp", 0))
 	])
+	lines.append("Budget hors salaires et maintenance future.")
+	lines.append(_funding_text(check))
 	if not bool(check.get("ok", false)):
 		lines.append(str(check.get("reason", "")))
 	_project_preview.text = "\n".join(lines)
+	_refresh_product_brief(preview, check)
 	_project_start.disabled = not bool(check.get("ok", false))
 	LOOK.button_style(_project_start, bool(check.get("ok", false)))
+	_refresh_comparison()
+
+func _funding_text(check: Dictionary) -> String:
+	if not check.has("required_cash"):
+		return "Trésorerie : %s €." % UI.money(Economy.money)
+	return "Trésorerie : %s € • minimum pour démarrer : %s € (%d mois). Déjà payées ce mois : %s €, déduites de la trésorerie. Les mois suivants restent à financer." % [UI.money(int(check.treasury)), UI.money(int(check.required_cash)), int(check.months), UI.money(int(check.spent_this_month))]
 
 func _start_product() -> void:
 	var family_id := UI.option_meta(_family_select)
@@ -703,3 +900,16 @@ func _start_product() -> void:
 		var check := SoftwareManager.can_start(family_id, levels)
 		status_changed.emit(str(check.get("reason", "Impossible de lancer ce produit Software.")))
 	_refresh_product_preview()
+
+
+func _change_live_price(_index: int, product_id: String, select: OptionButton) -> void:
+	if SoftwareManager.set_product_price(product_id, UI.option_meta(select)):
+		status_changed.emit("Prix ajusté. Les ventes du prochain mois mesureront ce choix.")
+		_show_software_choice()
+
+func _toggle_product(product_id: String, active: bool) -> void:
+	if SoftwareManager.set_product_active(product_id, active):
+		status_changed.emit("Produit remis en vente." if active else "Catalogue suspendu. Vous pouvez reprendre sa commercialisation.")
+	else:
+		status_changed.emit("Terminez la maintenance en cours avant de suspendre ce produit.")
+	_show_software_choice()

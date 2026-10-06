@@ -106,7 +106,7 @@ func _ready() -> void:
 	add_child(garage)
 	garage.call("_refresh_gameplay_overlays")
 	garage.call("_refresh_primary_action")
-	_check(str(garage.call("primary_action_text")) == "Choix de conception", "garage does not surface the new phase choice immediately", failures)
+	_check(str(garage.call("primary_action_text")) == "Piloter les projets", "garage must show ongoing work before the next required checkpoint", failures)
 	var primary: Button = garage.get("_primary_action")
 	_check(str(primary.get_meta("context", "")) == "PROJECT_COCKPIT", "garage cockpit button has wrong navigation context", failures)
 	var trackers: VBoxContainer = garage.get("_parallel_projects_box")

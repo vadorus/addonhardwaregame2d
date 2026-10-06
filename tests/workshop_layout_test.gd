@@ -5,6 +5,11 @@ const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 var _launched: Dictionary = {}
 
 func _ready() -> void:
+	SaveManager.use_test_folder()
+	var software_script := load("res://ui/SoftwareWorkshop.gd") as Script
+	if software_script == null or not software_script.can_instantiate():
+		_fail("Software workshop script cannot instantiate")
+		return
 	_LIVE_THEME.override = "NONE"
 	for dimensions in [Vector2i(1616, 720), Vector2i(1280, 720), Vector2i(700, 720)]:
 		var viewport := SubViewport.new()

@@ -35,6 +35,13 @@ func quoted_expense(amount: int, category: String = "Autres dépenses") -> int:
 func can_afford(amount: int, category: String = "Autres dépenses") -> bool:
 	return money >= quoted_expense(amount, category)
 
+func project_funding_quote(monthly_base: int, months: int, category: String, upfront_cash: int = 0) -> Dictionary:
+	var monthly_cash := quoted_expense(maxi(monthly_base, 0), category)
+	var required := monthly_cash * maxi(months, 1) + maxi(upfront_cash, 0)
+	return {"ok":money >= required, "treasury":money, "required_cash":required,
+		"monthly_cash":monthly_cash, "months":maxi(months, 1), "upfront_cash":maxi(upfront_cash, 0),
+		"shortfall":maxi(required - money, 0), "spent_this_month":monthly_expenses}
+
 func add_expense(amount: int, category: String = "Autres dépenses"):
 	if amount <= 0:
 		return

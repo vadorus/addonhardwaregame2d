@@ -2,8 +2,10 @@ extends RefCounted
 ## Petites animations réutilisables (« juice ») : apparitions, pulsations, compteurs.
 ## Toutes sont sans effet si le nœud n'est pas dans l'arbre (tests, écrans cachés).
 
+static var reduced_motion := false
+
 static func pop_in(node: Control, duration: float = 0.18) -> void:
-	if node == null or not node.is_inside_tree():
+	if node == null or not node.is_inside_tree() or reduced_motion:
 		return
 	node.pivot_offset = node.size * 0.5
 	node.modulate.a = 0.0
@@ -13,13 +15,13 @@ static func pop_in(node: Control, duration: float = 0.18) -> void:
 	tween.tween_property(node, "scale", Vector2.ONE, duration)
 
 static func fade_in(node: CanvasItem, duration: float = 0.2) -> void:
-	if node == null or not node.is_inside_tree():
+	if node == null or not node.is_inside_tree() or reduced_motion:
 		return
 	node.modulate.a = 0.0
 	node.create_tween().tween_property(node, "modulate:a", 1.0, duration)
 
 static func slide_in(node: Control, offset: Vector2, duration: float = 0.25) -> void:
-	if node == null or not node.is_inside_tree():
+	if node == null or not node.is_inside_tree() or reduced_motion:
 		return
 	var target := node.position
 	node.position = target + offset
@@ -30,7 +32,7 @@ static func slide_in(node: Control, offset: Vector2, duration: float = 0.25) -> 
 
 ## Pulsation en boucle (repère qui réclame l'attention). Renvoie le Tween pour pouvoir l'arrêter.
 static func pulse_forever(node: Control, amount: float = 0.12, period: float = 0.9) -> Tween:
-	if node == null or not node.is_inside_tree():
+	if node == null or not node.is_inside_tree() or reduced_motion:
 		return null
 	node.pivot_offset = node.size * 0.5
 	var tween := node.create_tween().set_loops()
@@ -48,7 +50,7 @@ static func stop_pulse(node: Control, tween: Tween) -> void:
 static func count_label(label: Label, from_value: float, to_value: float, formatter: Callable, duration: float = 0.6) -> Tween:
 	if label == null:
 		return null
-	if not label.is_inside_tree() or is_equal_approx(from_value, to_value):
+	if reduced_motion or not label.is_inside_tree() or is_equal_approx(from_value, to_value):
 		label.text = formatter.call(to_value)
 		return null
 	var tween := label.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

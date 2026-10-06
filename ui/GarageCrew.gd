@@ -31,9 +31,13 @@ var _last_staff_key := ""
 var _tier := 0
 var _celebrate_time := 0.0
 var _last_launch_count := -1
+var _work_events: Array = []
+const JUICE := preload("res://ui/Juice.gd")
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ResearchManager.work_event.connect(_queue_work_event)
+	SoftwareManager.work_event.connect(_queue_work_event)
 	_bubble = PanelContainer.new()
 	_bubble.add_theme_stylebox_override("panel", UI.stylebox(Color("fffaf1"), 12, 2, Color("d9822b"), 8))
 	_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -119,7 +123,7 @@ func refresh() -> void:
 		(member as Control).set("alert", talkers.has(str(member.get("member_id"))))
 	# Un nouveau CPU lancé : toute l'équipe fait la fête.
 	var launches := ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "LAUNCHED").size()
-	launches += SoftwareManager.active_products().size()
+	launches += SoftwareManager.products.size()
 	if _last_launch_count >= 0 and launches > _last_launch_count:
 		_celebrate_time = 5.0
 	_last_launch_count = launches
@@ -215,18 +219,18 @@ func _work_cues() -> Array:
 	var cues: Array = []
 	for project_value in ResearchManager.projects:
 		var project: Dictionary = project_value
-		if str(project.get("status", "")) == "DEVELOPMENT" and ResearchManager.cpu_pending_directive(project).is_empty() and (project.get("pending_decision", {}) as Dictionary).is_empty():
+		if PersonnelManager.count_department("Développement") > 0 and str(project.get("status", "")) == "DEVELOPMENT" and ResearchManager.cpu_pending_directive(project).is_empty() and (project.get("pending_decision", {}) as Dictionary).is_empty():
 			var phase := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 			cues.append([str(GameData.PHASES[phase]), Color("d9822b")])
 	for value in SoftwareManager.projects:
 		var project: Dictionary = value
-		if str(project.get("status", "DEVELOPMENT")) in ["DEVELOPMENT", "BETA"] and SoftwareManager.software_pending_directive(project).is_empty():
+		if PersonnelManager.count_department("Développement") > 0 and str(project.get("status", "DEVELOPMENT")) in ["DEVELOPMENT", "BETA"] and SoftwareManager.software_pending_directive(project).is_empty():
 			var phase := SoftwareManager.software_cockpit_phase(project)
 			var label := "Conception" if phase == "PLANNING" else "Code" if phase == "BUILD" else "Tests"
 			if str(project.get("kind", "")) in ["PATCH", "UPDATE"] or str(project.get("status", "")) == "BETA":
 				label = "Correctif" if str(project.get("kind", "")) == "PATCH" else "Tests" if str(project.get("status", "")) == "BETA" else "Mise à jour"
 			cues.append([label, Color("3f7f8c")])
-	if not SoftwareManager.activities.is_empty():
+	if PersonnelManager.count_department("Développement") > 0 and not SoftwareManager.activities.is_empty():
 		cues.append(["Contrat", Color("3f7f8c")])
 	for value in ProductionManager.get_active_jobs():
 		if bool((value as Dictionary).get("route_selected", false)):
@@ -249,15 +253,15 @@ func _process(delta: float) -> void:
 	var active := speed > 0.0 and _has_active_work()
 	for member in _members:
 		member.set("working", active and str(member.get("pose")) == "SIT")
-	if speed <= 0.0 or not is_visible_in_tree() or _members.is_empty():
+	if not is_visible_in_tree() or _members.is_empty():
 		return
 	_chat_timer -= delta
-	if _chat_timer <= 0.0:
+	if speed > 0.0 and _chat_timer <= 0.0:
 		_chat_timer = randf_range(14.0, 22.0)
 		var talker: Control = _members[randi() % _members.size()]
 		say(talker, line_for(talker))
-	if _has_active_work():
-		_point_timer -= delta * speed
+	if (not _work_events.is_empty() or (speed > 0.0 and _has_active_work())) and not JUICE.reduced_motion:
+		_point_timer -= delta * maxf(speed, 1.0)
 		if _point_timer <= 0.0:
 			_point_timer = randf_range(0.9, 1.6)
 			var workers: Array = _members.filter(func(m): return str(m.get("pose")) == "SIT")
@@ -267,9 +271,12 @@ func _process(delta: float) -> void:
 ## Activity animation, never invented metric gains.
 func _spawn_point(member: Control) -> void:
 	var cues := _work_cues()
-	if cues.is_empty():
+	if cues.is_empty() and _work_events.is_empty():
 		return
-	var kind: Array = cues[randi() % cues.size()]
+	var kind: Array = ["", Color("317c88")] if cues.is_empty() else cues[randi() % cues.size()]
+	if not _work_events.is_empty():
+		var event: Dictionary = _work_events.pop_front()
+		kind = [str(event.get("text", "")), Color("b9712e") if str(event.get("kind", "")) == "CPU" else Color("317c88")]
 	var pill := Label.new()
 	pill.text = str(kind[0])
 	pill.add_theme_font_size_override("font_size", 12)
@@ -388,3 +395,11 @@ func line_for(member: Control) -> String:
 	if ProductManager.has_ready_product_to_launch():
 		return "Le CPU est prêt. On le lance quand ?"
 	return "On attaque le prochain CPU ? J'ai quelques idées."
+
+
+func _queue_work_event(event: Dictionary) -> void:
+	if not is_visible_in_tree() or JUICE.reduced_motion:
+		return
+	_work_events.append(event.duplicate(true))
+	while _work_events.size() > 6:
+		_work_events.pop_front()

@@ -7,6 +7,7 @@ extends RefCounted
 const SCORE_STEPS := [1.0, 4.0, 9.0]
 ## Chaleur = puissance que la puce doit dissiper ; seuils en % d'écart.
 const HEAT_STEPS := [3.0, 15.0, 40.0]
+const SOFTWARE := preload("res://scripts/SoftwareCatalog.gd")
 
 ## Au-delà de ce seuil de puissance manquante, la puce est bridée par son enveloppe électrique.
 const THROTTLE_RATIO := 0.05
@@ -84,6 +85,41 @@ static func chips(before: Dictionary, after: Dictionary) -> Array:
 	var months := int(after.get("months", 0)) - int(before.get("months", 0))
 	if months != 0:
 		result.append({"key":"months", "text":"%s%d mois" % ["+" if months > 0 else "−", absi(months)], "good":months < 0, "delta":float(months)})
+	return result
+
+## Compare les prévisions Software du manager, sans simuler une vente ni modifier un projet.
+static func software_chips(before: Dictionary, after: Dictionary, family_id: String) -> Array:
+	var result: Array = []
+	var old_scores: Dictionary = before.get("metrics", before.get("scores", {}))
+	var new_scores: Dictionary = after.get("metrics", after.get("scores", {}))
+	for axis_value in SOFTWARE.settings_of(family_id):
+		var axis := str(axis_value)
+		var delta := float(new_scores.get(axis, 0.0)) - float(old_scores.get(axis, 0.0))
+		if absf(delta) >= 0.5:
+			result.append({"key":axis, "text":"%s %s%.0f" % [str(SOFTWARE.setting(family_id, axis).get("label", axis)), "+" if delta > 0 else "−", absf(delta)], "good":delta > 0, "delta":delta})
+	var quality := float(after.get("quality", 0.0)) - float(before.get("quality", 0.0))
+	if absf(quality) >= 0.5:
+		result.append({"key":"quality", "text":"Qualité %s%.1f" % ["+" if quality > 0 else "−", absf(quality)], "good":quality > 0, "delta":quality})
+	if before.has("bugs") and after.has("bugs"):
+		var bugs := int(after.bugs) - int(before.bugs)
+		if bugs != 0:
+			result.append({"key":"bugs", "text":"%s%d bugs estimés" % ["+" if bugs > 0 else "−", absi(bugs)], "good":bugs < 0, "delta":float(bugs)})
+	var months_before := int(before.get("calendar_months", -1))
+	var months_after := int(after.get("calendar_months", -1))
+	if months_before >= 0 and months_after >= 0:
+		var months := months_after - months_before
+		if months != 0:
+			result.append({"key":"months", "text":"%s%d mois" % ["+" if months > 0 else "−", absi(months)], "good":months < 0, "delta":float(months)})
+	for cost_key in ["monthly_cash_cost", "total_cost"]:
+		if cost_key == "total_cost" and (months_before < 0 or months_after < 0):
+			continue
+		var cost := int(after.get(cost_key, 0)) - int(before.get(cost_key, 0))
+		if cost != 0:
+			result.append({"key":cost_key, "text":"%s%s € %s" % ["+" if cost > 0 else "−", money(absi(cost)), "/ mois" if cost_key == "monthly_cash_cost" else "au total estimé"], "good":cost < 0, "delta":float(cost)})
+	var price := int(round(float(after.get("price", 0.0)) - float(before.get("price", 0.0))))
+	if price != 0:
+		# Un prix plus élevé réduit la demande : ni gain ni perte de marge garantis.
+		result.append({"key":"price", "text":"Licence %s%d €" % ["+" if price > 0 else "−", absi(price)], "good":false, "neutral":true, "delta":float(price)})
 	return result
 
 ## La même chose en une ligne (journal, tests, infobulles).

@@ -107,6 +107,19 @@ Tech Empire doit retrouver la lisibilité immédiate d’un tycoon comme Game De
 
 Règle de contrôle : **si le joueur doit comprendre l’interface avant de comprendre ce qu’il veut faire, l’interface a échoué.**
 
+## Références de conception
+
+Game Dev Tycoon reste une référence pour la lisibilité de la boucle et la place
+centrale de l'entreprise. **Devices Tycoon Simulator (ArraGames)** est ajouté
+comme base d'idées pour la conception des produits, la croissance visible de
+l'entreprise, les équipes, les contrats et les retours du marché.
+
+Les pistes retenues et leur source sont détaillées dans
+[Devices Tycoon Simulator — référence d'idées](design/DEVICE_TYCOON_REFERENCE.md).
+Elles sont adaptées au périmètre CPU + Software actuel, sans ouvrir de nouveaux
+marchés pendant P0/P1. L'ajout de cette référence ne signifie pas que ces pistes
+sont toutes implémentées ou validées en partie.
+
 ## Réalisme modulable
 
 Le jeu doit pouvoir être accessible au départ, tout en permettant une profondeur élevée.

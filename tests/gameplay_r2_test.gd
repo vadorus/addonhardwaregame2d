@@ -61,6 +61,7 @@ func _test_software_consequence_and_ui() -> void:
 	_check(SoftwareManager.resolve_software_directive(project_id, "SOLID"), "Software planning choice failed")
 
 	project["months_done"] = 1
+	project["work_done"] = 1.0
 	project["cockpit_directive_pending"] = DIRECTIVES.software_milestone("BUILD")
 	var months_before := int(project.get("months_total", 0))
 	var money_before := Economy.money
@@ -112,7 +113,7 @@ func _test_legacy_personnel_migration() -> void:
 		CPU_DESIGN.default_design(), {}, {}, "GENERAL", "", "BALANCED", "STANDARD",
 		"NONE", "SHARED", "NONE", true
 	)
-	_check(ok, "second CPU is still blocked after legacy personnel migration: " + ResearchManager.last_start_project_error)
+	_check(ok, "second CPU is still blocked after legacy personnel migration: " + ResearchManager.last_start_error)
 
 func _tree_has_text(node: Node, needle: String) -> bool:
 	if node is Label and str((node as Label).text).contains(needle):

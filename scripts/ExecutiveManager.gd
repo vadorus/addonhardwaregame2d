@@ -120,7 +120,7 @@ func sync_interface_unlocks() -> Array:
 	if not CompanyManager.created:
 		return newly_unlocked
 
-	var has_project := not ResearchManager.projects.is_empty()
+	var has_project := not ResearchManager.projects.is_empty() or not SoftwareManager.projects.is_empty() or not SoftwareManager.activities.is_empty()
 	var has_production := not ProductionManager.jobs.is_empty()
 	var has_products := not ProductManager.products.is_empty()
 	var has_launched_product := false
@@ -152,7 +152,7 @@ func sync_interface_unlocks() -> Array:
 		rules["CO_WORKPLACE"] = staff_count >= 4 or not get_open_hr_issues().is_empty() \
 			or int(workplace.get("tier", 0)) > 0 or int(workplace.get("upgrade_reminder_at", -1)) >= 0 \
 			or months_operated >= 6 or bool(workplace_upgrade_recommendation().get("recommended", false))
-		rules["CO_BUDGETS"] = has_launched_product or months_operated >= 24
+		rules["CO_BUDGETS"] = has_launched_product or not SoftwareManager.active_products().is_empty() or months_operated >= 24
 		rules["CO_DIVISIONS"] = staff_count >= 10 or DivisionManager.get_active_division_keys().size() >= 2
 		rules["CO_GROUP"] = Economy.money >= 5000000 or not CompanyManager.subsidiaries.is_empty()
 	for feature_value in rules.keys():
@@ -196,7 +196,7 @@ func interface_feature_info(feature: String) -> Dictionary:
 		"CO_WORKPLACE":
 			return {"label":"Entreprise › Locaux & RH","message":"L'équipe grandit : locaux, avantages et dossiers RH méritent votre attention."}
 		"CO_BUDGETS":
-			return {"label":"Entreprise › Budgets","message":"Votre CPU est en vente : marketing, R&D et fonctionnement ont maintenant un budget à piloter."}
+			return {"label":"Entreprise › Budgets","message":"Votre produit est en vente : marketing, R&D et fonctionnement ont maintenant un budget à piloter."}
 		"CO_DIVISIONS":
 			return {"label":"Entreprise › Divisions","message":"Dix personnes : il est temps d'organiser l'entreprise en divisions avec leurs responsables."}
 		"CO_GROUP":
@@ -209,7 +209,7 @@ func next_interface_unlock_hint() -> Dictionary:
 			continue
 		match feature:
 			"TEAM":
-				return {"feature":feature,"text":"Lancez votre premier projet CPU pour ouvrir la gestion de l'équipe."}
+				return {"feature":feature,"text":"Lancez un projet CPU, Logiciel ou un contrat pour ouvrir la gestion de l’équipe."}
 			"COMPANY":
 				return {"feature":feature,"text":"Faites tourner l'entreprise un premier mois pour ouvrir budgets, RH et locaux."}
 			"PRODUCTS":
@@ -224,7 +224,7 @@ func next_interface_unlock_hint() -> Dictionary:
 func interface_unlock_hint_for(feature: String) -> String:
 	match feature:
 		"TEAM":
-			return "Lancez votre premier projet CPU pour ouvrir la gestion de l'équipe."
+			return "Lancez un projet CPU, Logiciel ou un contrat pour ouvrir la gestion de l’équipe."
 		"COMPANY":
 			return "Faites tourner l'entreprise un premier mois pour ouvrir budgets, RH et locaux."
 		"PRODUCTS":
@@ -1100,9 +1100,20 @@ func get_executive_brief() -> Dictionary:
 	elif not active_project.is_empty():
 		priorities.append({"category":"PROJET","severity":45,"text":"%s poursuit son développement." % str(active_project.get("name", "Le CPU")),"action":"Surveiller surtout budget, délai et prochain rapport de phase."})
 
-	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
-		priorities.append({"category":"DÉMARRAGE","severity":72,"text":"Nous n'avons encore aucun produit en développement.","action":"Concentrez-vous sur un premier CPU simple et maîtrisable."})
+	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty() and SoftwareManager.projects.is_empty() and SoftwareManager.products.is_empty() and SoftwareManager.activities.is_empty():
+		priorities.append({"category":"DÉMARRAGE","severity":72,"text":"Nous n'avons encore aucun produit en développement.","action":"Choisissez un premier CPU, un utilitaire simple ou un contrat logiciel."})
 
+	if not SoftwareManager.projects.is_empty():
+		var software: Dictionary = SoftwareManager.projects[0]
+		var blocked := str(software.get("status", "")) in ["DECISION", "REVIEW"] or not SoftwareManager.software_pending_directive(software).is_empty()
+		priorities.append({"category":"LOGICIEL", "severity":82 if blocked else 45,
+			"text":str(software.get("name", "Le logiciel")) + (" attend votre décision." if blocked else " poursuit son développement."),
+			"action":"Ouvrez le pilotage du projet : choix de phase, équipe partagée, tests et sortie."})
+	elif not SoftwareManager.active_products().is_empty():
+		var software: Dictionary = SoftwareManager.active_products()[0]
+		priorities.append({"category":"LOGICIEL", "severity":50,
+			"text":str(software.get("name", "Le logiciel")) + " : marge %d €/mois." % int(software.get("margin_last", 0)),
+			"action":SoftwareManager.product_feedback(software)})
 	var unlock_hint := next_interface_unlock_hint()
 	if not unlock_hint.is_empty() and priorities.size() < 3:
 		priorities.append({"category":"GUIDE","severity":28,"text":"Prochaine fonction à découvrir : %s." % str(interface_feature_info(str(unlock_hint.feature)).get("label", "")),"action":str(unlock_hint.text)})
