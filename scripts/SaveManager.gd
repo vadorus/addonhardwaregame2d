@@ -7,7 +7,7 @@ const SAVE_PATH := "user://tech_empire_save.json"
 const TEMP_SAVE_PATH := "user://tech_empire_save.json.tmp"
 const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SLOT_COUNT := 3 # emplacements manuels 1..3
-const SAVE_VERSION := 30
+const SAVE_VERSION := 33
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 const TEST_ROOT := "user://ci_tests/"
 
@@ -273,5 +273,64 @@ func _migrate_state(state: Dictionary, source_version: int) -> Dictionary:
 				if section.has(key):
 					section[key] = SaveCodec.int64_to_json(SaveCodec.int64_from_json(section[key], 0))
 			migrated[section_name] = section
+	if source_version < 31:
+		var personnel: Dictionary = migrated.get("personnel", {})
+		personnel["development_focus"] = "BALANCED"
+		migrated["personnel"] = personnel
+		var software: Dictionary = migrated.get("software", {})
+		var objectives: Dictionary = migrated.get("objectives", {})
+		objectives["product_path"] = "CPU" if not (migrated.get("research", {}).get("projects", []) as Array).is_empty() or not (migrated.get("products", {}).get("products", []) as Array).is_empty() else "SOFTWARE" if not (software.get("products", []) as Array).is_empty() or not (software.get("projects", []) as Array).is_empty() else ""
+		objectives["new_software_objectives"] = str(objectives.product_path) == "SOFTWARE"
+		migrated["objectives"] = objectives
+		for list_name in ["projects", "activities"]:
+			for value in software.get(list_name, []):
+				var project: Dictionary = value
+				project["work_done"] = float(project.get("months_done", 0))
+				project["elapsed_months"] = int(project.get("months_done", 0))
+				if str(project.get("status", "")) == "BETA":
+					project["beta_work_done"] = float(project.get("beta_months_done", 0))
+	if source_version < 32:
+		# Older transferred saves contain a UTF-8 department decoded as CP850/Latin-1.
+		# Repair only the known department identifiers, retaining employee IDs and payroll.
+		var personnel: Dictionary = migrated.get("personnel", {})
+		for list_name in ["staff", "shortlist"]:
+			for employee in personnel.get(list_name, []):
+				employee["department"] = _canonical_saved_department(str(employee.get("department", "")))
+		var candidate: Dictionary = personnel.get("candidate", {})
+		if candidate.has("department"):
+			candidate["department"] = _canonical_saved_department(str(candidate.department))
+		var company: Dictionary = migrated.get("company", {})
+		var departments: Dictionary = company.get("departments", {})
+		for key in departments.keys():
+			var canonical := _canonical_saved_department(str(key))
+			if canonical == str(key):
+				continue
+			var legacy: Dictionary = departments[key]
+			if not departments.has(canonical):
+				departments[canonical] = legacy.duplicate(true)
+			elif str(departments[canonical].get("leader_id", "")) == "":
+				departments[canonical]["leader_id"] = str(legacy.get("leader_id", ""))
+			departments.erase(key)
+		company["departments"] = departments
+		migrated["company"] = company
+		migrated["personnel"] = personnel
+	if source_version < 33:
+		# Legacy monthly autosaves were written inside month_processed, before the clock rollover.
+		var clock: Dictionary = migrated.get("time", {})
+		var history: Array = migrated.get("economy", {}).get("history", [])
+		if int(clock.get("day", 1)) > 30 and not history.is_empty():
+			var closed: Dictionary = history.back()
+			if int(closed.get("month", -1)) == int(clock.get("month", 1)) and int(closed.get("year", -1)) == int(clock.get("year", 1971)):
+				clock["day"] = 1
+				clock["month"] = int(clock.get("month", 1)) + 1
+				if int(clock.month) > 12:
+					clock["month"] = 1
+					clock["year"] = int(clock.get("year", 1971)) + 1
+				migrated["time"] = clock
 	migrated["version"] = SAVE_VERSION
 	return migrated
+
+func _canonical_saved_department(value: String) -> String:
+	if value in ["D├®veloppement", "DÃ©veloppement", "DÃƒÂ©veloppement"]:
+		return "Développement"
+	return value

@@ -93,6 +93,8 @@ func set_scale_px(value: float) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if preload("res://ui/Juice.gd").reduced_motion or not is_visible_in_tree():
+		return
 	_t += delta * (2.0 if working else 1.0)
 	queue_redraw()
 

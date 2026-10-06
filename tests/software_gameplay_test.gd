@@ -9,6 +9,9 @@ func _ready() -> void:
 	Economy.reset(100000)
 	CompanyManager.reset("Software Gameplay CI", "CPU", 100000)
 
+	PersonnelManager.reset("CPU")
+	ResearchManager.reset("CPU")
+	SoftwareManager.reset()
 	var manager := MANAGER.new()
 	add_child(manager)
 	manager.reset()

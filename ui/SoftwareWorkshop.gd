@@ -9,6 +9,7 @@ const UI := preload("res://ui/UiKit.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
+const PRESENTATION := preload("res://scripts/ProjectPresentation.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
 
 enum ViewMode { PROJECT_CHOICE, SOFTWARE_CHOICE, ACTIVITIES, PRODUCT }
@@ -198,9 +199,13 @@ func _add_compact_status() -> void:
 			int(terms.get("months", 1))
 		], 12))
 
-	if not SoftwareManager.projects.is_empty():
-		var project: Dictionary = SoftwareManager.projects[0]
+	for project_value in SoftwareManager.projects:
+		var project: Dictionary = project_value
 		var status := str(project.get("status", "DEVELOPMENT"))
+		var project_row := PRESENTATION.software(project)
+		var project_heading := UI.muted_label(str(project.name) + " • " + str(project_row.detail), 12)
+		project_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_content.add_child(project_heading)
 		if status == "DECISION":
 			var decision: Dictionary = project.get("pending_decision", {})
 			var card := UI.card(UI.APP_PANEL_ALT, 12, 12)
@@ -259,8 +264,8 @@ func _add_compact_status() -> void:
 				button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				match release_choice:
 					"RELEASE": button.text = "Sortir maintenant"
-					"BETA": button.text = "Faire une bêta\n+1 mois de tests"
-					"DELAY": button.text = "Repousser\n+1 mois de finition"
+					"BETA": button.text = "Faire une bêta\n+1 mois de travail de tests"
+					"DELAY": button.text = "Repousser\n+1 mois de travail de finition"
 				LOOK.button_style(button, release_choice == "BETA")
 				button.pressed.connect(_choose_release.bind(str(project.get("id", "")), release_choice))
 				actions.add_child(button)
@@ -273,20 +278,61 @@ func _add_compact_status() -> void:
 				int(project.get("months_total", 1))
 			], 12))
 
-	var active := SoftwareManager.active_products()
-	if not active.is_empty():
-		var product: Dictionary = active[0]
+	for product_value in SoftwareManager.products:
+		var product: Dictionary = product_value
 		var version := "%d.%d.%d" % [
 			int(product.get("version_major", 1)),
 			int(product.get("version_minor", 0)),
 			int(product.get("version_patch", 0))
 		]
-		_content.add_child(UI.muted_label("En vente : %s v%s • %s licences ce mois • bugs connus %d" % [
+		_content.add_child(UI.muted_label("Catalogue : %s v%s • %s licences ce mois • bugs connus %d" % [
 			str(product.get("name", "Produit Software")),
 			version,
 			UI.money(int(product.get("licenses_last", 0))),
 			int(product.get("bugs_known", 0))
 		], 12))
+		var commercial := UI.card(UI.APP_PANEL, 12, 12)
+		_content.add_child(commercial)
+		var commercial_box := VBoxContainer.new()
+		commercial_box.add_theme_constant_override("separation", 6)
+		commercial.add_child(commercial_box)
+		commercial_box.add_child(UI.eyebrow("VOTRE LOGICIEL EST SORTI" if int(product.get("market_months", 0)) == 0 and str(product.get("status", "")) == "ACTIVE" else "BILAN DU PRODUIT"))
+		commercial_box.add_child(UI.label(str(product.get("name", "Logiciel")) + " • v" + version, 17))
+		var figures := UI.muted_label("Prix %.0f € • recettes %d € • support %d € • marge %d €/mois\nMarge cumulée %d € • développement investi %d €" % [float(product.get("price", 0)), int(product.get("revenue_last", 0)), int(product.get("support_last", 0)), int(product.get("margin_last", 0)), int(product.get("margin_total", 0)), int(product.get("development_spent", 0))], 12)
+		figures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		commercial_box.add_child(figures)
+		if not bool(product.get("spend_tracking_complete", false)):
+			commercial_box.add_child(UI.muted_label("Suivi de l'investissement partiel pour cette ancienne partie.", 11))
+		commercial_box.add_child(UI.muted_label("Maintenance investie : %d €" % int(product.get("maintenance_spent", 0)), 11))
+		var orientations: Array[String] = []
+		for choice in product.get("cockpit_directive_history", []): orientations.append(str(choice.get("label", "")))
+		if not orientations.is_empty():
+			var history := UI.muted_label("Votre orientation : " + " → ".join(orientations), 11)
+			history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			commercial_box.add_child(history)
+		var feedback := UI.muted_label(SoftwareManager.product_feedback(product), 12)
+		feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		commercial_box.add_child(feedback)
+		var commerce_actions := HBoxContainer.new()
+		commerce_actions.add_theme_constant_override("separation", 8)
+		commercial_box.add_child(commerce_actions)
+		var price_select := OptionButton.new()
+		price_select.custom_minimum_size = Vector2(190, 44)
+		price_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		for mode in ["LOW", "MARKET", "PREMIUM"]:
+			price_select.add_item(str(CAT.PRICE_MODES[mode].get("label", mode)))
+			price_select.set_item_metadata(price_select.item_count - 1, mode)
+		UI.select_meta(price_select, str(product.get("price_mode", "MARKET")))
+		price_select.item_selected.connect(_change_live_price.bind(str(product.id), price_select))
+		commerce_actions.add_child(price_select)
+		var retire := Button.new()
+		var is_active := str(product.get("status", "")) == "ACTIVE"
+		retire.text = "Suspendre le catalogue" if is_active else "Remettre en vente"
+		retire.custom_minimum_size.y = 44
+		retire.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		LOOK.button_style(retire)
+		retire.pressed.connect(_toggle_product.bind(str(product.id), not is_active))
+		commerce_actions.add_child(retire)
 		if str(product.get("kind", "")) == "UTILITY_SLICE" and SoftwareManager.project_for("UTILITY").is_empty():
 			var maintenance := UI.card(UI.APP_PANEL, 10, 10)
 			_content.add_child(maintenance)
@@ -300,7 +346,7 @@ func _add_compact_status() -> void:
 
 			var patch_check := SoftwareManager.can_start_patch(str(product.get("id", "")))
 			var patch := Button.new()
-			patch.text = "Correctif\n1 mois"
+			patch.text = "Correctif\n1 mois de travail"
 			patch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			patch.disabled = not bool(patch_check.get("ok", false))
 			patch.tooltip_text = str(patch_check.get("reason", ""))
@@ -355,8 +401,8 @@ func _choose_release(project_id: String, choice: String) -> void:
 	if SoftwareManager.choose_release(project_id, choice):
 		match choice:
 			"RELEASE": status_changed.emit("Produit Software commercialisé.")
-			"BETA": status_changed.emit("Bêta lancée pour un mois.")
-			"DELAY": status_changed.emit("Sortie repoussée d'un mois pour finition.")
+			"BETA": status_changed.emit("Bêta lancée : un mois de travail de tests, réparti selon l’équipe disponible.")
+			"DELAY": status_changed.emit("Un mois de travail de finition ajouté au planning.")
 	else:
 		status_changed.emit("Cette décision de sortie n'est plus disponible.")
 	_show_software_choice()
@@ -420,10 +466,10 @@ func _show_activities() -> void:
 			var terms := SoftwareManager.activity_terms(activity_id, approach_id)
 			var check := SoftwareManager.can_start_activity(activity_id, approach_id)
 			var button := Button.new()
-			button.text = "%s\n%d mois • net %s €\nXP %d • %s" % [
+			button.text = "%s\n~%d mois • net estimé %s €\nXP %d • %s" % [
 				PLAY.approach_label(approach_id),
-				int(terms.get("months", 1)),
-				UI.money(int(terms.get("net", 0))),
+				int(terms.get("calendar_months", 1)),
+				UI.money(int(terms.get("net_estimate", 0))),
 				int(terms.get("xp", 0)),
 				str(PLAY.approach(approach_id).get("risk_label", ""))
 			]
@@ -432,7 +478,7 @@ func _show_activities() -> void:
 			LOOK.button_style(button, approach_id == "BALANCED" and bool(check.get("ok", false)))
 			button.disabled = not bool(check.get("ok", false))
 			button.tooltip_text = "Coût %s €/mois • paiement %s € • XP %d%s" % [
-				UI.money(int(terms.get("monthly_cost", 0))),
+				UI.money(int(terms.get("monthly_cash_cost", terms.get("monthly_cost", 0)))),
 				UI.money(int(terms.get("payout", 0))),
 				int(terms.get("xp", 0)),
 				(" • " + str(check.get("reason", ""))) if button.disabled else ""
@@ -477,6 +523,7 @@ func _build_product_controls() -> void:
 	_content.add_child(name_label)
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Nom du produit (facultatif)"
+	_name_edit.max_length = 48
 	_name_edit.custom_minimum_size.y = 46
 	LOOK.input_style(_name_edit)
 	_content.add_child(_name_edit)
@@ -632,9 +679,9 @@ func _refresh_product_preview() -> void:
 		var check := SoftwareManager.can_start_utility(features, target_id)
 		var metrics: Dictionary = preview.get("metrics", {})
 		lines.append("%s • %d fonctionnalité(s)" % [PLAY.utility_target_label(target_id), features.size()])
-		lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-			int(preview.get("months", 0)),
-			UI.money(int(preview.get("monthly_cost", 0))),
+		lines.append("~%d mois avec cette équipe • %s €/mois • budget estimé %s €" % [
+			int(preview.get("calendar_months", preview.get("months", 0))),
+			UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
 			UI.money(int(preview.get("total_cost", 0)))
 		])
 		lines.append("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performances %.0f" % [
@@ -643,6 +690,7 @@ func _refresh_product_preview() -> void:
 			float(metrics.get("stability", 0.0)),
 			float(metrics.get("performance", 0.0))
 		])
+		lines.append("Budget hors salaires, choix de phase payants et bêta.")
 		lines.append("Bugs estimés %d • licence %.0f € • qualité %.0f/100" % [
 			int(preview.get("bugs", 0)),
 			float(preview.get("price", 0.0)),
@@ -660,8 +708,8 @@ func _refresh_product_preview() -> void:
 	var check := SoftwareManager.can_start(family_id, levels)
 	var state := SoftwareManager.family_state(family_id)
 	lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-		int(preview.get("months", 0)),
-		UI.money(int(preview.get("monthly_cost", 0))),
+		int(preview.get("calendar_months", preview.get("months", 0))),
+		UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
 		UI.money(int(preview.get("total_cost", 0)))
 	])
 	lines.append("Licence %.0f € • qualité estimée %.0f/100 • XP %d/100" % [
@@ -703,3 +751,16 @@ func _start_product() -> void:
 		var check := SoftwareManager.can_start(family_id, levels)
 		status_changed.emit(str(check.get("reason", "Impossible de lancer ce produit Software.")))
 	_refresh_product_preview()
+
+
+func _change_live_price(_index: int, product_id: String, select: OptionButton) -> void:
+	if SoftwareManager.set_product_price(product_id, UI.option_meta(select)):
+		status_changed.emit("Prix ajusté. Les ventes du prochain mois mesureront ce choix.")
+		_show_software_choice()
+
+func _toggle_product(product_id: String, active: bool) -> void:
+	if SoftwareManager.set_product_active(product_id, active):
+		status_changed.emit("Produit remis en vente." if active else "Catalogue suspendu. Vous pouvez reprendre sa commercialisation.")
+	else:
+		status_changed.emit("Terminez la maintenance en cours avant de suspendre ce produit.")
+	_show_software_choice()

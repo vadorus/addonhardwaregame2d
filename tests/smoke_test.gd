@@ -1720,7 +1720,7 @@ func _ready() -> void:
 		return
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
-	var platform_error := PLATFORM_SCENARIO.run(self)
+	var platform_error := await PLATFORM_SCENARIO.run(self)
 	if platform_error != "":
 		_fail(platform_error)
 		return

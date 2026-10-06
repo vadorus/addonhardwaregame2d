@@ -8,6 +8,7 @@ const CPU_MARKET_LEARNING := preload("res://scripts/CpuMarketLearning.gd")
 const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
 const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
 
+signal work_event(event)
 signal projects_changed
 signal generation_proposals_changed(proposals)
 signal phase_report_created(project, report)
@@ -49,6 +50,7 @@ const CPU_CONCEPT_AXES := {
 	"RELIABILITY":{"label":"Fiabilité extrême", "capability":"LAYOUT", "domain":"RELIABILITY"}
 }
 
+var last_start_error := ""
 var projects: Array = []
 var cpu_generation_proposals: Array = []
 var cpu_generation_context: Dictionary = {}
@@ -829,12 +831,18 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 		GameData.PHASES.size(),
 		segment_team_factor
 	)
+	var allocation := PersonnelManager.allocation_for({"id":"CPU-PREVIEW", "kind":"CPU", "need":2.0})
+	var allocation_factor := float(allocation.get("factor", 0.0))
+	if allocation_factor > 0.0001:
+		months = int(ceil(float(months) / allocation_factor))
 	var monthly_raw := development_monthly_base_cost(approach, monthly_budget, resolved_sourcing)
 	var monthly_charged := Economy.quoted_expense(monthly_raw, "Développement — estimation CPU")
 	var setup_charged := Economy.quoted_expense(int(resolved_sourcing.get("setup_cost", 0)), "Accès technologique")
 	var upfront_charged := Economy.quoted_expense(upfront_cost, "Programme technique")
 	return {
 		"months":months,
+		"assigned_engineers":float(allocation.get("assigned", 0.0)),
+		"workforce_factor":allocation_factor,
 		"base_months":maxi(months - maxi(extra_months, 0), 1),
 		"extra_months":maxi(extra_months, 0),
 		"monthly_cost":monthly_charged,
@@ -848,7 +856,7 @@ func estimate_cpu_development(design_input: Dictionary, approach: String, monthl
 			1.0,
 			management,
 			float(evaluation.get("complexity", 50.0))
-		) * segment_team_factor,
+		) * segment_team_factor * allocation_factor,
 		"complexity":float(evaluation.get("complexity", 50.0)),
 		"segment":market_segment,
 		"segment_required_team":int(scale.get("team", 3)),
@@ -903,23 +911,28 @@ func internal_research_monthly_base_cost(intensity: int) -> int:
 func quoted_internal_research_monthly_cost(intensity: int, category: String = "Recherche fondamentale CPU") -> int:
 	return Economy.quoted_expense(internal_research_monthly_base_cost(intensity), category)
 
+func _reject_project_start(message: String) -> bool:
+	last_start_error = message
+	return false
+
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE", player_controlled: bool = false) -> bool:
+	last_start_error = ""
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
-		return false
+		return _reject_project_start("La division %s n’est pas opérationnelle." % sector)
 	var market_segment := segment
 	if sector == "CPU":
 		market_segment = MarketManager.normalize_segment(segment)
 		if not MarketManager.is_segment_available(market_segment):
-			return false
+			return _reject_project_start("Ce marché n’est pas encore disponible : %s." % market_segment)
 	var remediation_upfront := int(technical_remediation.get("upfront_cost", 0)) if sector == "CPU" else 0
 	var resolved_supplier_id := supplier_id
 	if approach != "INTERNAL" and resolved_supplier_id.is_empty():
 		resolved_supplier_id = SupplierManager.recommended_supplier(approach)
 	var sourcing_profile: Dictionary = GameData.sourcing_profile("INTERNAL") if approach == "INTERNAL" else SupplierManager.contract_quote(approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
 	if sourcing_profile.is_empty():
-		return false
+		return _reject_project_start("Aucun partenaire compatible avec cette approche.")
 	if approach != "INTERNAL" and (not bool(sourcing_profile.get("accepted", false)) or not SupplierManager.can_accept_project(approach, resolved_supplier_id)):
-		return false
+		return _reject_project_start("Le partenaire refuse le contrat ou ne dispose plus de capacité. Ajustez les conditions ou changez de partenaire.")
 	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
 	var first_month_commitment := Economy.quoted_expense(development_monthly_base_cost(approach, monthly_budget, sourcing_profile), "Développement — %s" % project_name)
 	if remediation_upfront > 0:
@@ -927,15 +940,15 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if sourcing_setup_cost > 0:
 		first_month_commitment += Economy.quoted_expense(sourcing_setup_cost, "Accès technologique — %s" % str(sourcing_profile.get("label", "")))
 	if Economy.money < first_month_commitment:
-		return false
+		return _reject_project_start("Trésorerie insuffisante : %d € disponibles, %d € requis pour engager le premier mois et les frais initiaux." % [Economy.money, first_month_commitment])
 	if sector == "CPU" and get_development_team_size() <= 0:
-		return false
+		return _reject_project_start("Aucun ingénieur dans le département Développement. Recrutez ou réaffectez un développeur dans Équipe ; les chercheurs R&D ne remplacent pas cette équipe.")
 	var active_count := 0
 	for existing_project in projects:
 		if str(existing_project.status) == "DEVELOPMENT":
 			active_count += 1
 	if active_count >= 3:
-		return false
+		return _reject_project_start("Trois projets sont déjà en développement. Terminez un projet avant d’en lancer un autre.")
 
 	var desired := {}
 	for metric in GameData.METRICS:
@@ -960,7 +973,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		if not technical_remediation.is_empty():
 			var remediation_design := CPU_DESIGN.normalize(technical_remediation.get("design", {}))
 			if remediation_design != normalized_design:
-				return false
+				return _reject_project_start("Le programme technique ne correspond plus à cette configuration. Recalculez-le dans le laboratoire.")
 			stored_remediation = technical_remediation.duplicate(true)
 			var capability_key := str(stored_remediation.get("capability", "ARCHITECTURE"))
 			effective_capabilities[capability_key] = clampf(
@@ -973,7 +986,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 			float(effective_capabilities.get("MINIATURIZATION", get_cpu_capability("MINIATURIZATION")))
 		)
 		if not available_nodes.has(int(normalized_design.node_nm)):
-			return false
+			return _reject_project_start("Le procédé de gravure %d nm n’est pas maîtrisé. Choisissez un procédé disponible ou développez la miniaturisation." % int(normalized_design.node_nm))
 		design_estimate = CPU_DESIGN.evaluate(normalized_design, effective_capabilities)
 		if not stored_remediation.is_empty():
 			design_estimate = cpu_remediation_preview(normalized_design, stored_remediation)
@@ -1120,7 +1133,7 @@ func cpu_cockpit_phase_weights(project: Dictionary) -> Dictionary:
 	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 	return (CPU_COCKPIT_PHASE_WEIGHTS.get(phase_index, {}) as Dictionary).duplicate(true)
 
-func _apply_cpu_cockpit_month(project: Dictionary) -> void:
+func _apply_cpu_cockpit_month(project: Dictionary, effort: float = 1.0) -> void:
 	if str(project.get("sector", "")) != "CPU":
 		return
 	var priorities := PROJECT_COCKPIT.normalize(project.get("cockpit_priorities", {}), CPU_COCKPIT_AXES)
@@ -1130,7 +1143,7 @@ func _apply_cpu_cockpit_month(project: Dictionary) -> void:
 	for axis_value in CPU_COCKPIT_AXES:
 		var axis := str(axis_value)
 		var leverage := float(phase_weights.get(axis, 1.0))
-		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage
+		influence[axis] = float(influence.get(axis, 0.0)) + float(priorities.get(axis, 25)) / 100.0 * leverage * effort
 	project["cockpit_influence"] = influence
 	project["cockpit_months"] = int(project.get("cockpit_months", 0)) + 1
 
@@ -1191,7 +1204,7 @@ func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
 		project["cockpit_directive_impact"] = impact
 		if cost_once > 0:
 			Economy.add_expense(cost_once, "Décision de développement — %s" % str(project.get("name", "CPU")))
-			outcome_parts.append("coût %d €" % cost_once)
+			outcome_parts.append("coût %d €" % Economy.quoted_expense(cost_once, "Décision de développement"))
 		if delay_months > 0:
 			project["decision_delay_months_remaining"] = int(project.get("decision_delay_months_remaining", 0)) + delay_months
 			outcome_parts.append("+%d mois" % delay_months)
@@ -1230,6 +1243,9 @@ func _process_project_month(project: Dictionary):
 	if typeof(pending_decision_value) == TYPE_DICTIONARY and not pending_decision_value.is_empty():
 		return
 	if str(project.get("sector", "")) == "CPU" and _ensure_cpu_directive(project):
+		return
+	var allocation := PersonnelManager.allocation_for({"id":str(project.id), "kind":"CPU", "need":2.0})
+	if str(project.get("sector", "")) == "CPU" and float(allocation.get("factor", 0.0)) <= 0.0:
 		return
 	var sector_data: Dictionary = GameData.SECTORS[str(project.sector)]
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
@@ -1305,9 +1321,14 @@ func _process_project_month(project: Dictionary):
 		progress *= segment_team_factor * GarageBusiness.development_speed_factor()
 		# Lot E3 : un tick (même architecture) avance plus vite qu'un tock (nouvelle architecture).
 		progress *= float(ArchitectureManager.MODE_SPEED.get(str(project.get("arch_mode", "NEW_LINE")), 1.0))
+		var assigned := PersonnelManager.allocation_for({"id":str(project.id), "kind":"CPU", "need":2.0})
+		progress *= float(assigned.get("factor", 1.0))
+		project["assigned_engineers"] = float(assigned.get("assigned", 0.0))
 	project.phase_progress = float(project.phase_progress) + progress
+	project["work_last"] = progress
+	work_event.emit({"kind":"CPU", "id":str(project.id), "text":"%s : +%.0f %%" % [str(GameData.PHASES[clampi(int(project.phase_index), 0, GameData.PHASES.size() - 1)]), progress]})
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
-	_apply_cpu_cockpit_month(project)
+	_apply_cpu_cockpit_month(project, float(allocation.get("factor", 1.0)))
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
 	technologies[specialization] = tech
 	raise_technology(specialization, knowledge_gain)

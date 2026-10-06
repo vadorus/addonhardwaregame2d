@@ -62,10 +62,38 @@ const TRACKS := {
 	]
 }
 
+const SOFTWARE_TRACKS := {
+	"PRODUIT":[
+		{"id":"SP1", "title":"Lancer votre premier utilitaire", "kind":"SW_LAUNCHED", "target":1, "hint":"Trois orientations de phase, des tests, puis une décision de sortie.", "reward":{"rep":{"innovation":1.0}}},
+		{"id":"SP2", "title":"Vendre 1 000 licences", "kind":"SW_LICENSES", "target":1000, "hint":"Comparez la demande, les bugs et le prix dans le bilan logiciel.", "reward":{"rep":{"professional":1.0}}},
+		{"id":"SP3", "title":"Publier un correctif", "kind":"SW_PATCH", "target":1, "hint":"Réduisez les défauts connus depuis le bilan du produit.", "reward":{"rep":{"support":1.0}}},
+		{"id":"SP4", "title":"Publier une mise à jour", "kind":"SW_UPDATE", "target":1, "hint":"Ajoutez une fonction et terminez le travail de maintenance.", "reward":{"rep":{"innovation":1.0}}},
+		{"id":"SP5", "title":"Sortir trois logiciels", "kind":"SW_LAUNCHED", "target":3, "hint":"Renouvelez le catalogue avec des publics et fonctions complémentaires.", "reward":{"rep":{"innovation":2.0}}},
+		{"id":"SP6", "title":"Dégager 100 000 € de marge logiciels", "kind":"SW_MARGIN", "target":100000, "hint":"La marge des licences retire le support. Les salaires restent dans le bilan de l'entreprise.", "reward":{"rep":{"prestige":2.0}}}
+	],
+	"MARCHE":[
+		{"id":"SM1", "title":"Livrer un premier contrat logiciel", "kind":"SW_CONTRACTS", "target":1, "hint":"Les petits contrats rapportent de l'argent et du savoir-faire.", "reward":{"rep":{"professional":1.0}}},
+		{"id":"SM2", "title":"Atteindre 100 XP en développement", "kind":"SW_XP", "target":100, "hint":"Contrats, sorties et maintenance renforcent l'équipe logicielle.", "reward":{"rep":{"innovation":1.0}}},
+		{"id":"SM3", "title":"Servir particuliers et professionnels", "kind":"SW_TARGETS", "target":2, "hint":"Les particuliers privilégient l'ergonomie ; les pros la fiabilité.", "reward":{"rep":{"professional":2.0}}}
+	]
+}
+var product_path := ""
+
+func _track_objectives(track: String) -> Array:
+	if product_path == "":
+		if not ResearchManager.projects.is_empty() or not ProductManager.products.is_empty():
+			product_path = "CPU"
+		elif not SoftwareManager.projects.is_empty() or not SoftwareManager.products.is_empty() or not SoftwareManager.activities.is_empty() or SoftwareManager.completed_activities > 0:
+			product_path = "SOFTWARE"
+	if product_path == "SOFTWARE" and SOFTWARE_TRACKS.has(track):
+		return SOFTWARE_TRACKS[track]
+	return TRACKS[track]
+
 var completed: Array = [] # {id, title, month, year, reward_label}
 var _best_review := 0.0
 
 func reset() -> void:
+	product_path = ""
 	completed = []
 	_best_review = 0.0
 	objectives_changed.emit()
@@ -80,7 +108,7 @@ func is_completed(objective_id: String) -> bool:
 func active_objectives() -> Array:
 	var result: Array = []
 	for track in TRACK_ORDER:
-		for objective_value in TRACKS[track]:
+		for objective_value in _track_objectives(track):
 			var objective: Dictionary = objective_value
 			if not is_completed(str(objective.id)):
 				var entry := objective.duplicate(true)
@@ -95,7 +123,7 @@ func completed_count() -> int:
 func total_count() -> int:
 	var total := 0
 	for track in TRACK_ORDER:
-		total += (TRACKS[track] as Array).size()
+		total += _track_objectives(track).size()
 	return total
 
 # --- Mesures -------------------------------------------------------------------
@@ -105,6 +133,23 @@ func _launched_products() -> Array:
 
 func progress_value(objective: Dictionary) -> float:
 	match str(objective.get("kind", "")):
+		"SW_LAUNCHED": return float(SoftwareManager.products.size())
+		"SW_CONTRACTS": return float(SoftwareManager.completed_activities)
+		"SW_XP": return float(SoftwareManager.skill_xp("development"))
+		"SW_PATCH", "SW_UPDATE":
+			var key := "version_patch" if str(objective.kind) == "SW_PATCH" else "version_minor"
+			for value in SoftwareManager.products:
+				if int(value.get(key, 0)) > 0: return 1.0
+			return 0.0
+		"SW_LICENSES", "SW_MARGIN":
+			var total := 0.0
+			var key := "licenses_total" if str(objective.kind) == "SW_LICENSES" else "margin_total"
+			for value in SoftwareManager.products: total += float(value.get(key, 0))
+			return total
+		"SW_TARGETS":
+			var targets := {}
+			for value in SoftwareManager.products: targets[str(value.get("target", "HOME"))] = true
+			return float(targets.size())
 		"LAUNCHED":
 			return float(_launched_products().size())
 		"UNITS":
@@ -167,11 +212,11 @@ func progress_text(objective: Dictionary) -> String:
 	var value := progress_value(objective)
 	var target := float(objective.get("target", 1))
 	match str(objective.get("kind", "")):
-		"CASH", "ANNUAL_REVENUE":
+		"CASH", "ANNUAL_REVENUE", "SW_MARGIN":
 			return "%s / %s" % [_short_money(value), _short_money(target)]
 		"REVIEW":
 			return "%.1f/10" % (value / 10.0) if value > 0.0 else "pas encore testé"
-		"UNITS":
+		"UNITS", "SW_LICENSES":
 			return "%s / %s" % [_short_count(value), _short_count(target)]
 		"LAUNCHED", "BENCHMARK_FIRST", "SEGMENT_IN", "OWN_FAB", "WORKPLACE":
 			return "fait" if value >= target else "à faire"
@@ -235,14 +280,16 @@ func process_month() -> void:
 # --- Sauvegarde ------------------------------------------------------------------
 
 func get_state() -> Dictionary:
-	return {"completed":completed, "best_review":_best_review}
+	return {"completed":completed, "best_review":_best_review, "product_path":product_path}
 
 func load_state(state: Dictionary) -> void:
+	product_path = str(state.get("product_path", ""))
+	if product_path not in ["", "CPU", "SOFTWARE"]: product_path = ""
 	completed = state.get("completed", []).duplicate(true)
 	_best_review = float(state.get("best_review", 0.0))
 	# Partie d'avant le lot C : ce qui est déjà accompli est coché sans récompense,
 	# pour que Nora propose des objectifs à la hauteur de l'entreprise.
-	if not state.has("completed"):
+	if not state.has("completed") or bool(state.get("new_software_objectives", false)):
 		evaluate(true)
 	objectives_changed.emit()
 

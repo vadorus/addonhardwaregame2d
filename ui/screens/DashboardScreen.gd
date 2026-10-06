@@ -450,7 +450,7 @@ func refresh() -> void:
 	call_deferred("_fit_room_to_screen")
 	if dashboard_label == null:
 		return
-	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty()
+	var garage_intro := CompanyManager.created and ResearchManager.projects.is_empty() and SoftwareManager.projects.is_empty() and SoftwareManager.activities.is_empty() and SoftwareManager.products.is_empty() and SoftwareManager.completed_activities == 0 and ProductManager.products.is_empty()
 	var room_first := CompanyManager.created
 	if dashboard_nora_guide != null:
 		# V0.8 garage-first: Nora intervient dans le monde, pas comme panneau permanent.

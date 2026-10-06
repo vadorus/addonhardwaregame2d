@@ -181,6 +181,7 @@ var _review_resume_scale := 0.0
 var _last_news_toast_ms := -100000
 var menu_volume_label: Label
 var menu_music_label: Label
+var menu_motion_button: Button
 var setup_load_button: Button
 var slot_layer: ColorRect
 var slot_title_label: Label
@@ -197,6 +198,7 @@ func _ready():
 	var live_config := ConfigFile.new()
 	if live_config.load(SETTINGS_PATH) == OK:
 		LIVE_THEME.enabled = bool(live_config.get_value("ui", "live_theme", true))
+		JUICE.reduced_motion = bool(live_config.get_value("ui", "reduced_motion", false))
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
@@ -234,7 +236,7 @@ func _ready():
 
 func _notification(what: int) -> void:
 	match what:
-		NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_PAUSED:
+		NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
 			# Fermeture PC ou appli Android passée en arrière-plan : ne jamais perdre la partie.
 			_autosave("fermeture")
 		NOTIFICATION_WM_GO_BACK_REQUEST:
@@ -274,6 +276,8 @@ func _connect_signals():
 			personnel_screen.call("refresh")
 	)
 	ExecutiveManager.executive_changed.connect(_request_refresh_all)
+	SoftwareManager.software_changed.connect(_request_refresh_all)
+	SoftwareManager.software_launched.connect(_on_software_launched)
 	ResearchManager.projects_changed.connect(_request_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _request_refresh_all())
@@ -476,11 +480,13 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
-	if context == "PROJECT_COCKPIT":
-		_open_project_cockpit()
+	if context == "PROJECT_COCKPIT" or context.begins_with("PROJECT_COCKPIT:"):
+		_open_project_cockpit(context.trim_prefix("PROJECT_COCKPIT:" ) if context.begins_with("PROJECT_COCKPIT:") else "")
 		return
-	if context in ["SOFTWARE", "PROJECT_CHOICE"]:
+	if context in ["SOFTWARE", "PROJECT_CHOICE", "SOFTWARE_CONTRACTS"]:
 		_open_software_workshop()
+		if context != "PROJECT_CHOICE":
+			software_workshop.call("_show_activities" if context == "SOFTWARE_CONTRACTS" else "_show_software_choice")
 		return
 	if context == "HARDWARE_CPU":
 		_show_first_cpu_workshop()
@@ -1442,12 +1448,12 @@ func _build_project_cockpit_layer() -> void:
 			project_cockpit.call_deferred("refresh")
 	)
 
-func _open_project_cockpit() -> void:
+func _open_project_cockpit(project_id: String = "") -> void:
 	if project_cockpit == null or not CompanyManager.created:
 		return
 	_project_cockpit_resume_scale = TimeManager.time_scale
 	TimeManager.time_scale = 0.0
-	project_cockpit.call("open")
+	project_cockpit.call("open", project_id)
 	SoundManager.play("open")
 	JUICE.fade_in(project_cockpit, 0.2)
 	status_label.text = "Pilotage : répartissez l'effort de vos équipes entre les priorités du projet."
@@ -1466,6 +1472,7 @@ func _project_cockpit_to_cpu_decision() -> void:
 func _project_cockpit_to_software() -> void:
 	_close_project_cockpit()
 	_open_software_workshop()
+	software_workshop.call("_show_activities" if str(project_cockpit.get("_selected_kind")) == "CONTRACT" else "_show_software_choice")
 
 func _build_software_workshop_layer() -> void:
 	var workshop_script: Script = load("res://ui/SoftwareWorkshop.gd")
@@ -1554,7 +1561,7 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 		"", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
 	if not ok:
 		SoundManager.play("error")
-		cpu_stepper.call("show_error", "Le projet ne peut pas démarrer : trésorerie ou capacité R&D insuffisante. Baissez l'ambition ou le budget.")
+		cpu_stepper.call("show_error", ResearchManager.last_start_error)
 		return
 	# V0.9 : gamme (nouvelle ou suite) + architecture + modèles choisis, reliés au projet.
 	var arch_id := str(spec.get("architecture_id", ArchitectureManager.latest_id()))
@@ -1639,7 +1646,7 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	)
 	if not ok:
 		if first_cpu_workshop != null:
-			first_cpu_workshop.call("show_error", "Le projet ne peut pas démarrer. Vérifiez la trésorerie ou choisissez un design moins ambitieux.")
+			first_cpu_workshop.call("show_error", ResearchManager.last_start_error)
 		return
 	if first_cpu_workshop != null:
 		first_cpu_workshop.call("close")
@@ -2352,7 +2359,8 @@ func _on_month_closed(report: Dictionary):
 	_refresh_all()
 	call_deferred("_maybe_open_milestone")
 	# V0.8.1 : sauvegarde automatique à chaque clôture de mois (PC et Android).
-	_autosave("mensuelle")
+	# The clock advances to the next month after month_processed; save after that rollover.
+	call_deferred("_autosave", "mensuelle")
 
 func _breakdown(data: Dictionary) -> String:
 	if data.is_empty(): return "  —"
@@ -2592,7 +2600,7 @@ func _start_project():
 		if TimeManager.time_scale <= 0.0:
 			TimeManager.time_scale = 1.0
 	else:
-		status_label.text = "Impossible de lancer le projet : vérifiez la trésorerie, la capacité R&D et la disponibilité du partenaire."
+		status_label.text = ResearchManager.last_start_error
 	_refresh_all()
 
 func _file_patent(): status_label.text="Brevet déposé." if PatentManager.file_first_candidate() else "Aucun brevet candidat ou trésorerie insuffisante."; _refresh_all()
@@ -2943,7 +2951,14 @@ func _build_menu_layer() -> void:
 	music_up.custom_minimum_size = Vector2(52, 46)
 	music_row.add_child(music_up)
 	menu_live_theme_button = _menu_button("Décorations du moment : %s" % ("oui" if LIVE_THEME.enabled else "non"), _menu_toggle_live_theme)
-	box.add_child(menu_live_theme_button)
+	var visual_row := HBoxContainer.new()
+	visual_row.add_theme_constant_override("separation", 8)
+	box.add_child(visual_row)
+	menu_live_theme_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	visual_row.add_child(menu_live_theme_button)
+	menu_motion_button = _menu_button("Animations : %s" % ("réduites" if JUICE.reduced_motion else "complètes"), _menu_toggle_motion)
+	menu_motion_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	visual_row.add_child(menu_motion_button)
 	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
 	menu_fullscreen_button.visible = not _is_mobile()
 	box.add_child(menu_fullscreen_button)
@@ -3685,3 +3700,18 @@ func _launch_range(generation_id: String) -> void:
 	status_label.text = "Gamme lancée : %d modèle(s), %s € engagés pour la capacité.%s" % [launched.size(), _money(total_cost), " %d modèle(s) non lancé(s) faute de trésorerie." % failed if failed > 0 else ""]
 	_show_launch_moment(ProductManager.get_product(str(headline.get("id", ""))), total_cost)
 	_refresh_all()
+
+
+func _menu_toggle_motion() -> void:
+	JUICE.reduced_motion = not JUICE.reduced_motion
+	menu_motion_button.text = "Animations : %s" % ("réduites" if JUICE.reduced_motion else "complètes")
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("ui", "reduced_motion", JUICE.reduced_motion)
+	config.save(SETTINGS_PATH)
+
+func _on_software_launched(product: Dictionary) -> void:
+	call_deferred("_autosave", "sortie logiciel")
+	SoundManager.play("success")
+	notify(str(product.get("name", "Votre logiciel")) + " est sorti. Les premiers résultats arriveront au prochain mois.", "good")
+	_request_refresh_all()
