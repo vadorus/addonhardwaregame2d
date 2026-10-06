@@ -47,7 +47,7 @@ const ROW_HINTS := {
 	"Cache":"Accélère la puce ; limité par l'architecture.",
 	"Procédé de gravure":"Plus fin = plus rapide et sobre, mais plus difficile.",
 	"Enveloppe électrique":"Trop juste, la puce est bridée ; trop large, elle coûte.",
-	"Effort mensuel":"Plus d'argent chaque mois = développement plus court."
+	"Budget mensuel du projet":"Matériel, prototypes et essais. Salaires et locaux payés séparément."
 }
 
 var step := 0
@@ -652,9 +652,9 @@ func _build_models_step() -> void:
 func _build_budget_step() -> void:
 	_content.add_child(_step_title("Budget de développement"))
 	var index := BUDGET_STEPS.find(_closest(BUDGET_STEPS, budget))
-	_content.add_child(_stepper_row("Effort mensuel", "%s €" % UI.money(budget), float(index + 1) / float(BUDGET_STEPS.size()) * 0.99,
-		func(): _shift_budget(-1), func(): _shift_budget(1), true, "budget"))
 	var monthly := ResearchManager.quoted_development_monthly_cost("INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
+	_content.add_child(_stepper_row("Budget mensuel du projet", "%s €" % UI.money(monthly), float(index + 1) / float(BUDGET_STEPS.size()) * 0.99,
+		func(): _shift_budget(-1), func(): _shift_budget(1), true, "budget"))
 	var spec_segment := str(current_spec().get("segment", segment))
 	var estimate := ResearchManager.estimate_cpu_development(current_design(), "INTERNAL", budget, GameData.sourcing_profile("INTERNAL"), 0, 0, {}, spec_segment)
 	var evaluation := CPU_DESIGN.evaluate(current_design(), ResearchManager.get_cpu_capabilities())
