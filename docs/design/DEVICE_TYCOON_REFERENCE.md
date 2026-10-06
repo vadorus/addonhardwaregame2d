@@ -51,3 +51,6 @@ résultat. Les conséquences doivent venir de la simulation réelle ; le retour
 doit distinguer dépenses déjà payées, budget à prévoir et résultat commercial.
 Un choix supplémentaire doit améliorer la partie observée, pas seulement ajouter
 un paramètre. Cette référence ne constitue pas une preuve d'équilibrage.
+
+Première mise en application :
+[comparaison des projets logiciel avant lancement](SOFTWARE_CHOICE_COMPARISON.md).

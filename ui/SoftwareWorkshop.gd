@@ -11,6 +11,8 @@ const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PRESENTATION := preload("res://scripts/ProjectPresentation.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
+const IMPACT := preload("res://scripts/ImpactPreview.gd")
+const CHIPS := preload("res://ui/components/ImpactChips.gd")
 
 enum ViewMode { PROJECT_CHOICE, SOFTWARE_CHOICE, ACTIVITIES, PRODUCT }
 
@@ -28,6 +30,10 @@ var _target_select: OptionButton
 var _feature_checks: Dictionary = {}
 var _project_preview: Label
 var _project_start: Button
+var _comparison_box: VBoxContainer
+var _comparison_keep: Button
+var _comparison_choice: Dictionary = {}
+var _comparison_pinned := false
 
 func _ready() -> void:
 	color = Color(0.025, 0.055, 0.10, 0.78)
@@ -58,7 +64,6 @@ func _build_shell() -> void:
 	add_child(margin)
 
 	var panel := LOOK.card(Color("fffaf1"), 20, 20)
-	panel.custom_minimum_size = Vector2(820, 0)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(panel)
@@ -551,6 +556,17 @@ func _build_product_controls() -> void:
 	_project_preview = UI.rich_label()
 	_content.add_child(_project_preview)
 
+	_comparison_box = VBoxContainer.new()
+	_comparison_box.add_theme_constant_override("separation", 6)
+	_content.add_child(_comparison_box)
+	_comparison_keep = Button.new()
+	_comparison_keep.text = "Garder cette version pour comparer"
+	_comparison_keep.custom_minimum_size.y = 48
+	_comparison_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	LOOK.button_style(_comparison_keep)
+	_comparison_keep.pressed.connect(_keep_comparison)
+	_content.add_child(_comparison_keep)
+
 	_project_start = Button.new()
 	_project_start.text = "Lancer le développement"
 	LOOK.button_style(_project_start, true)
@@ -578,6 +594,8 @@ func _refresh_family_options() -> void:
 
 func _on_family_changed() -> void:
 	_rebuild_settings()
+	_comparison_choice = _product_choice()
+	_comparison_pinned = false
 	_refresh_product_preview()
 
 func _rebuild_settings() -> void:
@@ -666,27 +684,68 @@ func _levels() -> Dictionary:
 		levels[key] = int((_setting_controls[key] as SpinBox).value)
 	return levels
 
+func _product_choice() -> Dictionary:
+	return {"family":UI.option_meta(_family_select), "price_mode":UI.option_meta(_price_select),
+		"features":_utility_features(), "target":UI.option_meta(_target_select) if _target_select != null else "HOME", "levels":_levels()}
+
+func _choice_preview(choice: Dictionary) -> Dictionary:
+	var family_id := str(choice.get("family", ""))
+	if family_id == "UTILITY":
+		return SoftwareManager.utility_preview(choice.get("features", []), str(choice.get("target", "HOME")), str(choice.get("price_mode", "MARKET")))
+	var preview := SoftwareManager.preview(family_id, choice.get("levels", {}), str(choice.get("price_mode", "MARKET")))
+	preview["assigned"] = float(SoftwareManager.work_preview({"id":"SW-PREVIEW", "months_total":int(preview.get("months", 1))}).get("assigned", 0.0))
+	return preview
+
+func comparison_chips() -> Array:
+	if _comparison_choice.is_empty():
+		return []
+	return IMPACT.software_chips(_choice_preview(_comparison_choice), _choice_preview(_product_choice()), str(_comparison_choice.family))
+
+func _keep_comparison() -> void:
+	_comparison_choice = _product_choice().duplicate(true)
+	_comparison_pinned = true
+	_refresh_product_preview()
+
+func _refresh_comparison() -> void:
+	for child in _comparison_box.get_children():
+		_comparison_box.remove_child(child)
+		child.queue_free()
+	_comparison_box.add_child(UI.eyebrow("CE QUE VOS CHOIX CHANGENT"))
+	var description := CAT.family_label(str(_comparison_choice.get("family", "")))
+	if str(_comparison_choice.get("family", "")) == "UTILITY":
+		var names: Array[String] = []
+		for feature_id in _comparison_choice.get("features", []): names.append(str(PLAY.utility_feature(str(feature_id)).get("label", feature_id)))
+		description = "%s • %s" % [PLAY.utility_target_label(str(_comparison_choice.get("target", "HOME"))), ", ".join(names)]
+	var reference := UI.rich_label("Par rapport à la version %s : %s • %s." % ["gardée" if _comparison_pinned else "de départ", description, str((CAT.PRICE_MODES.get(str(_comparison_choice.get("price_mode", "MARKET")), {}) as Dictionary).get("label", ""))])
+	_comparison_box.add_child(reference)
+	_comparison_box.add_child(CHIPS.flow(comparison_chips(), "Écarts estimés :", 13))
+	_comparison_box.add_child(UI.rich_label("Le prix modifie aussi la demande. Ces estimations ne garantissent ni ventes ni marge ; les décisions pendant le développement peuvent les faire évoluer."))
+	var feature_count := (_product_choice().features as Array).size()
+	_comparison_keep.disabled = str(_comparison_choice.get("family", "")) == "" or (str(_comparison_choice.family) == "UTILITY" and (feature_count < 2 or feature_count > 4))
+
+func _development_text(preview: Dictionary) -> String:
+	var months := int(preview.get("calendar_months", -1))
+	var monthly := UI.money(int(preview.get("monthly_cash_cost", 0)))
+	if months < 0:
+		return "Durée et coût total non estimables sans équipe disponible • %s € par mois de travail." % monthly
+	return "~%d mois avec cette équipe • %s €/mois • budget estimé %s €\nÉquipe prévue : %.1f développeur(s), partagée avec les autres projets." % [months, monthly, UI.money(int(preview.get("total_cost", 0))), float(preview.get("assigned", 0.0))]
+
 func _refresh_product_preview() -> void:
 	if _family_select == null or _project_preview == null:
 		return
 	var family_id := UI.option_meta(_family_select)
 	if family_id == "":
 		return
-	var price_mode := UI.option_meta(_price_select)
 	var lines: Array[String] = []
 
 	if family_id == "UTILITY":
 		var features := _utility_features()
 		var target_id := UI.option_meta(_target_select) if _target_select != null else "HOME"
-		var preview := SoftwareManager.utility_preview(features, target_id, price_mode)
+		var preview := _choice_preview(_product_choice())
 		var check := SoftwareManager.can_start_utility(features, target_id)
 		var metrics: Dictionary = preview.get("metrics", {})
 		lines.append("%s • %d fonctionnalité(s)" % [PLAY.utility_target_label(target_id), features.size()])
-		lines.append("~%d mois avec cette équipe • %s €/mois • budget estimé %s €" % [
-			int(preview.get("calendar_months", preview.get("months", 0))),
-			UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
-			UI.money(int(preview.get("total_cost", 0)))
-		])
+		lines.append(_development_text(preview))
 		lines.append("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performances %.0f" % [
 			float(metrics.get("features", 0.0)),
 			float(metrics.get("usability", 0.0)),
@@ -705,28 +764,27 @@ func _refresh_product_preview() -> void:
 		_project_preview.text = "\n".join(lines)
 		_project_start.disabled = not bool(check.get("ok", false))
 		LOOK.button_style(_project_start, bool(check.get("ok", false)))
+		_refresh_comparison()
 		return
 
 	var levels := _levels()
-	var preview := SoftwareManager.preview(family_id, levels, price_mode)
+	var preview := _choice_preview(_product_choice())
 	var check := SoftwareManager.can_start(family_id, levels)
 	var state := SoftwareManager.family_state(family_id)
-	lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-		int(preview.get("calendar_months", preview.get("months", 0))),
-		UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
-		UI.money(int(preview.get("total_cost", 0)))
-	])
+	lines.append(_development_text(preview))
 	lines.append("Licence %.0f € • qualité estimée %.0f/100 • XP %d/100" % [
 		float(preview.get("price", 0.0)),
 		float(preview.get("quality", 0.0)),
 		int(state.get("activity_xp", 0))
 	])
+	lines.append("Budget hors salaires et maintenance future.")
 	lines.append(_funding_text(check))
 	if not bool(check.get("ok", false)):
 		lines.append(str(check.get("reason", "")))
 	_project_preview.text = "\n".join(lines)
 	_project_start.disabled = not bool(check.get("ok", false))
 	LOOK.button_style(_project_start, bool(check.get("ok", false)))
+	_refresh_comparison()
 
 func _funding_text(check: Dictionary) -> String:
 	if not check.has("required_cash"):

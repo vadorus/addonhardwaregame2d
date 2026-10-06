@@ -27,6 +27,16 @@ func _ready() -> void:
 	await settle()
 	game.call("_open_software_workshop")
 	await capture("p0p1-new-project-choice")
+	var software_workshop: Control = game.get("software_workshop")
+	software_workshop.call("_show_product")
+	var checks: Dictionary = software_workshop.get("_feature_checks")
+	(checks.AUTOMATION as CheckBox).button_pressed = true
+	(checks.SIMPLE_UI as CheckBox).button_pressed = true
+	await settle()
+	var software_content: Control = software_workshop.get("_content")
+	var software_scroll: ScrollContainer = software_content.get_parent()
+	software_scroll.scroll_vertical = int(software_workshop.get("_project_preview").position.y)
+	await capture("device-tycoon-software-comparison")
 	game.call("_close_software_workshop")
 	game.call("open_cpu_stepper")
 	game.get("cpu_stepper").call("go_to_step", 4)

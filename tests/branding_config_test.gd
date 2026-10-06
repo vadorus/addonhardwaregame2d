@@ -15,7 +15,7 @@ func _init() -> void:
 	_check(export_text.count("launcher_icons/adaptive_foreground_432x432") == 2, "adaptive foreground missing from an Android preset", failures)
 	_check(export_text.count("launcher_icons/adaptive_background_432x432") == 2, "adaptive background missing from an Android preset", failures)
 	_check(export_text.count("launcher_icons/adaptive_monochrome_432x432") == 2, "themed Android icon missing from an Android preset", failures)
-	_check(export_text.count("version/name=\"0.11.1-rc1\"") == 2, "Android version name must be 0.11.1-rc1", failures)
+	_check(export_text.count("version/name=\"0.11.1-rc2\"") == 2, "Android version name must be 0.11.1-rc2", failures)
 	_check(export_text.count("gradle_build/target_sdk=\"36\"") == 1, "Play Store preset must target Android API 36", failures)
 	var image := Image.new()
 	var err := image.load(ProjectSettings.globalize_path(PLAY_ICON))
