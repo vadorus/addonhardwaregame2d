@@ -113,7 +113,7 @@ func _test_legacy_personnel_migration() -> void:
 		CPU_DESIGN.default_design(), {}, {}, "GENERAL", "", "BALANCED", "STANDARD",
 		"NONE", "SHARED", "NONE", true
 	)
-	_check(ok, "second CPU is still blocked after legacy personnel migration: " + ResearchManager.last_start_project_error)
+	_check(ok, "second CPU is still blocked after legacy personnel migration: " + ResearchManager.last_start_error)
 
 func _tree_has_text(node: Node, needle: String) -> bool:
 	if node is Label and str((node as Label).text).contains(needle):

@@ -13,9 +13,9 @@ func _ready() -> void:
 	for employee in personnel.staff:
 		if str(employee.department) == "Développement": employee.department = "D├®veloppement"
 	PersonnelManager.load_state(personnel)
-	check(ResearchManager.get_development_team_size() == 0, "corrupted save fixture no longer reproduces the blocker")
-	check(not ResearchManager.start_project("CPU 2", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 45000, CPU_DESIGN.default_design()), "corrupted team unexpectedly starts CPU")
-	check(ResearchManager.last_start_error.contains("Développement") and not ResearchManager.last_start_error.contains("Trésorerie"), "staff failure is reported as budget failure")
+	check(ResearchManager.get_development_team_size() == 2, "legacy department normalization still hides developers")
+	check(ResearchManager.start_project("CPU legacy", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 45000, CPU_DESIGN.default_design()), "legacy department still blocks CPU before explicit migration")
+	ResearchManager.projects.clear()
 	var company := CompanyManager.get_state().duplicate(true)
 	company.departments["D├®veloppement"] = company.departments["Développement"].duplicate(true)
 	company.departments["Développement"]["leader_id"] = ""
