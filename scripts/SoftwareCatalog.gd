@@ -139,10 +139,37 @@ static func dev_monthly_cost(family_id: String, levels: Dictionary, year: int) -
 static func license_price(family_id: String, mode: String) -> float:
 	return snappedf(float(family(family_id).get("reference_price", 50.0)) * price_factor(mode), 1.0)
 
-static func support_monthly_cost(family_id: String, installed_users: int) -> int:
+const SUPPORT_MONTHS := 12
+
+static func support_cohorts(product: Dictionary, year: int, month: int) -> Array:
+	var result: Array = []
+	var saved = product.get("support_cohorts", null)
+	if typeof(saved) == TYPE_ARRAY:
+		for count in (saved as Array).slice(maxi(0, saved.size() - SUPPORT_MONTHS)):
+			result.append(maxi(int(count), 0))
+	else:
+		# Old saves retained only lifetime sales. Estimate the recent cohorts from
+		# their average monthly sales and latest month, without changing finances.
+		var total := maxi(int(product.get("licenses_total", product.get("installed_users", 0))), 0)
+		var age := maxi(1, int(round((year_f(year, month) - float(product.get("launch_f", year_f(year, month)))) * 12.0)) + 1)
+		var recent := mini(age, SUPPORT_MONTHS)
+		var monthly := maxi(int(product.get("licenses_last", 0)), int(ceil(float(total) / age)))
+		var supported := mini(total, monthly * recent)
+		for index in range(recent):
+			result.append(supported / recent + (1 if index < supported % recent else 0))
+	while result.size() < SUPPORT_MONTHS:
+		result.push_front(0)
+	return result
+
+static func supported_licenses(cohorts: Array) -> int:
+	var total := 0
+	for count in cohorts: total += maxi(int(count), 0)
+	return total
+
+static func support_monthly_cost(family_id: String, supported_users: int) -> int:
 	var rate := float(family(family_id).get("support_rate", 0.05))
 	var price := float(family(family_id).get("reference_price", 50.0))
-	return int(round(float(maxi(installed_users, 0)) * price * rate))
+	return int(round(float(maxi(supported_users, 0)) * price * rate))
 static func year_f(year: int, month: int) -> float:
 	return float(year) + float(month - 1) / 12.0
 

@@ -51,6 +51,7 @@ const CPU_CONCEPT_AXES := {
 }
 
 var last_start_error := ""
+var last_start_quote: Dictionary = {}
 var projects: Array = []
 var cpu_generation_proposals: Array = []
 var cpu_generation_context: Dictionary = {}
@@ -915,8 +916,14 @@ func _reject_project_start(message: String) -> bool:
 	last_start_error = message
 	return false
 
+func project_start_quote(approach: String, monthly_budget: int, sourcing: Dictionary = {}, remediation: Dictionary = {}) -> Dictionary:
+	var upfront := Economy.quoted_expense(maxi(int(remediation.get("upfront_cost", 0)), 0), "Programme technique")
+	upfront += Economy.quoted_expense(maxi(int(sourcing.get("setup_cost", 0)), 0), "Accès technologique")
+	return Economy.project_funding_quote(development_monthly_base_cost(approach, monthly_budget, sourcing), 1, "Développement", upfront)
+
 func start_project(project_name: String, sector: String, segment: String, approach: String, focus: String, monthly_budget: int, cpu_design: Dictionary = {}, generation_plan: Dictionary = {}, technical_remediation: Dictionary = {}, application_profile: String = "GENERAL", supplier_id: String = "", negotiation: String = "BALANCED", contract_term: String = "STANDARD", exclusivity: String = "NONE", ip_term: String = "SHARED", volume_term: String = "NONE", player_controlled: bool = false) -> bool:
 	last_start_error = ""
+	last_start_quote = {}
 	if not GameData.is_sector_active(sector) or not DivisionManager.is_operational(sector):
 		return _reject_project_start("La division %s n’est pas opérationnelle." % sector)
 	var market_segment := segment
@@ -934,13 +941,9 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if approach != "INTERNAL" and (not bool(sourcing_profile.get("accepted", false)) or not SupplierManager.can_accept_project(approach, resolved_supplier_id)):
 		return _reject_project_start("Le partenaire refuse le contrat ou ne dispose plus de capacité. Ajustez les conditions ou changez de partenaire.")
 	var sourcing_setup_cost := int(sourcing_profile.get("setup_cost", 0))
-	var first_month_commitment := Economy.quoted_expense(development_monthly_base_cost(approach, monthly_budget, sourcing_profile), "Développement — %s" % project_name)
-	if remediation_upfront > 0:
-		first_month_commitment += Economy.quoted_expense(remediation_upfront, "Programme technique")
-	if sourcing_setup_cost > 0:
-		first_month_commitment += Economy.quoted_expense(sourcing_setup_cost, "Accès technologique — %s" % str(sourcing_profile.get("label", "")))
-	if Economy.money < first_month_commitment:
-		return _reject_project_start("Trésorerie insuffisante : %d € disponibles, %d € requis pour engager le premier mois et les frais initiaux." % [Economy.money, first_month_commitment])
+	last_start_quote = project_start_quote(approach, monthly_budget, sourcing_profile, technical_remediation)
+	if not bool(last_start_quote.ok):
+		return _reject_project_start("Trésorerie insuffisante : %d € disponibles, %d € requis pour le premier mois et les frais initiaux, il manque %d €." % [Economy.money, int(last_start_quote.required_cash), int(last_start_quote.shortfall)])
 	if sector == "CPU" and get_development_team_size() <= 0:
 		return _reject_project_start("Aucun ingénieur dans le département Développement. Recrutez ou réaffectez un développeur dans Équipe ; les chercheurs R&D ne remplacent pas cette équipe.")
 	var active_count := 0

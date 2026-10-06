@@ -7,7 +7,7 @@ const SAVE_PATH := "user://tech_empire_save.json"
 const TEMP_SAVE_PATH := "user://tech_empire_save.json.tmp"
 const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SLOT_COUNT := 3 # emplacements manuels 1..3
-const SAVE_VERSION := 33
+const SAVE_VERSION := 34
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 const TEST_ROOT := "user://ci_tests/"
 
@@ -327,6 +327,12 @@ func _migrate_state(state: Dictionary, source_version: int) -> Dictionary:
 					clock["month"] = 1
 					clock["year"] = int(clock.get("year", 1971)) + 1
 				migrated["time"] = clock
+	if source_version < 34:
+		var catalog := preload("res://scripts/SoftwareCatalog.gd")
+		var clock: Dictionary = migrated.get("time", {})
+		for product in migrated.get("software", {}).get("products", []):
+			product["support_cohorts"] = catalog.support_cohorts(product, int(clock.get("year", 1971)), int(clock.get("month", 1)))
+			product["supported_users"] = catalog.supported_licenses(product.support_cohorts)
 	migrated["version"] = SAVE_VERSION
 	return migrated
 

@@ -129,9 +129,12 @@ func can_start_activity(activity_id: String, approach_id: String = "BALANCED") -
 		return {"ok":false, "reason":"Le domaine Software correspondant n'est pas encore ouvert."}
 	var terms := activity_terms(activity_id, approach_id)
 	var first_month := int(terms.get("monthly_cost", 0))
-	if not Economy.can_afford(first_month, "Activité software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour démarrer cette activité."}
-	return {"ok":true, "reason":""}
+	return _funding_check(first_month, 1, "Activité software")
+
+func _funding_check(monthly_base: int, months: int, category: String) -> Dictionary:
+	var quote := Economy.project_funding_quote(monthly_base, months, category)
+	quote["reason"] = "" if bool(quote.ok) else "Trésorerie insuffisante : %d € disponibles, %d € requis (%d mois à %d €), il manque %d €." % [int(quote.treasury), int(quote.required_cash), months, int(quote.monthly_cash), int(quote.shortfall)]
+	return quote
 
 func start_activity(activity_id: String, approach_id: String = "BALANCED") -> bool:
 	if not bool(can_start_activity(activity_id, approach_id).get("ok", false)):
@@ -223,9 +226,7 @@ func can_start_utility(feature_ids: Array, target_id: String = "HOME") -> Dictio
 	if not PLAY.UTILITY_TARGETS.has(target_id):
 		return {"ok":false, "reason":"Public cible inconnu."}
 	var plan := PLAY.utility_plan(chosen, target_id, skills)
-	if not Economy.can_afford(int(plan.get("monthly_cost", 0)) * 2, "Développement software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les deux premiers mois."}
-	return {"ok":true, "reason":""}
+	return _funding_check(int(plan.get("monthly_cost", 0)), 2, "Développement software")
 
 func start_utility_project(feature_ids: Array, target_id: String = "HOME", price_mode: String = "MARKET", product_name: String = "", player_controlled: bool = false) -> bool:
 	if not bool(can_start_utility(feature_ids, target_id).get("ok", false)):
@@ -573,9 +574,7 @@ func can_start_patch(product_id: String) -> Dictionary:
 	if int(product.get("bugs_known", 0)) <= 0:
 		return {"ok":false, "reason":"Aucun bug connu ne justifie un correctif."}
 	var cost := 1800 + int(product.get("bugs_known", 0)) * 40
-	if not Economy.can_afford(cost, "Correctif software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour préparer le correctif."}
-	return {"ok":true, "reason":""}
+	return _funding_check(cost, 1, "Correctif software")
 
 func start_patch(product_id: String) -> bool:
 	if not bool(can_start_patch(product_id).get("ok", false)):
@@ -621,9 +620,7 @@ func can_start_update(product_id: String, feature_id: String) -> Dictionary:
 		return {"ok":false, "reason":"L'équipe Software travaille déjà sur cette famille."}
 	var feature := PLAY.utility_feature(feature_id)
 	var monthly_cost := 2400 + int(round(float(feature.get("cost", 1000)) * 0.45))
-	if not Economy.can_afford(monthly_cost * 2, "Mise à jour software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour lancer cette mise à jour."}
-	return {"ok":true, "reason":""}
+	return _funding_check(monthly_cost, 2, "Mise à jour software")
 
 func start_update(product_id: String, feature_id: String) -> bool:
 	if not bool(can_start_update(product_id, feature_id).get("ok", false)):
@@ -714,9 +711,7 @@ func can_start(family_id: String, levels: Dictionary) -> Dictionary:
 		if level < 1 or level > max_level(family_id):
 			return {"ok":false, "reason":"Ambition trop élevée pour l'expérience de l'équipe."}
 	var monthly := CAT.dev_monthly_cost(family_id, levels, TimeManager.year)
-	if not Economy.can_afford(monthly * 2, "Développement software"):
-		return {"ok":false, "reason":"Trésorerie insuffisante pour financer les premiers mois."}
-	return {"ok":true, "reason":""}
+	return _funding_check(monthly, 2, "Développement software")
 
 func start_project(family_id: String, levels: Dictionary, price_mode: String = "MARKET", product_name: String = "") -> bool:
 	if not bool(can_start(family_id, levels).get("ok", false)):
@@ -848,7 +843,9 @@ func _launch(project: Dictionary) -> void:
 	var product := {"id":str(project.id), "family":family_id, "name":str(project.name),
 		"levels":project.levels.duplicate(), "price_mode":str(project.price_mode), "price":CAT.license_price(family_id, str(project.price_mode)),
 		"mastery":product_mastery, "launch_f":now, "quality_launch":quality, "status":"ACTIVE",
-		"licenses_last":0, "licenses_total":0, "installed_users":0, "revenue_last":0, "support_last":0, "margin_last":0}
+		"licenses_last":0, "licenses_total":0, "installed_users":0, "supported_users":0,
+		"support_cohorts":CAT.support_cohorts({"licenses_total":0}, TimeManager.year, TimeManager.month),
+		"revenue_last":0, "support_last":0, "margin_last":0}
 	if str(project.get("kind", "")) == "UTILITY_SLICE":
 		product["kind"] = "UTILITY_SLICE"
 		product["target"] = str(project.get("target", "HOME"))
@@ -875,6 +872,14 @@ func _launch(project: Dictionary) -> void:
 	software_launched.emit(product)
 func _process_sales() -> void:
 	var now := CAT.year_f(TimeManager.year, TimeManager.month)
+	# Age all licences, including suspended products, before this month's sales.
+	for product_value in products:
+		var product: Dictionary = product_value
+		var cohorts := CAT.support_cohorts(product, TimeManager.year, TimeManager.month)
+		cohorts.pop_front()
+		cohorts.append(0)
+		product["support_cohorts"] = cohorts
+		product["supported_users"] = CAT.supported_licenses(cohorts)
 	for family_value in CAT.FAMILY_ORDER:
 		var family_id := str(family_value)
 		var active := active_products(family_id)
@@ -917,7 +922,10 @@ func _process_sales() -> void:
 			var licenses := int(floor(reachable_market * float(weights[i]) / (1.0 + total_weight)))
 			var revenue := int(round(float(licenses) * float(product.price)))
 			product["installed_users"] = int(product.installed_users) + licenses
-			var support_raw := CAT.support_monthly_cost(family_id, int(product.installed_users))
+			var cohorts: Array = product.support_cohorts
+			cohorts[CAT.SUPPORT_MONTHS - 1] = licenses
+			product["supported_users"] = CAT.supported_licenses(cohorts)
+			var support_raw := CAT.support_monthly_cost(family_id, int(product.supported_users))
 			var support := Economy.quoted_expense(support_raw, "Support software")
 			product["licenses_last"] = licenses; product["licenses_total"] = int(product.licenses_total) + licenses
 			product["revenue_last"] = revenue; product["support_last"] = support; product["margin_last"] = revenue - support
@@ -1005,6 +1013,9 @@ func load_state(state: Dictionary) -> void:
 		families[str(family_id)] = merged
 	projects = state.get("projects", []).duplicate(true)
 	products = state.get("products", []).duplicate(true)
+	for product in products:
+		product["support_cohorts"] = CAT.support_cohorts(product, TimeManager.year, TimeManager.month)
+		product["supported_users"] = CAT.supported_licenses(product.support_cohorts)
 	reveals = state.get("reveals", []).duplicate(true)
 	activities = state.get("activities", []).duplicate(true)
 	completed_activities = int(state.get("completed_activities", 0))

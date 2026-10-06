@@ -675,6 +675,12 @@ func _build_budget_step() -> void:
 		facts.add_child(UI.muted_label(str(pair[0]), 13))
 		facts.add_child(UI.label(str(pair[1]), 14))
 	_content.add_child(facts)
+	var funding := ResearchManager.project_start_quote("INTERNAL", budget, GameData.sourcing_profile("INTERNAL"))
+	var budget_note := _note("Minimum pour démarrer : %s € (premier mois). Déjà payées ce mois : %s €, déduites de la trésorerie. Les mois suivants restent à financer." % [UI.money(int(funding.required_cash)), UI.money(int(funding.spent_this_month))])
+	if not bool(funding.ok):
+		budget_note.text += " Il manque %s €." % UI.money(int(funding.shortfall))
+		budget_note.add_theme_color_override("font_color", Color("b3261e"))
+	_content.add_child(budget_note)
 	# V0.10 / H5 : ce qu'il restera au lancement, en clair, avant de s'engager.
 	var projection := launch_projection(estimate, monthly)
 	var cash_note := _note(ExecutiveManager.launch_cash_text(projection))

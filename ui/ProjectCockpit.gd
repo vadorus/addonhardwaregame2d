@@ -303,7 +303,8 @@ func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: St
 		var option_cost := maxi(int(option.get("cost_once", 0)), 0)
 		button.disabled = option_cost > 0 and not Economy.can_afford(option_cost, "Décision de développement" if kind == "CPU" else "Décision Software")
 		if button.disabled:
-			button.text += "\nFonds insuffisants"
+			var required := Economy.quoted_expense(option_cost, "Décision de développement" if kind == "CPU" else "Décision Software")
+			button.text += "\n%d € disponibles • %d € requis • manque %d €" % [Economy.money, required, maxi(required - Economy.money, 0)]
 		LOOK.button_style(button)
 		if kind == "CPU":
 			button.pressed.connect(_choose_cpu_directive.bind(project_id, str(option.get("id", ""))))

@@ -299,6 +299,7 @@ func _add_compact_status() -> void:
 		commercial_box.add_child(UI.eyebrow("VOTRE LOGICIEL EST SORTI" if int(product.get("market_months", 0)) == 0 and str(product.get("status", "")) == "ACTIVE" else "BILAN DU PRODUIT"))
 		commercial_box.add_child(UI.label(str(product.get("name", "Logiciel")) + " • v" + version, 17))
 		var figures := UI.muted_label("Prix %.0f € • recettes %d € • support %d € • marge %d €/mois\nMarge cumulée %d € • développement investi %d €" % [float(product.get("price", 0)), int(product.get("revenue_last", 0)), int(product.get("support_last", 0)), int(product.get("margin_last", 0)), int(product.get("margin_total", 0)), int(product.get("development_spent", 0))], 12)
+		figures.text += "\nLicences sous support : %s (ventes des %d derniers mois) • cumul vendu : %s" % [UI.money(int(product.get("supported_users", 0))), CAT.SUPPORT_MONTHS, UI.money(int(product.get("licenses_total", 0)))]
 		figures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		commercial_box.add_child(figures)
 		if not bool(product.get("spend_tracking_complete", false)):
@@ -691,6 +692,7 @@ func _refresh_product_preview() -> void:
 			float(metrics.get("performance", 0.0))
 		])
 		lines.append("Budget hors salaires, choix de phase payants et bêta.")
+		lines.append(_funding_text(check))
 		lines.append("Bugs estimés %d • licence %.0f € • qualité %.0f/100" % [
 			int(preview.get("bugs", 0)),
 			float(preview.get("price", 0.0)),
@@ -717,11 +719,17 @@ func _refresh_product_preview() -> void:
 		float(preview.get("quality", 0.0)),
 		int(state.get("activity_xp", 0))
 	])
+	lines.append(_funding_text(check))
 	if not bool(check.get("ok", false)):
 		lines.append(str(check.get("reason", "")))
 	_project_preview.text = "\n".join(lines)
 	_project_start.disabled = not bool(check.get("ok", false))
 	LOOK.button_style(_project_start, bool(check.get("ok", false)))
+
+func _funding_text(check: Dictionary) -> String:
+	if not check.has("required_cash"):
+		return "Trésorerie : %s €." % UI.money(Economy.money)
+	return "Trésorerie : %s € • minimum pour démarrer : %s € (%d mois). Déjà payées ce mois : %s €, déduites de la trésorerie. Les mois suivants restent à financer." % [UI.money(int(check.treasury)), UI.money(int(check.required_cash)), int(check.months), UI.money(int(check.spent_this_month))]
 
 func _start_product() -> void:
 	var family_id := UI.option_meta(_family_select)
