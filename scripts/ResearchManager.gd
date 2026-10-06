@@ -1063,7 +1063,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 	if approach != "INTERNAL":
 		var signed_contract := SupplierManager.sign_contract(project_id, approach, resolved_supplier_id, negotiation, contract_term, exclusivity, ip_term, volume_term)
 		if signed_contract.is_empty():
-			return false
+			return _reject_project_start("Le contrat fournisseur n’a pas pu être signé. Revérifiez le partenaire et les conditions avant de relancer le projet.")
 		project["supplier_contract_id"] = str(signed_contract.get("id", ""))
 		project["sourcing"] = signed_contract.duplicate(true)
 		project["monthly_cash_cost"] = development_monthly_base_cost(approach, monthly_budget, project["sourcing"])
