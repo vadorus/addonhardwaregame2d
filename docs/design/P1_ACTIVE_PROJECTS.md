@@ -1,5 +1,10 @@
 # P1 — créer et piloter les projets au garage
 
+Base d'idées complémentaire :
+[Devices Tycoon Simulator](DEVICE_TYCOON_REFERENCE.md), ajouté le 6 octobre 2026.
+Les prochains playtests doivent en particulier examiner la lisibilité des choix
+produit, du partage de l'équipe et des conséquences des décisions au garage.
+
 Le parcours partagé est `Nouveau projet → Processeur ou Logiciel`, puis pour le
 logiciel `Petits contrats ou Créer un produit`. Le choix Processeur ouvre la
 conception d'un nouveau CPU, y compris lorsqu'un CPU est déjà en développement.
