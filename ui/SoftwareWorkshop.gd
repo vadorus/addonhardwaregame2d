@@ -298,8 +298,10 @@ func _add_compact_status() -> void:
 		commercial.add_child(commercial_box)
 		commercial_box.add_child(UI.eyebrow("VOTRE LOGICIEL EST SORTI" if int(product.get("market_months", 0)) == 0 and str(product.get("status", "")) == "ACTIVE" else "BILAN DU PRODUIT"))
 		commercial_box.add_child(UI.label(str(product.get("name", "Logiciel")) + " • v" + version, 17))
-		var figures := UI.muted_label("Prix %.0f € • recettes %d € • support %d € • marge %d €/mois\nMarge cumulée %d € • développement investi %d €" % [float(product.get("price", 0)), int(product.get("revenue_last", 0)), int(product.get("support_last", 0)), int(product.get("margin_last", 0)), int(product.get("margin_total", 0)), int(product.get("development_spent", 0))], 12)
+		var figures := UI.muted_label("Prix actuel %.0f €\nDernier mois de ventes : recettes %d € • support payé %d € • marge %d €\nMarge cumulée %d € • développement investi %d €" % [float(product.get("price", 0)), int(product.get("revenue_last", 0)), int(product.get("support_last", 0)), int(product.get("margin_last", 0)), int(product.get("margin_total", 0)), int(product.get("development_spent", 0))], 12)
 		figures.text += "\nLicences sous support : %s (ventes des %d derniers mois) • cumul vendu : %s" % [UI.money(int(product.get("supported_users", 0))), CAT.SUPPORT_MONTHS, UI.money(int(product.get("licenses_total", 0)))]
+		var support_quote := Economy.quoted_expense(CAT.support_monthly_cost(str(product.get("family", "UTILITY")), int(product.get("supported_users", 0))), "Support software") if str(product.get("status", "")) == "ACTIVE" else 0
+		figures.text += "\nBarème actuel pour cette base : ~%s €/mois, avant nouvelles ventes et expiration des licences." % UI.money(support_quote)
 		figures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		commercial_box.add_child(figures)
 		if not bool(product.get("spend_tracking_complete", false)):
