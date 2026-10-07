@@ -131,15 +131,41 @@ func _onglets() -> void:
 	await _frames(20)
 	TimeManager.time_scale = 0.0
 	var names := ["qg", "entreprise", "equipe", "labo", "produits", "marche", "presse"]
+	var screens := [null, "company_screen", "personnel_screen", "lab_screen", "products_screen", "market_screen", "media_screen"]
 	for i in range(names.size()):
 		game.call("_show_tab", i)
 		await _frames(30)
-		await _shot("onglet_%d_%s" % [i, names[i]])
-		var scroll := _first_scroll(game.get("tabs").get_current_tab_control())
-		if scroll != null and scroll.get_v_scroll_bar().max_value > scroll.size.y + 40.0:
-			scroll.scroll_vertical = int(scroll.size.y * 0.9)
-			await _frames(10)
-			await _shot("onglet_%d_%s_suite" % [i, names[i]])
+		await _shot_with_scroll("onglet_%d_%s" % [i, names[i]])
+		if screens[i] == null:
+			continue
+		var screen: Control = game.get(str(screens[i]))
+		var pager: Node = screen.get("pager") if screen != null and "pager" in screen else null
+		if pager != null:
+			var first := str(pager.get("current"))
+			for key in pager.call("page_keys"):
+				if str(key) == first or not bool(pager.call("is_page_available", str(key))):
+					continue
+				pager.call("show_page", str(key))
+				await _frames(20)
+				await _shot_with_scroll("onglet_%d_%s_%s" % [i, names[i], str(key).to_lower()])
+			pager.call("show_page", first)
+		elif screen != null and screen.has_method("_select_mode"):
+			for mode in ["SELL", "SUPPORT", "RANGES"]:
+				screen.call("_select_mode", mode)
+				await _frames(20)
+				await _shot_with_scroll("onglet_%d_%s_%s" % [i, names[i], mode.to_lower()])
+
+func _shot_with_scroll(name: String) -> void:
+	var scroll := _first_scroll(game.get("tabs").get_current_tab_control())
+	if scroll != null:
+		scroll.scroll_vertical = 0
+		await _frames(4)
+	await _shot(name)
+	if scroll != null and scroll.get_v_scroll_bar().max_value > scroll.size.y + 40.0:
+		scroll.scroll_vertical = int(scroll.size.y * 0.9)
+		await _frames(8)
+		await _shot(name + "_suite")
+		scroll.scroll_vertical = 0
 
 func _first_scroll(node: Node) -> ScrollContainer:
 	if node == null:
