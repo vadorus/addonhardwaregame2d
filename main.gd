@@ -29,6 +29,12 @@ var nav_panel: PanelContainer
 var setup_layer: Control
 var setup_panel: PanelContainer
 var setup_title_box: VBoxContainer
+## D5 (07/10) : un vrai menu de jeu — logo à gauche, entrées empilées, décor qui vit, courte intro au 1er lancement.
+var setup_menu_column: VBoxContainer
+var setup_title_art: TextureRect
+var setup_new_button: Button
+var intro_layer: Control
+var _title_drift: Tween
 var setup_creation_box: VBoxContainer
 var first_cpu_workshop: Control
 var software_workshop: Control
@@ -231,6 +237,7 @@ func _ready():
 	setup_layer.visible = not CompanyManager.created
 	if setup_layer.visible:
 		_show_title_screen()
+		_play_intro_if_first_launch()
 	call_deferred("_update_responsive_layout")
 	call_deferred("_apply_safe_area")
 
@@ -1226,6 +1233,7 @@ func _build_setup_layer():
 	if ResourceLoader.exists(title_art_path):
 		setup_layer.color = Color(0.10, 0.065, 0.04, 1.0)
 		var title_art := TextureRect.new()
+		setup_title_art = title_art
 		title_art.texture = load(title_art_path)
 		title_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		title_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -1237,6 +1245,23 @@ func _build_setup_layer():
 		title_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		title_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		setup_layer.add_child(title_veil)
+
+	# Voile chaud à gauche : le menu se lit sur le décor sans le cacher.
+	var menu_shade := TextureRect.new()
+	var shade_gradient := Gradient.new()
+	shade_gradient.set_color(0, Color(0.10, 0.065, 0.04, 0.88))
+	shade_gradient.set_color(1, Color(0.10, 0.065, 0.04, 0.0))
+	var shade_texture := GradientTexture2D.new()
+	shade_texture.gradient = shade_gradient
+	shade_texture.fill_from = Vector2(0, 0)
+	shade_texture.fill_to = Vector2(1, 0)
+	menu_shade.texture = shade_texture
+	menu_shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	menu_shade.stretch_mode = TextureRect.STRETCH_SCALE
+	menu_shade.anchor_right = 0.62
+	menu_shade.anchor_bottom = 1.0
+	menu_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	setup_layer.add_child(menu_shade)
 
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1250,50 +1275,64 @@ func _build_setup_layer():
 	shell.add_theme_constant_override("separation", 16)
 	setup_panel.add_child(shell)
 
+	setup_menu_column = VBoxContainer.new()
+	setup_menu_column.anchor_top = 0.5
+	setup_menu_column.anchor_bottom = 0.5
+	setup_menu_column.offset_left = 64
+	setup_menu_column.offset_right = 64 + 440
+	setup_menu_column.offset_top = -250
+	setup_menu_column.offset_bottom = 250
+	setup_menu_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	setup_layer.add_child(setup_menu_column)
 	setup_title_box = VBoxContainer.new()
-	setup_title_box.add_theme_constant_override("separation", 14)
-	shell.add_child(setup_title_box)
+	setup_title_box.add_theme_constant_override("separation", 10)
+	setup_menu_column.add_child(setup_title_box)
 
-	var brand := _label("TECH EMPIRE", 34)
-	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	brand.add_theme_color_override("font_color", APP_CYAN)
-	setup_title_box.add_child(brand)
-	var version := _eyebrow("SIMULATION D'ENTREPRISE • 1971")
-	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	setup_title_box.add_child(version)
-	setup_season_label = _label("", 18)
-	setup_season_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	setup_season_label.add_theme_color_override("font_color", Color("d9822b"))
+	var brand_row := HBoxContainer.new()
+	brand_row.add_theme_constant_override("separation", 0)
+	setup_title_box.add_child(brand_row)
+	for part in [["TECH ", Color("f6e7cf")], ["EMPIRE", Color("f2a541")]]:
+		var word := _label(str(part[0]), 62)
+		word.add_theme_color_override("font_color", part[1])
+		word.add_theme_color_override("font_outline_color", Color(0.10, 0.065, 0.04, 0.9))
+		word.add_theme_constant_override("outline_size", 10)
+		brand_row.add_child(word)
+	var tagline := _label("Du garage à l'empire technologique", 20)
+	tagline.add_theme_color_override("font_color", Color("e9d6b8"))
+	setup_title_box.add_child(tagline)
+	setup_season_label = _label("", 16)
+	setup_season_label.add_theme_color_override("font_color", Color("f2a541"))
 	setup_season_label.visible = false
 	setup_title_box.add_child(setup_season_label)
-	var title := _label("Du garage à l'empire technologique", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	setup_title_box.add_child(title)
-	var desc := _muted_label("1971. Un garage, une petite équipe et une première idée de processeur. Le reste de l'entreprise apparaîtra quand vous en aurez réellement besoin.", 14)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	setup_title_box.add_child(desc)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 14
+	setup_title_box.add_child(gap)
 
-	var new_game := Button.new()
-	new_game.text = "Nouvelle entreprise"
-	LOOK.button_style(new_game, true)
-	new_game.custom_minimum_size.y = 54
-	new_game.pressed.connect(_show_creation_screen)
-	setup_title_box.add_child(new_game)
-
-	var continue_game := Button.new()
-	continue_game.text = "Continuer"
-	continue_game.custom_minimum_size.y = 48
+	var continue_game := _title_menu_button("Continuer", _load_game, true)
 	continue_game.disabled = not SaveManager.has_any_save()
-	continue_game.pressed.connect(_load_game)
 	setup_continue_button = continue_game
 	setup_title_box.add_child(continue_game)
-	var load_game_button := Button.new()
-	load_game_button.text = "Charger une partie"
-	load_game_button.custom_minimum_size.y = 44
-	load_game_button.pressed.connect(open_slot_picker.bind("load"))
+	var new_game := _title_menu_button("Nouvelle entreprise", _show_creation_screen)
+	setup_new_button = new_game
+	setup_title_box.add_child(new_game)
+	var load_game_button := _title_menu_button("Charger une partie", open_slot_picker.bind("load"))
 	setup_title_box.add_child(load_game_button)
 	setup_load_button = load_game_button
+	setup_title_box.add_child(_title_menu_button("Options", open_system_menu))
+	if not _is_mobile():
+		setup_title_box.add_child(_title_menu_button("Quitter", func(): get_tree().quit()))
+	var version_label := _label("v%s  ·  vadorus" % str(ProjectSettings.get_setting("application/config/version", "")), 12)
+	version_label.add_theme_color_override("font_color", Color(0.96, 0.9, 0.81, 0.55))
+	version_label.anchor_left = 1.0
+	version_label.anchor_right = 1.0
+	version_label.anchor_top = 1.0
+	version_label.anchor_bottom = 1.0
+	version_label.offset_left = -220
+	version_label.offset_right = -18
+	version_label.offset_top = -30
+	version_label.offset_bottom = -10
+	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	setup_layer.add_child(version_label)
 
 	setup_creation_box = VBoxContainer.new()
 	setup_creation_box.add_theme_constant_override("separation", 12)
@@ -1370,6 +1409,102 @@ func _build_setup_layer():
 	back.pressed.connect(_show_title_screen)
 	setup_creation_box.add_child(back)
 
+## Entrée du menu titre : large, crème translucide, l'entrée principale en vert.
+func _title_menu_button(text: String, action: Callable, primary: bool = false) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size = Vector2(360, 54)
+	button.add_theme_font_size_override("font_size", 20)
+	var base := Color("2f9e5b") if primary else Color(1.0, 0.97, 0.92, 0.88)
+	var ink := Color.WHITE if primary else Color("3b2b1e")
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var fill := base
+		if state == "hover": fill = base.lightened(0.08)
+		if state == "pressed": fill = base.darkened(0.12)
+		if state == "disabled": fill = Color(1.0, 0.97, 0.92, 0.35)
+		var box := UI.stylebox(fill, 14, 0, fill, 18) if state != "focus" else UI.stylebox(Color(0, 0, 0, 0), 14, 3, Color("f2a541"), 18)
+		button.add_theme_stylebox_override(state, box)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, ink)
+	button.add_theme_color_override("font_disabled_color", Color(0.23, 0.17, 0.12, 0.45))
+	button.pressed.connect(func():
+		SoundManager.play("click")
+		action.call())
+	button.mouse_entered.connect(func():
+		if not button.disabled:
+			button.create_tween().tween_property(button, "position:x", 8.0, 0.12))
+	button.mouse_exited.connect(func(): button.create_tween().tween_property(button, "position:x", 0.0, 0.12))
+	return button
+
+## Le décor du titre respire : un très lent zoom avant/arrière, comme une caméra posée dans la rue.
+func _start_title_drift() -> void:
+	if setup_title_art == null or not setup_title_art.is_inside_tree() or JUICE.reduced_motion:
+		return
+	if _title_drift != null and _title_drift.is_valid():
+		return
+	setup_title_art.pivot_offset = setup_title_art.size * Vector2(0.62, 0.55)
+	_title_drift = setup_title_art.create_tween().set_loops().set_trans(Tween.TRANS_SINE)
+	_title_drift.tween_property(setup_title_art, "scale", Vector2(1.07, 1.07), 22.0)
+	_title_drift.tween_property(setup_title_art, "scale", Vector2.ONE, 22.0)
+
+## Intro (premier lancement, touche pour passer) : trois phrases dans le noir, puis le garage s'éclaire.
+func _play_intro_if_first_launch() -> void:
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	# Les tests (dossier de sauvegarde à part) et les captures ne jouent pas l'intro.
+	if bool(config.get_value("ui", "intro_seen", false)) or JUICE.reduced_motion or not setup_layer.visible or SaveManager.save_root != "user://":
+		return
+	config.set_value("ui", "intro_seen", true)
+	config.save(SETTINGS_PATH)
+	intro_layer = ColorRect.new()
+	(intro_layer as ColorRect).color = Color(0.06, 0.04, 0.03, 1.0)
+	intro_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_layer.z_index = 120
+	intro_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(intro_layer)
+	var lines := ["1971.", "Un garage. Une petite équipe. Un fer à souder.", "Et une idée un peu folle : fabriquer nos propres processeurs."]
+	var holder := VBoxContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.alignment = BoxContainer.ALIGNMENT_CENTER
+	holder.add_theme_constant_override("separation", 18)
+	intro_layer.add_child(holder)
+	var labels: Array[Label] = []
+	for i in range(lines.size()):
+		var line := _label(lines[i], 44 if i == 0 else 24)
+		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		line.add_theme_color_override("font_color", Color("f2a541") if i == 0 else Color("f6e7cf"))
+		line.modulate.a = 0.0
+		holder.add_child(line)
+		labels.append(line)
+	var skip := _label("Touchez pour passer", 13)
+	skip.add_theme_color_override("font_color", Color(0.96, 0.9, 0.81, 0.4))
+	skip.anchor_left = 0.5
+	skip.anchor_right = 0.5
+	skip.anchor_top = 1.0
+	skip.anchor_bottom = 1.0
+	skip.offset_left = -150
+	skip.offset_right = 150
+	skip.offset_top = -44
+	skip.offset_bottom = -20
+	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro_layer.add_child(skip)
+	var story := intro_layer.create_tween()
+	for line in labels:
+		story.tween_property(line, "modulate:a", 1.0, 0.9)
+		story.tween_interval(1.1)
+	story.tween_interval(0.6)
+	story.tween_property(intro_layer, "modulate:a", 0.0, 1.2)
+	story.tween_callback(_end_intro)
+	intro_layer.gui_input.connect(func(event: InputEvent):
+		if (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) or (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed):
+			_end_intro())
+
+func _end_intro() -> void:
+	if intro_layer != null and is_instance_valid(intro_layer):
+		intro_layer.queue_free()
+	intro_layer = null
+
 func _show_title_screen() -> void:
 	if setup_continue_button != null:
 		setup_continue_button.disabled = not _has_save_file()
@@ -1383,8 +1518,22 @@ func _show_title_screen() -> void:
 		setup_load_button.disabled = not _has_save_file()
 	if setup_title_box != null:
 		setup_title_box.visible = true
+	if setup_menu_column != null:
+		setup_menu_column.visible = true
+	if setup_panel != null:
+		setup_panel.visible = false
 	if setup_creation_box != null:
 		setup_creation_box.visible = false
+	# Pas de partie : « Nouvelle entreprise » devient l'entrée principale (en vert).
+	if setup_continue_button != null and setup_new_button != null:
+		var has_save := not setup_continue_button.disabled
+		setup_continue_button.visible = has_save
+		if not has_save:
+			setup_new_button.add_theme_stylebox_override("normal", UI.stylebox(Color("2f9e5b"), 14, 0, Color("2f9e5b"), 18))
+			setup_new_button.add_theme_stylebox_override("hover", UI.stylebox(Color("2f9e5b").lightened(0.08), 14, 0, Color("2f9e5b"), 18))
+			for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+				setup_new_button.add_theme_color_override(state, Color.WHITE)
+	call_deferred("_start_title_drift")
 	_refresh_live_theme()
 
 ## Thème du moment : message de saison sur l'accueil, petit air joué une seule fois par lancement.
@@ -1413,6 +1562,10 @@ func _menu_toggle_live_theme() -> void:
 func _show_creation_screen() -> void:
 	if setup_title_box != null:
 		setup_title_box.visible = false
+	if setup_menu_column != null:
+		setup_menu_column.visible = false
+	if setup_panel != null:
+		setup_panel.visible = true
 	if setup_creation_box != null:
 		setup_creation_box.visible = true
 	if setup_name != null and not _is_mobile():
