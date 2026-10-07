@@ -139,6 +139,34 @@ func _check_fabrication_and_launch_cards() -> bool:
 	for frame in range(4): await get_tree().process_frame
 	game.call("_on_dashboard_navigation", 4, "Production")
 	for frame in range(16): await get_tree().process_frame
+	# Reboot R2 : fabrication et lancement passent par le parcours CPU. Même exigence : le bouton vert est
+	# visible sans défiler, à la taille du Pixel.
+	var journey: Control = game.get("cpu_journey")
+	if journey != null and journey.visible:
+		var build := _find_button(journey, "Confier la fabrication")
+		if build == null or build.disabled or not build.is_visible_in_tree() or not journey.get_global_rect().encloses(build.get_global_rect()):
+			_fail("I4: the CPU journey fabrication button is missing or needs scrolling")
+			return false
+		print("[UI] Parcours CPU : bouton de fabrication visible sans défiler (phone 1616x720)")
+		build.pressed.emit()
+		var running: Dictionary = ProductionManager.get_active_jobs()[0]
+		for month in range(24):
+			SimulationManager.process_month_end()
+			if str(running.get("status", "")) == "COMPLETED":
+				break
+		GarageBusiness.mark_shown("first_binning_shown")
+		game.call("close_dialogue")
+		game.call("_refresh_all")
+		for frame in range(4): await get_tree().process_frame
+		game.call("_on_dashboard_navigation", 4, "PRODUCT_LAUNCH")
+		for frame in range(16): await get_tree().process_frame
+		var launch := _find_button(journey, "Lancer ")
+		if launch == null or not launch.is_visible_in_tree() or not journey.get_global_rect().encloses(launch.get_global_rect()):
+			_fail("I4: the CPU journey launch button is missing or needs scrolling")
+			return false
+		print("[UI] Parcours CPU : bouton de lancement visible sans défiler (phone 1616x720)")
+		viewport.queue_free()
+		return true
 	var screen: Control = game.get("products_screen")
 	var panel: Control = screen.get("industrialization_panel")
 	var go: Button = panel.call("go_button")
@@ -247,3 +275,12 @@ func _check_width(panel: Control, dimensions: Vector2i) -> bool:
 func _fail(message: String) -> void:
 	push_error(message)
 	get_tree().quit(1)
+
+func _find_button(root: Node, prefix: String) -> Button:
+	for child in root.get_children():
+		if child is Button and (child as Button).visible and str((child as Button).text).begins_with(prefix):
+			return child as Button
+		var found := _find_button(child, prefix)
+		if found != null:
+			return found
+	return null
