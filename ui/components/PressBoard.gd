@@ -400,7 +400,7 @@ class Curve2DView extends Control:
 		var right := size.x - 16.0
 		var top := 14.0
 		var bottom := size.y - 22.0
-		for level in [5.0, 7.0]:
+		for level: float in [5.0, 7.0]:
 			var y := bottom - (bottom - top) * level / 10.0
 			draw_line(Vector2(left, y), Vector2(right, y), Color(0.42, 0.34, 0.25, 0.25), 1.0)
 			draw_string(font, Vector2(2.0, y + 4.0), "%d" % int(level), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("6b5640"))
