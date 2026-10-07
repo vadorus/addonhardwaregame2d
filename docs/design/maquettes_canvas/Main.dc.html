@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>L'établi — concevoir Nova 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes te-zoom{0%{transform:scale(.72) translate(220px,120px)}100%{transform:scale(1) translate(0,0)}}
+@keyframes te-slide{0%{transform:translateX(560px);opacity:0}100%{transform:translateX(0);opacity:1}}
+@keyframes te-glow{0%,100%{box-shadow:0 0 0 0 rgba(242,165,65,.55)}50%{box-shadow:0 0 0 14px rgba(242,165,65,0)}}
+@keyframes te-float{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)}}
+@keyframes te-pop{0%{transform:scale(.82)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes te-puff{0%{transform:translate(-50%,0);opacity:0}20%{opacity:1}100%{transform:translate(-50%,-46px);opacity:0}}
+@keyframes te-glint{0%{transform:translateX(-160px) skewX(-20deg)}60%,100%{transform:translateX(220px) skewX(-20deg)}}
+@keyframes te-sway{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
+@keyframes te-bubble{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes te-flicker{0%,100%{opacity:0;transform:scale(.4)}40%{opacity:1;transform:scale(1)}70%{opacity:.2}}
+@keyframes te-bounce{0%{transform:translateY(8px)}60%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+@keyframes te-launch{0%{transform:scale(.5) rotate(-12deg);opacity:0}60%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+@keyframes te-ring{0%{transform:scale(.4);opacity:.9}100%{transform:scale(2.6);opacity:0}}
+@keyframes te-s1{to{transform:translate(170px,-40px) scale(.2);opacity:0}}
+@keyframes te-s2{to{transform:translate(120px,130px) scale(.2);opacity:0}}
+@keyframes te-s3{to{transform:translate(-20px,170px) scale(.2);opacity:0}}
+@keyframes te-s4{to{transform:translate(-150px,110px) scale(.2);opacity:0}}
+@keyframes te-s5{to{transform:translate(-170px,-50px) scale(.2);opacity:0}}
+@keyframes te-s6{to{transform:translate(-90px,-160px) scale(.2);opacity:0}}
+@keyframes te-s7{to{transform:translate(40px,-175px) scale(.2);opacity:0}}
+@keyframes te-s8{to{transform:translate(160px,-130px) scale(.2);opacity:0}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+
+<div style="position: absolute; left: 0; top: 0; width: 1280px; height: 580px; transform-origin: 40% 50%; animation: te-zoom 1.8s cubic-bezier(.2,.8,.2,1) both">
+<img src="../../../assets/art/v010/J1_decors/decor_0_garage.webp" alt="Le garage, l'établi au centre" style="position: absolute; width: 1900px; height: 950px; left: -520px; top: -260px; object-fit: cover">
+</div>
+<div style="position: absolute; left: 0; top: 0; width: 1280px; height: 580px; background: rgba(43,31,21,0.16)"></div>
+
+<div style="position: absolute; left: 408px; top: 318px; width: 10px; height: 10px; border-radius: 999px; background: #ffd27a; box-shadow: 0 0 12px 4px #ffb84a; animation: te-flicker 1.1s ease-in-out infinite"></div>
+<div style="position: absolute; left: 430px; top: 330px; width: 7px; height: 7px; border-radius: 999px; background: #ffe2a8; box-shadow: 0 0 10px 3px #ffb84a; animation: te-flicker 1.4s ease-in-out .5s infinite"></div>
+<div style="position: absolute; left: 395px; top: 336px; width: 6px; height: 6px; border-radius: 999px; background: #fff0c8; box-shadow: 0 0 8px 3px #ffb84a; animation: te-flicker .9s ease-in-out .2s infinite"></div>
+
+<img src="../../../assets/art/v010/J2_personnages/perso_03_reflexion.png" alt="Camille, ingénieure, réfléchit près de l'établi" style="position: absolute; left: 236px; top: 268px; height: 150px; width: auto; transform-origin: 50% 100%; animation: te-sway 3.2s ease-in-out infinite">
+<sc-if value="{{bubbleA}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 150px; top: 200px; max-width: 220px; padding: 8px 12px; border-radius: 14px; background: #fff8ec; font-weight: 800; font-size: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.25); transform-origin: 70% 100%; animation: te-bubble .35s ease-out">{{camille}}</div>
+</sc-if>
+<sc-if value="{{bubbleB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 150px; top: 200px; max-width: 220px; padding: 8px 12px; border-radius: 14px; background: #fff8ec; font-weight: 800; font-size: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.25); transform-origin: 70% 100%; animation: te-bubble .35s ease-out">{{camille}}</div>
+</sc-if>
+
+<div style="position: absolute; left: 380px; top: 430px; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: #fff8ec; animation: te-glow 2.4s ease-in-out infinite">
+<img src="../../../assets/art/v010/J4_icones/zone_etabli_cpu.png" alt="" style="width: 34px; height: 30px; object-fit: contain">
+<span style="font-weight: 800; font-size: 14px">L'établi</span>
+</div>
+
+<div style="position: absolute; left: 14px; top: 12px; right: 14px; height: 46px; border-radius: 14px; background: rgba(43,31,21,0.92); display: flex; align-items: center; gap: 18px; padding: 0 16px; box-sizing: border-box; color: #f6e7cf">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: .5px">TECH <span style="color: #f2a541">EMPIRE</span></div>
+<div style="font-weight: 800; font-size: 17px; color: #7be0a8">48 200 €</div>
+<div style="font-weight: 700; font-size: 15px">Mars 1978</div>
+<div style="flex: 1"></div>
+<div style="font-size: 13px; color: #dcc7a6">Le temps attend votre idée</div>
+</div>
+
+<div style="position: absolute; right: 16px; top: 72px; bottom: 16px; width: 480px; box-sizing: border-box; padding: 16px 20px; border-radius: 18px; background: #fff8ec; box-shadow: 0 18px 40px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 12px; animation: te-slide .7s .5s cubic-bezier(.2,.8,.2,1) both; overflow: hidden">
+
+<div style="display: flex; gap: 6px; align-items: center">
+<sc-for list="{{steps}}" as="st" hint-placeholder-count="4">
+<button type="button" onClick="{{st.go}}" style="height: 28px; padding: 0 11px; border-radius: 999px; border: none; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; background: {{st.bg}}; color: {{st.fg}}">{{st.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 16px; align-items: center; position: relative">
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="width: 150px; height: 108px; border-radius: 18px; background: #5a3f28; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; overflow: hidden; box-shadow: {{glow}}; animation: te-pop .45s ease-out">
+<img src="{{chipImg}}" alt="La puce" style="width: 132px; height: auto; animation: te-float 3s ease-in-out infinite">
+<div style="position: absolute; top: -20px; left: 0; width: 46px; height: 160px; background: rgba(255,255,255,.28); animation: te-glint 3.6s ease-in-out infinite"></div>
+<div style="position: absolute; left: 75px; top: 40px; font-weight: 800; font-size: 14px; color: {{puffColor}}; white-space: nowrap; animation: te-puff 1s ease-out both">{{puff}}</div>
+</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="width: 150px; height: 108px; border-radius: 18px; background: #5a3f28; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; overflow: hidden; box-shadow: {{glow}}; animation: te-pop .45s ease-out">
+<img src="{{chipImg}}" alt="La puce" style="width: 132px; height: auto; animation: te-float 3s ease-in-out infinite">
+<div style="position: absolute; top: -20px; left: 0; width: 46px; height: 160px; background: rgba(255,255,255,.28); animation: te-glint 3.6s ease-in-out infinite"></div>
+<div style="position: absolute; left: 75px; top: 40px; font-weight: 800; font-size: 14px; color: {{puffColor}}; white-space: nowrap; animation: te-puff 1s ease-out both">{{puff}}</div>
+</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 28px; line-height: 1">{{name}}</div>
+<div style="font-size: 13px; font-weight: 700; color: #6b5640">{{sub}}</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 6px">
+<span style="width: 38px; font-size: 11px; font-weight: 800; color: #6b5640">{{b.short}}</span>
+<div style="flex: 1; height: 8px; border-radius: 999px; background: #eadcc5; position: relative">
+<div style="height: 8px; border-radius: 999px; background: {{b.color}}; width: {{b.w}}; transition: width .5s cubic-bezier(.2,.8,.2,1)"></div>
+<div style="position: absolute; top: -3px; left: {{b.ref}}; width: 2px; height: 14px; background: #3b2b1e; opacity: .55"></div>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="font-size: 12px; font-weight: 800; color: {{vsColor}}">{{vs}}</div>
+</div>
+</div>
+
+<sc-if value="{{s1}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; animation: te-bounce .35s ease-out">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">Pour qui, cette puce ?</div>
+<sc-for list="{{segs}}" as="o" hint-placeholder-count="2">
+<button type="button" onClick="{{o.pick}}" style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; font-family: inherit; color: inherit; text-align: left; cursor: pointer; border: 2px solid {{o.border}}; background: {{o.bg}}">
+<span style="display: flex; flex-direction: column"><span style="font-weight: 800; font-size: 15px">{{o.label}}</span><span style="font-size: 12px; font-weight: 700; color: #6b5640">{{o.note}}</span></span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; animation: te-bounce .35s ease-out">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">Sur quelle architecture ?</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{archs}}" as="o" hint-placeholder-count="2">
+<button type="button" onClick="{{o.pick}}" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border-radius: 14px; font-family: inherit; color: inherit; cursor: pointer; border: 2px solid {{o.border}}; background: {{o.bg}}">
+<img src="{{o.img}}" alt="" style="width: 96px; height: 56px; object-fit: contain">
+<span style="font-weight: 800; font-size: 15px">{{o.label}}</span>
+<span style="font-size: 12px; font-weight: 700; color: #6b5640">{{o.note}}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{s3}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 9px; animation: te-bounce .35s ease-out">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">Où l'équipe met-elle son énergie ?</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="width: 12px; height: 12px; border-radius: 999px; background: {{row.color}}; flex-shrink: 0"></span>
+<span style="width: 100px; font-weight: 800; font-size: 14px">{{row.label}}</span>
+<div style="flex: 1; display: flex; gap: 4px">
+<sc-for list="{{row.segs}}" as="seg" hint-placeholder-count="5">
+<button type="button" aria-label="{{seg.aria}}" onClick="{{seg.pick}}" style="flex: 1; height: 24px; border: none; border-radius: 6px; cursor: pointer; background: {{seg.bg}}; transition: background .25s"></button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{noraA}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 12px; background: {{hintBg}}; animation: te-bounce .35s ease-out">
+<img src="{{noraImg}}" alt="Nora" style="width: 32px; height: 44px; object-fit: contain; flex-shrink: 0">
+<div style="font-size: 13px; font-weight: 700; line-height: 1.3">{{hint}}</div>
+</div>
+</sc-if>
+<sc-if value="{{noraB}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 12px; background: {{hintBg}}; animation: te-bounce .35s ease-out">
+<img src="{{noraImg}}" alt="Nora" style="width: 32px; height: 44px; object-fit: contain; flex-shrink: 0">
+<div style="font-size: 13px; font-weight: 700; line-height: 1.3">{{hint}}</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 8px; animation: te-bounce .35s ease-out">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">On se lance ?</div>
+<div style="font-size: 15px; font-weight: 700">{{summary}}</div>
+<div style="font-size: 14px; font-weight: 700; color: #6b5640">Toute l'équipe sur le projet · ~{{months}} mois · {{cost}} €</div>
+</div>
+</sc-if>
+
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; gap: 10px">
+<button type="button" onClick="{{back}}" style="height: 44px; padding: 0 16px; border: 1px solid #d9c6a7; border-radius: 12px; background: transparent; color: #6b5640; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">◀ Retour</button>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{next}}" style="height: 46px; padding: 0 22px; border: none; border-radius: 12px; background: #2f9e5b; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer">{{nextLabel}}</button>
+</div>
+
+<sc-if value="{{launched}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: #fff8ec; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px">
+<div style="position: relative; width: 200px; height: 140px; display: flex; align-items: center; justify-content: center">
+<div style="position: absolute; left: 70px; top: 40px; width: 60px; height: 60px; border-radius: 999px; border: 4px solid #f2a541; animation: te-ring 1.2s ease-out infinite"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #e8743b; animation: te-s1 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #3a9fd6; animation: te-s2 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #4caf6a; animation: te-s3 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #f2a541; animation: te-s4 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #e8743b; animation: te-s5 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #3a9fd6; animation: te-s6 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #4caf6a; animation: te-s7 .9s ease-out both"></div>
+<div style="position: absolute; left: 96px; top: 66px; width: 10px; height: 10px; border-radius: 999px; background: #f2a541; animation: te-s8 .9s ease-out both"></div>
+<img src="{{chipImg}}" alt="La puce" style="width: 170px; height: auto; animation: te-launch .8s cubic-bezier(.2,.8,.2,1) both">
+</div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 28px">{{name}} est lancé !</div>
+<div style="font-size: 15px; font-weight: 700; color: #6b5640">Camille réunit l'équipe autour de l'établi.</div>
+<div style="display: flex; gap: 10px">
+<a href="Atelier.dc.html" style="display: inline-flex; align-items: center; height: 46px; padding: 0 22px; border-radius: 12px; background: #2f9e5b; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; text-decoration: none">Voir l'atelier au travail ▶</a>
+<button type="button" onClick="{{restart}}" style="height: 46px; padding: 0 16px; border: 1px solid #d9c6a7; border-radius: 12px; background: transparent; color: #6b5640; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Recommencer</button>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 3, seg: 'calc', arch: '16', perf: 2, eff: 4, fia: 3, tick: 0, puff: '', puffColor: '#2f8a52', launched: false };
+  }
+  bump(patch, puff, color) {
+    this.setState({ ...patch, tick: this.state.tick + 1, puff: puff, puffColor: color || '#2f8a52' });
+  }
+  renderVals() {
+    const s = this.state;
+    const CHIP8 = '../../../assets/art/v010/J3_moments/moment_premier_cpu.webp';
+    const CHIP16 = '../../../assets/art/v010/_sources/astra_suite_puce_1993.png';
+    const NORA_OK = '../../../assets/art/v010/J2_personnages/perso_02_joie.png';
+    const NORA_HM = '../../../assets/art/v010/J2_personnages/perso_02_reflexion.png';
+    const colors = { perf: '#e8743b', eff: '#3a9fd6', fia: '#4caf6a' };
+    const labels = ['Gamme', 'Architecture', 'Dosage', 'Lancer'];
+    const steps = labels.map((l, i) => {
+      const n = i + 1;
+      const cur = n === s.step;
+      const done = n < s.step;
+      return {
+        label: (done ? '✓ ' : '') + l,
+        bg: cur ? '#f2a541' : (done ? '#e3f3e6' : '#efe2cc'),
+        fg: cur ? '#3b2b1e' : (done ? '#2f7f46' : '#8a7357'),
+        go: () => this.setState({ step: n })
+      };
+    });
+    const calc = s.seg === 'calc';
+    const a16 = s.arch === '16';
+    const segs = [
+      { key: 'calc', label: 'Suite de Nova 1 — calculatrices', note: 'Nos clients actuels. Sûr.' },
+      { key: 'home', label: 'Nouvelle gamme — ordinateurs familiaux', note: 'Un marché qui naît. Risqué, énorme.' }
+    ].map((o) => ({
+      ...o,
+      border: s.seg === o.key ? '#f2a541' : '#e6d6bd',
+      bg: s.seg === o.key ? '#fff3dd' : 'transparent',
+      pick: () => this.bump({ seg: o.key }, o.key === 'calc' ? 'Calculatrices !' : 'Nouveau marché !', '#b07a18')
+    }));
+    const archs = [
+      { key: '8', img: CHIP8, label: '8 bits', note: 'Éprouvée · sûre' },
+      { key: '16', img: CHIP16, label: '16 bits', note: 'Toute neuve · 1978' }
+    ].map((o) => ({
+      ...o,
+      border: s.arch === o.key ? '#f2a541' : '#e6d6bd',
+      bg: s.arch === o.key ? '#fff3dd' : 'transparent',
+      pick: () => this.bump({ arch: o.key }, o.label + ' !', '#b07a18')
+    }));
+    const defs = [
+      { key: 'perf', label: 'Performance' },
+      { key: 'eff', label: 'Efficacité' },
+      { key: 'fia', label: 'Fiabilité' }
+    ];
+    const rows = defs.map((d) => ({
+      label: d.label,
+      color: colors[d.key],
+      segs: [1, 2, 3, 4, 5].map((n) => ({
+        bg: n <= s[d.key] ? colors[d.key] : '#eadcc5',
+        aria: d.label + ' niveau ' + n,
+        pick: () => this.bump({ [d.key]: n }, (n >= s[d.key] ? '+ ' : '− ') + d.label, colors[d.key])
+      }))
+    }));
+    const perfV = Math.min(96, 18 + s.perf * 11 + (a16 ? 12 : 0));
+    const effV = Math.min(96, 20 + s.eff * 11);
+    const fiaV = Math.min(96, 24 + s.fia * 11 - (a16 ? 8 : 0));
+    const ref = { perf: 42, eff: 48, fia: 55 };
+    const bars = [
+      { short: 'Perf', color: colors.perf, w: perfV + '%', ref: ref.perf + '%' },
+      { short: 'Effic', color: colors.eff, w: effV + '%', ref: ref.eff + '%' },
+      { short: 'Fiab', color: colors.fia, w: fiaV + '%', ref: ref.fia + '%' }
+    ];
+    const gain = Math.round(((perfV + effV + fiaV) / (ref.perf + ref.eff + ref.fia) - 1) * 100);
+    const top = s.perf >= s.eff && s.perf >= s.fia ? 'perf' : (s.eff >= s.fia ? 'eff' : 'fia');
+    const good = calc ? (s.eff >= s.perf && s.fia >= s.perf) : (s.perf >= s.eff && s.perf >= s.fia);
+    const total = s.perf + s.eff + s.fia;
+    const months = 3 + Math.round(total / 3) + (a16 ? 2 : 0);
+    const name = calc ? 'Nova 2' : 'Foyer 1';
+    const bubbles = [
+      '',
+      'Une suite sûre… ou un pari ?',
+      a16 ? '16 bits ? On n’a jamais fait ça !' : '8 bits, on connaît par cœur.',
+      good ? 'Ça, c’est un bon dosage.' : 'Hmm… tu es sûr du dosage ?',
+      'Tout le monde est prêt !'
+    ];
+    const even = s.tick % 2 === 0;
+    return {
+      steps, segs, archs, rows, bars, name,
+      s1: s.step === 1, s2: s.step === 2, s3: s.step === 3, s4: s.step === 4,
+      sub: (calc ? 'Calculatrices' : 'Ordinateurs familiaux') + ' · ' + (a16 ? '16 bits · 8 µm · 2 MHz' : '8 bits · 10 µm · 1 MHz'),
+      chipImg: a16 ? CHIP16 : CHIP8,
+      glow: '0 0 34px 6px ' + colors[top] + '99',
+      popA: even, popB: !even, puff: s.puff, puffColor: s.puffColor,
+      noraA: even, noraB: !even,
+      bubbleA: even, bubbleB: !even,
+      camille: bubbles[s.step],
+      vs: (gain >= 0 ? '+' : '') + gain + ' % contre Nova 1 (trait noir)',
+      vsColor: gain >= 0 ? '#2f8a52' : '#b5352d',
+      noraImg: good ? NORA_OK : NORA_HM,
+      hint: good ? (calc ? 'Parfait : les calculatrices aiment l’efficacité et la fiabilité.' : 'Bien vu : les familles veulent de la vitesse.') : (calc ? 'Nos clients de calculatrices ne demandent pas de vitesse…' : 'Un ordinateur familial, ça doit aller vite !'),
+      hintBg: good ? '#e3f3e6' : '#fbe9d2',
+      summary: name + ' · ' + (a16 ? '16 bits' : '8 bits') + ' · dosé ' + (top === 'perf' ? 'vitesse' : (top === 'eff' ? 'efficacité' : 'fiabilité')),
+      months, cost: (total * 1000 + (a16 ? 6000 : 0)).toLocaleString('fr-FR'),
+      nextLabel: s.step < 4 ? 'Suivant ▶' : 'Lancer le développement',
+      next: () => { if (s.step < 4) { this.bump({ step: s.step + 1 }, '', '#2f8a52'); } else { this.setState({ launched: true }); } },
+      back: () => { if (s.step > 1) this.bump({ step: s.step - 1 }, '', '#2f8a52'); },
+      launched: s.launched,
+      restart: () => this.setState({ launched: false, step: 1, tick: s.tick + 1, puff: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>

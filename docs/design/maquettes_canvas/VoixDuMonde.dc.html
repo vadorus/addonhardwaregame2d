@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>La voix du monde — Nova 2, premier mois</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;family=Libre+Baskerville:ital,wght@0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes vm-rise{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes vm-pop{0%{transform:scale(.9)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+<img src="../../../assets/art/v010/J1_decors/decor_0_garage.webp" alt="Le garage" style="position: absolute; width: 1900px; height: 950px; left: -500px; top: -260px; object-fit: cover; filter: blur(4px) brightness(.45)">
+
+<div style="position: absolute; left: 24px; top: 16px; right: 24px; display: flex; align-items: flex-end; gap: 16px; color: #fff8ec">
+<div style="display: flex; flex-direction: column">
+<span style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #f2a541">LA VOIX DU MONDE</span>
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 28px">Nova 2 — premier mois en vente</span>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+<button type="button" onClick="{{t.pick}}" style="height: 34px; padding: 0 14px; border-radius: 999px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: {{t.bg}}; color: {{t.fg}}">{{t.label}}</button>
+</sc-for>
+</div>
+</div>
+
+<div style="position: absolute; left: 24px; top: 86px; width: 400px; bottom: 18px; box-sizing: border-box; padding: 16px 18px; border-radius: 18px; background: #fff8ec; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 14px 30px rgba(0,0,0,.35)">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">Espéré, obtenu</div>
+<sc-for list="{{gaps}}" as="g" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800"><span>{{g.label}}</span><span style="color: {{g.color}}">{{g.result}}</span></div>
+<div style="position: relative; height: 12px; border-radius: 999px; background: #eadcc5">
+<div style="height: 12px; border-radius: 999px; width: {{g.got}}; background: {{g.color}}; transition: width .6s cubic-bezier(.2,.8,.2,1)"></div>
+<div style="position: absolute; top: -4px; left: {{g.hoped}}; width: 3px; height: 20px; border-radius: 2px; background: #3b2b1e"></div>
+</div>
+<div style="font-size: 12px; font-weight: 700; color: #8a7357">{{g.note}}</div>
+</div>
+</sc-for>
+<div style="height: 1px; background: #eadcc5"></div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px">Vaut-il son prix ?</div>
+<div style="position: relative; height: 26px; border-radius: 999px; background: linear-gradient(90deg, #d9534f, #f2a541 45%, #4caf6a)">
+<div style="position: absolute; top: -6px; left: {{valuePos}}; width: 6px; height: 38px; border-radius: 3px; background: #3b2b1e; box-shadow: 0 0 0 3px #fff8ec; transition: left .6s cubic-bezier(.2,.8,.2,1)"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: #8a7357"><span>Trop cher</span><span>Juste</span><span>Bonne affaire</span></div>
+<div style="font-size: 14px; font-weight: 800">{{valueText}}</div>
+<div style="flex: 1"></div>
+<div style="display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: {{noraBg}}">
+<img src="{{noraImg}}" alt="Nora" style="width: 30px; height: 42px; object-fit: contain; flex-shrink: 0">
+<div style="font-size: 13px; font-weight: 700; line-height: 1.3">{{noraText}}</div>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{lower}}" style="flex: 1; height: 42px; border: none; border-radius: 12px; background: {{lowerBg}}; color: #ffffff; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">{{lowerLabel}}</button>
+<button type="button" onClick="{{keep}}" style="flex: 1; height: 42px; border: 1px solid #d9c6a7; border-radius: 12px; background: transparent; color: #6b5640; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Garder 18 €</button>
+</div>
+</div>
+
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 444px; top: 86px; right: 24px; bottom: 18px; display: flex; flex-direction: column; gap: 12px; animation: vm-rise .35s ease-out">
+<div style="color: #fff8ec; font-size: 15px; font-weight: 800">{{voiceIntro}}</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{cards}}" as="c" hint-placeholder-count="4">
+<div style="padding: 12px 14px; border-radius: 14px; background: #fbf3e2; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 10px 22px rgba(0,0,0,.3)">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="width: 38px; height: 38px; border-radius: 999px; background: {{c.color}}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px; flex-shrink: 0">{{c.badge}}</div>
+<div style="display: flex; flex-direction: column"><span style="font-weight: 800; font-size: 14px">{{c.who}}</span><span style="font-size: 12px; font-weight: 700; color: #8a7357">{{c.meta}}</span></div>
+</div>
+<div style="font-family: 'Libre Baskerville', serif; font-style: italic; font-size: 14px; line-height: 1.35">« {{c.quote}} »</div>
+<div style="font-size: 12px; font-weight: 800; color: {{c.effectColor}}">{{c.effect}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 444px; top: 86px; right: 24px; bottom: 18px; display: flex; flex-direction: column; gap: 12px; animation: vm-rise .35s ease-out">
+<div style="color: #fff8ec; font-size: 15px; font-weight: 800">{{voiceIntro}}</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{cards}}" as="c" hint-placeholder-count="4">
+<div style="padding: 12px 14px; border-radius: 14px; background: #fbf3e2; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 10px 22px rgba(0,0,0,.3)">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="width: 38px; height: 38px; border-radius: 999px; background: {{c.color}}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px; flex-shrink: 0">{{c.badge}}</div>
+<div style="display: flex; flex-direction: column"><span style="font-weight: 800; font-size: 14px">{{c.who}}</span><span style="font-size: 12px; font-weight: 700; color: #8a7357">{{c.meta}}</span></div>
+</div>
+<div style="font-family: 'Libre Baskerville', serif; font-style: italic; font-size: 14px; line-height: 1.35">« {{c.quote}} »</div>
+<div style="font-size: 12px; font-weight: 800; color: {{c.effectColor}}">{{c.effect}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'public', lowered: false, tick: 0 };
+  }
+  renderVals() {
+    const s = this.state;
+    const NORA_OK = '../../../assets/art/v010/J2_personnages/perso_02_joie.png';
+    const NORA_HM = '../../../assets/art/v010/J2_personnages/perso_02_reflexion.png';
+    const low = s.lowered;
+    const VOICES = {
+      public: { label: 'Le public', intro: 'Les clients parlent : ce qu’ils disent fait vendre (ou pas).', cards: [
+        { badge: '★3', color: '#c98a2b', who: 'Atelier Bréval', meta: 'fabricant de calculatrices', quote: 'Il chauffe un peu dans nos boîtiers, mais il ne plante jamais.', effect: 'Fiabilité appréciée', effectColor: '#2f7f46' },
+        { badge: low ? '★4' : '★2', color: low ? '#2f8a52' : '#b5352d', who: 'Comptoir Électronique', meta: 'revendeur', quote: low ? 'À 16 €, mes clients le prennent sans hésiter.' : 'À 18 €, mes clients préfèrent l’Helix : c’est 3 € de moins.', effect: low ? 'Prix accepté' : 'Prix jugé trop haut', effectColor: low ? '#2f7f46' : '#b5352d' },
+        { badge: '★5', color: '#2f8a52', who: 'Club Micro de Lille', meta: 'passionnés', quote: 'Enfin une petite marque qui répond quand on écrit !', effect: 'Image de marque +', effectColor: '#2f7f46' },
+        { badge: '★3', color: '#c98a2b', who: 'M. Duval', meta: 'ingénieur', quote: 'Solide, sans plus. J’attends la vraie nouveauté de Nova 3.', effect: 'Attente pour la suite', effectColor: '#b07a18' }
+      ] },
+      rivals: { label: 'Les concurrents', intro: 'Les rivaux ont vu Nova 2 arriver. Ils réagissent.', cards: [
+        { badge: 'H', color: '#7a4ab5', who: 'Helix Global', meta: 'Helix G7 · le leader', quote: 'Baisse son prix de 18 € à 15 € dès la sortie de Nova 2.', effect: 'Pression sur vos ventes', effectColor: '#b5352d' },
+        { badge: 'A', color: '#3a7f9f', who: 'Aster Systems', meta: 'Aster G1 · bas de gamme', quote: 'Prépare une version « économie » pour l’an prochain.', effect: 'À surveiller', effectColor: '#b07a18' },
+        { badge: 'Q', color: '#8a8a3a', who: 'Quantum Works', meta: 'Quantum Q2', quote: 'Ne réagit pas : vise les ordinateurs familiaux.', effect: 'Pas de menace immédiate', effectColor: '#2f7f46' },
+        { badge: '€', color: '#6b5640', who: 'Prix du marché', meta: 'calculatrices', quote: 'Prix moyen constaté : 16 € · le haut de gamme se vend 22 €.', effect: 'Votre prix : 18 €', effectColor: '#b07a18' }
+      ] },
+      pros: { label: 'Les pros', intro: 'Les laboratoires passent la puce au banc d’essai.', cards: [
+        { badge: '1', color: '#c9a24a', who: 'Helix G7', meta: 'Circuit Lab · banc', quote: 'Toujours le plus rapide en calcul pur.', effect: '1er sur 4', effectColor: '#3b2b1e' },
+        { badge: '2', color: '#2f8a52', who: 'Nova 2', meta: 'Circuit Lab · banc', quote: 'Le plus sobre du lot, et de loin le plus stable.', effect: '2e sur 4 — gagne 1 place', effectColor: '#2f7f46' },
+        { badge: '3', color: '#9a8a70', who: 'Quantum Q2', meta: 'Circuit Lab · banc', quote: 'Rapide mais capricieux en charge.', effect: '3e sur 4', effectColor: '#3b2b1e' },
+        { badge: '4', color: '#9a8a70', who: 'Aster G1', meta: 'Circuit Lab · banc', quote: 'Bon marché, mais il montre son âge.', effect: '4e sur 4', effectColor: '#3b2b1e' }
+      ] },
+      press: { label: 'La presse', intro: 'Ce qu’ont écrit les journaux le jour J.', cards: [
+        { badge: '7', color: '#2f8a52', who: 'Systems & Industry Review', meta: 'presse spécialisée', quote: 'Sobre, solide, sans éclat.', effect: 'Fiabilité saluée', effectColor: '#2f7f46' },
+        { badge: '6', color: '#c98a2b', who: 'Circuit Lab', meta: 'laboratoire', quote: 'Il chauffe moins. Il ne va pas plus vite.', effect: 'Vitesse en retrait', effectColor: '#b5352d' },
+        { badge: '8', color: '#2f8a52', who: 'Le Micro Hebdo', meta: 'presse grand public', quote: 'La calculatrice de l’année ?', effect: 'Prix bien placé', effectColor: '#2f7f46' },
+        { badge: '7', color: '#3b2b1e', who: 'Moyenne', meta: 'record de la marque', quote: 'Mieux que Nova 1 (6,5), mais Helix reste devant.', effect: 'Nouveau record', effectColor: '#2f7f46' }
+      ] }
+    };
+    const tabs = ['public', 'rivals', 'pros', 'press'].map((k) => ({
+      label: VOICES[k].label, bg: s.tab === k ? '#f2a541' : 'rgba(255,248,236,.85)', fg: '#3b2b1e',
+      pick: () => this.setState({ tab: k, tick: s.tick + 1 })
+    }));
+    const gaps = [
+      { label: 'Ventes du mois', hoped: '60%', got: low ? '62%' : '43%', color: low ? '#4caf6a' : '#e8743b', result: low ? '1 240 / 1 200 espérées' : '860 / 1 200 espérées', note: low ? 'Au-dessus de l’objectif depuis la baisse de prix.' : 'Le prix freine : les revendeurs préfèrent l’Helix.' },
+      { label: 'Part de marché', hoped: '50%', got: low ? '48%' : '36%', color: low ? '#4caf6a' : '#e8743b', result: low ? '4,8 % / 5 % visés' : '3,6 % / 5 % visés', note: 'Calculatrices et contrôle numérique.' },
+      { label: 'Note de la presse', hoped: '60%', got: '70%', color: '#4caf6a', result: '7/10 / 6 espéré', note: 'Mieux que prévu : la fiabilité a payé.' }
+    ];
+    const even = s.tick % 2 === 0;
+    return {
+      tabs, gaps,
+      voiceIntro: VOICES[s.tab].intro,
+      cards: VOICES[s.tab].cards,
+      popA: even, popB: !even,
+      valuePos: low ? '58%' : '30%',
+      valueText: low ? 'Le public estime Nova 2 à 16 € : vendu 16 €, c’est juste.' : 'Le public estime Nova 2 à 15 € : à 18 €, il le trouve un peu cher.',
+      noraImg: low ? NORA_OK : NORA_HM,
+      noraBg: low ? '#e3f3e6' : '#fbe9d2',
+      noraText: low ? 'Bien joué : les revendeurs suivent. On perd 2 € par puce, mais on en vend 380 de plus.' : 'Helix vient de passer à 15 €. À 16 €, on reste plus cher mais plus fiable : je pense que ça passe.',
+      lowerLabel: low ? 'Prix : 16 € ✓' : 'Baisser à 16 €',
+      lowerBg: low ? '#8fbf9f' : '#2f9e5b',
+      lower: () => this.setState({ lowered: true, tick: s.tick + 1 }),
+      keep: () => this.setState({ lowered: false, tick: s.tick + 1 })
+    };
+  }
+}
+</script>
+</body>
+</html>

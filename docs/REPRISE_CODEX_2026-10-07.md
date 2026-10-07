@@ -1,0 +1,264 @@
+# Reprise pour Codex — 07/10/2026 au soir
+
+Ce document permet de reprendre le travail de Claude sur la branche `v013/demo-octobre`, là où il s'est arrêté.
+Lis-le après `AGENTS.md`, qui reste la règle prioritaire.
+
+Objectif du mois : **la démo pour testeurs fermés, fin octobre**. Seule la branche **CPU** est concernée.
+
+---
+
+## 1. Démarrer
+
+```bash
+git fetch origin && git checkout v013/demo-octobre && git pull
+godot --headless --path . --import
+godot --headless --path . --quit-after 2
+godot --headless --path . res://tests/smoke_test.tscn    # doit finir par « [CI] Smoke test passed »
+```
+
+**Dernier commit de code avant ce document :** `252b3bf` (Équipe).
+
+Ce commit ajoute aussi les maquettes dans `docs/design/maquettes_canvas/` ; elles sont décrites au §4.
+
+### Outils de vérification utiles
+
+**Capture rendue des onglets.** Sous Linux, il faut un écran virtuel. Sous Windows, la même commande fonctionne sans `xvfb-run`.
+
+```bash
+xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3 \
+  res://tests/tools/feel_capture.tscn -- --moment=onglets --months=84
+```
+
+- Sans `--save`, l'outil joue une partie automatiquement pendant N mois, puis capture chaque onglet et chaque sous-page.
+- `--save=<chemin>` capture une sauvegarde réelle à la place.
+- Les captures arrivent dans le dossier utilisateur de test (le chemin est affiché en sortie).
+
+**Sonde économique sur 30 ans** (argent, gravure atteinte, architectures, meilleur rival) :
+
+```bash
+godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
+```
+
+- `--tech` ne lance que le profil DEFAUT.
+- Valeurs de référence pour un bot passif : 8 µm en 1974, 6 µm en 1979, 3 µm en 1985.
+
+---
+
+## 2. Ce qui a été fait le 07/10
+
+| Commit | Sujet |
+|---|---|
+| `82d77c9` | **Musiques de saison** : Halloween et fêtes de fin d'année. 3 morceaux CC0 chacun plus une boucle de menu, intercalés avec la musique de la décennie. |
+| `cecb41a`, `3beb405`, `dd3bb09` | Outil de capture des onglets (`feel_capture.gd`, moment `onglets`) sur une vraie partie. |
+| `acf9c77` | **Noms du personnel** : plus aucun candidat « Nora » (elle est l'assistante), pas de doublons, chercheurs spécialisés CPU. |
+| `eb402c1`, `f255107` | Sonde : progrès technologique par année et frontière des rivaux. |
+| `5846322` | **Diffusion du savoir** : sans recherche, la gravure suit l'état de l'art avec du retard. Auparavant, le joueur restait bloqué à 10 µm pendant 16 ans. |
+| `4a0f665`, `c6883fd` | **Labo** refait d'après la planche 5. |
+| `c69bad3`, `5b77e93` | Fichiers `.uid`. |
+| `ac70db7`, `5b77e93`, `dd3bb09` | **Presse** dans l'esprit du « Jour J » : salle de presse avec Nora, courbe des notes, une pile de coupures par CPU. |
+| `252b3bf` | **Équipe** : scène où Nora fait le point, visage sur chaque fiche, en-tête de scène commun (`SceneHeader`). |
+
+### Nouvelles API à connaître
+
+**`ui/components/SceneHeader.gd`** : la règle commune décidée lors de la revue des onglets.
+
+- Chaque onglet s'ouvre sur une scène : un décor voilé, un personnage qui dit une phrase, et à droite le chiffre du moment avec un bouton.
+- API :
+  - `set_scene(art, kicker)`, `set_speaker(portrait)`, `set_line(text)`
+  - `set_hero(value, caption, button_text, color)`
+  - signal `hero_pressed`
+  - `line_text()`, `hero_button_text()` pour les tests
+- Pour l'instant, seul **Équipe** (`PersonnelScreen`) l'utilise.
+
+**`ui/components/LabBoard.gd`** : planche 5, hébergé dans `LabScreen`, page « Le labo ».
+
+- Scène avec Camille et un panneau héros.
+- Frise « Nos architectures » : les 3 dernières possédées, la suivante avec un anneau de progression, puis une carte en pointillés.
+- 3 équipes de recherche avec visages.
+- Colonne latérale : gravure et carnet des trouvailles.
+- Communique par `signal board_action(action: Dictionary)`. Types d'action : `OPEN_STEPPER`, `SHOW_PROJECTS`, `SHOW_RESEARCH`, `OPEN_COCKPIT`, `PROJECT_DECISION`, `CONCEPT`, `MESSAGE`. `LabScreen._on_board_action` les traite.
+- `OPEN_COCKPIT` remonte jusqu'à `main.gd` (`_on_lab_action` → `_open_project_cockpit`).
+
+**`ui/components/PressBoard.gd`** : hébergé dans `MediaScreen`, page « Tests de vos CPU ».
+
+- `static products_with_reviews(news)` regroupe les critiques par produit : les plus récents d'abord, la meilleure critique d'abord.
+- Classe interne `Curve2DView` : courbe des notes sur une échelle resserrée.
+
+**`ui/WorkplaceArt.gd`** : les visages.
+
+- `CAST` fixe les personnages nommés : Camille Durand = 2, Samira Lefèvre = 7, Noah Leroy = 8. Nora utilise le look 4 (`NORA_LOOK`).
+- `cast_look(name)`.
+- `assign_looks(staff) -> {id: look}` : le casting d'abord, puis un hachage stable sans doublon.
+- `face_avatar(look, diameter, ring_color)` : médaillon circulaire découpé dans la pose « joie ».
+
+**`scripts/ResearchManager.gd`** : `_process_knowledge_diffusion()`, appelé chaque mois.
+
+- Concerne MINIATURIZATION, LAYOUT et ARCHITECTURE.
+- Un plancher à 80 % de la frontière de l'industrie, rattrapé à 5 % par mois.
+- Tire aussi la gravure (`technologies.manufacturing`) et publie la nouvelle « La gravure … est à notre portée ».
+
+**`scripts/SoundManager.gd`** : `music_key(base, theme)` renvoie `"menu+HALLOWEEN"` et `music_tracks()` intercale les morceaux.
+
+- Si un fichier manque, le jeu retombe sur la musique de la décennie.
+- Script de construction des pistes : `tools/audio/build_seasonal.py`. Crédits : `assets/audio/CREDITS.md`.
+
+**`scripts/PersonnelManager.gd`** : `_unique_candidate_name()`.
+
+- Migration dans `load_state` : `_rename_assistant_namesakes()` renomme les « Nora X » des anciennes sauvegardes.
+
+### Nouveaux tests, branchés dans `smoke_test.gd`
+
+- `StaffNamesScenario`
+- `KnowledgeDiffusionScenario`
+- `LabBoardScenario`
+- `PressBoardScenario`
+- `LiveThemeScenario`, adapté à la musique de saison
+
+> ⚠️ Un scénario qui rencontre une **erreur d'exécution** GDScript s'interrompt et renvoie `""`, ce qui est lu comme un succès.
+> Après chaque modification, lis aussi la sortie du smoke test (`SCRIPT ERROR`), pas seulement la dernière ligne.
+
+---
+
+## 3. Où en est la revue des onglets
+
+**Décision d'Alexandre (07/10, 17 h 05).** Les planches de maquettes du midi sont plus proches de la cible que les onglets actuels. Il faut **refaire les onglets d'après les planches**, pas les retoucher par petits bouts.
+
+| Onglet | État | Planche |
+|---|---|---|
+| Labo | ✅ refait. Validé sur le Pixel par Alexandre. | 5 |
+| Presse | ✅ refait. Pas encore vu sur le Pixel : l'APK du Pixel date d'avant. | 3 |
+| Équipe | ✅ refait. Pas encore vu sur le Pixel. **Capture rendue jamais faite.** | (règle commune) |
+| Produits | ❌ à refaire | 4 Fabrication, 6 Finition |
+| Marché | ❌ à refaire | 8 Voix du monde |
+| Entreprise | ❌ à refaire | 7 Carte des branches |
+| Tableau de bord / atelier | déjà proche des planches 1 et 2 | 1, 2 |
+
+---
+
+## 4. Les maquettes (`docs/design/maquettes_canvas/`)
+
+- Il y a 8 planches de 1280×580, en HTML avec des gabarits `{{…}}`. La disposition est dans `canvas.json`.
+- Elles s'ouvrent dans un navigateur.
+- Les images pointent vers `../../../assets/...`.
+- La plupart des correspondances sont exactes : portraits `perso_0X_*` et icônes `J4_icones/zone_*`.
+- Cinq images ont été **devinées** :
+  - le garage (`decor_0_garage`)
+  - `moment_presse`
+  - la puce `_sources/astra_suite_puce_1993.png`
+  - `trophee_or`
+  - `moment_premier_cpu`
+
+| # | Fichier | Contenu attendu en jeu |
+|---|---|---|
+| 1 | `Main.dc.html` | **L'établi : concevoir.** Camille propose, le joueur choisit les pièces de la puce sur l'établi. |
+| 2 | `Atelier.dc.html` | **L'atelier vit : développer.** Le garage s'anime pendant le projet et l'équipe est visible à son poste. |
+| 3 | `JourJ.dc.html` | **Le jour J : la presse.** La révélation des notes. Il a servi de modèle à l'onglet Presse. |
+| 4 | `Production.dc.html` | **La fabrication.** « Le prototype est validé : place à l'usine ». Voir le détail ci-dessous. |
+| 5 | `Recherche.dc.html` | **Le labo.** Fait (`LabBoard`). |
+| 6 | `Finition.dc.html` | **La finition : le design du CPU.** Voir le détail ci-dessous. |
+| 7 | `Branches.dc.html` | **La carte de l'entreprise.** « Le tronc, c'est le CPU. Les branches poussent avec les époques. » Voir le détail ci-dessous. |
+| 8 | `VoixDuMonde.dc.html` | **La voix du monde : après la sortie.** Voir le détail ci-dessous. |
+
+**Planche 4, La fabrication** :
+
+- Le stock.
+- Le nouveau CPU face au marché : l'ancien modèle, le rival, des écarts chiffrés et un verdict.
+- « Qui grave nos puces ? » : le choix du fondeur.
+- Les puces bonnes par plaquette (rendement).
+- La répartition des trois versions E / standard / X, en % et en prix.
+- Le bouton « Lancer la fabrication ».
+
+**Planche 6, La finition** :
+
+- Le boîtier, avec son nom, son numéro et le matériau.
+- « La puce au microscope ».
+- « Les trois pistes de Camille ».
+- Les retouches : couleur, nom de gamme, numéro, logo gravé, dessin caché.
+- Le bouton « Valider la finition », puis le passage au jour J.
+
+**Planche 7, La carte de l'entreprise** :
+
+- Des nœuds à toucher, avec trois statuts : « Jouable », « Version complète » et « Extension à venir ».
+- C'est ici que se brancheront les futurs DLC payants (voir le §6).
+
+**Planche 8, La voix du monde** :
+
+- « Espéré, obtenu » : les objectifs comparés aux résultats.
+- Une jauge **« Vaut-il son prix ? »** : Trop cher / Juste / Bonne affaire, avec le conseil de Nora et une baisse de prix proposée.
+- Des citations de clients avec leur effet.
+
+---
+
+## 5. Prochaines tâches, dans l'ordre
+
+Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert, et une capture rendue relue.
+
+1. **Valider Équipe en capture.**
+   - Lancer `feel_capture --moment=onglets`.
+   - Vérifier que la scène tient en 1280×720 et en portrait téléphone, que les visages sont distincts et que la phrase de Nora correspond au diagnostic.
+2. **Produits → planches 4 et 6.**
+   - Créer un `ProductionBoard` sur le modèle de `LabBoard` / `PressBoard`, en réutilisant `IndustrializationPanel`, `SalesPortfolio` et `ProductLifecyclePanel` plutôt que de les dupliquer.
+   - Critère : depuis un prototype validé, le joueur choisit le fondeur et la répartition E / standard / X, voit le coût total et lance la fabrication sur un seul écran.
+3. **Marché → planche 8.**
+   - Jauge « vaut ce qu'il coûte », calculée à partir du prix comparé à la performance et aux rivaux.
+   - Bouton de baisse de prix qui modifie réellement le prix.
+   - Test : la jauge change de zone quand le prix change.
+4. **Entreprise.**
+   - Une version « garage » simplifiée au début, puis la carte des branches de la planche 7.
+   - Seul le CPU est jouable. Les autres nœuds sont marqués « Extension à venir », **sans aucun gameplay GPU ni mobile** (`AGENTS.md`).
+5. **Passer Labo et Presse sur `SceneHeader`**, pour unifier le code. Leurs scènes sont aujourd'hui codées à la main dans chaque board.
+6. **Noms de projets uniques.**
+   - Deux « Nova 1 » ont été observés dans une même partie.
+   - Il faut une numérotation automatique et une migration des sauvegardes existantes.
+7. **Lien vers la politique de confidentialité dans le jeu** (menu ou options). Google l'exige.
+8. **Élasticité des prix** : la demande doit réagir au prix de façon lisible. Ce point est lié à la tâche 3.
+9. **Plateformes / sockets / refresh** : une gamme qui vieillit et un rafraîchissement de gamme. À cadrer avec Alexandre avant de coder.
+
+---
+
+## 6. Google Play — où on en est
+
+- **Compte** : développeur 5596457224700637014, application 4973288943456373927, package `com.vadorus.techempire`.
+- **Déclarations** : les 10 déclarations « Contenu de l'appli » sont enregistrées.
+  - Classification : PEGI 3, avec une référence rare à l'alcool, pour le champagne du décor du Nouvel An.
+  - Public visé : 13 ans et plus.
+- **Fiche Play Store** : la fiche fr-FR est complète.
+- **Examen** : **rien n'a été envoyé**.
+- **Reste à faire** :
+  1. Publier une version sur le test fermé (piste Alpha), avec l'AAB signé par la clé d'importation. Voir `docs/PUBLICATION_PLAY_STORE.md`.
+  2. Créer une liste de testeurs.
+  3. Garder au moins **12 testeurs pendant 14 jours d'affilée**.
+  4. Demander l'accès à la production.
+- **DLC payants prévus plus tard.** Le jour où ils arrivent, il faudra mettre à jour, dans la Play Console :
+  - « Informations de connexion » ;
+  - « Classification » (achats intégrés) ;
+  - « Sécurité des données ».
+- **Bandeau « vérification des développeurs Android »** : faible priorité, noté seulement.
+- **Ne jamais faire** :
+  - envoyer pour examen ou accepter des conditions sans l'accord d'Alexandre ;
+  - versionner la clé ou son mot de passe.
+
+---
+
+## 7. Pixel d'Alexandre : précautions
+
+- L'APK installé à côté du Play Store est signé avec la **clé de debug du PC du travail**.
+- Installer la version Play Store par-dessus provoque un conflit de signature. Il faudrait alors désinstaller, et **la sauvegarde serait perdue**. Il faut la sauvegarder avant.
+- **Sauvegarde** : script `Documents\_TechEmpire_signature\install_pixel.ps1` sur le PC du travail. Il sauvegarde, exporte, puis exécute `adb install -r`.
+  - Lire la sauvegarde **uniquement** avec `cmd /c "adb exec-out run-as com.vadorus.techempire cat ... > fichier"`.
+  - Une redirection PowerShell corrompt l'encodage. `repair_save.ps1` répare ce type de dégât.
+- **Restauration** : `adb push` vers `/data/local/tmp`, puis `run-as ... cp`.
+- Ne jamais installer pendant qu'Alexandre joue.
+- Prévenir avant d'ouvrir une fenêtre Godot sur ses PC.
+- Ne pas toucher aux autres worktrees, par exemple `TechEmpire-cpu-experience-20261007`.
+- L'APK actuel du Pixel ne contient pas encore Presse ni Équipe. Il faudra le reconstruire au prochain branchement.
+
+---
+
+## 8. Points ouverts, à vérifier par un humain
+
+- La sauvegarde d'Alexandre (environ 16 M€) date d'**avant** la correction de l'économie. Ses chiffres ne reflètent donc pas l'équilibrage actuel.
+- Les cinq images devinées dans les maquettes : à confirmer visuellement.
+- Musiques de saison : écoute faite à la construction des pistes seulement, pas en jeu sur le téléphone.
+- Équipe et Presse : vérifiées par les tests et par une capture (Presse uniquement), pas encore sur le Pixel.
+- Le plan directeur (Claude Docs, onglet « Revue des onglets — 07/10 ») contient la checklist de la revue. Il doit être mis à jour à mesure que les onglets avancent.

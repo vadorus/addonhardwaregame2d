@@ -1,0 +1,108 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Atelier.dc.html": {
+      "h": 580,
+      "radius": 18,
+      "title": "2 · L'atelier vit — développer",
+      "w": 1280,
+      "x": 1360,
+      "y": 0,
+      "is_interactive": true
+    },
+    "JourJ.dc.html": {
+      "h": 580,
+      "is_interactive": true,
+      "radius": 18,
+      "title": "3 · Le jour J — la presse",
+      "w": 1280,
+      "x": 0,
+      "y": 700
+    },
+    "Main.dc.html": {
+      "h": 580,
+      "is_interactive": true,
+      "radius": 18,
+      "title": "1 · L'établi — concevoir",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "Production.dc.html": {
+      "h": 580,
+      "radius": 18,
+      "title": "4 · La fabrication — produire",
+      "w": 1280,
+      "x": 1360,
+      "y": 700,
+      "is_interactive": true
+    },
+    "Finition.dc.html": {
+      "x": 1360,
+      "y": 1400,
+      "w": 1280,
+      "h": 580,
+      "title": "6 · La finition — le design du CPU",
+      "is_interactive": true,
+      "radius": 18
+    },
+    "Branches.dc.html": {
+      "x": 0,
+      "y": 2220,
+      "w": 1280,
+      "h": 580,
+      "title": "7 · La carte de l'entreprise — les branches",
+      "is_interactive": true,
+      "radius": 18
+    },
+    "VoixDuMonde.dc.html": {
+      "x": 1360,
+      "y": 2220,
+      "w": 1280,
+      "h": 580,
+      "title": "8 · La voix du monde — après la sortie",
+      "is_interactive": true,
+      "radius": 18
+    },
+    "Recherche.dc.html": {
+      "x": 0,
+      "y": 1400,
+      "w": 1280,
+      "h": 720,
+      "title": "5 · Le labo — équipes et architectures",
+      "is_interactive": true,
+      "radius": 18
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-07T09:25:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "titre": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Tech Empire — l'esprit visé, époque du garage (démo)",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Atelier.dc.html",
+    "JourJ.dc.html",
+    "Production.dc.html",
+    "Recherche.dc.html",
+    "Finition.dc.html",
+    "Branches.dc.html",
+    "VoixDuMonde.dc.html"
+  ],
+  "pages": [],
+  "title": "Tech Empire — maquettes du ressenti"
+}

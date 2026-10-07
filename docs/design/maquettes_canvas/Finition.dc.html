@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>La finition — le design de Nova 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;family=Space+Mono:wght@700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes fi-float{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-8px) rotate(1.2deg)}}
+@keyframes fi-glint{0%{transform:translateX(-220px) skewX(-20deg)}55%,100%{transform:translateX(520px) skewX(-20deg)}}
+@keyframes fi-pop{0%{transform:scale(.9)}55%{transform:scale(1.05)}100%{transform:scale(1)}}
+@keyframes fi-bubble{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes fi-sway{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
+@keyframes fi-slide{0%{transform:translateX(520px);opacity:0}100%{transform:translateX(0);opacity:1}}
+@keyframes fi-zoom{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes fi-drop{0%{transform:translateY(-40px) scale(1);opacity:1}70%{transform:translateY(118px) scale(.42);opacity:1}100%{transform:translateY(126px) scale(.4);opacity:0}}
+@keyframes fi-lid{0%,60%{transform:rotateX(0)}100%{transform:rotateX(-100deg)}}
+@keyframes fi-rise{0%{transform:translateY(16px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes fi-spot{0%,100%{opacity:.85}50%{opacity:1}}
+@keyframes fi-tick{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+
+<img src="../../../assets/art/v010/J1_decors/decor_0_garage.webp" alt="Le garage, le soir" style="position: absolute; width: 1900px; height: 950px; left: -560px; top: -300px; object-fit: cover; filter: blur(3px) brightness(.55)">
+<div style="position: absolute; left: 40px; top: 70px; width: 600px; height: 470px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,214,150,.45), rgba(255,214,150,0)); animation: fi-spot 4s ease-in-out infinite"></div>
+
+<div style="position: absolute; left: 14px; top: 12px; right: 14px; height: 46px; border-radius: 14px; background: rgba(43,31,21,0.92); display: flex; align-items: center; gap: 18px; padding: 0 16px; box-sizing: border-box; color: #f6e7cf">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: .5px">TECH <span style="color: #f2a541">EMPIRE</span></div>
+<div style="font-weight: 800; font-size: 17px; color: #7be0a8">31 400 €</div>
+<div style="font-weight: 700; font-size: 15px">Novembre 1978</div>
+<div style="flex: 1"></div>
+<div style="font-size: 13px; color: #dcc7a6">Nova 2 · dernière étape avant le lancement</div>
+</div>
+
+<div style="position: absolute; left: 70px; top: 96px; width: 520px; text-align: center; color: #fff8ec">
+<div style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #f2a541">FINITION</div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 26px">À quoi ressemblera {{name}} ?</div>
+</div>
+
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 110px; top: 178px; width: 440px; height: 190px; animation: fi-pop .45s ease-out">
+<div style="position: absolute; left: 0; top: 0; width: 440px; height: 190px; animation: fi-float 4.2s ease-in-out infinite">
+<div style="position: absolute; left: 30px; top: 6px; right: 30px; height: 26px; display: flex; justify-content: space-between">
+<sc-for list="{{pins}}" as="pin" hint-placeholder-count="20"><div style="width: 9px; height: 26px; border-radius: 2px 2px 0 0; background: linear-gradient(90deg, #8d8f94, #e9eaee 45%, #9a9ca1)"></div></sc-for>
+</div>
+<div style="position: absolute; left: 30px; bottom: 6px; right: 30px; height: 26px; display: flex; justify-content: space-between">
+<sc-for list="{{pins}}" as="pin" hint-placeholder-count="20"><div style="width: 9px; height: 26px; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, #8d8f94, #e9eaee 45%, #9a9ca1)"></div></sc-for>
+</div>
+<div style="position: absolute; left: 14px; top: 30px; width: 412px; height: 130px; border-radius: 8px; background: {{bodyBg}}; box-shadow: 0 18px 30px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.25); overflow: hidden">
+<div style="position: absolute; left: -2px; top: 47px; width: 20px; height: 36px; border-radius: 0 18px 18px 0; background: {{notchBg}}"></div>
+<div style="position: absolute; top: -10px; left: 0; width: 70px; height: 160px; background: rgba(255,255,255,.22); animation: fi-glint 4.5s ease-in-out infinite"></div>
+<sc-if value="{{lid}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 236px; top: 22px; width: 150px; height: 86px; border-radius: 8px; background: linear-gradient(135deg, #f7d27a, #c9902c 55%, #f1c562); box-shadow: inset 0 0 0 2px rgba(110,70,10,.35)"></div>
+</sc-if>
+<div style="position: absolute; left: 40px; top: 26px; display: flex; align-items: center; gap: 14px">
+<div style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border: 3px solid {{ink}}; border-radius: {{logoRadius}}; transform: rotate({{logoRotate}}); box-sizing: border-box">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px; color: {{ink}}; transform: rotate({{logoUnrotate}})">N</span>
+</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 36px; line-height: 1; color: {{ink}}; text-shadow: {{engrave}}; letter-spacing: 1px">{{name}}</span>
+<span style="font-family: 'Space Mono', monospace; font-size: 13px; color: {{ink}}; opacity: .8; margin-top: 6px">{{code}}</span>
+</div>
+</div>
+<div style="position: absolute; left: 40px; bottom: 14px; font-family: 'Space Mono', monospace; font-size: 11px; color: {{ink}}; opacity: .6">NOVA TECHNOLOGIES · {{material}}</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 110px; top: 178px; width: 440px; height: 190px; animation: fi-pop .45s ease-out">
+<div style="position: absolute; left: 0; top: 0; width: 440px; height: 190px; animation: fi-float 4.2s ease-in-out infinite">
+<div style="position: absolute; left: 30px; top: 6px; right: 30px; height: 26px; display: flex; justify-content: space-between">
+<sc-for list="{{pins}}" as="pin" hint-placeholder-count="20"><div style="width: 9px; height: 26px; border-radius: 2px 2px 0 0; background: linear-gradient(90deg, #8d8f94, #e9eaee 45%, #9a9ca1)"></div></sc-for>
+</div>
+<div style="position: absolute; left: 30px; bottom: 6px; right: 30px; height: 26px; display: flex; justify-content: space-between">
+<sc-for list="{{pins}}" as="pin" hint-placeholder-count="20"><div style="width: 9px; height: 26px; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, #8d8f94, #e9eaee 45%, #9a9ca1)"></div></sc-for>
+</div>
+<div style="position: absolute; left: 14px; top: 30px; width: 412px; height: 130px; border-radius: 8px; background: {{bodyBg}}; box-shadow: 0 18px 30px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.25); overflow: hidden">
+<div style="position: absolute; left: -2px; top: 47px; width: 20px; height: 36px; border-radius: 0 18px 18px 0; background: {{notchBg}}"></div>
+<div style="position: absolute; top: -10px; left: 0; width: 70px; height: 160px; background: rgba(255,255,255,.22); animation: fi-glint 4.5s ease-in-out infinite"></div>
+<sc-if value="{{lid}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 236px; top: 22px; width: 150px; height: 86px; border-radius: 8px; background: linear-gradient(135deg, #f7d27a, #c9902c 55%, #f1c562); box-shadow: inset 0 0 0 2px rgba(110,70,10,.35)"></div>
+</sc-if>
+<div style="position: absolute; left: 40px; top: 26px; display: flex; align-items: center; gap: 14px">
+<div style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border: 3px solid {{ink}}; border-radius: {{logoRadius}}; transform: rotate({{logoRotate}}); box-sizing: border-box">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px; color: {{ink}}; transform: rotate({{logoUnrotate}})">N</span>
+</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 36px; line-height: 1; color: {{ink}}; text-shadow: {{engrave}}; letter-spacing: 1px">{{name}}</span>
+<span style="font-family: 'Space Mono', monospace; font-size: 13px; color: {{ink}}; opacity: .8; margin-top: 6px">{{code}}</span>
+</div>
+</div>
+<div style="position: absolute; left: 40px; bottom: 14px; font-family: 'Space Mono', monospace; font-size: 11px; color: {{ink}}; opacity: .6">NOVA TECHNOLOGIES · {{material}}</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<button type="button" onClick="{{toggleDie}}" style="position: absolute; left: 254px; top: 392px; height: 34px; padding: 0 14px; border: none; border-radius: 999px; background: rgba(255,248,236,.92); color: #3b2b1e; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer">{{dieLabel}}</button>
+
+<img src="../../../assets/art/v010/J2_personnages/perso_03_reflexion.png" alt="Camille, ingénieure" style="position: absolute; left: 28px; top: 404px; height: 150px; width: auto; transform-origin: 50% 100%; animation: fi-sway 3.2s ease-in-out infinite">
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 132px; top: 446px; max-width: 300px; padding: 9px 13px; border-radius: 14px; background: #fff8ec; font-weight: 800; font-size: 14px; line-height: 1.3; box-shadow: 0 6px 16px rgba(0,0,0,.3); transform-origin: 0 100%; animation: fi-bubble .35s ease-out">{{camille}}</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 132px; top: 446px; max-width: 300px; padding: 9px 13px; border-radius: 14px; background: #fff8ec; font-weight: 800; font-size: 14px; line-height: 1.3; box-shadow: 0 6px 16px rgba(0,0,0,.3); transform-origin: 0 100%; animation: fi-bubble .35s ease-out">{{camille}}</div>
+</sc-if>
+
+<sc-if value="{{dieOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 60px; top: 70px; width: 560px; height: 490px; border-radius: 20px; background: rgba(20,14,9,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; animation: fi-zoom .35s ease-out">
+<div style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #f2a541">LA PUCE AU MICROSCOPE</div>
+<div style="position: relative; width: 300px; height: 300px; border-radius: 6px; background: linear-gradient(135deg, #6f8a5a, #a7b77c 40%, #5d7a4e); box-shadow: 0 0 0 6px #c9a24a, 0 20px 40px rgba(0,0,0,.6); overflow: hidden">
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 2px, transparent 2px 22px), repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 2px, transparent 2px 22px)"></div>
+<div style="position: absolute; left: 22px; top: 22px; width: 110px; height: 70px; background: rgba(40,60,30,.55); border-radius: 3px"></div>
+<div style="position: absolute; left: 160px; top: 30px; width: 116px; height: 120px; background: rgba(210,190,120,.45); border-radius: 3px"></div>
+<div style="position: absolute; left: 30px; top: 170px; width: 140px; height: 100px; background: rgba(40,60,30,.45); border-radius: 3px"></div>
+<sc-if value="{{doodle}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 196px; top: 196px; width: 80px; height: 80px; animation: fi-tick .6s ease-out">
+<div style="position: absolute; left: 10px; top: 4px; width: 0; height: 0; border-left: 30px solid transparent; border-right: 30px solid transparent; border-bottom: 24px solid #f6e7cf"></div>
+<div style="position: absolute; left: 14px; top: 28px; width: 52px; height: 30px; background: #f6e7cf"></div>
+<div style="position: absolute; left: 28px; top: 38px; width: 24px; height: 20px; background: #3b2b1e"></div>
+<div style="position: absolute; left: 0; top: 62px; width: 80px; text-align: center; font-family: 'Space Mono', monospace; font-size: 10px; color: #f6e7cf">C · 78</div>
+</div>
+</sc-if>
+</div>
+<div style="max-width: 420px; text-align: center; color: #f6e7cf; font-size: 14px; font-weight: 700; line-height: 1.4">{{dieText}}</div>
+<button type="button" onClick="{{toggleDie}}" style="height: 38px; padding: 0 18px; border: none; border-radius: 10px; background: #f2a541; color: #3b2b1e; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Revenir au boîtier</button>
+</div>
+</sc-if>
+
+<div style="position: absolute; right: 16px; top: 70px; bottom: 16px; width: 590px; box-sizing: border-box; padding: 16px 20px; border-radius: 18px; background: #fff8ec; box-shadow: 0 18px 40px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 11px; animation: fi-slide .7s .3s cubic-bezier(.2,.8,.2,1) both; overflow: hidden">
+
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 19px">Les trois pistes de Camille</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{pistes}}" as="p" hint-placeholder-count="3">
+<button type="button" onClick="{{p.pick}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 10px 11px; border-radius: 14px; font-family: inherit; color: inherit; text-align: left; cursor: pointer; border: 2px solid {{p.border}}; background: {{p.bg}}">
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 22px; height: 14px; border-radius: 3px; background: {{p.swatch}}; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2)"></span><span style="font-weight: 800; font-size: 15px">{{p.label}}</span></span>
+<span style="font-size: 12px; font-weight: 700; color: #6b5640; line-height: 1.3">{{p.note}}</span>
+<span style="font-size: 12px; font-weight: 800; color: {{p.effColor}}">{{p.effect}}</span>
+</button>
+</sc-for>
+</div>
+
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px; margin-top: 2px">Retoucher</div>
+<div style="display: grid; grid-template-columns: 112px 1fr; row-gap: 8px; column-gap: 10px; align-items: center">
+<span style="font-size: 13px; font-weight: 800; color: #6b5640">Couleur</span>
+<div style="display: flex; gap: 8px">
+<sc-for list="{{colors}}" as="c" hint-placeholder-count="4">
+<button type="button" aria-label="{{c.label}}" onClick="{{c.pick}}" style="width: 34px; height: 26px; border-radius: 6px; cursor: pointer; background: {{c.bg}}; border: 3px solid {{c.border}}"></button>
+</sc-for>
+</div>
+<span style="font-size: 13px; font-weight: 800; color: #6b5640">Nom de gamme</span>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{names}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.pick}}" style="height: 28px; padding: 0 12px; border-radius: 999px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: {{n.bg}}; color: {{n.fg}}">{{n.label}}</button>
+</sc-for>
+</div>
+<span style="font-size: 13px; font-weight: 800; color: #6b5640">Numéro</span>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{numbers}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.pick}}" style="height: 28px; padding: 0 12px; border-radius: 999px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: {{n.bg}}; color: {{n.fg}}">{{n.label}}</button>
+</sc-for>
+</div>
+<span style="font-size: 13px; font-weight: 800; color: #6b5640">Logo gravé</span>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{logos}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.pick}}" style="height: 28px; padding: 0 12px; border-radius: 999px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: {{n.bg}}; color: {{n.fg}}">{{n.label}}</button>
+</sc-for>
+</div>
+<span style="font-size: 13px; font-weight: 800; color: #6b5640">Dessin caché</span>
+<button type="button" onClick="{{toggleDoodle}}" style="justify-self: start; height: 28px; padding: 0 12px; border-radius: 999px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: {{doodleBg}}; color: {{doodleFg}}">{{doodleLabel}}</button>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 2px">
+<sc-for list="{{impacts}}" as="i" hint-placeholder-count="4">
+<div style="padding: 7px 9px; border-radius: 12px; background: #f3e7d2; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 11px; font-weight: 800; color: #8a7357">{{i.label}}</span>
+<span style="font-size: 15px; font-weight: 800; color: {{i.color}}">{{i.value}}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 12px; background: {{hintBg}}">
+<img src="{{noraImg}}" alt="Nora" style="width: 30px; height: 42px; object-fit: contain; flex-shrink: 0">
+<div style="font-size: 13px; font-weight: 700; line-height: 1.3">{{hint}}</div>
+</div>
+
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; gap: 10px">
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; height: 44px; padding: 0 16px; border: 1px solid #d9c6a7; border-radius: 12px; color: #6b5640; font-weight: 800; font-size: 14px; text-decoration: none">◀ L'établi</a>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{validate}}" style="height: 46px; padding: 0 22px; border: none; border-radius: 12px; background: #2f9e5b; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer">Valider la finition</button>
+</div>
+
+<sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: #fff8ec; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px">
+<div style="position: relative; width: 260px; height: 190px">
+<div style="position: absolute; left: 40px; top: 0; width: 180px; height: 78px; border-radius: 6px; background: {{bodyBg}}; box-shadow: 0 10px 18px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; animation: fi-drop 1.4s cubic-bezier(.4,.1,.6,1) both">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 22px; color: {{ink}}">{{name}}</span>
+</div>
+<div style="position: absolute; left: 50px; top: 118px; width: 160px; height: 70px; border-radius: 4px; background: linear-gradient(#c8955a, #a8743d); box-shadow: inset 0 0 0 2px rgba(80,50,20,.35)">
+<div style="position: absolute; left: 0; top: 30px; width: 160px; height: 8px; background: rgba(240,220,170,.6)"></div>
+<div style="position: absolute; left: 0; top: 46px; width: 160px; text-align: center; font-family: 'Space Mono', monospace; font-size: 11px; color: #4a2f14">NOVA · FRAGILE</div>
+</div>
+</div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 26px; animation: fi-rise .5s 1.1s both">{{name}} est prêt pour le jour J</div>
+<div style="font-size: 14px; font-weight: 700; color: #6b5640; animation: fi-rise .5s 1.3s both">{{doneText}}</div>
+<div style="display: flex; gap: 10px; animation: fi-rise .5s 1.5s both">
+<a href="JourJ.dc.html" style="display: inline-flex; align-items: center; height: 46px; padding: 0 22px; border-radius: 12px; background: #2f9e5b; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; text-decoration: none">Le jour J ▶</a>
+<button type="button" onClick="{{restart}}" style="height: 46px; padding: 0 16px; border: 1px solid #d9c6a7; border-radius: 12px; background: transparent; color: #6b5640; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Recommencer</button>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { piste: '', color: 'blanc', gamme: 'Nova', num: '2', logo: 'rond', doodle: false, die: false, done: false, tick: 0 };
+  }
+  bump(patch) {
+    this.setState({ ...patch, tick: this.state.tick + 1 });
+  }
+  renderVals() {
+    const s = this.state;
+    const NORA_OK = '../../../assets/art/v010/J2_personnages/perso_02_joie.png';
+    const NORA_HM = '../../../assets/art/v010/J2_personnages/perso_02_reflexion.png';
+    const COLORS = {
+      blanc: { label: 'Céramique blanche', bg: 'linear-gradient(160deg, #fbf7ee, #ddd5c4)', notch: '#c9bfac', ink: '#5b5246', engrave: '0 1px 0 rgba(255,255,255,.7)' },
+      brun: { label: 'Céramique brune', bg: 'linear-gradient(160deg, #a2714c, #6e4529)', notch: '#5a371f', ink: '#f3dfc2', engrave: '0 -1px 0 rgba(0,0,0,.35)' },
+      noir: { label: 'Noir mat', bg: 'linear-gradient(160deg, #46403b, #1f1b18)', notch: '#141110', ink: '#d8d0c4', engrave: '0 -1px 0 rgba(0,0,0,.6)' },
+      bleu: { label: 'Bleu nuit', bg: 'linear-gradient(160deg, #3c4f74, #1d2840)', notch: '#141c2e', ink: '#dfe6f5', engrave: '0 -1px 0 rgba(0,0,0,.6)' }
+    };
+    const PISTES = {
+      sobre: { label: 'Sobre et pro', note: 'Céramique, gravure simple.', effect: 'Aucun surcoût', effColor: '#2f7f46', color: 'blanc', lid: false, cost: 0, heat: 0, rel: 0, image: 0, material: 'CÉRAMIQUE' },
+      vitrine: { label: 'Vitrine', note: 'Céramique et capot doré.', effect: '+1 € / puce · presse +', effColor: '#b07a18', color: 'brun', lid: true, cost: 1, heat: 0, rel: 0, image: 2, material: 'CÉRAMIQUE · CAPOT OR' },
+      eco: { label: 'Économique', note: 'Boîtier plastique.', effect: '−2 € / puce · chauffe +', effColor: '#b5352d', color: 'noir', lid: false, cost: -2, heat: 1, rel: -1, image: 0, material: 'PLASTIQUE' }
+    };
+    const base = PISTES[s.piste] || PISTES.sobre;
+    const col = COLORS[s.color];
+    const name = s.gamme + ' ' + s.num;
+    const pistes = Object.keys(PISTES).map((k) => ({
+      ...PISTES[k],
+      swatch: COLORS[PISTES[k].color].bg,
+      border: s.piste === k ? '#f2a541' : '#e6d6bd',
+      bg: s.piste === k ? '#fff3dd' : '#ffffff',
+      pick: () => this.bump({ piste: k, color: PISTES[k].color })
+    }));
+    const colors = Object.keys(COLORS).map((k) => ({
+      label: COLORS[k].label, bg: COLORS[k].bg,
+      border: s.color === k ? '#f2a541' : 'transparent',
+      pick: () => this.bump({ color: k })
+    }));
+    const chip = (list, key) => list.map((v) => ({
+      label: v.label, bg: s[key] === v.key ? '#f2a541' : '#efe2cc', fg: s[key] === v.key ? '#3b2b1e' : '#8a7357',
+      pick: () => this.bump({ [key]: v.key })
+    }));
+    const names = chip([{ key: 'Nova', label: 'Nova' }, { key: 'Astra', label: 'Astra' }, { key: 'Orion', label: 'Orion' }], 'gamme');
+    const numbers = chip([{ key: '2', label: '2' }, { key: '200', label: '200' }, { key: 'II', label: 'II' }], 'num');
+    const logos = chip([{ key: 'rond', label: 'Rond' }, { key: 'losange', label: 'Losange' }, { key: 'carre', label: 'Carré' }], 'logo');
+    const cost = 14 + base.cost;
+    const image = base.image + (s.doodle ? 1 : 0);
+    const impacts = [
+      { label: 'Coût par puce', value: cost + ' €' + (base.cost ? (base.cost > 0 ? ' (+' : ' (−') + Math.abs(base.cost) + ')' : ''), color: base.cost > 0 ? '#b07a18' : (base.cost < 0 ? '#2f7f46' : '#3b2b1e') },
+      { label: 'Chaleur', value: base.heat > 0 ? 'Un peu plus' : 'Normale', color: base.heat > 0 ? '#b5352d' : '#3b2b1e' },
+      { label: 'Fiabilité', value: base.rel < 0 ? '−1 point' : 'Inchangée', color: base.rel < 0 ? '#b5352d' : '#3b2b1e' },
+      { label: 'Image', value: image > 0 ? '+' + image + ' (presse, salon)' : 'Neutre', color: image > 0 ? '#2f7f46' : '#3b2b1e' }
+    ];
+    let hint = 'Choisissez une piste : chacune parle à un public différent.';
+    let ok = true;
+    if (s.piste === 'vitrine') { hint = 'Un capot doré sur une puce de calculatrice à 15 € ? Les clients risquent de trouver ça « trop ». Ça brillera surtout au salon.'; ok = false; }
+    if (s.piste === 'eco') hint = 'Les fabricants de calculatrices regardent d’abord le prix : bon choix. Surveillez juste la chaleur dans les retours.';
+    if (s.piste === 'sobre') hint = 'Rien à redire : c’est exactement ce que nos clients industriels attendent.';
+    const bubbles = {
+      '': 'On arrive au bout ! Pour le boîtier, je vois trois pistes.',
+      sobre: 'Sobre et pro : nos clients adorent les puces sans chichi.',
+      vitrine: 'Le capot doré, ça claque sur un stand… mais ça coûte.',
+      eco: 'Plastique : moins cher, mais ça chauffera un peu plus.'
+    };
+    const even = s.tick % 2 === 0;
+    const logoRadius = s.logo === 'rond' ? '999px' : (s.logo === 'losange' ? '6px' : '4px');
+    return {
+      pins: Array.from({ length: 20 }, (_, i) => ({ i })),
+      name, code: (s.gamme[0] + s.num).toUpperCase() + '-16 · 7845', material: base.material,
+      bodyBg: col.bg, notchBg: col.notch, ink: col.ink, engrave: col.engrave, lid: base.lid && !!s.piste,
+      logoRadius, logoRotate: s.logo === 'losange' ? '45deg' : '0deg', logoUnrotate: s.logo === 'losange' ? '-45deg' : '0deg',
+      popA: even, popB: !even,
+      camille: s.doodle && s.tick % 3 === 0 ? 'J’ai caché notre garage dans le silicium. Chut !' : bubbles[s.piste],
+      pistes, colors, names, numbers, logos, impacts,
+      doodleLabel: s.doodle ? 'Oui — le garage, gravé en 3 µm' : 'Non', doodleBg: s.doodle ? '#f2a541' : '#efe2cc', doodleFg: s.doodle ? '#3b2b1e' : '#8a7357',
+      toggleDoodle: () => this.bump({ doodle: !s.doodle }),
+      dieOpen: s.die, dieLabel: 'Voir la puce au microscope', doodle: s.doodle,
+      dieText: s.doodle ? 'Le petit garage de Camille, gravé dans un coin du silicium. Un jour, un journaliste le trouvera… et les collectionneurs adoreront.' : 'Rien de caché pour l’instant. Les ingénieurs de l’époque signaient parfois leurs puces d’un petit dessin.',
+      toggleDie: () => this.setState({ die: !s.die }),
+      hint, hintBg: ok ? '#e3f3e6' : '#fbe9d2', noraImg: ok ? NORA_OK : NORA_HM,
+      validate: () => this.setState({ done: true, die: false }),
+      done: s.done,
+      doneText: (s.piste ? PISTES[s.piste].label : 'Sobre et pro') + ' · ' + col.label.toLowerCase() + (s.doodle ? ' · avec un secret gravé' : ''),
+      restart: () => this.setState({ done: false, piste: '', color: 'blanc', doodle: false, tick: s.tick + 1 })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>L'atelier vit — développement de Nova 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes te-rise-a{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1;transform:translate(0,-20px) scale(1)}100%{transform:translate(520px,-250px) scale(.7);opacity:0}}
+@keyframes te-rise-b{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1;transform:translate(0,-20px) scale(1)}100%{transform:translate(300px,-230px) scale(.7);opacity:0}}
+@keyframes te-rise-c{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1;transform:translate(0,-20px) scale(1)}100%{transform:translate(60px,-260px) scale(.7);opacity:0}}
+@keyframes te-type{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes te-fill{0%{width:38%}100%{width:64%}}
+@keyframes te-bulb{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,210,90,.8)}50%{transform:scale(1.12);box-shadow:0 0 0 16px rgba(255,210,90,0)}}
+@keyframes te-drift{0%{transform:translate(0,0)}25%{transform:translate(-90px,70px)}50%{transform:translate(-200px,110px)}75%{transform:translate(-300px,190px)}100%{transform:translate(-420px,230px)}}
+@keyframes te-shine{0%,100%{box-shadow:0 0 14px 4px rgba(255,205,80,.9)}50%{box-shadow:0 0 26px 10px rgba(255,205,80,.5)}}
+@keyframes te-card{0%{transform:scale(.7) translateY(20px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes te-pop{0%{transform:scale(.9)}50%{transform:scale(1.07)}100%{transform:scale(1)}}
+@keyframes te-toast{0%{transform:translateY(16px);opacity:0}12%{transform:translateY(0);opacity:1}85%{opacity:1}100%{opacity:0}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+<img src="../../../assets/art/v010/J1_decors/decor_0_garage.webp" alt="Le garage, l'équipe au travail" style="position: absolute; width: 1280px; height: 640px; left: 0; top: -20px; object-fit: cover">
+
+<img src="../../../assets/art/v010/J2_personnages/perso_01_bureau.png" alt="Une ingénieure au clavier" style="position: absolute; left: 400px; top: 250px; height: 118px; width: auto; animation: te-type .5s ease-in-out infinite">
+<img src="../../../assets/art/v010/J2_personnages/perso_04_bureau.png" alt="Hugo, ingénieur, au clavier" style="position: absolute; left: 640px; top: 300px; height: 118px; width: auto; animation: te-type .6s ease-in-out infinite">
+<img src="../../../assets/art/v010/J2_personnages/perso_05_bureau.png" alt="Une technicienne au clavier" style="position: absolute; left: 880px; top: 360px; height: 118px; width: auto; animation: te-type .55s ease-in-out infinite">
+
+<div style="position: absolute; left: 450px; top: 250px; width: 40px; height: 40px; border-radius: 999px; background: #e8743b; color: #ffffff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; animation: te-rise-a 3.2s ease-out infinite">+3</div>
+<div style="position: absolute; left: 450px; top: 250px; width: 40px; height: 40px; border-radius: 999px; background: #3a9fd6; color: #ffffff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; animation: te-rise-a 3.2s ease-out 1.6s infinite">+2</div>
+<div style="position: absolute; left: 690px; top: 300px; width: 40px; height: 40px; border-radius: 999px; background: #3a9fd6; color: #ffffff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; animation: te-rise-b 2.8s ease-out .7s infinite">+4</div>
+<div style="position: absolute; left: 930px; top: 360px; width: 40px; height: 40px; border-radius: 999px; background: #4caf6a; color: #ffffff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; animation: te-rise-c 3s ease-out .3s infinite">+3</div>
+<div style="position: absolute; left: 930px; top: 360px; width: 40px; height: 40px; border-radius: 999px; background: #d6453d; color: #ffffff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; animation: te-rise-c 3s ease-out 1.9s infinite">bug</div>
+
+<sc-if value="{{bulb}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{openEureka}}" aria-label="Hugo a une idée" style="position: absolute; left: 676px; top: 252px; width: 44px; height: 44px; border-radius: 999px; border: 3px solid #fff8ec; background: #ffd25a; color: #3b2b1e; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px; cursor: pointer; animation: te-bulb 1.4s ease-in-out infinite">!</button>
+</sc-if>
+
+<sc-if value="{{eurekaOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 470px; top: 70px; width: 420px; box-sizing: border-box; padding: 14px 16px; border-radius: 18px; background: #fff8ec; border: 3px solid #ffd25a; box-shadow: 0 16px 34px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 10px; transform-origin: 60% 100%; animation: te-card .35s cubic-bezier(.2,.8,.2,1)">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="width: 46px; height: 46px; border-radius: 999px; background: #ffd25a; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px">!</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-weight: 800; font-size: 15px">Hugo a une trouvaille</span>
+<span style="font-size: 12px; font-weight: 700; color: #6b5640">Conception · 9 ans de métier</span>
+</div>
+</div>
+<div style="font-size: 15px; font-weight: 700; line-height: 1.4">« Si on raccourcit le chemin de l'horloge ici, Nova 2 peut monter à 2,5 MHz. Par contre, la puce chauffera plus… »</div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<span style="font-size: 12px; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: #dff0e3; color: #2f7f46">Vitesse +25 %</span>
+<span style="font-size: 12px; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: #f8dcd9; color: #b5352d">Fiabilité −6</span>
+<span style="font-size: 12px; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: #fbe9d2; color: #9a5a12">+2 semaines</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{apply}}" style="flex: 1; height: 40px; border: none; border-radius: 10px; background: #2f9e5b; color: #ffffff; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Appliquer</button>
+<button type="button" onClick="{{keep}}" style="flex: 1.3; height: 40px; border: none; border-radius: 10px; background: #f2a541; color: #3b2b1e; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Garder pour Nova 3</button>
+<button type="button" onClick="{{decline}}" style="height: 40px; padding: 0 12px; border: 1px solid #d9c6a7; border-radius: 10px; background: transparent; color: #6b5640; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Non merci</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{sparkFly}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{openSpark}}" aria-label="Attraper l'étincelle" style="position: absolute; left: 1010px; top: 230px; width: 38px; height: 38px; border-radius: 999px; border: 2px solid #fff3c4; background: #ffcc4d; color: #6e3f0a; font-size: 18px; font-weight: 800; cursor: pointer; animation: te-drift 9s linear infinite, te-shine 1.2s ease-in-out infinite">✦</button>
+</sc-if>
+<sc-if value="{{sparkOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 560px; top: 420px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; background: #fff8ec; box-shadow: 0 10px 24px rgba(0,0,0,0.35); animation: te-card .3s ease-out">
+<div style="width: 34px; height: 34px; border-radius: 999px; background: #ffcc4d; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #6e3f0a; animation: te-shine 1.2s ease-in-out infinite">✦</div>
+<span style="font-size: 13px; font-weight: 800">Une étincelle ! Où la mettre ?</span>
+<button type="button" onClick="{{toPerf}}" style="height: 32px; padding: 0 10px; border: none; border-radius: 999px; background: #e8743b; color: #ffffff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer">Perf</button>
+<button type="button" onClick="{{toEff}}" style="height: 32px; padding: 0 10px; border: none; border-radius: 999px; background: #3a9fd6; color: #ffffff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer">Effic</button>
+<button type="button" onClick="{{toFia}}" style="height: 32px; padding: 0 10px; border: none; border-radius: 999px; background: #4caf6a; color: #ffffff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer">Fiab</button>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 14px; top: 12px; right: 14px; height: 46px; border-radius: 14px; background: rgba(43,31,21,0.92); display: flex; align-items: center; gap: 18px; padding: 0 8px 0 16px; box-sizing: border-box; color: #f6e7cf">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: .5px">TECH <span style="color: #f2a541">EMPIRE</span></div>
+<div style="font-weight: 800; font-size: 17px; color: #7be0a8">39 400 €</div>
+<div style="font-weight: 700; font-size: 15px">Juin 1978</div>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{reset}}" style="height: 34px; padding: 0 12px; border: none; border-radius: 9px; background: #4a3626; color: #f6e7cf; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer">↺ Rejouer</button>
+<div style="display: flex; gap: 6px">
+<button type="button" aria-label="Pause" style="width: 38px; height: 34px; border: none; border-radius: 9px; background: #4a3626; color: #f6e7cf; font-size: 14px">❚❚</button>
+<button type="button" aria-label="Vitesse normale" style="width: 38px; height: 34px; border: none; border-radius: 9px; background: #f2a541; color: #3b2b1e; font-size: 14px">▶</button>
+<button type="button" aria-label="Vitesse rapide" style="width: 38px; height: 34px; border: none; border-radius: 9px; background: #4a3626; color: #f6e7cf; font-size: 12px">▶▶</button>
+</div>
+</div>
+
+<div style="position: absolute; right: 16px; top: 70px; width: 330px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: #fff8ec; box-shadow: 0 14px 30px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 12px; align-items: center">
+<img src="../../../assets/art/v010/_sources/astra_suite_puce_1993.png" alt="Nova 2" style="width: 76px; height: auto">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 22px; line-height: 1">Nova 2</div>
+<div style="font-size: 13px; font-weight: 700; color: #6b5640">Phase 2 — la conception · {{mhz}} MHz</div>
+</div>
+</div>
+<div style="height: 10px; border-radius: 999px; background: #eadcc5; overflow: hidden">
+<div style="height: 10px; border-radius: 999px; background: #f2a541; animation: te-fill 9s linear infinite"></div>
+</div>
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; text-align: center; animation: te-pop .4s ease-out">
+<div style="padding: 6px 0; border-radius: 10px; background: #fbe4d6"><div style="font-weight: 800; font-size: 18px; color: #c4561f">{{perf}}</div><div style="font-size: 11px; font-weight: 700">Perf</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #dcedf8"><div style="font-weight: 800; font-size: 18px; color: #1f6f9f">{{eff}}</div><div style="font-size: 11px; font-weight: 700">Effic</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #dff0e3"><div style="font-weight: 800; font-size: 18px; color: #2f7f46">{{fia}}</div><div style="font-size: 11px; font-weight: 700">Fiab</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #f8dcd9"><div style="font-weight: 800; font-size: 18px; color: #b5352d">2</div><div style="font-size: 11px; font-weight: 700">Bugs</div></div>
+</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; text-align: center; animation: te-pop .4s ease-out">
+<div style="padding: 6px 0; border-radius: 10px; background: #fbe4d6"><div style="font-weight: 800; font-size: 18px; color: #c4561f">{{perf}}</div><div style="font-size: 11px; font-weight: 700">Perf</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #dcedf8"><div style="font-weight: 800; font-size: 18px; color: #1f6f9f">{{eff}}</div><div style="font-size: 11px; font-weight: 700">Effic</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #dff0e3"><div style="font-weight: 800; font-size: 18px; color: #2f7f46">{{fia}}</div><div style="font-size: 11px; font-weight: 700">Fiab</div></div>
+<div style="padding: 6px 0; border-radius: 10px; background: #f8dcd9"><div style="font-weight: 800; font-size: 18px; color: #b5352d">2</div><div style="font-size: 11px; font-weight: 700">Bugs</div></div>
+</div>
+</sc-if>
+<sc-if value="{{hasCarnet}}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 12px; font-weight: 800; padding: 6px 9px; border-radius: 10px; background: #fff3dd; color: #9a5a12">Carnet : 1 trouvaille gardée pour Nova 3</div>
+</sc-if>
+</div>
+
+<sc-if value="{{toastA}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: #3b2b1e; color: #fff8ec; font-weight: 800; font-size: 14px; animation: te-toast 3.4s ease-out both">{{toast}}</div>
+</sc-if>
+<sc-if value="{{toastB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: #3b2b1e; color: #fff8ec; font-weight: 800; font-size: 14px; animation: te-toast 3.4s ease-out both">{{toast}}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = this.fresh();
+  }
+  fresh() {
+    return { perf: 38, eff: 71, fia: 54, mhz: '2', eureka: 'idle', spark: 'fly', carnet: false, tick: 0, toast: '' };
+  }
+  act(patch, toast) {
+    this.setState({ ...patch, tick: this.state.tick + 1, toast: toast || '' });
+  }
+  renderVals() {
+    const s = this.state;
+    const even = s.tick % 2 === 0;
+    const spark = (key, label) => () => this.act({ spark: 'done', [key]: s[key] + 5 }, 'Étincelle attrapée : +5 ' + label);
+    return {
+      perf: s.perf, eff: s.eff, fia: s.fia, mhz: s.mhz,
+      popA: even, popB: !even,
+      toast: s.toast, toastA: s.toast !== '' && even, toastB: s.toast !== '' && !even,
+      bulb: s.eureka === 'idle',
+      eurekaOpen: s.eureka === 'open',
+      hasCarnet: s.carnet,
+      sparkFly: s.spark === 'fly',
+      sparkOpen: s.spark === 'open',
+      openEureka: () => this.setState({ eureka: 'open' }),
+      apply: () => this.act({ eureka: 'done', perf: s.perf + 12, fia: s.fia - 6, mhz: '2,5' }, 'Hugo est ravi : Nova 2 passe à 2,5 MHz !'),
+      keep: () => this.act({ eureka: 'done', carnet: true }, 'Rangé dans le carnet : Nova 3 partira avec cette idée.'),
+      decline: () => this.act({ eureka: 'done' }, 'Hugo hausse les épaules : « Une autre fois. »'),
+      openSpark: () => this.setState({ spark: 'open' }),
+      toPerf: spark('perf', 'Performance'),
+      toEff: spark('eff', 'Efficacité'),
+      toFia: spark('fia', 'Fiabilité'),
+      reset: () => this.setState({ ...this.fresh(), tick: s.tick + 1 })
+    };
+  }
+}
+</script>
+</body>
+</html>

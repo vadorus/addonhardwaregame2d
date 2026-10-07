@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>La carte de l'entreprise — les branches</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes br-grow{from{stroke-dashoffset:600}to{stroke-dashoffset:0}}
+@keyframes br-pop{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}70%{transform:translate(-50%,-50%) scale(1.08);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes br-breathe{0%,100%{box-shadow:0 0 0 0 rgba(242,165,65,.0)}50%{box-shadow:0 0 0 10px rgba(242,165,65,.25)}}
+@keyframes br-slide{0%{transform:translateX(40px);opacity:0}100%{transform:translateX(0);opacity:1}}
+@keyframes br-leaf{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+<div style="position: absolute; left: 0; top: 0; width: 1280px; height: 580px; background-color: #f3e6cf; background-image: linear-gradient(rgba(154,90,18,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(154,90,18,.08) 1px, transparent 1px); background-size: 32px 32px"></div>
+
+<div style="position: absolute; left: 24px; top: 18px">
+<div style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #b07a18">LA CARTE DE L'ENTREPRISE</div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 28px">Ce que Nova Technologies peut devenir</div>
+<div style="font-size: 14px; font-weight: 700; color: #6b5640">Le tronc, c'est le CPU. Les branches poussent avec les époques. Touchez-en une.</div>
+</div>
+
+<svg width="820" height="580" viewBox="0 0 820 580" style="position: absolute; left: 0; top: 0">
+<g fill="none" stroke-linecap="round">
+<path d="M410 560 C410 470 410 420 410 360" stroke="#8a5a32" stroke-width="22" style="stroke-dasharray:600; animation: br-grow 1s ease-out both"></path>
+<path d="M410 400 C340 380 280 360 220 330" stroke="#5b8fc9" stroke-width="10" style="stroke-dasharray:600; animation: br-grow 1s .4s ease-out both"></path>
+<path d="M410 360 C420 300 470 250 560 230" stroke="#9a9a6a" stroke-width="8" stroke-dasharray="10 8" style="opacity:.85"></path>
+<path d="M410 360 C380 300 330 240 260 200" stroke="#4a5a8a" stroke-width="8" stroke-dasharray="10 8" style="opacity:.8"></path>
+<path d="M410 360 C440 280 560 200 660 150" stroke="#c9b9a0" stroke-width="6" stroke-dasharray="4 10"></path>
+<path d="M410 360 C400 260 420 180 440 110" stroke="#c9b9a0" stroke-width="6" stroke-dasharray="4 10"></path>
+<path d="M410 360 C330 280 220 200 120 160" stroke="#c9b9a0" stroke-width="6" stroke-dasharray="4 10"></path>
+<path d="M410 420 C500 410 600 380 680 340" stroke="#c9b9a0" stroke-width="6" stroke-dasharray="4 10"></path>
+</g>
+</svg>
+
+<sc-for list="{{nodes}}" as="n" hint-placeholder-count="8">
+<button type="button" onClick="{{n.pick}}" style="position: absolute; left: {{n.x}}; top: {{n.y}}; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; min-width: 120px; border-radius: 16px; border: 3px solid {{n.border}}; background: {{n.bg}}; color: {{n.ink}}; font-family: inherit; cursor: pointer; opacity: {{n.opacity}}; animation: br-pop .5s {{n.delay}} ease-out both; box-shadow: 0 8px 18px rgba(59,43,30,.18)">
+<span style="font-size: 22px; line-height: 1">{{n.glyph}}</span>
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 16px">{{n.label}}</span>
+<span style="font-size: 11px; font-weight: 800; letter-spacing: .5px; color: {{n.tagColor}}">{{n.tag}}</span>
+</button>
+</sc-for>
+
+<sc-if value="{{popA}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; right: 18px; top: 18px; bottom: 18px; width: 420px; box-sizing: border-box; padding: 20px 22px; border-radius: 18px; background: #fff8ec; box-shadow: 0 18px 40px rgba(59,43,30,.25); display: flex; flex-direction: column; gap: 12px; animation: br-slide .35s ease-out">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 54px; height: 54px; border-radius: 14px; background: {{sel.bg}}; border: 3px solid {{sel.border}}; display: flex; align-items: center; justify-content: center; font-size: 28px">{{sel.glyph}}</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px">{{sel.label}}</span>
+<span style="font-size: 13px; font-weight: 800; color: {{sel.tagColor}}">{{sel.status}}</span>
+</div>
+</div>
+<div style="font-size: 15px; font-weight: 700; line-height: 1.45">{{sel.text}}</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{sel.points}}" as="p" hint-placeholder-count="3">
+<div style="display: flex; gap: 8px; align-items: flex-start; font-size: 14px; font-weight: 700; color: #4a3826"><span style="color: {{sel.border}}">●</span><span>{{p.t}}</span></div>
+</sc-for>
+</div>
+<div style="padding: 10px 12px; border-radius: 12px; background: #f3e7d2; font-size: 13px; font-weight: 700; color: #6b5640; font-style: italic">{{sel.teaser}}</div>
+<div style="flex: 1"></div>
+<button type="button" style="height: 48px; border: none; border-radius: 12px; background: {{sel.ctaBg}}; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer">{{sel.cta}}</button>
+</div>
+</sc-if>
+<sc-if value="{{popB}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; right: 18px; top: 18px; bottom: 18px; width: 420px; box-sizing: border-box; padding: 20px 22px; border-radius: 18px; background: #fff8ec; box-shadow: 0 18px 40px rgba(59,43,30,.25); display: flex; flex-direction: column; gap: 12px; animation: br-slide .35s ease-out">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 54px; height: 54px; border-radius: 14px; background: {{sel.bg}}; border: 3px solid {{sel.border}}; display: flex; align-items: center; justify-content: center; font-size: 28px">{{sel.glyph}}</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 24px">{{sel.label}}</span>
+<span style="font-size: 13px; font-weight: 800; color: {{sel.tagColor}}">{{sel.status}}</span>
+</div>
+</div>
+<div style="font-size: 15px; font-weight: 700; line-height: 1.45">{{sel.text}}</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{sel.points}}" as="p" hint-placeholder-count="3">
+<div style="display: flex; gap: 8px; align-items: flex-start; font-size: 14px; font-weight: 700; color: #4a3826"><span style="color: {{sel.border}}">●</span><span>{{p.t}}</span></div>
+</sc-for>
+</div>
+<div style="padding: 10px 12px; border-radius: 12px; background: #f3e7d2; font-size: 13px; font-weight: 700; color: #6b5640; font-style: italic">{{sel.teaser}}</div>
+<div style="flex: 1"></div>
+<button type="button" style="height: 48px; border: none; border-radius: 12px; background: {{sel.ctaBg}}; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer">{{sel.cta}}</button>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 24px; bottom: 16px; display: flex; gap: 16px; font-size: 12px; font-weight: 800; color: #6b5640">
+<span><span style="display: inline-block; width: 14px; height: 6px; border-radius: 3px; background: #8a5a32; vertical-align: middle"></span> Jouable</span>
+<span><span style="display: inline-block; width: 14px; height: 0; border-top: 3px dashed #9a9a6a; vertical-align: middle"></span> Version complète</span>
+<span><span style="display: inline-block; width: 14px; height: 0; border-top: 3px dotted #c9b9a0; vertical-align: middle"></span> Extension à venir</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'cpu', tick: 0 };
+  }
+  renderVals() {
+    const s = this.state;
+    const D = {
+      cpu: { x: 410, y: 470, glyph: '◼', label: 'CPU', tag: 'JOUABLE · LE TRONC', tagColor: '#2f7f46', bg: '#fff3dd', border: '#d9822b', ink: '#3b2b1e', opacity: 1, delay: '.1s',
+        status: 'Jouable · depuis 1971', text: 'Le cœur de l’entreprise : concevoir, fabriquer et vendre vos processeurs.',
+        points: ['Calculatrices, puis ordinateurs, puis serveurs', 'Plateformes sur plusieurs générations', 'Design de la puce, presse, salons'],
+        teaser: '« Tout commence ici, sur l’établi du garage. » — Camille', cta: 'Ouvrir l’établi', ctaBg: '#2f9e5b' },
+      soft: { x: 210, y: 325, glyph: '❮❯', label: 'Logiciel', tag: 'JOUABLE · DÉBUT', tagColor: '#2f7f46', bg: '#e6f0fb', border: '#5b8fc9', ink: '#22344d', opacity: 1, delay: '.6s',
+        status: 'Jouable · le coin ordinateur', text: 'Votre équipe écrit des outils, des firmwares et plus tard vos propres bancs d’essai.',
+        points: ['Fait respirer l’équipe entre deux CPU', 'Un firmware corrige une surchauffe', 'Plus tard : vos benchmarks maison'],
+        teaser: '« Si on passait l’équipe sur un outil pendant six mois ? » — Nora', cta: 'Ouvrir le coin logiciel', ctaBg: '#3f7fbf' },
+      def: { x: 570, y: 225, glyph: '✪', label: 'Défense', tag: 'VERSION COMPLÈTE', tagColor: '#7a7a4a', bg: '#eeeedd', border: '#9a9a6a', ink: '#3d3d25', opacity: 0.85, delay: '.8s',
+        status: 'S’ouvre en 1980 · version complète', text: 'Des puces durcies pour les programmes militaires : accréditation, appels d’offres, secret.',
+        points: ['Contrats longs et très bien payés', 'Fiabilité exigée au plus haut', 'Accréditation chère : 12 mois'],
+        teaser: '« 1980 — une lettre officielle arrive au garage. Un général voudrait vous rencontrer. »', cta: 'Débloquer avec la version complète', ctaBg: '#8a6a2a' },
+      aero: { x: 250, y: 190, glyph: '▲', label: 'Aérospatial', tag: 'VERSION COMPLÈTE', tagColor: '#4a5a8a', bg: '#e6e9f4', border: '#4a5a8a', ink: '#1f2840', opacity: 0.85, delay: '.9s',
+        status: 'S’ouvre en 1990 · version complète', text: 'Ordinateurs de bord, satellites, avionique : là où une panne n’est pas permise.',
+        points: ['Agences spatiales et avionneurs', 'Volumes faibles, prix très élevés', 'Votre équipe Fiabilité devient reine'],
+        teaser: '« Une maquette de fusée apparaît sur l’étagère… »', cta: 'Débloquer avec la version complète', ctaBg: '#8a6a2a' },
+      mobile: { x: 670, y: 145, glyph: '▯', label: 'Mobile', tag: 'EXTENSION À VENIR', tagColor: '#9a8a70', bg: '#f6efe2', border: '#c9b9a0', ink: '#7a6a58', opacity: 0.6, delay: '1s',
+        status: 'Extension à venir', text: 'Téléphones et appareils nomades : l’autonomie avant tout.', points: ['Puces tout-en-un', 'Consommation reine', 'Nouveaux rivaux'],
+        teaser: 'Silhouette seulement : on en reparlera.', cta: 'Bientôt', ctaBg: '#b9aa90' },
+      console: { x: 440, y: 105, glyph: '◉', label: 'Consoles', tag: 'EXTENSION À VENIR', tagColor: '#9a8a70', bg: '#f6efe2', border: '#c9b9a0', ink: '#7a6a58', opacity: 0.6, delay: '1.05s',
+        status: 'Extension à venir', text: 'Le processeur d’une console de salon : un seul client, des millions de puces.', points: ['Un contrat géant', 'Puissance graphique', 'Délais imposés'],
+        teaser: 'Silhouette seulement : on en reparlera.', cta: 'Bientôt', ctaBg: '#b9aa90' },
+      board: { x: 120, y: 155, glyph: '▦', label: 'Cartes mères', tag: 'EXTENSION À VENIR', tagColor: '#9a8a70', bg: '#f6efe2', border: '#c9b9a0', ink: '#7a6a58', opacity: 0.6, delay: '1.1s',
+        status: 'Extension à venir', text: 'Fabriquez les cartes pour votre propre socket, ou laissez faire des partenaires.', points: ['Le pont avec vos CPU', 'Alimentations, SSD ensuite', 'Fidélité à la plateforme'],
+        teaser: 'Silhouette seulement : on en reparlera.', cta: 'Bientôt', ctaBg: '#b9aa90' },
+      server: { x: 690, y: 340, glyph: '☰', label: 'Serveurs', tag: 'EXTENSION À VENIR', tagColor: '#9a8a70', bg: '#f6efe2', border: '#c9b9a0', ink: '#7a6a58', opacity: 0.6, delay: '1.15s',
+        status: 'Extension à venir', text: 'Les salles machines des grandes entreprises, puis les datacenters.', points: ['Fiabilité 24 h sur 24', 'Grosses équipes nécessaires', 'Marges élevées'],
+        teaser: 'Silhouette seulement : on en reparlera.', cta: 'Bientôt', ctaBg: '#b9aa90' }
+    };
+    const nodes = Object.keys(D).map((k) => ({
+      ...D[k], x: D[k].x + 'px', y: D[k].y + 'px',
+      border: s.sel === k ? '#f2a541' : D[k].border,
+      pick: () => this.setState({ sel: k, tick: s.tick + 1 })
+    }));
+    const cur = D[s.sel];
+    const even = s.tick % 2 === 0;
+    return {
+      nodes,
+      sel: { ...cur, points: cur.points.map((t) => ({ t })) },
+      popA: even, popB: !even
+    };
+  }
+}
+</script>
+</body>
+</html>

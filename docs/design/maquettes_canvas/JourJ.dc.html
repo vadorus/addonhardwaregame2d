@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Le jour J — la presse teste Nova 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Nunito:wght@500;700;800&amp;family=Libre+Baskerville:ital,wght@0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#9a5a12}a:hover{color:#6e3f0a}
+@keyframes te-drop{0%{transform:translateY(-30px) rotate(-3deg);opacity:0}70%{transform:translateY(4px) rotate(0)}100%{transform:translateY(0);opacity:1}}
+@keyframes te-pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+<div style="width: 1280px; height: 580px; position: relative; overflow: hidden; background: #2b1f15; font-family: 'Nunito', system-ui, sans-serif; color: #3b2b1e">
+<img src="../../../assets/art/v010/J3_moments/moment_presse.webp" alt="Le journal du matin sur le bureau" style="position: absolute; width: 1280px; height: 640px; left: 0; top: -30px; object-fit: cover">
+<div style="position: absolute; left: 0; top: 0; width: 1280px; height: 580px; background: rgba(43,31,21,0.45)"></div>
+
+<div style="position: absolute; left: 0; right: 0; top: 26px; text-align: center; color: #fff8ec">
+<div style="font-size: 14px; font-weight: 800; letter-spacing: 2px; color: #f2a541">LE JOUR J</div>
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 34px">Nova 2 est en vente. La presse rend son verdict…</div>
+</div>
+
+<div style="position: absolute; left: 90px; right: 90px; top: 104px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px">
+<sc-for list="{{cards}}" as="card" hint-placeholder-count="3">
+<sc-if value="{{card.shown}}" hint-placeholder-val="{{ true }}">
+<div style="height: 268px; box-sizing: border-box; padding: 16px; border-radius: 14px; background: #fbf3e2; box-shadow: 0 14px 30px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 10px; animation: te-drop .5s ease-out">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 64px; height: 64px; border-radius: 999px; background: {{card.color}}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 34px; flex-shrink: 0">{{card.score}}</div>
+<div style="font-family: 'Libre Baskerville', serif; font-weight: 700; font-size: 16px; line-height: 1.2">{{card.paper}}</div>
+</div>
+<div style="font-family: 'Libre Baskerville', serif; font-style: italic; font-size: 16px; line-height: 1.3">« {{card.headline}} »</div>
+<div style="font-size: 13px; line-height: 1.45; color: #4a3826">{{card.body}}</div>
+<div style="display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 800">
+<span style="color: #2f7f46">+ {{card.plus}}</span>
+<span style="color: #b5352d">− {{card.minus}}</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{card.hidden}}" hint-placeholder-val="{{ false }}">
+<div style="height: 268px; border-radius: 14px; border: 2px dashed rgba(255,248,236,0.5); display: flex; align-items: center; justify-content: center; color: #f6e7cf; font-family: 'Fredoka', sans-serif; font-size: 40px">?</div>
+</sc-if>
+</sc-for>
+</div>
+
+<sc-if value="{{done}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 90px; right: 90px; bottom: 18px; height: 150px; box-sizing: border-box; padding: 16px 22px; border-radius: 16px; background: #fff8ec; box-shadow: 0 14px 30px rgba(0,0,0,0.35); display: flex; gap: 22px; align-items: center; animation: te-pop .4s ease-out">
+<img src="../../../assets/art/v010/J7_vitrine/trophee_or.png" alt="Trophée" style="width: 70px; height: auto">
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1">
+<div style="font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 26px">7/10 — Nouveau record ! <span style="color: #2f8a52">(Nova 1 : 6,5)</span></div>
+<div style="font-size: 15px; font-weight: 700">Mieux que Nova 1, mais Helix G7 reste plus rapide.</div>
+<div style="display: flex; gap: 10px; align-items: center; font-size: 14px; font-weight: 700; color: #6b5640">
+<img src="../../../assets/art/v010/J2_personnages/perso_02_reflexion.png" alt="Nora" style="width: 26px; height: 36px; object-fit: contain">
+Carnet de Nora : les calculatrices préfèrent l'efficacité à la vitesse.
+</div>
+</div>
+<button type="button" style="height: 48px; padding: 0 24px; border: none; border-radius: 12px; background: #2f9e5b; color: #ffffff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer">Continuer</button>
+</div>
+</sc-if>
+
+<sc-if value="{{done}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{start}}" style="position: absolute; right: 18px; top: 18px; height: 38px; padding: 0 14px; border: none; border-radius: 10px; background: rgba(255,248,236,0.9); color: #3b2b1e; font-weight: 800; font-size: 14px; cursor: pointer">↺ Rejouer la révélation</button>
+</sc-if>
+<sc-if value="{{idle}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: center">
+<button type="button" onClick="{{start}}" style="height: 54px; padding: 0 30px; border: none; border-radius: 14px; background: #f2a541; color: #3b2b1e; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 20px; cursor: pointer">Ouvrir les journaux</button>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":580}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { shown: 3, running: false };
+  }
+  componentWillUnmount() {
+    if (this.timer) clearInterval(this.timer);
+  }
+  renderVals() {
+    const papers = [
+      { paper: 'Systems & Industry Review', score: 7, color: '#c98a2b', headline: 'Sobre, solide, sans éclat.',
+        body: 'Nova Technologies a soigné sa copie : Nova 2 consomme peu et n\u2019a planté qu\u2019une fois en trois semaines d\u2019essais. On aurait aimé un peu plus d\u2019audace.',
+        plus: 'Consomme 30 % de moins que Nova 1', minus: 'À peine plus rapide' },
+      { paper: 'Circuit Lab', score: 6, color: '#b5652d', headline: 'Il chauffe moins. Il ne va pas plus vite.',
+        body: 'Sur notre banc, Nova 2 reste derrière l\u2019Helix G7 dès qu\u2019on pousse les calculs. Pour une calculatrice, ça passe ; pour le reste, il faudra mieux.',
+        plus: 'Très stable sous la charge', minus: 'Battu par l\u2019Helix G7 de 12 %' },
+      { paper: 'Le Micro Hebdo', score: 8, color: '#2f8a52', headline: 'La calculatrice de l\u2019année ?',
+        body: 'Discret, fiable, bon marché : exactement ce que les fabricants de calculatrices réclamaient. Le petit garage de Nova commence à faire parler de lui.',
+        plus: 'Prix très bien placé', minus: 'Rien de révolutionnaire' }
+    ];
+    const n = this.state.shown;
+    return {
+      cards: papers.map((p, i) => ({ ...p, shown: i < n, hidden: i >= n })),
+      done: n >= 3 && !this.state.running,
+      idle: n === 0,
+      start: () => {
+        this.setState({ shown: 0, running: true });
+        let k = 0;
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => {
+          k += 1;
+          this.setState({ shown: k, running: k < 3 });
+          if (k >= 3) clearInterval(this.timer);
+        }, 1300);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
