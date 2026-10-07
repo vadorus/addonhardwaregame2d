@@ -764,7 +764,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	# V0.10 / H1 : courbe d'expérience (les premières séries coûtent plus cher à fabriquer)
 	# et part des distributeurs sur les ventes grand public (pas sur les contrats B2B directs).
 	var learning := experience_cost_factor()
-	var production_cost := int(round(float(total_units * int(product.unit_cost)) * MarketManager.production_cost_threat_factor() * learning))
+	# D2 : la courbe d'expérience et les tensions d'approvisionnement ne touchent que la fabrication de la puce,
+	# pas le coût fixe de mise sur le marché (test final, boîtier, qualification).
+	var entry_cost := clampi(int(product.get("market_entry_cost", 0)), 0, int(product.unit_cost))
+	var silicon_cost := int(product.unit_cost) - entry_cost
+	var production_cost := int(round(float(total_units * silicon_cost) * MarketManager.production_cost_threat_factor() * learning)) + total_units * entry_cost
 	var distributor_rate := MarketManager.distributor_share()
 	var distributor_cost := int(round(float(sold_consumer * int(product.price)) * distributor_rate))
 	product["experience_cost_factor"] = learning

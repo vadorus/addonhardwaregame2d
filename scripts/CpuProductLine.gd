@@ -112,9 +112,9 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 
 ## D2 : coût de mise sur le marché par puce (test, boîtier, qualification, garantie), en part du prix de référence.
 const MARKET_ENTRY_RATE := {
-	"CALCULATOR":0.12, "EMBEDDED":0.15, "INDUSTRIAL":0.24, "SCIENTIFIC":0.28, "HOBBYIST":0.18,
-	"BUSINESS_PC":0.28, "HOME_PC":0.30, "WORKSTATION":0.32, "SERVER":0.38, "GAMING":0.30,
-	"MOBILE_COMPUTING":0.32, "DATACENTER":0.40
+	"CALCULATOR":0.07, "EMBEDDED":0.08, "INDUSTRIAL":0.13, "SCIENTIFIC":0.15, "HOBBYIST":0.10,
+	"BUSINESS_PC":0.16, "HOME_PC":0.18, "WORKSTATION":0.20, "SERVER":0.24, "GAMING":0.18,
+	"MOBILE_COMPUTING":0.20, "DATACENTER":0.26
 }
 
 static func market_entry_unit_cost(segment: String, tier_price_factor: float = 1.0) -> int:
