@@ -110,6 +110,18 @@ static func build_range(project: Dictionary, generation_id: String, generation_i
 	}
 	return {"generation":generation, "products":products}
 
+## D2 : coût de mise sur le marché par puce (test, boîtier, qualification, garantie), en part du prix de référence.
+const MARKET_ENTRY_RATE := {
+	"CALCULATOR":0.12, "EMBEDDED":0.15, "INDUSTRIAL":0.24, "SCIENTIFIC":0.28, "HOBBYIST":0.18,
+	"BUSINESS_PC":0.28, "HOME_PC":0.30, "WORKSTATION":0.32, "SERVER":0.38, "GAMING":0.30,
+	"MOBILE_COMPUTING":0.32, "DATACENTER":0.40
+}
+
+static func market_entry_unit_cost(segment: String, tier_price_factor: float = 1.0) -> int:
+	var normalized := MarketManager.normalize_segment(segment)
+	var rate := float(MARKET_ENTRY_RATE.get(normalized, 0.20))
+	return maxi(0, int(round(MarketManager.segment_reference_price(normalized) * rate * clampf(tier_price_factor, 0.5, 2.0))))
+
 static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary, capability_snapshot: Dictionary) -> Dictionary:
 	var tier_key := str(tier.key)
 	var design := _tier_design(architecture, tier_key)
@@ -159,6 +171,12 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 	var target_margin := BalanceManager.gross_margin_target(str(project.get("segment", "EMBEDDED")))
 	var margin_guard_price := float(unit_cost) / maxf(1.0 - target_margin, 0.20)
 	var suggested_price := maxi(unit_cost + 5, _round_price(maxf(price_from_position, maxf(price_from_margin, margin_guard_price))))
+	# D2 (07/10) : la puce n'est pas tout. Test final, boîtier, notice, qualification client et garantie
+	# coûtent plus cher sur un marché exigeant. Sans ce coût, une puce de 28 € se vendait 290 € (90 % de marge)
+	# et une partie de 1987 accumulait 16 M€ sans effort. Le prix conseillé reste celui du positionnement.
+	var market_entry_cost := market_entry_unit_cost(str(_target_segment(str(project.get("segment", "MAINSTREAM")), tier_key)), float(tier.price_factor))
+	unit_cost += market_entry_cost
+	suggested_price = maxi(suggested_price, unit_cost + 5)
 	var recommended_capacity := maxi(25, int(round(float(total_monthly_capacity) * bin_share)))
 	var max_capacity := maxi(recommended_capacity, int(round(float(recommended_capacity) * 1.35)))
 	var suffix := str(tier.suffix)
@@ -225,6 +243,7 @@ static func _build_product(project: Dictionary, tier: Dictionary, tier_index: in
 		"design_estimate":design_estimate,
 		"metrics":metrics,
 		"unit_cost":unit_cost,
+		"market_entry_cost":market_entry_cost,
 		"price":suggested_price,
 		"recommended_capacity":recommended_capacity,
 		"max_monthly_capacity":max_capacity,

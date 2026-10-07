@@ -1736,7 +1736,12 @@ func _ready() -> void:
 	if explanation_error != "":
 		_fail(explanation_error)
 		return
-	print("[CI] C2 : note expliquée par son calcul, note inchangée, conseil et ventes OK")
+	print("[CI] C2/D1 : note expliquée par son calcul, attentes de la presse, conseil et ventes OK")
+	var entry_error: String = (load("res://tests/scenarios/MarketEntryCostScenario.gd") as Script).call("run", self)
+	if entry_error != "":
+		_fail(entry_error)
+		return
+	print("[CI] D2 : coût de mise sur le marché par marché et par gamme OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)
