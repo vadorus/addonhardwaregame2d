@@ -1276,16 +1276,17 @@ func _build_setup_layer():
 	setup_panel.add_child(shell)
 
 	setup_menu_column = VBoxContainer.new()
-	setup_menu_column.anchor_top = 0.5
-	setup_menu_column.anchor_bottom = 0.5
+	# En haut à gauche : le bas de l'écran reste libre pour le décor (et les décorations de saison).
+	setup_menu_column.anchor_top = 0.0
+	setup_menu_column.anchor_bottom = 1.0
 	setup_menu_column.offset_left = 64
 	setup_menu_column.offset_right = 64 + 440
-	setup_menu_column.offset_top = -250
-	setup_menu_column.offset_bottom = 250
-	setup_menu_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	setup_menu_column.offset_top = 48
+	setup_menu_column.offset_bottom = -110
+	setup_menu_column.alignment = BoxContainer.ALIGNMENT_BEGIN
 	setup_layer.add_child(setup_menu_column)
 	setup_title_box = VBoxContainer.new()
-	setup_title_box.add_theme_constant_override("separation", 10)
+	setup_title_box.add_theme_constant_override("separation", 8)
 	setup_menu_column.add_child(setup_title_box)
 
 	var brand_row := HBoxContainer.new()
@@ -1414,8 +1415,8 @@ func _title_menu_button(text: String, action: Callable, primary: bool = false) -
 	var button := Button.new()
 	button.text = text
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size = Vector2(360, 54)
-	button.add_theme_font_size_override("font_size", 20)
+	button.custom_minimum_size = Vector2(360, 48)
+	button.add_theme_font_size_override("font_size", 19)
 	var base := Color("2f9e5b") if primary else Color(1.0, 0.97, 0.92, 0.88)
 	var ink := Color.WHITE if primary else Color("3b2b1e")
 	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
