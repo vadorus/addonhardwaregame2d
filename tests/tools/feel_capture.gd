@@ -30,6 +30,13 @@ func _ready() -> void:
 	game = (load("res://main.tscn") as PackedScene).instantiate() as Control
 	add_child(game)
 	await _frames(8)
+	if moment == "intro":
+		game.call("_play_intro_if_first_launch", true)
+		for t in [0.6, 1.8, 3.4, 5.6, 7.6]:
+			await _wait(t - [0.0, 0.6, 1.8, 3.4, 5.6][[0.6, 1.8, 3.4, 5.6, 7.6].find(t)])
+			await _shot("intro_%.1fs" % t)
+		get_tree().quit(0)
+		return
 	if moment == "titre":
 		await _wait(1.5)
 		await _shot("titre")

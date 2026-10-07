@@ -1450,14 +1450,15 @@ func _start_title_drift() -> void:
 	_title_drift.tween_property(setup_title_art, "scale", Vector2.ONE, 22.0)
 
 ## Intro (premier lancement, touche pour passer) : trois phrases dans le noir, puis le garage s'éclaire.
-func _play_intro_if_first_launch() -> void:
+func _play_intro_if_first_launch(force: bool = false) -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
-	# Les tests (dossier de sauvegarde à part) et les captures ne jouent pas l'intro.
-	if bool(config.get_value("ui", "intro_seen", false)) or JUICE.reduced_motion or not setup_layer.visible or SaveManager.save_root != "user://":
+	# Les tests (dossier de sauvegarde à part) et les captures ne jouent pas l'intro (sauf demande explicite).
+	if not force and (bool(config.get_value("ui", "intro_seen", false)) or JUICE.reduced_motion or not setup_layer.visible or SaveManager.save_root != "user://"):
 		return
-	config.set_value("ui", "intro_seen", true)
-	config.save(SETTINGS_PATH)
+	if not force:
+		config.set_value("ui", "intro_seen", true)
+		config.save(SETTINGS_PATH)
 	intro_layer = ColorRect.new()
 	(intro_layer as ColorRect).color = Color(0.06, 0.04, 0.03, 1.0)
 	intro_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
