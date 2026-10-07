@@ -68,6 +68,8 @@ func _run(profile: String) -> void:
 		if TimeManager.year != last_year:
 			last_year = TimeManager.year
 			yearly.append("%d: %s €" % [TimeManager.year, _k(Economy.money)])
+			if profile == "DEFAUT" and TimeManager.year in [1974, 1977, 1980]:
+				print("[SONDE] bilan %d : %s" % [TimeManager.year - 1, _year_summary()])
 	print("[SONDE] ===== %s =====" % profile)
 	print("[SONDE] départ %s € · %d mois joués · %d projets · %d modèles lancés · faillite: %s" % [_k(start_money), months, project_count, launched, str(SimulationManager.is_game_over)])
 	print("[SONDE] argent par année : " + " | ".join(yearly))
@@ -78,6 +80,32 @@ func _run(profile: String) -> void:
 	print("[SONDE] en vente : %d modeles, marge brute du dernier mois %s EUR, equipe : %d" % [on_sale.size(), _k(monthly), PersonnelManager.staff.size()])
 	for line in _reviews:
 		print("[SONDE] presse " + str(line))
+
+## Recettes et dépenses des 12 derniers mois, regroupées par catégorie (le nom du produit est retiré).
+func _year_summary() -> String:
+	var income := {}
+	var expense := {}
+	var reports: Array = Economy.history.slice(maxi(Economy.history.size() - 12, 0))
+	for report_value in reports:
+		var report: Dictionary = report_value
+		for key in (report.get("income_breakdown", {}) as Dictionary).keys():
+			var k := str(key).split(" — ")[0]
+			income[k] = int(income.get(k, 0)) + int(report.income_breakdown[key])
+		for key in (report.get("expense_breakdown", {}) as Dictionary).keys():
+			var k := str(key).split(" — ")[0]
+			expense[k] = int(expense.get(k, 0)) + int(report.expense_breakdown[key])
+	var parts: Array[String] = []
+	var total_in := 0
+	var total_out := 0
+	for k in income.keys():
+		total_in += int(income[k])
+		parts.append("+%s %s" % [k, _k(int(income[k]))])
+	for k in expense.keys():
+		total_out += int(expense[k])
+		if int(expense[k]) >= 2000:
+			parts.append("-%s %s" % [k, _k(int(expense[k]))])
+	var market := MarketManager.segment_market_units(MarketManager.default_segment())
+	return "recettes %s, dépenses %s, marché %s puces/mois || %s" % [_k(total_in), _k(total_out), str(market), " | ".join(parts)]
 
 func _ready_products() -> Array:
 	return ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "READY")
