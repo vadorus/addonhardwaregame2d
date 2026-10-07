@@ -211,23 +211,45 @@ func _outlet_score(outlet: Dictionary, product: Dictionary, _segment_scores: Dic
 ## d'essai (médias de benchmark), la marge d'overclocking (vidéastes) → « base ». Ensuite la comparaison au
 ## meilleur rival et à votre modèle précédent, puis l'effet de l'interview → « final », la note publiée.
 ## parts : [{key, points}] du plus grand effet au plus petit ; les bornes 0-100 apparaissent en « clamp ».
+## D1 (07/10, retour d'Alexandre : « 9,8/10 pour tout ce qu'on sort ») : la presse note par rapport à ce
+## qu'elle ATTENDAIT, pas dans l'absolu. Avec une référence du moment (le meilleur rival du marché), chaque
+## critère est comparé au sien : être à son niveau vaut 5,6. Le tout premier CPU d'une marque profite de
+## l'effet nouveauté ; ensuite, chaque suite doit progresser nettement, et une suite trop rapprochée agace.
+## Sans référence (bac à sable, tests isolés), l'ancienne lecture absolue s'applique (départ 5,0).
+const PRESS_PAR_START := 56.0
+const PRESS_RELATIVE_GAIN := 0.8
+const PRESS_PART_CAP := 12.0
+const PRESS_NOVELTY_BONUS := 9.0
+const PRESS_EXPECTED_PROGRESS := 4.0
+const PRESS_TOO_SOON_MONTHS := 10
+
 func review_breakdown(outlet: Dictionary, product: Dictionary, benchmark_rank: int, benchmark_total: int, comparison: Dictionary) -> Dictionary:
 	var channel := str(outlet.get("channel", "SPECIALIST_PRESS"))
 	var weights: Dictionary = OUTLET_WEIGHTS.get(channel, OUTLET_WEIGHTS.SPECIALIST_PRESS)
 	var metrics: Dictionary = product.get("metrics", {})
+	var reference: Dictionary = comparison.get("rival_metrics", {})
+	var relative := bool(comparison.get("has_rival", false)) and not reference.is_empty()
+	var start := PRESS_PAR_START if relative else 50.0
 	var parts: Array = []
-	var raw := 50.0
+	var raw := 0.0
+	var absolute := 50.0
 	for key_value in weights.keys():
 		var key := str(key_value)
 		var value := 50.0
+		var ref := 50.0
 		if key == "price":
 			value = MarketManager.price_score(product, str(product.get("target_segment", MarketManager.default_segment())))
+			ref = float(comparison.get("rival_price_score", 60.0))
 		elif key == "brand":
 			value = CompanyManager.get_brand_score()
 		else:
 			value = float(metrics.get(key, 50.0))
+			ref = float(reference.get(key, 50.0))
+		absolute += (value - 50.0) * float(weights[key])
 		var points := (value - 50.0) * float(weights[key])
-		parts.append({"key":key, "points":points, "weight":float(weights[key]), "value":value})
+		if relative and key != "brand":
+			points = clampf((value - ref) * float(weights[key]) * PRESS_RELATIVE_GAIN, -PRESS_PART_CAP, PRESS_PART_CAP)
+		parts.append({"key":key, "points":points, "weight":float(weights[key]), "value":value, "ref":ref})
 		raw += points
 	if channel in ["BENCHMARK", "BENCHMARK_SITE"] and benchmark_total > 0:
 		var rank_bonus := (1.0 - float(maxi(benchmark_rank - 1, 0)) / float(maxi(benchmark_total - 1, 1))) * 12.0 - 4.0
@@ -238,19 +260,30 @@ func review_breakdown(outlet: Dictionary, product: Dictionary, benchmark_rank: i
 		if absf(overclock) > 0.001:
 			parts.append({"key":"overclock", "points":overclock})
 			raw += overclock
-	var base := clampf(raw, 0.0, 100.0)
-	var rival := clampf(float(comparison.get("rival_delta", 0.0)) * 0.52, -14.0, 14.0) if bool(comparison.get("has_rival", false)) else 0.0
-	var previous := clampf(float(comparison.get("previous_delta", 0.0)) * 0.30, -9.0, 9.0) if bool(comparison.get("has_previous", false)) else 0.0
-	var era := _era_relative_score(base, comparison)
-	var final := press_pitch_adjusted(era, str(product.get("press_pitch", "")), channel, benchmark_rank)
+	# Sans détail du rival, son écart global reste pris en compte (ancienne règle).
+	var rival := 0.0 if relative else (clampf(float(comparison.get("rival_delta", 0.0)) * 0.52, -14.0, 14.0) if bool(comparison.get("has_rival", false)) else 0.0)
+	var has_previous := bool(comparison.get("has_previous", false))
+	var previous := 0.0
+	var novelty := 0.0
+	var too_soon := 0.0
+	if has_previous:
+		previous = clampf((float(comparison.get("previous_delta", 0.0)) - PRESS_EXPECTED_PROGRESS) * 0.9, -12.0, 8.0)
+		var age := int(comparison.get("previous_age", 99))
+		if age < PRESS_TOO_SOON_MONTHS:
+			too_soon = -minf(float(PRESS_TOO_SOON_MONTHS - age) * 0.6, 6.0)
+	elif relative:
+		novelty = PRESS_NOVELTY_BONUS
+	var before_interview := clampf(start + raw + rival + previous + novelty + too_soon, 0.0, 100.0)
+	var final := press_pitch_adjusted(before_interview, str(product.get("press_pitch", "")), channel, benchmark_rank)
 	parts.sort_custom(func(a, b): return absf(float(a.points)) > absf(float(b.points)))
 	return {
-		"channel":channel, "start":50.0, "parts":parts, "base":base,
+		"channel":channel, "start":start, "relative":relative, "parts":parts, "base":clampf(absolute, 0.0, 100.0),
 		"rival":rival, "rival_name":str(comparison.get("rival_name", "")),
 		"previous":previous, "previous_name":str(comparison.get("previous_name", "")),
-		"interview":final - era, "final":final,
+		"novelty":novelty, "too_soon":too_soon,
+		"interview":final - before_interview, "final":final,
 		# Ce que les bornes 0-100 ont retiré ou ajouté (rare) : la somme affichée tombe toujours juste.
-		"clamp":final - (raw + rival + previous + (final - era))
+		"clamp":before_interview - (start + raw + rival + previous + novelty + too_soon)
 	}
 
 ## Version compacte gardée avec chaque test (sauvegardée) : [[clé, points arrondis au dixième], …].
@@ -259,7 +292,9 @@ static func compact_breakdown(breakdown: Dictionary) -> Dictionary:
 	for part_value in breakdown.get("parts", []):
 		var part: Dictionary = part_value
 		parts.append([str(part.key), snappedf(float(part.points), 0.1)])
-	return {"parts":parts, "rival":snappedf(float(breakdown.get("rival", 0.0)), 0.1), "rival_name":str(breakdown.get("rival_name", "")),
+	return {"parts":parts, "start":float(breakdown.get("start", 50.0)),
+		"novelty":snappedf(float(breakdown.get("novelty", 0.0)), 0.1), "too_soon":snappedf(float(breakdown.get("too_soon", 0.0)), 0.1),
+		"rival":snappedf(float(breakdown.get("rival", 0.0)), 0.1), "rival_name":str(breakdown.get("rival_name", "")),
 		"previous":snappedf(float(breakdown.get("previous", 0.0)), 0.1), "previous_name":str(breakdown.get("previous_name", "")),
 		"interview":snappedf(float(breakdown.get("interview", 0.0)), 0.1), "clamp":snappedf(float(breakdown.get("clamp", 0.0)), 0.1),
 		"final":float(breakdown.get("final", 50.0))}
@@ -302,12 +337,20 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	if bool(comparison.get("has_previous", false)):
 		var previous_delta := float(comparison.get("previous_delta", 0.0))
 		var previous_name := str(comparison.get("previous_name", "la génération précédente"))
-		if previous_delta >= 2.5:
+		if previous_delta >= PRESS_EXPECTED_PROGRESS + 3.0:
+			sentences.append("Par rapport à %s, le bond est réel (+%.1f points au benchmark) : voilà une vraie raison de changer." % [previous_name, previous_delta])
+		elif previous_delta >= PRESS_EXPECTED_PROGRESS:
 			sentences.append("Par rapport à %s, la progression est nette (+%.1f points au benchmark)." % [previous_name, previous_delta])
 		elif previous_delta <= -2.5:
 			sentences.append("Déception : il recule face à %s (%.1f points au benchmark)." % [previous_name, previous_delta])
+		elif previous_delta < 1.5:
+			sentences.append("Franchement, c'est un %s repeint (%+.1f point) : pourquoi le racheter ?" % [previous_name, previous_delta])
 		else:
-			sentences.append("Face à %s, l'évolution reste limitée (%+.1f point)." % [previous_name, previous_delta])
+			sentences.append("Face à %s, l'évolution reste timide (%+.1f point) : on attendait plus." % [previous_name, previous_delta])
+		if int(comparison.get("previous_age", 99)) < PRESS_TOO_SOON_MONTHS:
+			sentences.append("Et %s n'a que %d mois : ses acheteurs vont grincer des dents." % [previous_name, int(comparison.get("previous_age", 0))])
+	elif bool(comparison.get("has_rival", false)) and not (comparison.get("rival_metrics", {}) as Dictionary).is_empty():
+		sentences.append("Pour un premier processeur, %s fait une entrée remarquée : on surveillera la suite." % CompanyManager.company_name)
 	if bool(comparison.get("has_rival", false)):
 		var rival_delta := float(comparison.get("rival_delta", 0.0))
 		var rival_name := str(comparison.get("rival_name", "le meilleur rival"))

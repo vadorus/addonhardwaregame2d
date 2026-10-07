@@ -5,7 +5,8 @@ extends RefCounted
 
 const FACTOR_LABELS := {
 	"price":"Prix", "brand":"Image de marque", "rank":"Classement au banc d'essai",
-	"overclock":"Marge d'overclocking", "interview":"Votre interview"
+	"overclock":"Marge d'overclocking", "interview":"Votre interview",
+	"novelty":"Effet nouveauté (premier CPU)", "too_soon":"Suite trop rapprochée"
 }
 
 static func factor_label(key: String, why: Dictionary = {}) -> String:
@@ -31,7 +32,7 @@ static func effects(why: Dictionary) -> Array:
 	for part_value in why.get("parts", []):
 		var part: Array = part_value
 		rows.append([str(part[0]), float(part[1]), factor_label(str(part[0]), why)])
-	for key in ["rival", "previous", "interview"]:
+	for key in ["rival", "previous", "novelty", "too_soon", "interview"]:
 		var points := float(why.get(key, 0.0))
 		if absf(points) >= 0.05:
 			rows.append([key, points, factor_label(key, why)])
@@ -39,7 +40,7 @@ static func effects(why: Dictionary) -> Array:
 
 ## Le calcul complet d'un test, lisible : « Départ 5,0 · Performance +0,6 · Prix −0,4 … = 6,2 ».
 static func detail_line(why: Dictionary) -> String:
-	var bits: Array[String] = ["Départ 5,0"]
+	var bits: Array[String] = ["Départ %s" % tenths(float(why.get("start", 50.0)), false)]
 	for row_value in effects(why):
 		var row: Array = row_value
 		if absf(float(row[1])) >= 0.5:
@@ -121,7 +122,9 @@ static func advice(brake: Dictionary) -> String:
 		"rival":
 			return "%s est devant : sortez une génération nettement meilleure, ou visez un marché où il est moins fort." % str(brake.label).trim_prefix("Face à ")
 		"previous":
-			return "La presse attend un progrès à chaque génération : ne sortez une suite que si elle fait mieux."
+			return "La presse attend un vrai progrès à chaque génération : laissez l'équipe chercher (ou passez-la sur un projet logiciel) avant de sortir la suite."
+		"too_soon":
+			return "Cette suite est arrivée trop vite : laissez vivre un modèle au moins un an avant de le remplacer."
 		"interview":
 			return "Votre interview a coûté des points : ne promettez « le meilleur CPU » que si vous l'êtes vraiment."
 		"rank":

@@ -20,7 +20,7 @@ static func run(host: Node) -> String:
 		if absf(total - 1.0) > 0.0001:
 			return "C2: weights of %s sum to %.3f, not 1" % [channel, total]
 
-	# 2. La note ne change pas (ancienne formule recopiée) et l'explication retombe exactement sur la note.
+	# 2. L'explication retombe exactement sur la note, pour chaque média, interview et rang.
 	for channel in MediaManager.OUTLET_WEIGHTS.keys():
 		for pitch in ["", "BOLD", "HONEST", "TECH"]:
 			for rank in [1, 3]:
@@ -28,14 +28,38 @@ static func run(host: Node) -> String:
 				p["press_pitch"] = pitch
 				var outlet := {"id":"CI_" + str(channel), "name":"CI", "channel":channel, "reach":0.5}
 				var b: Dictionary = MediaManager.review_breakdown(outlet, p, rank, 5, comparison)
-				var expected := _legacy_score(channel, p, rank, 5, comparison)
-				if absf(float(b.final) - expected) > 0.01:
-					return "C2: %s note changed with the explanation (%.3f instead of %.3f, pitch %s)" % [channel, float(b.final), expected, pitch]
-				var sum := float(b.start) + float(b.rival) + float(b.previous) + float(b.interview) + float(b.clamp)
+				var sum := float(b.start) + float(b.rival) + float(b.previous) + float(b.novelty) + float(b.too_soon) + float(b.interview) + float(b.clamp)
 				for part_value in b.parts:
 					sum += float((part_value as Dictionary).points)
 				if absf(sum - float(b.final)) > 0.01:
 					return "C2: %s explanation does not add up to the note (%.3f vs %.3f)" % [channel, sum, float(b.final)]
+
+	# 2 bis. D1 : la presse note par rapport à ce qu'elle attendait.
+	var spec := {"id":"CI_SPEC_D1", "name":"CI", "channel":"SPECIALIST_PRESS", "reach":0.5}
+	var at_par := {"has_rival":true, "rival_name":"Helix 4", "rival_delta":0.0, "has_previous":false,
+		"rival_metrics":base_metrics.duplicate(), "rival_price_score":MarketManager.price_score(product, "INDUSTRIAL")}
+	var first_score := float(MediaManager.review_breakdown(spec, product, 2, 5, at_par).final)
+	if absf(first_score - (MediaManager.PRESS_PAR_START + MediaManager.PRESS_NOVELTY_BONUS)) > 0.01:
+		return "D1: a first CPU at the level of the best rival should score par + novelty (%.1f)" % first_score
+	var same := at_par.duplicate(true)
+	same.merge({"has_previous":true, "previous_name":"Nova 1", "previous_delta":0.5, "previous_age":24}, true)
+	var same_score := float(MediaManager.review_breakdown(spec, product, 2, 5, same).final)
+	if same_score > first_score - 10.0:
+		return "D1: an identical sequel should be clearly below the first CPU (%.1f vs %.1f)" % [same_score, first_score]
+	var leap := same.duplicate(true)
+	leap["previous_delta"] = 10.0
+	var leap_score := float(MediaManager.review_breakdown(spec, product, 2, 5, leap).final)
+	if leap_score <= same_score + 8.0:
+		return "D1: a real generational leap should be rewarded (%.1f vs %.1f)" % [leap_score, same_score]
+	var rushed := leap.duplicate(true)
+	rushed["previous_age"] = 4
+	var rushed_b: Dictionary = MediaManager.review_breakdown(spec, product, 2, 5, rushed)
+	if float(rushed_b.too_soon) >= 0.0 or float(rushed_b.final) >= leap_score:
+		return "D1: a sequel released 4 months after its predecessor should be penalised"
+	var behind := at_par.duplicate(true)
+	behind["rival_metrics"] = {"performance":84.0, "efficiency":67.0, "reliability":91.0, "usability":75.0, "innovation":78.0, "ecosystem":64.0, "sustainability":70.0}
+	if float(MediaManager.review_breakdown(spec, product, 2, 5, behind).final) >= first_score - 8.0:
+		return "D1: being far behind the reference of the moment should cost points"
 
 	# 3. Cohérence : une meilleure fiabilité ne fait jamais baisser un média qui la regarde.
 	var better := product.duplicate(true)
@@ -110,32 +134,3 @@ static func run(host: Node) -> String:
 	if not needs.begins_with("Ce que ce marché regarde : Fiabilité 34 %"):
 		return "C2: market priorities are wrong or missing: %s" % needs
 	return ""
-
-## Ancienne formule de MediaManager._outlet_score (avant C2), recopiée telle quelle : la note ne doit pas bouger.
-static func _legacy_score(channel: String, product: Dictionary, rank: int, total: int, comparison: Dictionary) -> float:
-	var m: Dictionary = product.metrics
-	var price := MarketManager.price_score(product, str(product.target_segment))
-	var perf := float(m.performance); var eff := float(m.efficiency); var rel := float(m.reliability)
-	var usa := float(m.usability); var inn := float(m.innovation); var eco := float(m.ecosystem)
-	var rank_bonus := (1.0 - float(maxi(rank - 1, 0)) / float(maxi(total - 1, 1))) * 12.0 - 4.0
-	var raw := 0.0
-	match channel:
-		"BENCHMARK", "BENCHMARK_SITE":
-			raw = clampf(perf * 0.34 + eff * 0.22 + rel * 0.20 + price * 0.24 + rank_bonus, 0.0, 100.0)
-		"GENERAL_PRESS":
-			raw = clampf(inn * 0.42 + perf * 0.18 + usa * 0.18 + CompanyManager.get_brand_score() * 0.22, 0.0, 100.0)
-		"COMMUNITY":
-			raw = clampf(price * 0.32 + usa * 0.22 + eco * 0.20 + perf * 0.16 + rel * 0.10, 0.0, 100.0)
-		"VIDEO_CREATOR":
-			raw = clampf(perf * 0.26 + price * 0.25 + inn * 0.19 + usa * 0.15 + rel * 0.15 + float(product.get("oc_headroom_pct", 0.0)) * 0.35, 0.0, 100.0)
-		"STREAMER":
-			raw = clampf(perf * 0.34 + rel * 0.20 + usa * 0.16 + price * 0.14 + eco * 0.16, 0.0, 100.0)
-		_:
-			raw = clampf(rel * 0.38 + eff * 0.20 + perf * 0.16 + price * 0.14 + eco * 0.12, 0.0, 100.0)
-	var era := raw
-	if bool(comparison.get("has_rival", false)):
-		era += clampf(float(comparison.rival_delta) * 0.52, -14.0, 14.0)
-	if bool(comparison.get("has_previous", false)):
-		era += clampf(float(comparison.previous_delta) * 0.30, -9.0, 9.0)
-	era = clampf(era, 0.0, 100.0)
-	return MediaManager.press_pitch_adjusted(era, str(product.get("press_pitch", "")), channel, rank)

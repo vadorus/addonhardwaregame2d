@@ -878,9 +878,13 @@ func press_comparison(product: Dictionary) -> Dictionary:
 	var result := {"current_score":current_score,"has_previous":not previous.is_empty(),"has_rival":not best_rival.is_empty()}
 	if not previous.is_empty():
 		var previous_score := benchmark_score(previous)
-		result.merge({"previous_name":str(previous.get("name", "Ancienne génération")),"previous_score":previous_score,"previous_delta":current_score-previous_score})
+		result.merge({"previous_name":str(previous.get("name", "Ancienne génération")),"previous_score":previous_score,"previous_delta":current_score-previous_score,
+			"previous_age":maxi(int(previous.get("months_on_market", 0)), 0)})
 	if not best_rival.is_empty():
-		result.merge({"rival_name":str(best_rival.get("name", "Concurrent")),"rival_company":str(best_rival.get("company", "")),"rival_score":best_rival_score,"rival_delta":current_score-best_rival_score})
+		result.merge({"rival_name":str(best_rival.get("name", "Concurrent")),"rival_company":str(best_rival.get("company", "")),"rival_score":best_rival_score,"rival_delta":current_score-best_rival_score,
+			# D1 (07/10) : la presse compare chaque critère à la référence du moment, plus seulement le score global.
+			"rival_metrics":(best_rival.get("metrics", {}) as Dictionary).duplicate(),
+			"rival_price_score":price_score(best_rival, target) if best_rival.has("price") else 60.0})
 	return result
 
 func _segment_expectation_drift(segment: String) -> float:
