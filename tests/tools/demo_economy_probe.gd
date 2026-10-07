@@ -4,7 +4,7 @@ extends Node
 ## Imprime l'argent par année et les notes de presse de chaque lancement. Ne fait échouer aucun test.
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
-const YEARS := 10
+const YEARS := 30
 
 var _reviews: Array = []
 
@@ -16,7 +16,7 @@ func _ready() -> void:
 		for review in published:
 			total += float((review as Dictionary).get("score", 0.0))
 		_reviews.append("%s %d/%02d : %.1f/10 (%d tests)" % [name, TimeManager.year, TimeManager.month, total / maxf(float(published.size()), 1.0) / 10.0, published.size()]))
-	for profile in ["DEFAUT", "UN_SEUL", "TROP_CHER"]:
+	for profile in (["DEFAUT"] if OS.get_cmdline_user_args().has("--tech") else ["DEFAUT", "UN_SEUL", "TROP_CHER"]):
 		_run(profile)
 	get_tree().quit(0)
 
@@ -123,4 +123,7 @@ func _tech() -> String:
 	var best := 10000
 	for n in nodes:
 		best = mini(best, int(n))
-	return "[grav %s µm, fab %.0f, mini %.0f, archi %.0f]" % [str(best / 1000.0), manufacturing, mini, ResearchManager.get_cpu_capability("ARCHITECTURE")]
+	var rival := 0.0
+	for c in MarketManager.competitors.get("CPU", []):
+		rival = maxf(rival, minf(float((c as Dictionary).get("miniaturization_skill", 0.0)), float((c as Dictionary).get("manufacturing_skill", 0.0))))
+	return "[grav %s µm, fab %.0f, mini %.0f, archi %.0f, rival %.0f]" % [str(best / 1000.0), manufacturing, mini, ResearchManager.get_cpu_capability("ARCHITECTURE"), rival]
