@@ -67,7 +67,7 @@ func _run(profile: String) -> void:
 			TimeManager.year += 1
 		if TimeManager.year != last_year:
 			last_year = TimeManager.year
-			yearly.append("%d: %s €" % [TimeManager.year, _k(Economy.money)])
+			yearly.append("%d: %s € %s" % [TimeManager.year, _k(Economy.money), _tech()])
 			if profile == "DEFAUT" and TimeManager.year in [1974, 1977, 1980]:
 				print("[SONDE] bilan %d : %s" % [TimeManager.year - 1, _year_summary()])
 	print("[SONDE] ===== %s =====" % profile)
@@ -114,3 +114,13 @@ func _k(value: int) -> String:
 	if absi(value) >= 1000000:
 		return "%.1f M" % (float(value) / 1000000.0)
 	return "%d k" % int(round(float(value) / 1000.0))
+
+## Revue des onglets (07/10) : où en est la technologie ? (gravure atteinte, maîtrise, rivaux)
+func _tech() -> String:
+	var manufacturing := float(ResearchManager.technologies.get("manufacturing", 0.0))
+	var mini := ResearchManager.get_cpu_capability("MINIATURIZATION")
+	var nodes: Array = CPU_DESIGN.available_nodes_for_capabilities(manufacturing, mini)
+	var best := 10000
+	for n in nodes:
+		best = mini(best, int(n))
+	return "[grav %s µm, fab %.0f, mini %.0f, archi %.0f]" % [str(best / 1000.0), manufacturing, mini, ResearchManager.get_cpu_capability("ARCHITECTURE")]
