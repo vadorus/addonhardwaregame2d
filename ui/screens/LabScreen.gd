@@ -106,6 +106,8 @@ func _build() -> void:
 
 	var heading := VBoxContainer.new()
 	box.add_child(heading)
+	# Revue des onglets (07/10) : la scène du labo (LabBoard) remplace ce titre abstrait.
+	heading.visible = false
 	heading.add_child(_eyebrow("LABORATOIRE DE CONCEPTION"))
 	heading.add_child(_label("Donnez une personnalité à votre processeur", 27))
 	var intro := _muted_label("Chaque choix technique change les performances, le coût, la consommation, le risque et le temps de développement.", 13)
@@ -509,9 +511,14 @@ func _build() -> void:
 	var pager_script: Script = load("res://ui/SectionPager.gd")
 	pager = pager_script.new() as Control
 	box.add_child(pager)
-	var new_page: VBoxContainer = pager.call("add_page", "NEW", "Nouveau CPU")
-	# V0.9 : entrée principale = conception en étapes ; le formulaire complet reste dessous (mode expert).
+	var new_page: VBoxContainer = pager.call("add_page", "NEW", "Le labo")
+	# Revue des onglets (07/10) : la planche 5 du canvas — scène, architectures, équipes, gravure, carnet.
+	lab_board = (load("res://ui/components/LabBoard.gd") as Script).new() as Control
+	lab_board.connect("board_action", _on_board_action)
+	new_page.add_child(lab_board)
+	# V0.9 : entrée principale = conception en étapes ; le bouton du labo (scène) la lance maintenant.
 	var stepper_button := Button.new()
+	stepper_button.visible = false
 	stepper_button.text = "✚  Concevoir un nouveau processeur, étape par étape"
 	stepper_button.custom_minimum_size.y = 56
 	stepper_button.add_theme_font_size_override("font_size", 17)
@@ -607,6 +614,21 @@ func _build() -> void:
 	lab_reference_design = CPU_DESIGN.default_design()
 	lab_reference_name = "Design équilibré"
 	set_depth_mode("ESSENTIAL")
+
+var lab_board: Control
+
+func _on_board_action(action: Dictionary) -> void:
+	match str(action.get("type", "")):
+		"OPEN_STEPPER":
+			action_requested.emit("open_stepper", null)
+		"SHOW_PROJECTS":
+			show_section("PROJECTS")
+		"SHOW_RESEARCH":
+			show_section("RESEARCH")
+		"CONCEPT":
+			_on_research_tree_action(action)
+		"MESSAGE":
+			_emit_action("research_tree_message", str(action.get("text", "")))
 
 ## Ouvre la sous-page utile selon d'où vient le joueur (garage, Nora, décision).
 func show_section(key: String) -> void:
@@ -775,6 +797,8 @@ func refresh_research_content() -> void:
 		research_tree.call("refresh")
 	if research_teams_panel != null:
 		research_teams_panel.call("refresh")
+	if lab_board != null and lab_board.is_inside_tree():
+		lab_board.call("refresh")
 
 	if concept_status_label != null:
 		var concept_lines: Array[String] = []

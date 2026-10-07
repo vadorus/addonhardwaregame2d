@@ -26,8 +26,8 @@ const BAD_TEXT := Color("b3261e")
 const STEPS := ["Gamme", "Architecture", "Objectif", "Modèles", "Budget"]
 ## D3 (07/10) : maquette « L'établi » validée — la puce vit dans le garage, Camille réagit à chaque étape.
 const GARAGE_ART := "res://assets/art/v010/J1_decors/decor_0_garage.webp"
-const CAMILLE_THINK := "res://assets/art/v010/J2_personnages/perso_03_reflexion.png"
-const CAMILLE_JOY := "res://assets/art/v010/J2_personnages/perso_03_joie.png"
+const CAMILLE_THINK := "res://assets/art/v010/J2_personnages/perso_02_reflexion.png"
+const CAMILLE_JOY := "res://assets/art/v010/J2_personnages/perso_02_joie.png"
 const AXIS_COLORS := {"performance":Color("e8743b"), "efficiency":Color("3a9fd6"), "reliability":Color("4caf6a")}
 const CORE_STEPS := [1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64]
 const FREQ_FACTORS := [0.4, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]

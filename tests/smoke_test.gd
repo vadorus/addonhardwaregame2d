@@ -1757,6 +1757,11 @@ func _ready() -> void:
 		_fail(diffusion_error)
 		return
 	print("[CI] Diffusion du savoir : la gravure suit l'état de l'art avec retard OK")
+	var lab_board_error: String = (load("res://tests/scenarios/LabBoardScenario.gd") as Script).call("run", self)
+	if lab_board_error != "":
+		_fail(lab_board_error)
+		return
+	print("[CI] Labo (planche 5) : scène, architectures, équipes, gravure, carnet OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

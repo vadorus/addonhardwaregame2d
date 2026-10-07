@@ -2246,6 +2246,9 @@ func _update_responsive_layout():
 	var narrow := size.x < 620.0
 	if lab_layout_grid != null:
 		lab_layout_grid.columns = 1 if compact else 2
+	var board: Control = lab_screen.get("lab_board") if lab_screen != null else null
+	if board != null:
+		board.call("set_viewport_width", size.x)
 	var tree: Control = lab_screen.get("research_tree") if lab_screen != null else null
 	if tree != null:
 		tree.call("set_viewport_width", size.x)

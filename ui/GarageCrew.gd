@@ -171,23 +171,15 @@ func _rebuild_members() -> void:
 	staff.sort_custom(func(a, b): return int(order.get(str(a.get("department", "")), 9)) < int(order.get(str(b.get("department", "")), 9)))
 	var layout := WORKPLACE.crew_layout(_tier)
 	var seats: Array = layout.seats
-	var looks := WORKPLACE.staff_looks()
-	var used := {}
-	for i in range(mini(staff.size(), seats.size())):
-		var employee: Dictionary = staff[i]
+	# Chaque salarié garde le même visage partout (WorkplaceArt.assign_looks) ; deux personnes à l'écran ne se ressemblent pas.
+	var seated: Array = staff.slice(0, mini(staff.size(), seats.size()))
+	var looks := WORKPLACE.assign_looks(seated)
+	for i in range(seated.size()):
+		var employee: Dictionary = seated[i]
 		var seat: Vector3 = seats[i]
 		var id := str(employee.get("id", ""))
-		# Chaque salarié garde le même visage ; deux personnes à l'écran ne se ressemblent pas.
-		# D'abord parmi les visages bien distincts, puis les variantes.
-		var distinct := WORKPLACE.DISTINCT_STAFF_LOOKS.size()
-		var pick := absi(hash(id)) % distinct
-		for _probe in range(looks.size()):
-			if not used.has(looks[pick]):
-				break
-			pick = (pick + 1) % looks.size()
-		used[looks[pick]] = true
 		_add_member({"id":id, "name":str(employee.get("name", "")), "role":str(employee.get("role", "")),
-			"department":str(employee.get("department", "")), "pose":"SIT", "facing":seat.z, "at":Vector2(seat.x, seat.y), "look":looks[pick]})
+			"department":str(employee.get("department", "")), "pose":"SIT", "facing":seat.z, "at":Vector2(seat.x, seat.y), "look":int(looks.get(id, 1))})
 	var nora := ExecutiveManager.get_right_hand()
 	_add_member({"id":"NORA", "name":str(nora.get("name", "Nora Bernard")), "role":"Bras droit", "department":"Direction",
 		"pose":"STAND", "facing":-1.0, "at":layout.nora, "hair":Color("5a3a2a"), "shirt":Color("3f7f8c"), "look":WORKPLACE.NORA_LOOK})

@@ -92,6 +92,40 @@ static func character_path(look: int, pose: String) -> String:
 const DISTINCT_STAFF_LOOKS := [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]
 const EXTRA_STAFF_LOOKS := []
 
+## Revue des onglets (07/10) : un même personnage garde le même visage partout (QG, établi, jour J, labo).
+## Avant, Nora était le n° 4 au QG mais le n° 2 au jour J, et « Camille » (une cofondatrice) avait à l'établi
+## le visage d'un homme grisonnant (n° 3). Les fondateurs ont maintenant un visage réservé.
+const CAST := {"Camille Durand":2, "Samira Lefèvre":7, "Noah Leroy":8}
+
+static func cast_look(name: String) -> int:
+	return int(CAST.get(name, 0))
+
+## Visage de chaque salarié (id → numéro) : les fondateurs d'abord, puis un visage stable par personne,
+## sans doublon tant qu'il reste des visages libres.
+static func assign_looks(staff: Array) -> Dictionary:
+	var result := {}
+	var used := {}
+	for employee_value in staff:
+		var employee: Dictionary = employee_value
+		var fixed := cast_look(str(employee.get("name", "")))
+		if fixed > 0:
+			result[str(employee.get("id", ""))] = fixed
+			used[fixed] = true
+	var looks := staff_looks()
+	for employee_value in staff:
+		var employee: Dictionary = employee_value
+		var id := str(employee.get("id", ""))
+		if result.has(id):
+			continue
+		var pick := absi(hash(id)) % looks.size()
+		for _probe in range(looks.size()):
+			if not used.has(looks[pick]):
+				break
+			pick = (pick + 1) % looks.size()
+		used[looks[pick]] = true
+		result[id] = looks[pick]
+	return result
+
 static func staff_looks() -> Array[int]:
 	var looks: Array[int] = []
 	for look in DISTINCT_STAFF_LOOKS + EXTRA_STAFF_LOOKS:
