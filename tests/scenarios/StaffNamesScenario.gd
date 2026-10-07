@@ -16,6 +16,17 @@ static func run(_host: Node) -> String:
 static func _checks() -> String:
 	if "Nora" in PersonnelManager.FIRST_NAMES:
 		return "Staff: Nora is the assistant, not a candidate name"
+	# Migration des anciennes parties : les « Nora » de l'équipe reçoivent un autre prénom, sans doublon.
+	var saved_staff: Array = PersonnelManager.staff.duplicate(true)
+	PersonnelManager.staff.append({"id":"MIG-1", "name":"Nora Simon"})
+	PersonnelManager.staff.append({"id":"MIG-2", "name":"Nora Morel"})
+	PersonnelManager._rename_assistant_namesakes()
+	var renamed: Array = PersonnelManager.staff.slice(PersonnelManager.staff.size() - 2)
+	PersonnelManager.staff = saved_staff
+	if str(renamed[0].name).begins_with("Nora ") or str(renamed[1].name).begins_with("Nora "):
+		return "Staff: old saves keep employees named Nora (%s)" % str(renamed)
+	if not str(renamed[0].name).ends_with(" Simon") or str(renamed[0].name).get_slice(" ", 0) == str(renamed[1].name).get_slice(" ", 0):
+		return "Staff: renamed employees keep their last name and get distinct first names (%s)" % str(renamed)
 	var team := {}
 	for emp in PersonnelManager.staff:
 		team[str(emp.get("name", ""))] = true

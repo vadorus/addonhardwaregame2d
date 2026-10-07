@@ -491,10 +491,31 @@ func load_state(state: Dictionary):
 		var shortlist_candidate: Dictionary = shortlist_value
 		shortlist_candidate["department"] = normalize_department(str(shortlist_candidate.get("department", "")))
 	_next_id = int(state.get("next_id", 1))
+	_rename_assistant_namesakes()
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
 	_refresh_founding_stage()
 	staff_changed.emit()
+
+## Migration (07/10) : les anciennes parties recrutaient des « Nora » (le prénom de l'assistante) —
+## jusqu'à trois dans une même équipe. Chacune reçoit un autre prénom, stable (tiré de son id), sans doublon.
+func _rename_assistant_namesakes() -> void:
+	var taken := {}
+	for emp in staff:
+		taken[str(emp.get("name", "")).get_slice(" ", 0)] = true
+	for emp_value in staff:
+		var emp: Dictionary = emp_value
+		var name := str(emp.get("name", ""))
+		if not name.begins_with("Nora "):
+			continue
+		var start := absi(hash(str(emp.get("id", name)))) % FIRST_NAMES.size()
+		var first := str(FIRST_NAMES[start])
+		for step in range(FIRST_NAMES.size()):
+			first = str(FIRST_NAMES[(start + step) % FIRST_NAMES.size()])
+			if not taken.has(first):
+				break
+		taken[first] = true
+		emp["name"] = first + name.substr(4)
 
 func set_development_focus(focus: String) -> bool:
 	if focus not in ["BALANCED", "CPU", "SOFTWARE"]:

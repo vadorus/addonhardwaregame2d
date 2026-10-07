@@ -106,7 +106,7 @@ func _build_scene() -> void:
 	face_margin.add_theme_constant_override("margin_top", 10)
 	row.add_child(face_margin)
 	_scene_face = TextureRect.new()
-	_scene_face.custom_minimum_size = Vector2(108, 160)
+	_scene_face.custom_minimum_size = Vector2(118, 168)
 	_scene_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_scene_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_scene_face.size_flags_vertical = Control.SIZE_SHRINK_END
@@ -170,7 +170,7 @@ func _build_architectures() -> void:
 	box.add_child(_heading("Nos architectures", "La base de tous nos CPU. Vos équipes préparent la suivante."))
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = 150
+	scroll.custom_minimum_size.y = 186
 	box.add_child(scroll)
 	_arch_row = HBoxContainer.new()
 	_arch_row.add_theme_constant_override("separation", 10)
@@ -255,13 +255,28 @@ func _refresh_scene() -> void:
 	if not project.is_empty():
 		var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		var progress := clampf(float(project.get("phase_progress", 0.0)), 0.0, 100.0)
-		_scene_line.text = "Camille : « On avance sur %s. Phase « %s » : on en est à %d %%. »" % [str(project.get("name", "")), str(GameData.PHASES[phase_index]), int(progress)]
+		var directive := ResearchManager.cpu_pending_directive(project)
+		var decision_value = project.get("pending_decision", {})
+		var decision: Dictionary = decision_value if typeof(decision_value) == TYPE_DICTIONARY else {}
 		_hero_title.text = "En cours : %s" % str(project.get("name", ""))
-		_hero_detail.text = "Phase %d sur %d — %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
 		_hero_bar.visible = true
 		_hero_bar.value = progress
-		_hero_button.text = "Voir le projet"
-		pose = "bureau"
+		_hero_action = {"type":"SHOW_PROJECTS"}
+		if not directive.is_empty():
+			# Le projet est à l'arrêt tant que le joueur n'a pas choisi : on le dit, et le bouton y mène.
+			_scene_line.text = "Camille : « On attend votre choix pour avancer : %s. »" % str(directive.get("title", "l'orientation de la phase")).to_lower()
+			_hero_detail.text = "Choix de conception requis — le projet attend"
+			_hero_button.text = "Choisir maintenant"
+			_hero_action = {"type":"OPEN_COCKPIT"}
+		elif not decision.is_empty():
+			_scene_line.text = "Camille : « Le prototype est sur le banc. À vous de trancher. »"
+			_hero_detail.text = "Décision prototype / validation"
+			_hero_button.text = "Décider"
+			_hero_action = {"type":"PROJECT_DECISION"}
+		else:
+			_scene_line.text = "Camille : « On avance sur %s. Phase « %s » : on en est à %d %%. »" % [str(project.get("name", "")), str(GameData.PHASES[phase_index]), int(progress)]
+			_hero_detail.text = "Phase %d sur %d — %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
+			_hero_button.text = "Voir le projet"
 	else:
 		if not next.is_empty():
 			_scene_line.text = "Camille : « La %s arrive %s. Plus nos équipes sont fortes, plus elle arrive tôt. »" % [str(next.get("short", "")), _eta_text(next)]
@@ -271,12 +286,15 @@ func _refresh_scene() -> void:
 		_hero_detail.text = "Sur %s : %s" % [str(CATALOG.get_by_id(ArchitectureManager.latest_id()).get("name", "")).to_lower(), ArchitectureManager.maturity_label(ArchitectureManager.latest_id()).to_lower()]
 		_hero_bar.visible = false
 		_hero_button.text = "✚  Concevoir un nouveau processeur"
+		_hero_action = {"type":"OPEN_STEPPER"}
 		pose = "joie"
 	var path := WORKPLACE.character_path(WORKPLACE.cast_look(CAMILLE), pose)
 	_scene_face.texture = load(path) if ResourceLoader.exists(path) else null
 
+var _hero_action: Dictionary = {"type":"OPEN_STEPPER"}
+
 func _on_hero_pressed() -> void:
-	board_action.emit({"type":"SHOW_PROJECTS"} if not ResearchManager.active_cpu_project().is_empty() else {"type":"OPEN_STEPPER"})
+	board_action.emit(_hero_action.duplicate())
 
 ## La première architecture pas encore disponible (celle que les équipes préparent).
 func next_architecture() -> Dictionary:
@@ -553,7 +571,7 @@ func _paper_card() -> PanelContainer:
 
 func _arch_box(bg: Color, width: float, dashed: bool, border: Color = Color(0, 0, 0, 0)) -> PanelContainer:
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(width, 136)
+	card.custom_minimum_size = Vector2(width, 168)
 	var style := _box(bg, 14, 10)
 	if border.a > 0.0:
 		style.set_border_width_all(2)

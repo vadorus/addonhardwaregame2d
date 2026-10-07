@@ -29,8 +29,10 @@ static func _checks(board: Control) -> String:
 	var active := ResearchManager.active_cpu_project()
 	if active.is_empty() and not hero.text.contains("Concevoir"):
 		return "Lab board: with a free workbench the hero button designs a new CPU (%s)" % hero.text
-	if not active.is_empty() and hero.text != "Voir le projet":
-		return "Lab board: with a project running the hero button opens it (%s)" % hero.text
+	if not active.is_empty() and not ["Voir le projet", "Choisir maintenant", "Décider"].has(hero.text):
+		return "Lab board: with a project running the hero button leads to it (%s)" % hero.text
+	if not active.is_empty() and not ResearchManager.cpu_pending_directive(active).is_empty() and hero.text != "Choisir maintenant":
+		return "Lab board: a project waiting for a design choice says so (%s)" % hero.text
 	var line: Label = board.get("_scene_line")
 	if not line.text.begins_with("Camille"):
 		return "Lab board: Camille speaks in the scene (%s)" % line.text

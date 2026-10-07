@@ -596,6 +596,8 @@ func _on_lab_action(action: String, payload: Variant = null):
 	match action:
 		"open_stepper":
 			open_cpu_stepper()
+		"open_cockpit":
+			_open_project_cockpit("")
 		"research_tree_message":
 			if str(payload) != "":
 				status_label.text = str(payload)

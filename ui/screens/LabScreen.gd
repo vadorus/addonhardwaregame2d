@@ -625,6 +625,11 @@ func _on_board_action(action: Dictionary) -> void:
 			show_section("PROJECTS")
 		"SHOW_RESEARCH":
 			show_section("RESEARCH")
+		"OPEN_COCKPIT":
+			action_requested.emit("open_cockpit", null)
+		"PROJECT_DECISION":
+			show_section("PROJECTS")
+			focus_project_decision()
 		"CONCEPT":
 			_on_research_tree_action(action)
 		"MESSAGE":
