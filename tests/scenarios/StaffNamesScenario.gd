@@ -2,7 +2,10 @@ extends RefCounted
 ## Revue des onglets (07/10) — Les candidats ne s'appellent plus « Nora » (le prénom de l'assistante),
 ## ne reprennent pas le nom d'un membre de l'équipe, et un chercheur d'une entreprise CPU travaille sur les processeurs.
 
-static func run(_host: Node) -> String:
+static func run(host: Node) -> String:
+	var screen_error := _team_screen(host)
+	if screen_error != "":
+		return screen_error
 	var saved_state: int = PersonnelManager.rng.state
 	var saved_candidate: Dictionary = PersonnelManager.candidate.duplicate(true)
 	var saved_sector: String = CompanyManager.starting_sector
@@ -40,4 +43,29 @@ static func _checks() -> String:
 			return "Staff: candidate %s has the same name as a team member" % name
 		if str(c.get("specialization", "")) != "cpu":
 			return "Staff: a CPU company's researcher should work on processors (%s)" % str(c.get("specialization", ""))
+	return ""
+
+## L'onglet Équipe s'ouvre sur une scène : Nora fait le point, le chiffre du moment, un bouton Recruter ;
+## chaque fiche a le visage de la personne.
+static func _team_screen(host: Node) -> String:
+	var screen: Control = (load("res://ui/screens/PersonnelScreen.gd") as Script).new() as Control
+	host.add_child(screen)
+	screen.call("refresh")
+	var scene: Control = screen.get("scene")
+	var line := str(scene.call("line_text"))
+	var button := str(scene.call("hero_button_text"))
+	var members: Control = screen.get("members_box")
+	var has_face := false
+	for node in members.find_children("*", "PanelContainer", true, false):
+		if (node as Control).clip_children == CanvasItem.CLIP_CHILDREN_ONLY:
+			has_face = true
+			break
+	host.remove_child(screen)
+	screen.queue_free()
+	if not line.begins_with("Nora"):
+		return "Team: Nora sums up the team in the scene (%s)" % line
+	if button != "Recruter":
+		return "Team: the scene offers to recruit"
+	if not has_face and not PersonnelManager.staff.is_empty():
+		return "Team: each member card shows a face"
 	return ""

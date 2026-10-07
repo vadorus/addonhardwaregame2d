@@ -126,6 +126,31 @@ static func assign_looks(staff: Array) -> Dictionary:
 		result[id] = looks[pick]
 	return result
 
+## Visage rond (le haut de la pose « joie ») pour les fiches : même découpe partout (labo, équipe).
+static func face_avatar(look: int, diameter: float, ring_color: Color) -> Control:
+	var holder := PanelContainer.new()
+	holder.custom_minimum_size = Vector2(diameter, diameter)
+	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var style := StyleBoxFlat.new()
+	style.bg_color = ring_color.lightened(0.6)
+	style.set_corner_radius_all(int(diameter))
+	holder.add_theme_stylebox_override("panel", style)
+	holder.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	var path := character_path(look, "joie")
+	if ResourceLoader.exists(path):
+		var texture: Texture2D = load(path)
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		var w := float(texture.get_width())
+		var side := w * 0.62
+		atlas.region = Rect2((w - side) * 0.5, 0.0, side, side)
+		var face := TextureRect.new()
+		face.texture = atlas
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		holder.add_child(face)
+	return holder
+
 static func staff_looks() -> Array[int]:
 	var looks: Array[int] = []
 	for look in DISTINCT_STAFF_LOOKS + EXTRA_STAFF_LOOKS:

@@ -23,11 +23,10 @@ func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
 
-	box.add_child(UI.eyebrow("ÉQUIPE"))
-	box.add_child(UI.label("Qui fait quoi dans votre entreprise ?", 24))
-	var intro := UI.muted_label("Au début, deux groupes techniques travaillent ensemble mais n'ont pas le même rôle. Les autres métiers deviendront importants quand le CPU quittera le laboratoire.", 12)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(intro)
+	# Revue des onglets (07/10) : une scène (l'atelier, Nora qui fait le point sur l'équipe) remplace le titre.
+	scene = (load("res://ui/components/SceneHeader.gd") as Script).new() as Control
+	scene.connect("hero_pressed", func(): show_section("RECRUIT"))
+	box.add_child(scene)
 
 	var nora_card := UI.card(UI.APP_CYAN_DARK, 12, 12)
 	var nora_box := VBoxContainer.new()
@@ -145,6 +144,34 @@ static func _specialty_label(key: String) -> String:
 	return str(labels.get(key.to_lower(), key.capitalize()))
 
 var _member_columns := 3
+var scene: Control
+var _looks: Dictionary = {}
+const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const DEPARTMENT_COLORS := {"R&D":Color("e8743b"), "Développement":Color("3a9fd6"), "Production":Color("8a6d3b"),
+	"Marketing":Color("c0507a"), "Support":Color("4caf6a"), "Finance":Color("6b5640")}
+
+## La phrase de Nora : le point qui compte le plus pour l'équipe en ce moment (et le chiffre du moment).
+func team_diagnosis() -> Dictionary:
+	var staff: Array = PersonnelManager.staff
+	var payroll := 0
+	var low: Dictionary = {}
+	for employee_value in staff:
+		var employee: Dictionary = employee_value
+		payroll += int(employee.get("salary", 0))
+		if float(employee.get("morale", 70.0)) < 55.0 and (low.is_empty() or float(employee.get("morale", 70.0)) < float(low.get("morale", 70.0))):
+			low = employee
+	var free_researchers := staff.filter(func(e): return str(e.get("department", "")) == "R&D" and str(e.get("research_axis", "")) == "")
+	var dev := PersonnelManager.count_department("Développement")
+	var line := ""
+	if not low.is_empty():
+		line = "Nora : « %s n'a pas le moral (%d/100). Une formation ou une augmentation, sinon on risque de le perdre. »" % [str(low.get("name", "")), int(low.get("morale", 0))]
+	elif not free_researchers.is_empty():
+		line = "Nora : « %d chercheur(s) n'ont pas d'équipe. Au labo, rangez-les dans Vitesse, Énergie ou Fiabilité : sinon ils ne font rien avancer. »" % free_researchers.size()
+	elif dev < 3 and not ResearchManager.active_cpu_project().is_empty():
+		line = "Nora : « Le développement est à %d. Un ingénieur de plus, et le CPU en cours sortirait plus vite. »" % dev
+	else:
+		line = "Nora : « L'équipe tourne bien. Recrutez quand un besoin apparaît : chaque salaire compte chaque mois. »"
+	return {"line":line, "people":staff.size(), "payroll":payroll}
 
 func set_viewport_width(width: float) -> void:
 	var columns := 1 if width < 760.0 else (2 if width < 1100.0 else 3)
@@ -154,9 +181,15 @@ func set_viewport_width(width: float) -> void:
 
 func _member_card(employee: Dictionary) -> Control:
 	var card := UI.card(UI.APP_PANEL, 12, 8)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	card.add_child(row)
+	var department := str(employee.get("department", ""))
+	row.add_child(WORKPLACE.face_avatar(int(_looks.get(str(employee.get("id", "")), 1)), 46.0, DEPARTMENT_COLORS.get(department, Color("8a7357"))))
 	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 2)
-	card.add_child(column)
+	row.add_child(column)
 	var title := UI.label("%s%s" % [str(employee.get("name", "")), _leader_mark(employee)], 14)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(title)
@@ -198,6 +231,14 @@ func refresh() -> void:
 	if staff_label == null or candidate_label == null or team_explainer_label == null:
 		return
 
+	_looks = WORKPLACE.assign_looks(PersonnelManager.staff)
+	if scene != null:
+		var tier := int(ExecutiveManager.workplace_data().get("tier", 0))
+		scene.call("set_scene", WORKPLACE.seasonal_art_path(tier, TimeManager.month), "L'ÉQUIPE")
+		scene.call("set_speaker", WORKPLACE.character_path(WORKPLACE.NORA_LOOK, "reflexion"))
+		var diagnosis := team_diagnosis()
+		scene.call("set_line", str(diagnosis.line))
+		scene.call("set_hero", "%d" % int(diagnosis.people), "personne(s) · %s €/mois de salaires" % UI.money(int(diagnosis.payroll)), "Recruter")
 	var rd_count := PersonnelManager.count_department("R&D")
 	var dev_count := PersonnelManager.count_department("Développement")
 	team_explainer_label.text = "R&D — INVENTER ET APPRENDRE\n%d personne(s). Travaille sur l'architecture, l'efficacité et la fiabilité. Ce savoir-faire améliore les générations présentes et futures.\n\nDÉVELOPPEMENT CPU — TRANSFORMER L'IDÉE EN PRODUIT\n%d personne(s). Leur compétence, leur charge et leur expérience influencent directement la vitesse, la qualité et la confiance du projet CPU.\n\nÉquipe Développement : %.0f/100 • confiance actuelle %.0f%% • capacité %.0f%%." % [
