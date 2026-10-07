@@ -7,6 +7,7 @@ const DEVELOPMENT_GATES := preload("res://scripts/DevelopmentGates.gd")
 const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
 const CPU_MARKET_LEARNING := preload("res://scripts/CpuMarketLearning.gd")
 const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
+const DISCOVERIES := preload("res://scripts/WorkshopDiscoveries.gd")
 const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
 
 signal work_event(event)
@@ -66,11 +67,14 @@ var _next_research_event_id := 1
 var _next_concept_id := 1
 var _next_id := 1
 var rng := RandomNumberGenerator.new()
+## D4 : idées gardées pour le prochain CPU (carnet de Nora).
+var discovery_notebook: Array = []
 
 func _ready():
 	rng.seed = 8282
 
 func reset(starting_sector: String):
+	discovery_notebook = []
 	projects = []
 	cpu_generation_proposals = []
 	cpu_generation_context = {}
@@ -1074,6 +1078,7 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		Economy.add_expense(sourcing_setup_cost, "Accès technologique — %s" % str(sourcing_profile.get("label", "")))
 	_next_id += 1
 	projects.append(project)
+	DISCOVERIES.apply_notebook(project)
 	if sector == "CPU":
 		cpu_generation_proposals = []
 		cpu_generation_context = {}
@@ -1338,6 +1343,8 @@ func _process_project_month(project: Dictionary):
 	project.phase_progress = float(project.phase_progress) + progress
 	project["work_last"] = progress
 	work_event.emit({"kind":"CPU", "id":str(project.id), "text":"%s : +%.0f %%" % [str(GameData.PHASES[clampi(int(project.phase_index), 0, GameData.PHASES.size() - 1)]), progress]})
+	if str(project.sector) == "CPU":
+		DISCOVERIES.roll(project)
 	project.quality_accumulator = float(project.quality_accumulator) + team * 0.35 + tech * 0.15 + budget_ratio * 12.0
 	_apply_cpu_cockpit_month(project, float(allocation.get("factor", 1.0)))
 	var knowledge_gain := (0.35 + team / 190.0 + budget_ratio * 0.20) * float(approach_data.knowledge) * float(sourcing.get("knowledge_transfer_factor", 1.0))
@@ -1570,12 +1577,15 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 		var cockpit_impact := cpu_cockpit_final_impact(project)
 		project["cockpit_final_impact"] = cockpit_impact.duplicate(true)
 		var directive_impact: Dictionary = project.get("cockpit_directive_impact", {})
+		# D4 : trouvailles appliquées, carnet de Nora et étincelles attrapées.
+		var discovery_impact: Dictionary = project.get("discovery_impact", {})
 		for cockpit_axis_value in CPU_COCKPIT_AXES:
 			var cockpit_axis := str(cockpit_axis_value)
 			metrics[cockpit_axis] = clampf(
 				float(metrics.get(cockpit_axis, 50.0))
 				+ float(cockpit_impact.get(cockpit_axis, 0.0))
-				+ float(directive_impact.get(cockpit_axis, 0.0)),
+				+ float(directive_impact.get(cockpit_axis, 0.0))
+				+ float(discovery_impact.get(cockpit_axis, 0.0)),
 				15.0, 98.0
 			)
 	return metrics
@@ -1635,6 +1645,7 @@ func get_state() -> Dictionary:
 		"projects":projects,
 		"cpu_generation_proposals":cpu_generation_proposals,
 		"cpu_generation_context":cpu_generation_context,
+		"discovery_notebook":discovery_notebook,
 		"technologies":technologies,
 		"cpu_research_domains":cpu_research_domains,
 		"research_teams":1,
@@ -1716,6 +1727,8 @@ func load_state(state: Dictionary):
 				cpu_generation_proposals.append(CPU_GENERATION_PLANNER.normalize_saved_proposal(saved_proposal_value))
 	var saved_context_value = state.get("cpu_generation_context", {})
 	cpu_generation_context = saved_context_value.duplicate(true) if typeof(saved_context_value) == TYPE_DICTIONARY else {}
+	var notebook_value = state.get("discovery_notebook", [])
+	discovery_notebook = (notebook_value as Array).duplicate(true) if typeof(notebook_value) == TYPE_ARRAY else []
 	technologies = state.get("technologies", {}).duplicate(true)
 	if technologies.is_empty():
 		technologies = {"cpu":18.0, "manufacturing":12.0, "software":8.0, "integration":10.0}

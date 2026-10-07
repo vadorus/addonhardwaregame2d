@@ -1742,6 +1742,11 @@ func _ready() -> void:
 		_fail(entry_error)
 		return
 	print("[CI] D2 : coût de mise sur le marché par marché et par gamme OK")
+	var workshop_error: String = (load("res://tests/scenarios/WorkshopDiscoveryScenario.gd") as Script).call("run", self)
+	if workshop_error != "":
+		_fail(workshop_error)
+		return
+	print("[CI] D4 : atelier vivant — trouvailles, carnet de Nora, étincelles OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

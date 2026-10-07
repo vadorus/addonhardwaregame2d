@@ -33,6 +33,13 @@ var _celebrate_time := 0.0
 var _last_launch_count := -1
 var _work_events: Array = []
 const JUICE := preload("res://ui/Juice.gd")
+const DISCOVERIES := preload("res://scripts/WorkshopDiscoveries.gd")
+## D4 (maquette « L'atelier vit ») : bulles aux couleurs de l'axe travaillé, étincelle dorée à attraper.
+const AXIS_BUBBLES := {"performance":["Vitesse", Color("e8743b")], "efficiency":["Énergie", Color("3a9fd6")],
+	"reliability":["Fiabilité", Color("4caf6a")], "innovation":["Idées", Color("9b6bd6")]}
+var _spark: Button
+var _spark_timer := 35.0
+var _spark_menu: PanelContainer
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -255,6 +262,7 @@ func _process(delta: float) -> void:
 		member.set("working", active and str(member.get("pose")) == "SIT")
 	if not is_visible_in_tree() or _members.is_empty():
 		return
+	_tick_spark(delta)
 	_chat_timer -= delta
 	if speed > 0.0 and _chat_timer <= 0.0:
 		_chat_timer = randf_range(14.0, 22.0)
@@ -274,9 +282,15 @@ func _spawn_point(member: Control) -> void:
 	if cues.is_empty() and _work_events.is_empty():
 		return
 	var kind: Array = ["", Color("317c88")] if cues.is_empty() else cues[randi() % cues.size()]
+	# Pendant un CPU : la bulle porte l'axe sur lequel l'équipe met réellement son effort (priorités du projet).
+	var cpu := DISCOVERIES.active_cpu_project()
+	if not cpu.is_empty() and Color(kind[1]) == Color("d9822b"):
+		kind = _axis_bubble(cpu)
 	if not _work_events.is_empty():
 		var event: Dictionary = _work_events.pop_front()
 		kind = [str(event.get("text", "")), Color("b9712e") if str(event.get("kind", "")) == "CPU" else Color("317c88")]
+		if str(event.get("kind", "")) == "CPU" and not cpu.is_empty():
+			kind = [str(_axis_bubble(cpu)[0]) + "  " + str(event.get("text", "")).get_slice(":", 1).strip_edges(), _axis_bubble(cpu)[1]]
 	var pill := Label.new()
 	pill.text = str(kind[0])
 	pill.add_theme_font_size_override("font_size", 12)
@@ -403,3 +417,111 @@ func _queue_work_event(event: Dictionary) -> void:
 	_work_events.append(event.duplicate(true))
 	while _work_events.size() > 6:
 		_work_events.pop_front()
+
+## Un axe tiré selon la part d'effort que le projet lui donne (priorités réelles du cockpit).
+func _axis_bubble(project: Dictionary) -> Array:
+	var priorities: Dictionary = project.get("cockpit_priorities", {})
+	var total := 0.0
+	for axis in AXIS_BUBBLES.keys():
+		total += maxf(float(priorities.get(axis, 25.0)), 0.0)
+	var roll := randf() * maxf(total, 1.0)
+	for axis in AXIS_BUBBLES.keys():
+		roll -= maxf(float(priorities.get(axis, 25.0)), 0.0)
+		if roll <= 0.0:
+			return [str(AXIS_BUBBLES[axis][0]), AXIS_BUBBLES[axis][1]]
+	return [str(AXIS_BUBBLES.performance[0]), AXIS_BUBBLES.performance[1]]
+
+## L'étincelle dorée : elle traverse l'atelier pendant un CPU ; l'attraper donne un coup de pouce à un axe.
+func _tick_spark(delta: float) -> void:
+	var speed := TimeManager.time_scale
+	var cpu := DISCOVERIES.active_cpu_project()
+	if speed <= 0.0 or cpu.is_empty() or not DISCOVERIES.can_spark(cpu) or JUICE.reduced_motion or art_rect.size.x <= 0.0:
+		return
+	if _spark != null and is_instance_valid(_spark):
+		return
+	_spark_timer -= delta
+	if _spark_timer > 0.0:
+		return
+	_spark_timer = randf_range(45.0, 80.0)
+	_spark = Button.new()
+	_spark.text = "✦"
+	_spark.flat = true
+	_spark.focus_mode = Control.FOCUS_NONE
+	_spark.add_theme_font_size_override("font_size", 34)
+	for state in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_spark.add_theme_color_override(state, Color("ffd54a"))
+	_spark.add_theme_color_override("font_outline_color", Color("b9712e"))
+	_spark.add_theme_constant_override("outline_size", 6)
+	_spark.custom_minimum_size = Vector2(56, 56)
+	_spark.z_index = 7
+	_spark.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_spark)
+	var start := Vector2(art_rect.position.x + art_rect.size.x * randf_range(0.25, 0.65), art_rect.position.y + art_rect.size.y * 0.08)
+	_spark.position = start
+	var project_id := str(cpu.get("id", ""))
+	_spark.pressed.connect(func(): _open_spark_menu(project_id))
+	var fall := _spark.create_tween()
+	fall.tween_property(_spark, "position", start + Vector2(randf_range(-80, 80), art_rect.size.y * 0.55), 7.0).set_trans(Tween.TRANS_SINE)
+	fall.parallel().tween_property(_spark, "rotation", TAU, 7.0)
+	fall.tween_property(_spark, "modulate:a", 0.0, 0.6)
+	fall.tween_callback(func():
+		if _spark != null and is_instance_valid(_spark) and (_spark_menu == null or not _spark_menu.visible):
+			_spark.queue_free())
+
+func _open_spark_menu(project_id: String) -> void:
+	if _spark == null or not is_instance_valid(_spark):
+		return
+	_spark.disabled = true
+	if _spark_menu != null and is_instance_valid(_spark_menu):
+		_spark_menu.queue_free()
+	_spark_menu = PanelContainer.new()
+	_spark_menu.add_theme_stylebox_override("panel", UI.stylebox(Color("fffaf1"), 14, 2, Color("e2b33c"), 10))
+	_spark_menu.z_index = 8
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_spark_menu.add_child(box)
+	var title := UI.label("Une étincelle ! Où va l'idée ?", 14)
+	title.add_theme_color_override("font_color", Color("3b2b1e"))
+	box.add_child(title)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	box.add_child(row)
+	for axis in DISCOVERIES.AXES:
+		var pick := Button.new()
+		pick.text = "%s +" % str(AXIS_BUBBLES[axis][0])
+		pick.custom_minimum_size = Vector2(96, 40)
+		var tint: Color = AXIS_BUBBLES[axis][1]
+		for state in ["normal", "hover", "pressed"]:
+			pick.add_theme_stylebox_override(state, UI.stylebox(tint if state != "pressed" else tint.darkened(0.15), 10, 0, tint, 6))
+		for state in ["font_color", "font_hover_color", "font_pressed_color"]:
+			pick.add_theme_color_override(state, Color.WHITE)
+		pick.pressed.connect(func(): _catch_spark(project_id, str(axis)))
+		row.add_child(pick)
+	add_child(_spark_menu)
+	_spark_menu.position = (_spark.position + Vector2(-120, -96)).clamp(Vector2.ZERO, (size - Vector2(330, 100)).max(Vector2.ZERO))
+	JUICE.pop_in(_spark_menu, 0.2)
+
+func _catch_spark(project_id: String, axis: String) -> void:
+	var ok := DISCOVERIES.apply_spark(project_id, axis)
+	var at := _spark.position if _spark != null and is_instance_valid(_spark) else size * 0.5
+	if _spark_menu != null and is_instance_valid(_spark_menu):
+		_spark_menu.queue_free()
+	if _spark != null and is_instance_valid(_spark):
+		_spark.queue_free()
+	if not ok:
+		return
+	var toast := Label.new()
+	toast.text = "+ %s !" % str(AXIS_BUBBLES[axis][0])
+	toast.add_theme_font_size_override("font_size", 22)
+	toast.add_theme_color_override("font_color", AXIS_BUBBLES[axis][1])
+	toast.add_theme_color_override("font_outline_color", Color("fffaf1"))
+	toast.add_theme_constant_override("outline_size", 8)
+	toast.z_index = 8
+	toast.position = at
+	add_child(toast)
+	var tween := toast.create_tween().set_parallel(true)
+	tween.tween_property(toast, "position", at + Vector2(0, -70), 1.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(toast, "modulate:a", 0.0, 1.2).set_delay(0.4)
+	tween.chain().tween_callback(toast.queue_free)
+	if get_node_or_null("/root/SoundManager") != null:
+		SoundManager.play("review_good")

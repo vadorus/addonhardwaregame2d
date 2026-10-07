@@ -8,6 +8,7 @@ extends RefCounted
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
+const DISCOVERIES := preload("res://scripts/WorkshopDiscoveries.gd")
 
 ## Toutes les conversations en attente, avec qui parle.
 static func pending() -> Array:
@@ -46,6 +47,10 @@ static func pending() -> Array:
 	var advice: Dictionary = TEAM_LESSONS.pending_advice()
 	if not advice.is_empty():
 		result.append({"key":"ADVICE:%s:%s" % [str(advice.generation_id), str(advice.type)], "speaker":_dev_speaker()})
+	# D4 : un développeur a une idée pendant le développement (maquette « L'atelier vit »).
+	var eureka := DISCOVERIES.pending_project()
+	if not eureka.is_empty():
+		result.append({"key":"EUREKA:%s" % str(eureka.get("id", "")), "speaker":_dev_speaker()})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -357,6 +362,20 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"TECH", "label":"« Parlons chiffres : fiabilité, consommation, fréquence. »", "hint":"Labos et presse spécialisée +, grand public −"},
 				{"id":"NONE", "label":"« Pas de commentaire. »", "hint":"Aucun effet"},
 			]}
+	elif key.begins_with("EUREKA:"):
+		var eureka := DISCOVERIES.pending_project()
+		if eureka.is_empty() or str(eureka.get("id", "")) != sid:
+			return {}
+		var idea: Dictionary = eureka.get("discovery_pending", {})
+		var effect := DISCOVERIES.impact_text(idea.get("impact", {}))
+		return {"key":key, "person":_person(_dev_speaker()), "mood":"HAPPY", "kicker":"UNE TROUVAILLE !",
+			"text":"Patron ! %s" % str(idea.get("text", "")),
+			"note":"Sur %s : %s." % [str(eureka.get("name", "notre CPU")), effect],
+			"choices":[
+				{"id":"APPLY", "label":"Vas-y, on l'applique !", "hint":effect, "primary":true},
+				{"id":"KEEP", "label":"Garde-la pour le prochain CPU.", "hint":"Notée dans le carnet de Nora"},
+				{"id":"NO", "label":"Non merci, on garde notre plan.", "hint":"Rien ne change"},
+			]}
 	elif key.begins_with("CLIENT:"):
 		for contract_value in MarketManager.contracts:
 			var contract: Dictionary = contract_value
@@ -390,6 +409,8 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 		return {"ok":hired > 0, "message":("%d développeur(s) rejoignent l'équipe !" % hired) if hired > 0 else "Trésorerie insuffisante pour recruter."}
 	if key.begins_with("PARTY:"):
 		return SEASONAL.hold_party(choice_id)
+	if key.begins_with("EUREKA:"):
+		return DISCOVERIES.resolve(sid, choice_id)
 	if key == "NEXT:GEN":
 		if choice_id == "START":
 			return {"ok":true, "message":"", "open":"CPU_STEPPER"}
