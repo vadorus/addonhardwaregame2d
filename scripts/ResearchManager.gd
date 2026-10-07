@@ -166,6 +166,43 @@ func frontier_gain_factor(key: String, current: float) -> float:
 		return 1.0
 	return clampf(1.0 - lead / FRONTIER_LEAD_SPAN, FRONTIER_MIN_FACTOR, 1.0)
 
+## Revue des onglets (07/10) : mesuré sur 16 ans, un joueur sans programme Concept restait gravé en 10 µm
+## de 1971 à 1987 pendant que les rivaux passaient à 1 µm. Le savoir se diffuse (fournisseurs d'équipement,
+## publications, ingénieurs qui changent d'entreprise) : chaque mois, une maîtrise en retard rattrape une part
+## de l'écart avec DIFFUSION_SHARE de l'état de l'art. On avance donc toujours, mais en suiveur ;
+## la recherche reste le seul moyen d'être devant.
+const DIFFUSION_SHARE := 0.8
+const DIFFUSION_RATE := 0.05
+const DIFFUSION_CAPABILITIES := ["MINIATURIZATION", "LAYOUT", "ARCHITECTURE"]
+
+func knowledge_floor(key: String) -> float:
+	var frontier := industry_frontier(key)
+	return 0.0 if frontier >= 100.0 else frontier * DIFFUSION_SHARE
+
+func _process_knowledge_diffusion() -> void:
+	var nodes_before := CPU_DESIGN.available_nodes_for_capabilities(float(technologies.get("manufacturing", 0.0)), get_cpu_capability("MINIATURIZATION"))
+	var moved := false
+	for key in DIFFUSION_CAPABILITIES:
+		var floor_value := knowledge_floor(key)
+		var current := get_cpu_capability(key)
+		if floor_value > current:
+			cpu_capabilities[key] = current + (floor_value - current) * DIFFUSION_RATE
+			moved = true
+	var manufacturing_floor := knowledge_floor("manufacturing")
+	var manufacturing := float(technologies.get("manufacturing", 0.0))
+	if manufacturing_floor > manufacturing:
+		technologies["manufacturing"] = manufacturing + (manufacturing_floor - manufacturing) * DIFFUSION_RATE
+		moved = true
+	if not moved:
+		return
+	var nodes_after := CPU_DESIGN.available_nodes_for_capabilities(float(technologies.get("manufacturing", 0.0)), get_cpu_capability("MINIATURIZATION"))
+	if nodes_after.size() > nodes_before.size():
+		var label := str(CPU_DESIGN.node_profile(int(nodes_after.back())).get("label", "")).split(" — ")[0]
+		MediaManager.add_news("Technologie", "La gravure %s est à notre portée" % label,
+			"Nora : « Nos fournisseurs d'équipement savent maintenant graver en %s. Notre prochain CPU peut en profiter : plus de MHz, moins de consommation. »" % label,
+			{"topic":"PROCESS_NODE", "node_nm":int(nodes_after.back())})
+	research_changed.emit()
+
 func raise_capability(key: String, amount: float) -> float:
 	if amount <= 0.0:
 		return 0.0
@@ -1248,6 +1285,7 @@ func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
 func process_month():
 	_process_continuous_research()
 	_process_concept_programs()
+	_process_knowledge_diffusion()
 	for project in projects:
 		if str(project.status) != "DEVELOPMENT":
 			continue

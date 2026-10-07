@@ -1752,6 +1752,11 @@ func _ready() -> void:
 		_fail(staff_error)
 		return
 	print("[CI] Équipe : candidats sans Nora ni doublon, chercheurs CPU OK")
+	var diffusion_error: String = (load("res://tests/scenarios/KnowledgeDiffusionScenario.gd") as Script).call("run", self)
+	if diffusion_error != "":
+		_fail(diffusion_error)
+		return
+	print("[CI] Diffusion du savoir : la gravure suit l'état de l'art avec retard OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)
