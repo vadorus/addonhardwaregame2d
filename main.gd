@@ -1465,6 +1465,17 @@ func _play_intro_if_first_launch(force: bool = false) -> void:
 	intro_layer.z_index = 120
 	intro_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(intro_layer)
+	# Le garage de 1971 sort lentement de la nuit derrière les phrases, puis la caméra recule jusqu'au menu.
+	var intro_art := TextureRect.new()
+	var art_path := "res://assets/art/v010/titre/ecran_titre.webp"
+	if ResourceLoader.exists(art_path):
+		intro_art.texture = load(art_path)
+	intro_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	intro_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	intro_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	intro_art.modulate = Color(0.12, 0.10, 0.09, 1.0)
+	intro_layer.add_child(intro_art)
 	var lines := ["1971.", "Un garage. Une petite équipe. Un fer à souder.", "Et une idée un peu folle : fabriquer nos propres processeurs."]
 	var holder := VBoxContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1491,12 +1502,23 @@ func _play_intro_if_first_launch(force: bool = false) -> void:
 	skip.offset_bottom = -20
 	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro_layer.add_child(skip)
+	(intro_layer as ColorRect).color = Color(0.06, 0.04, 0.03, 1.0)
+	intro_art.pivot_offset = get_viewport_rect().size * Vector2(0.38, 0.45)
+	intro_art.scale = Vector2(1.35, 1.35)
+	var camera := intro_art.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	camera.tween_property(intro_art, "scale", Vector2(1.08, 1.08), 7.5)
 	var story := intro_layer.create_tween()
-	for line in labels:
-		story.tween_property(line, "modulate:a", 1.0, 0.9)
+	for i in range(labels.size()):
+		story.tween_property(labels[i], "modulate:a", 1.0, 0.9)
+		# La lampe du garage s'allume un peu plus à chaque phrase.
+		story.parallel().tween_property(intro_art, "modulate", Color(0.12, 0.10, 0.09).lerp(Color(0.55, 0.48, 0.42), float(i + 1) / float(labels.size())), 1.2)
 		story.tween_interval(1.1)
-	story.tween_interval(0.6)
-	story.tween_property(intro_layer, "modulate:a", 0.0, 1.2)
+	story.tween_interval(0.4)
+	for line in labels:
+		story.parallel().tween_property(line, "modulate:a", 0.0, 0.8)
+	story.parallel().tween_property(intro_art, "modulate", Color.WHITE, 1.0)
+	story.tween_interval(0.3)
+	story.tween_property(intro_layer, "modulate:a", 0.0, 1.0)
 	story.tween_callback(_end_intro)
 	intro_layer.gui_input.connect(func(event: InputEvent):
 		if (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) or (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed):
