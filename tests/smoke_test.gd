@@ -1747,6 +1747,11 @@ func _ready() -> void:
 		_fail(workshop_error)
 		return
 	print("[CI] D4 : atelier vivant — trouvailles, carnet de Nora, étincelles OK")
+	var staff_error: String = (load("res://tests/scenarios/StaffNamesScenario.gd") as Script).call("run", self)
+	if staff_error != "":
+		_fail(staff_error)
+		return
+	print("[CI] Équipe : candidats sans Nora ni doublon, chercheurs CPU OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

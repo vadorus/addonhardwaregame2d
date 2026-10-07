@@ -14,8 +14,13 @@ const WORK_ALLOCATION := preload("res://scripts/WorkAllocation.gd")
 var development_focus := "BALANCED"
 var _month_workforce: Dictionary = {}
 
-const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
-const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon","Laurent","Michel","Leroy","Dubois","Robert"]
+## Prénoms des candidats (07/10) : « Nora » est réservé à l'assistante (avant, une équipe sur deux comptait
+## trois Nora) et Camille, Samira… restent aux fondateurs. Liste plus large pour éviter les doublons.
+const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis",
+	"Jeanne","Paul","Chloé","Malik","Léa","Thomas","Zoé","Karim","Julie","Antoine","Clara","Mehdi","Sarah",
+	"Bastien","Elsa","Victor","Amira","Louis","Manon","Rémi","Alice"]
+const LAST_NAMES := ["Martin","Bernard","Roux","Petit","Garcia","Morel","Simon","Laurent","Michel","Leroy","Dubois","Robert",
+	"Fontaine","Chevalier","Benali","Lambert","Faure","Girard","Mercier","Blanc","Guérin","Muller","Henry","Perrin"]
 
 func _ready():
 	rng.seed = 1947
@@ -56,14 +61,32 @@ func _add_employee(full_name: String, role: String, department: String, skill: i
 	_next_id += 1
 	staff.append(emp)
 
+## Un nom qui n'est ni celui d'un membre de l'équipe, ni un prénom déjà porté (si possible).
+func _unique_candidate_name() -> String:
+	var taken_names := {}
+	var taken_first := {}
+	for emp in staff:
+		taken_names[str(emp.get("name", ""))] = true
+		taken_first[str(emp.get("name", "")).get_slice(" ", 0)] = true
+	var name := ""
+	for attempt in range(12):
+		var first := str(FIRST_NAMES[rng.randi_range(0, FIRST_NAMES.size() - 1)])
+		name = "%s %s" % [first, LAST_NAMES[rng.randi_range(0, LAST_NAMES.size() - 1)]]
+		if not taken_names.has(name) and (attempt >= 8 or not taken_first.has(first)):
+			return name
+	return name
+
 func generate_candidate(department: String) -> Dictionary:
-	var name := "%s %s" % [FIRST_NAMES[rng.randi_range(0, FIRST_NAMES.size()-1)], LAST_NAMES[rng.randi_range(0, LAST_NAMES.size()-1)]]
+	var name := _unique_candidate_name()
 	var skill := rng.randi_range(48, 82)
 	var exp: float = snappedf(rng.randf_range(1.0, 12.0), 0.5)
 	var leadership := rng.randi_range(28, 82)
 	var specialization := "product"
 	match department:
-		"R&D": specialization = ["cpu","gpu","software","mobile","display","cloud","satellite","ai"][rng.randi_range(0,7)]
+		"R&D":
+			# Périmètre CPU : un chercheur « écrans » ou « satellites » n'apportait rien (aucun bonus) et piégeait le joueur.
+			var pool: Array = ["cpu"] if CompanyManager.starting_sector == "CPU" else ["cpu","gpu","software","mobile","display","cloud","satellite","ai"]
+			specialization = str(pool[rng.randi_range(0, pool.size() - 1)])
 		"Développement": specialization = ["product","validation","firmware","integration"][rng.randi_range(0,3)]
 		"Production": specialization = ["manufacturing","quality","maintenance","process"][rng.randi_range(0,3)]
 		"Marketing": specialization = "marketing"
