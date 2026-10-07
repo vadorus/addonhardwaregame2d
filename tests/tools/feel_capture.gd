@@ -32,8 +32,8 @@ func _ready() -> void:
 	await _frames(8)
 	if moment == "intro":
 		game.call("_play_intro_if_first_launch", true)
-		for t in [0.6, 1.8, 3.4, 5.6, 7.6]:
-			await _wait(t - [0.0, 0.6, 1.8, 3.4, 5.6][[0.6, 1.8, 3.4, 5.6, 7.6].find(t)])
+		for t in [1.0, 3.0, 5.2, 7.2]:
+			await _wait(t - [0.0, 1.0, 3.0, 5.2][[1.0, 3.0, 5.2, 7.2].find(t)])
 			await _shot("intro_%.1fs" % t)
 		get_tree().quit(0)
 		return
