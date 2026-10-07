@@ -1,5 +1,7 @@
 extends RefCounted
 
+const CPU_EXPERIENCE := preload("res://scripts/CpuExperience.gd")
+
 const CPU_MILESTONES := {
 	0: {
 		"title":"Orientation du concept",
@@ -60,8 +62,9 @@ const SOFTWARE_MILESTONES := {
 	}
 }
 
-static func cpu_milestone(phase_index: int) -> Dictionary:
-	return (CPU_MILESTONES.get(phase_index, {}) as Dictionary).duplicate(true)
+static func cpu_milestone(phase_index: int, project: Dictionary = {}) -> Dictionary:
+	var base := (CPU_MILESTONES.get(phase_index, {}) as Dictionary).duplicate(true)
+	return CPU_EXPERIENCE.contextualize_milestone(base, phase_index, project) if not project.is_empty() else base
 
 static func software_milestone(phase: String) -> Dictionary:
 	return (SOFTWARE_MILESTONES.get(phase, {}) as Dictionary).duplicate(true)

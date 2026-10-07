@@ -33,7 +33,7 @@ static func _run_case(case: Dictionary) -> String:
 		"INTERNAL",
 		str(case.get("focus", "BALANCED")),
 		int(case.get("budget", 35000)),
-		design
+		design, {}, {}, "GENERAL", "", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", bool(case.get("interactive", false))
 	):
 		return "project could not start with %d €" % Economy.money
 
@@ -41,6 +41,13 @@ static func _run_case(case: Dictionary) -> String:
 	var validation_choice_used := false
 	var months := 0
 	while ProductionManager.get_active_jobs().is_empty() and months < 32:
+		if bool(case.get("interactive", false)):
+			var project := ResearchManager.active_cpu_project()
+			var directive := ResearchManager.cpu_pending_directive(project)
+			if not directive.is_empty():
+				var choice := "PROVEN" if int(project.get("phase_index", 0)) == 0 else "EFFICIENT" if int(project.get("phase_index", 0)) == 2 else "POWER"
+				if not ResearchManager.resolve_cpu_directive(str(project.id), choice):
+					return "interactive directive failed: " + choice
 		SimulationManager.process_month_end()
 		months += 1
 		if SimulationManager.is_game_over or Economy.money <= 0:

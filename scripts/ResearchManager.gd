@@ -1,6 +1,7 @@
 extends Node
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_PROTOTYPE := preload("res://scripts/CpuPrototypeModel.gd")
 const CPU_GENERATION_PLANNER := preload("res://scripts/CpuGenerationPlanner.gd")
 const DEVELOPMENT_GATES := preload("res://scripts/DevelopmentGates.gd")
 const DEVELOPMENT_ESTIMATOR := preload("res://scripts/DevelopmentEstimator.gd")
@@ -1154,6 +1155,8 @@ func cpu_pending_directive(project: Dictionary) -> Dictionary:
 	var value = project.get("cockpit_directive_pending", {})
 	if typeof(value) != TYPE_DICTIONARY:
 		return {}
+	if not (value as Dictionary).is_empty() and not (value as Dictionary).has("context_version"):
+		return CPU_PROTOTYPE.milestone(project, int(project.get("phase_index", 0)))
 	return (value as Dictionary).duplicate(true)
 
 func _cpu_has_directive_for_phase(project: Dictionary, phase_index: int) -> bool:
@@ -1172,7 +1175,7 @@ func _ensure_cpu_directive(project: Dictionary) -> bool:
 	var phase_index := int(project.get("phase_index", 0))
 	if _cpu_has_directive_for_phase(project, phase_index):
 		return false
-	var milestone := PROJECT_DIRECTIVES.cpu_milestone(phase_index)
+	var milestone := CPU_PROTOTYPE.milestone(project, phase_index)
 	if milestone.is_empty():
 		return false
 	project["cockpit_directive_pending"] = milestone
@@ -1195,6 +1198,9 @@ func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
 		var delay_months := maxi(int(option.get("delay_months", 0)), 0)
 		if cost_once > 0 and not Economy.can_afford(cost_once, "Décision de développement — %s" % str(project.get("name", "CPU"))):
 			return false
+		var before_preview := cpu_prototype_preview(project)
+		if option.has("design_change"):
+			_apply_cpu_design_action(project, option)
 		var impact: Dictionary = project.get("cockpit_directive_impact", {})
 		var outcome_parts: Array[String] = []
 		var labels := {"performance":"performance", "efficiency":"efficacité", "reliability":"fiabilité", "innovation":"innovation"}
@@ -1213,6 +1219,8 @@ func resolve_cpu_directive(project_id: String, option_id: String) -> bool:
 			outcome_parts.append("+%d mois" % delay_months)
 		var label := str(option.get("label", option_id))
 		var outcome := "%s — %s" % [label, " • ".join(outcome_parts)] if not outcome_parts.is_empty() else label
+		var after_preview := cpu_prototype_preview(project)
+		outcome += " • " + cpu_prototype_comparison(before_preview, after_preview)
 		project["cockpit_last_choice"] = label
 		project["cockpit_last_outcome"] = outcome
 		var history: Array = project.get("cockpit_directive_history", [])
@@ -1506,7 +1514,7 @@ func resolve_project_decision(project_id: String, choice_id: String) -> bool:
 func _finalize_project(project: Dictionary, team: float, tech: float, budget_ratio: float):
 	_complete_project(project, _calculate_final_metrics(project, team, tech, budget_ratio))
 
-func _calculate_final_metrics(project: Dictionary, team: float, tech: float, budget_ratio: float) -> Dictionary:
+func _calculate_final_metrics(project: Dictionary, team: float, tech: float, budget_ratio: float, sample_noise: bool = true) -> Dictionary:
 	var approach_data: Dictionary = GameData.approach_data(str(project.approach))
 	var sourcing_value = project.get("sourcing", {})
 	var sourcing: Dictionary = sourcing_value if typeof(sourcing_value) == TYPE_DICTIONARY else {}
@@ -1516,7 +1524,8 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 	for metric in GameData.METRICS:
 		var base := float(desired.get(metric, 55.0)) * 0.40 + team * 0.20 + tech * 0.16 + average_quality * 0.12 + budget_ratio * 6.0
 		base *= float(approach_data.quality) * float(sourcing.get("quality_factor", 1.0))
-		base += rng.randf_range(-4.0, 4.0)
+		if sample_noise:
+			base += rng.randf_range(-4.0, 4.0)
 		metrics[metric] = clampf(base, 25.0, 96.0)
 	var design_estimate: Dictionary = project.get("design_estimate", {})
 	if str(project.sector) == "CPU" and not design_estimate.is_empty():
@@ -1746,3 +1755,53 @@ func load_state(state: Dictionary):
 	generation_proposals_changed.emit(get_cpu_generation_proposals())
 	research_changed.emit()
 	projects_changed.emit()
+
+## Preview uses the production metric calculation without sampling RNG or mutating live state.
+func cpu_prototype_preview(project: Dictionary, option: Dictionary = {}) -> Dictionary:
+	var copy := project.duplicate(true)
+	if option.has("design_change"):
+		_apply_cpu_design_action(copy, option)
+	var impacts: Dictionary = copy.get("cockpit_directive_impact", {})
+	for axis in CPU_COCKPIT_AXES:
+		impacts[axis] = float(impacts.get(axis, 0.0)) + float((option.get("impact", {}) as Dictionary).get(axis, 0.0))
+	copy["cockpit_directive_impact"] = impacts
+	var team := development_team_score() * development_capacity_factor()
+	var tech := float(technologies.get("cpu", 5.0))
+	var base_cost := maxf(float(GameData.SECTORS.CPU.base_dev_cost), float(MarketManager.segment_recommended_budget(str(copy.get("segment", MarketManager.default_segment())))))
+	var ratio := clampf(float(copy.get("monthly_budget", 0)) / base_cost, 0.25, 2.2)
+	if int(copy.get("months_spent", 0)) <= 0:
+		copy["months_spent"] = 1
+		copy["quality_accumulator"] = team * 0.35 + tech * 0.15 + ratio * 12.0
+	var metrics := _calculate_final_metrics(copy, team, tech, ratio, false)
+	var estimate: Dictionary = copy.get("design_estimate", {})
+	var design: Dictionary = copy.get("cpu_design", {})
+	return {"metrics":metrics, "design":design.duplicate(true),
+		"required_tdp":float(estimate.get("required_tdp", 0.0)),
+		"power_deficit_ratio":float(estimate.get("power_deficit_ratio", 0.0)),
+		"tdp_w":int(design.get("tdp_w", 0)), "frequency_ghz":float(design.get("frequency_ghz", 0.0)),
+		"confidence":float(copy.get("estimate_confidence", 50.0)),
+		"situation":CPU_PROTOTYPE.situation(copy)}
+
+func _apply_cpu_design_action(project: Dictionary, option: Dictionary) -> void:
+	var previous: Dictionary = project.get("design_estimate", {})
+	var next := CPU_PROTOTYPE.evaluation_after(project, option)
+	var desired: Dictionary = project.get("desired_metrics", {})
+	for axis in ["performance", "efficiency", "reliability", "innovation", "sustainability"]:
+		desired[axis] = clampf(float(desired.get(axis, 55.0)) + float(next.get(axis, 55.0)) - float(previous.get(axis, 55.0)), 0.0, 96.0)
+	project["desired_metrics"] = desired
+	project["cpu_design"] = CPU_PROTOTYPE.design_after(project, option)
+	project["design_estimate"] = next
+	project["complexity"] = float(next.get("complexity", 50.0))
+	var plan: Dictionary = project.get("generation_plan", {})
+	if not plan.is_empty():
+		plan["design"] = (project.cpu_design as Dictionary).duplicate(true)
+		plan["customized"] = true
+		project["generation_plan"] = plan
+
+func cpu_prototype_comparison(before: Dictionary, after: Dictionary) -> String:
+	var parts: Array[String] = []
+	for axis in ["performance", "efficiency", "reliability"]:
+		var a := float((before.get("metrics", {}) as Dictionary).get(axis, 0.0))
+		var b := float((after.get("metrics", {}) as Dictionary).get(axis, 0.0))
+		parts.append("%s %.1f → %.1f" % [GameData.metric_label(axis), a, b])
+	return "Estimation : " + " • ".join(parts)

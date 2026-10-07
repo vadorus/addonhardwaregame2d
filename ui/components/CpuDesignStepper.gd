@@ -236,6 +236,9 @@ func open(prefill: Dictionary = {}) -> void:
 	ArchitectureManager.sync_unlocks(false)
 	var lines: Array = ArchitectureManager.lines
 	line_choice = str((lines[lines.size() - 1] as Dictionary).id) if not lines.is_empty() else "NEW"
+	var requested_line := str(prefill.get("line_id", ""))
+	for line in lines:
+		if str(line.get("id", "")) == requested_line: line_choice = requested_line
 	new_line_name = str(prefill.get("line_name", "Nova"))
 	var segments := MarketManager.available_segment_keys()
 	segment = str(prefill.get("segment", MarketManager.default_segment()))

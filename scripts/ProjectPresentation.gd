@@ -15,16 +15,23 @@ static func rows() -> Array:
 	return result
 
 static func cpu(project: Dictionary) -> Dictionary:
-	var phase := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
-	var blocked := not ResearchManager.cpu_pending_directive(project).is_empty() or not (project.get("pending_decision", {}) as Dictionary).is_empty()
-	var assigned := 0.0 if blocked else float(PersonnelManager.allocation_for({"id":str(project.id), "kind":"CPU", "need":2.0}).get("assigned", 0.0))
-	var progress := clampf((float(phase) + float(project.get("phase_progress", 0.0)) / 100.0) / float(GameData.PHASES.size()) * 100.0, 0.0, 100.0)
-	var phase_label := str(GameData.PHASES[phase])
-	var state := "Choix requis" if blocked else "Sans équipe" if assigned <= 0.0 else phase_label
-	return {"id":str(project.id), "kind":"CPU", "name":str(project.get("name", "CPU")), "phase":phase_label,
-		"phase_index":phase, "phase_count":GameData.PHASES.size(), "progress":progress, "blocked":blocked,
-		"assigned":assigned, "need":2.0, "remaining":-1, "cost":Economy.quoted_expense(int(project.get("monthly_cash_cost", 0)), "Développement CPU"),
-		"state":state, "detail":state + _team_suffix(assigned, blocked), "context":"PROJECT_COCKPIT:" + str(project.id)}
+	var phase:= clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+	var blocked:= not ResearchManager.cpu_pending_directive(project).is_empty() or not (project.get("pending_decision", {}) as Dictionary).is_empty()
+	var assigned:= 0.0 if blocked else float(PersonnelManager.allocation_for({"id": str(project.id), "kind": "CPU", "need": 2.0}).get("assigned", 0.0))
+	var progress:= clampf((float(phase) + float(project.get("phase_progress", 0.0)) / 100.0) / float(GameData.PHASES.size()) * 100.0, 0.0, 100.0)
+	var phase_label:= str(GameData.PHASES[phase])
+	var state:= "Choix requis" if blocked else "Sans équipe" if assigned <= 0.0 else phase_label
+	var design: Dictionary = project.get("cpu_design", {})
+	var estimate: Dictionary = project.get("design_estimate", {})
+	var live_preview := ResearchManager.cpu_prototype_preview(project)
+	return {"id": str(project.id), "kind": "CPU", "name": str(project.get("name", "CPU")), "phase": phase_label,
+		"phase_index": phase, "phase_count": GameData.PHASES.size(), "progress": progress, "blocked": blocked,
+		"assigned": assigned, "need": 2.0, "remaining": -1, "cost": Economy.quoted_expense(int(project.get("monthly_cash_cost", 0)), "Développement CPU"),
+		"target": str(project.get("segment", project.get("target_segment", ""))).replace("_", " ").capitalize(),
+		"cores": maxi(int(design.get("cores", 1)), 1), "frequency_mhz": float(design.get("frequency_ghz", 0.0)) * 1000.0,
+		"node_nm": maxi(int(design.get("node_nm", 0)), 0), "tdp_w": maxi(int(design.get("tdp_w", 0)), 0),
+		"metrics": (live_preview.get("metrics", {}) as Dictionary).duplicate(true),
+		"state": state, "detail": state + _team_suffix(assigned, blocked), "context": "PROJECT_COCKPIT:" + str(project.id)}
 
 static func software(project: Dictionary) -> Dictionary:
 	var status := str(project.get("status", "DEVELOPMENT"))

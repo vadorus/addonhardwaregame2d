@@ -480,6 +480,8 @@ func _create_dashboard_tab():
 	tabs.add_child(dashboard_screen)
 
 func _on_dashboard_navigation(tab_index: int, context: String):
+	if context in ["PROJECT_DECISION", "PRODUCTION", "Production", "PRODUCT_LAUNCH"] and _open_cpu_journey_context(context):
+		return
 	if context == "PROJECT_COCKPIT" or context.begins_with("PROJECT_COCKPIT:"):
 		_open_project_cockpit(context.trim_prefix("PROJECT_COCKPIT:" ) if context.begins_with("PROJECT_COCKPIT:") else "")
 		return
@@ -1432,7 +1434,20 @@ func _build_first_cpu_workshop_layer() -> void:
 	cpu_stepper.z_index = 100
 	add_child(cpu_stepper)
 
+var cpu_journey: Control
+
 func _build_project_cockpit_layer() -> void:
+	cpu_journey = (load("res://ui/CpuJourney.gd") as Script).new() as Control
+	cpu_journey.z_index = 90
+	add_child(cpu_journey)
+	cpu_journey.connect("close_requested", func():
+		cpu_journey.call("close")
+		_refresh_all())
+	cpu_journey.connect("time_requested", func(speed: float):
+		_request_time_scale(speed)
+		cpu_journey.call("refresh"))
+	cpu_journey.connect("product_action", _on_products_action)
+	cpu_journey.connect("successor_requested", _cpu_journey_successor)
 	var cockpit_script: Script = load("res://ui/ProjectCockpit.gd")
 	project_cockpit = cockpit_script.new() as Control
 	project_cockpit.connect("close_requested", _close_project_cockpit)
@@ -1449,6 +1464,11 @@ func _build_project_cockpit_layer() -> void:
 	)
 
 func _open_project_cockpit(project_id: String = "") -> void:
+	var cpu_model: Script = load("res://scripts/CpuJourneyModel.gd")
+	var cpu_id := project_id if project_id != "" else str(cpu_model.call("default_project_id"))
+	if not (cpu_model.call("project_for", cpu_id) as Dictionary).is_empty():
+		_open_cpu_journey(cpu_id)
+		return
 	if project_cockpit == null or not CompanyManager.created:
 		return
 	_project_cockpit_resume_scale = TimeManager.time_scale
@@ -1503,12 +1523,20 @@ func _close_software_workshop() -> void:
 	SoundManager.play("close")
 	_refresh_all()
 
-func _software_to_hardware() -> void:
+func _software_to_hardware() -> void :
 	if software_workshop != null:
 		software_workshop.call("close")
 	TimeManager.time_scale = _software_resume_scale
+	var active_cpu_project:= false
+	for project_value in ResearchManager.projects:
+		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
+			active_cpu_project = true
+			break
 	if ResearchManager.projects.is_empty() and ProductManager.products.is_empty():
 		_show_first_cpu_workshop()
+	elif active_cpu_project:
+		_show_tab(3)
+		status_label.text = "Hardware : votre projet CPU est ouvert dans le laboratoire."
 	else:
 		open_cpu_stepper()
 
@@ -3091,6 +3119,9 @@ func _handle_back_request() -> void:
 		elif _is_mobile():
 			_confirm_quit_on_back()
 		return
+	if cpu_journey != null and cpu_journey.visible:
+		cpu_journey.call("close")
+		return
 	var garage: Control = dashboard_screen.get("dashboard_garage") if dashboard_screen != null else null
 	if garage != null and bool(garage.call("context_menu_visible")):
 		garage.call("close_context_menu")
@@ -3707,3 +3738,36 @@ func _on_software_launched(product: Dictionary) -> void:
 	SoundManager.play("success")
 	notify(str(product.get("name", "Votre logiciel")) + " est sorti. Les premiers résultats arriveront au prochain mois.", "good")
 	_request_refresh_all()
+
+func _open_cpu_journey(project_id: String = "") -> void:
+	if cpu_journey == null or not CompanyManager.created: return
+	TimeManager.time_scale = 0.0
+	if notification_feed != null: notification_feed.call("clear")
+	cpu_journey.call("open", project_id)
+	SoundManager.play("open")
+
+func _open_cpu_journey_context(context: String) -> bool:
+	if context == "PROJECT_DECISION":
+		var pending := ResearchManager.get_pending_project_decisions()
+		if not pending.is_empty():
+			_open_cpu_journey(str(pending[0].get("project_id", "")))
+			return true
+	elif context == "PRODUCT_LAUNCH":
+		for product in ProductManager.products:
+			if str(product.get("sector", "")) == "CPU" and str(product.get("status", "")) == "READY":
+				_open_cpu_journey(str(product.get("project_id", "")))
+				return true
+	else:
+		for job in ProductionManager.get_active_jobs():
+			_open_cpu_journey(str(job.get("project_id", "")))
+			return true
+	return false
+
+func _cpu_journey_successor(project: Dictionary) -> void:
+	cpu_journey.call("close")
+	TimeManager.time_scale = 0.0
+	if project.is_empty():
+		_show_first_cpu_workshop()
+		return
+	cpu_stepper.call("open", {"line_id":str(project.get("line_id", "")), "line_name":str(project.get("name", "Nova")),
+		"segment":str(project.get("segment", MarketManager.default_segment())), "budget":int(project.get("monthly_budget", 45000))})

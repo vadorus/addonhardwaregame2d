@@ -15,6 +15,7 @@ var _selector: HBoxContainer
 var _selected_kind := "CPU"
 var selected_project_id := ""
 var _workforce: VBoxContainer
+var _team_controls_open := false
 
 func _ready() -> void:
 	color = Color(0.025, 0.055, 0.10, 0.82)
@@ -104,6 +105,7 @@ func refresh() -> void:
 			child.queue_free()
 	_build_workforce()
 	var rows := PRESENTATION.rows()
+	(_selector.get_parent() as Control).visible = rows.size() > 1
 	if rows.is_empty():
 		var empty := LOOK.muted_label("Aucun projet actif. Choisissez un processeur, un logiciel ou un contrat depuis le garage.", 15)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -140,8 +142,21 @@ func _build_workforce() -> void:
 	var summary := UI.muted_label("Équipe partagée : %d personnes • besoin %.1f • disponible %.1f. Les délais suivent cette répartition." % [
 		int(workforce.get("capacity", 0)), float(workforce.get("demand", 0)), float(workforce.get("free", 0))], 12)
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_workforce.add_child(summary)
+	var team_row := HBoxContainer.new()
+	_workforce.add_child(team_row)
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	team_row.add_child(summary)
+	var team_button := Button.new()
+	team_button.text = "Répartition équipe"
+	team_button.custom_minimum_size.y = 44
+	LOOK.button_style(team_button)
+	team_button.pressed.connect(func():
+		_team_controls_open = not _team_controls_open
+		refresh()
+	)
+	team_row.add_child(team_button)
 	var choices := HBoxContainer.new()
+	choices.visible = _team_controls_open
 	choices.add_theme_constant_override("separation", 8)
 	_workforce.add_child(choices)
 	for option in [["BALANCED", "Équilibrer"], ["CPU", "Priorité CPU"], ["SOFTWARE", "Priorité Logiciel"]]:
@@ -289,13 +304,23 @@ func _build_directive_prompt(box: VBoxContainer, directive: Dictionary, kind: St
 	prompt.add_child(actions)
 	for value in directive.get("options", []):
 		var option: Dictionary = value
+		var effect_text := _directive_effect_text(option, kind)
+		if kind == "CPU":
+			for project in ResearchManager.projects:
+				if str(project.id) != project_id: continue
+				effect_text = ResearchManager.cpu_prototype_comparison(ResearchManager.cpu_prototype_preview(project), ResearchManager.cpu_prototype_preview(project, option))
+				var cost := maxi(int(option.get("cost_once", 0)), 0)
+				var delay := maxi(int(option.get("delay_months", 0)), 0)
+				effect_text += "\n%d € immédiatement • +%d mois" % [Economy.quoted_expense(cost, "Décision de développement"), delay]
+				if delay > 0:
+					effect_text += " • développement pendant le délai ~%d €" % (int(PRESENTATION.cpu(project).cost) * delay)
 		var button := Button.new()
 		button.text = "%s
 %s
 %s" % [
 			str(option.get("label", "Choix")),
 			str(option.get("pitch", "")),
-			_directive_effect_text(option, kind)
+			effect_text
 		]
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.custom_minimum_size = Vector2(0 if narrow else 210, 88 if narrow else 124)
@@ -338,12 +363,14 @@ func _build_last_outcome(box: VBoxContainer, project: Dictionary) -> void:
 
 func _build_cpu_card(project: Dictionary) -> void:
 	var box := _project_card("PROCESSEUR", str(project.get("name", "Projet CPU")))
+	_artifact(box, PRESENTATION.cpu(project))
 	var directive := ResearchManager.cpu_pending_directive(project)
 	if not directive.is_empty():
 		_build_directive_prompt(box, directive, "CPU", str(project.get("id", "")))
-		_artifact(box, PRESENTATION.cpu(project))
+		_build_last_outcome(box, project)
 		return
-	_artifact(box, PRESENTATION.cpu(project))
+	_build_cpu_prototype(box, project)
+	_build_last_outcome(box, project)
 	var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 	var phase_progress := float(project.get("phase_progress", 0.0))
 	var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
@@ -356,7 +383,6 @@ func _build_cpu_card(project: Dictionary) -> void:
 	var phase_tip := UI.muted_label(_cpu_phase_tip(phase_index), 11)
 	phase_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(phase_tip)
-	_build_last_outcome(box, project)
 
 	var pending = project.get("pending_decision", {})
 	if typeof(pending) == TYPE_DICTIONARY and not (pending as Dictionary).is_empty():
@@ -551,3 +577,24 @@ func _software_status(status: String) -> String:
 		"REVIEW": return "prêt à sortir"
 		"BETA": return "bêta"
 	return status.to_lower()
+
+func _build_cpu_prototype(box: VBoxContainer, project: Dictionary) -> void:
+	var preview := ResearchManager.cpu_prototype_preview(project)
+	var panel := UI.card(Color("e8eff2"), 12, 12)
+	box.add_child(panel)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 6)
+	panel.add_child(body)
+	body.add_child(UI.eyebrow("BANC DE CONCEPTION • ESTIMATIONS"))
+	var context: Dictionary = preview.situation
+	var title := UI.label(str(context.title), 17)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(title)
+	var design: Dictionary = preview.design
+	var specs := UI.muted_label("%d cœur(s) • %.3f MHz • enveloppe %d W • besoin estimé %.1f W" % [
+		int(design.get("cores", 1)), float(preview.frequency_ghz) * 1000.0, int(preview.tdp_w), float(preview.required_tdp)], 12)
+	specs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(specs)
+	var note := UI.muted_label("Projection avec l'équipe et les choix actuels. La qualité finale et les notes presse restent à vérifier au lancement.", 11)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(note)

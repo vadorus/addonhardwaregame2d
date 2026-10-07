@@ -161,13 +161,13 @@ func _build_background() -> void:
 	add_child(_life)
 	_life.connect("ambiance_changed", _apply_workplace_art)
 
-func _build_overlay() -> void:
+func _build_overlay() -> void :
 	_room_badge = PanelContainer.new()
-	_room_badge.add_theme_stylebox_override("panel", _panel_style(Color(0.17, 0.11, 0.07, 0.80), Color(0.72, 0.52, 0.30, 0.75), 12, 10))
+	_room_badge.add_theme_stylebox_override("panel", _panel_style(Color(0.17, 0.11, 0.07, 0.8), Color(0.72, 0.52, 0.3, 0.75), 12, 10))
 	_room_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_room_badge)
 
-	var room_box := VBoxContainer.new()
+	var room_box:= VBoxContainer.new()
 	room_box.add_theme_constant_override("separation", 1)
 	_room_badge.add_child(room_box)
 	_room_title = Label.new()
@@ -178,14 +178,14 @@ func _build_overlay() -> void:
 	_room_subtitle = Label.new()
 	_room_subtitle.text = "Touchez un élément du décor"
 	_room_subtitle.add_theme_font_size_override("font_size", 12)
-	_room_subtitle.add_theme_color_override("font_color", Color(0.90, 0.80, 0.66))
+	_room_subtitle.add_theme_color_override("font_color", Color(0.9, 0.8, 0.66))
 	room_box.add_child(_room_subtitle)
 
 	_build_gameplay_overlays()
 	_build_side_actions()
 
 	for data in ZONES:
-		var button := Button.new()
+		var button:= Button.new()
 		button.text = ""
 		button.flat = false
 		button.focus_mode = Control.FOCUS_NONE
@@ -199,25 +199,19 @@ func _build_overlay() -> void:
 		button.pressed.connect(_on_zone_pressed.bind(button))
 		_apply_zone_style(button)
 		add_child(button)
-		var marker := BADGE.new()
+		var marker:= BADGE.new()
 		marker.kind = str(data.get("icon", "chip"))
 		marker.tint = data.get("color", BLUE)
 		marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		button.add_child(marker)
-		button.set_meta("badge_node", marker)
-		var project_marker := WORLD_MARKER.new()
-		project_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		project_marker.visible = false
-		button.add_child(project_marker)
-		button.set_meta("project_marker", project_marker)
-		# Pastille « ! » : bien visible quelle que soit la couleur du repère.
-		var alert := Label.new()
+
+		var alert:= Label.new()
 		alert.text = "!"
 		alert.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		alert.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		alert.add_theme_font_size_override("font_size", 17)
 		alert.add_theme_color_override("font_color", Color.WHITE)
-		var alert_style := _panel_style(Color("e5372c"), Color.WHITE, 13, 0)
+		var alert_style:= _panel_style(Color("e5372c"), Color.WHITE, 13, 0)
 		alert_style.set_border_width_all(2)
 		alert.add_theme_stylebox_override("normal", alert_style)
 		alert.position = Vector2(38, -4)
@@ -234,7 +228,7 @@ func _build_overlay() -> void:
 	_context_panel.add_theme_stylebox_override("panel", _panel_style(Color("fffaf1"), BLUE, 14, 14))
 	add_child(_context_panel)
 
-	var context_box := VBoxContainer.new()
+	var context_box:= VBoxContainer.new()
 	context_box.add_theme_constant_override("separation", 8)
 	_context_panel.add_child(context_box)
 	_context_title = Label.new()
@@ -250,39 +244,39 @@ func _build_overlay() -> void:
 	_context_actions = VBoxContainer.new()
 	_context_actions.add_theme_constant_override("separation", 7)
 	context_box.add_child(_context_actions)
-	var close := Button.new()
+	var close:= Button.new()
 	close.text = "Fermer"
 	LOOK.button_style(close)
 	close.custom_minimum_size.y = 38
 	close.pressed.connect(close_context_menu)
 	context_box.add_child(close)
 
-func _build_gameplay_overlays() -> void:
+func _build_gameplay_overlays() -> void :
 	_project_panel = PanelContainer.new()
 	_project_panel.z_index = 15
 	_project_panel.add_theme_stylebox_override("panel", _paper_style())
 	add_child(_project_panel)
-	var project_shell := VBoxContainer.new()
+	var project_shell:= VBoxContainer.new()
 	project_shell.add_theme_constant_override("separation", 10)
 	_project_panel.add_child(project_shell)
 	_project_scroll = ScrollContainer.new()
 	_project_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	UI.configure_touch_scroll(_project_scroll)
 	project_shell.add_child(_project_scroll)
-	var project_box := VBoxContainer.new()
+	var project_box:= VBoxContainer.new()
 	project_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	project_box.add_theme_constant_override("separation", 10)
 	_project_scroll.add_child(project_box)
 	_project_kicker = _card_heading(project_box, "Votre premier projet")
-	var heading := HBoxContainer.new()
+	var heading:= HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 12)
 	project_box.add_child(heading)
-	var chip := BADGE.new()
+	var chip:= BADGE.new()
 	chip.custom_minimum_size = Vector2(48, 48)
 	chip.filled = false
 	chip.tint = INK
 	heading.add_child(chip)
-	var copy := VBoxContainer.new()
+	var copy:= VBoxContainer.new()
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(copy)
 	_project_title = Label.new()
@@ -295,22 +289,22 @@ func _build_gameplay_overlays() -> void:
 	_project_stage.add_theme_color_override("font_color", MUTED)
 	_project_stage.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_child(_project_stage)
-	var phases := HBoxContainer.new()
+	var phases:= HBoxContainer.new()
 	phases.add_theme_constant_override("separation", 4)
 	project_box.add_child(phases)
 	_phase_row = phases
 	for phase in [["Concept", "chip"], ["Prototype", "screen"], ["Tests", "flask"], ["Lancement", "box"]]:
-		var cell := VBoxContainer.new()
+		var cell:= VBoxContainer.new()
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cell.add_theme_constant_override("separation", 2)
 		phases.add_child(cell)
-		var badge := BADGE.new()
+		var badge:= BADGE.new()
 		badge.kind = phase[1]
 		badge.custom_minimum_size = Vector2(32, 32)
 		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		cell.add_child(badge)
 		_phase_badges.append(badge)
-		var label := Label.new()
+		var label:= Label.new()
 		label.text = phase[0]
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 11)
@@ -330,42 +324,30 @@ func _build_gameplay_overlays() -> void:
 	_parallel_projects_box.visible = false
 	project_box.add_child(_parallel_projects_box)
 	_primary_action = Button.new()
-	_primary_action.custom_minimum_size = Vector2(150, 48)
-	_primary_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_primary_action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_primary_action.add_theme_font_size_override("font_size", 14)
+	_primary_action.custom_minimum_size = Vector2(250, 46)
+	_primary_action.add_theme_font_size_override("font_size", 16)
 	_primary_action.add_theme_color_override("font_color", Color.WHITE)
 	_primary_action.add_theme_stylebox_override("normal", _panel_style(Color("10aa4f"), Color("0d9244"), 12, 8))
 	_primary_action.add_theme_stylebox_override("hover", _panel_style(Color("16bd5e"), Color("0d9244"), 12, 8))
 	_primary_action.add_theme_stylebox_override("pressed", _panel_style(Color("07823b"), Color("086830"), 12, 8))
 	_primary_action.focus_mode = Control.FOCUS_NONE
 	_primary_action.pressed.connect(_run_primary_action)
-	var project_actions := HBoxContainer.new()
-	project_actions.add_theme_constant_override("separation", 8)
-	project_shell.add_child(project_actions)
-	project_actions.add_child(_primary_action)
-	_new_project_action = Button.new()
-	_new_project_action.text = "Nouveau\nprojet"
-	_new_project_action.custom_minimum_size = Vector2(106, 48)
-	_new_project_action.add_theme_font_size_override("font_size", 13)
-	_new_project_action.pressed.connect(func(): zone_requested.emit(0, "PROJECT_CHOICE"))
-	_new_project_action.visible = false
-	project_actions.add_child(_new_project_action)
+	project_shell.add_child(_primary_action)
 
 	_tasks_panel = PanelContainer.new()
 	_tasks_panel.z_index = 15
 	_tasks_panel.add_theme_stylebox_override("panel", _paper_style())
 	add_child(_tasks_panel)
-	var tasks_box := VBoxContainer.new()
+	var tasks_box:= VBoxContainer.new()
 	_tasks_panel.add_child(tasks_box)
-	# V0.8.1 : Nora remplace la liste de tâches figée — une seule prochaine étape, toujours vraie.
-	var nora_heading := _card_heading(tasks_box, "Nora • prochaine étape")
-	var nora_bar := nora_heading.get_parent()
+
+	var nora_heading:= _card_heading(tasks_box, "Nora • prochaine étape")
+	var nora_bar:= nora_heading.get_parent()
 	nora_bar.remove_child(nora_heading)
-	var nora_row := HBoxContainer.new()
+	var nora_row:= HBoxContainer.new()
 	nora_row.add_theme_constant_override("separation", 8)
 	nora_bar.add_child(nora_row)
-	var avatar := Label.new()
+	var avatar:= Label.new()
 	avatar.text = "N"
 	avatar.custom_minimum_size = Vector2(26, 26)
 	avatar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -383,7 +365,7 @@ func _build_gameplay_overlays() -> void:
 	_tasks_label.max_lines_visible = 4
 	_tasks_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tasks_box.add_child(_tasks_label)
-	# Lot C : les trois objectifs de Nora (un par piste), sous sa prochaine étape.
+
 	_objectives_title = Label.new()
 	_objectives_title.text = "OBJECTIFS"
 	_objectives_title.add_theme_font_size_override("font_size", 11)
@@ -396,7 +378,7 @@ func _build_gameplay_overlays() -> void:
 	_feedback_panel.z_index = 15
 	_feedback_panel.add_theme_stylebox_override("panel", _paper_style())
 	add_child(_feedback_panel)
-	var feedback_box := VBoxContainer.new()
+	var feedback_box:= VBoxContainer.new()
 	_feedback_panel.add_child(feedback_box)
 	_card_heading(feedback_box, "Actu & retours")
 	_feedback_label = Label.new()
@@ -548,10 +530,10 @@ func _apply_zone_style(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("focus", normal)
 
-func _layout_zones() -> void:
+func _layout_zones() -> void :
 	if size.x <= 0.0 or size.y <= 0.0:
 		return
-	var art_rect := _displayed_art_rect()
+	var art_rect:= _displayed_art_rect()
 	if _background != null:
 		_background.position = art_rect.position
 		_background.size = art_rect.size
@@ -560,12 +542,12 @@ func _layout_zones() -> void:
 		_room_badge.position = Vector2(14.0, 14.0)
 		_room_badge.size = Vector2(clampf(size.x * 0.22, 220.0, 290.0), 50.0)
 	if _project_panel != null:
-		# Écran bas (téléphone, petite fenêtre) : on retire la frise d'étapes pour libérer le décor.
+
 		if _phase_row != null:
-			var want_phases := size.y >= 560.0 and (_project_progress == null or _project_progress.visible)
+			var want_phases:= size.y >= 560.0 and (_project_progress == null or _project_progress.visible)
 			if _phase_row.visible != want_phases:
 				_phase_row.visible = want_phases
-		var project_w := clampf(size.x * 0.29, 300.0, 370.0)
+		var project_w:= clampf(size.x * 0.29, 300.0, 370.0)
 		_project_panel.size = Vector2(project_w, 0.0)
 		_project_panel.position = Vector2(size.x - project_w - 14.0, 14.0)
 		if _crew != null:
@@ -575,51 +557,51 @@ func _layout_zones() -> void:
 	if _life != null:
 		_life.call("set_art_rect", art_rect)
 	if _tasks_panel != null:
-		var tasks_w := clampf(size.x * 0.25, 250.0, 330.0)
+		var tasks_w:= clampf(size.x * 0.25, 250.0, 330.0)
 		_tasks_panel.size = Vector2(tasks_w, 0.0)
 		_tasks_panel.position = Vector2(14.0, size.y - _tasks_panel.size.y - 14.0)
 	if _feedback_panel != null:
-		var feedback_w := clampf(size.x * 0.29, 300.0, 370.0)
+		var feedback_w:= clampf(size.x * 0.29, 300.0, 370.0)
 		_feedback_panel.size = Vector2(feedback_w, 0.0)
 		_feedback_panel.position = Vector2(size.x - feedback_w - 14.0, size.y - _feedback_panel.size.y - 14.0)
 	if _project_scroll != null:
-		# Le contenu défile dans l'espace entre les cartes ; l'action reste hors du défilement.
-		var details := _project_scroll.get_child(0) as Control
-		var fixed_height := _project_panel.get_theme_stylebox("panel").get_minimum_size().y
+
+		var details:= _project_scroll.get_child(0) as Control
+		var fixed_height:= _project_panel.get_theme_stylebox("panel").get_minimum_size().y
 		if _primary_action.visible:
-			fixed_height += (_primary_action.get_parent() as Control).get_combined_minimum_size().y
+			fixed_height += _primary_action.get_combined_minimum_size().y
 			fixed_height += (_project_scroll.get_parent() as VBoxContainer).get_theme_constant("separation")
-		var project_bottom := size.y - 14.0
+		var project_bottom:= size.y - 14.0
 		if _feedback_panel != null and _feedback_panel.visible:
 			project_bottom = _feedback_panel.position.y - 12.0
-		var available := maxf(0.0, project_bottom - _project_panel.position.y - fixed_height)
+		var available:= maxf(0.0, project_bottom - _project_panel.position.y - fixed_height)
 		_project_scroll.custom_minimum_size.y = minf(details.get_combined_minimum_size().y, available)
 		_project_panel.size.y = 0.0
-	# Rail de navigation : s'adapte à la hauteur disponible au-dessus de la carte de Nora
-	# (téléphones 16:9 avec interface agrandie, fenêtres PC basses).
+
+
 	var visible_side: Array[Button] = []
 	for button in _side_buttons:
 		if button.visible:
 			visible_side.append(button)
 	if not visible_side.is_empty():
-		var rail_top := 78.0
-		var rail_bottom := size.y - 14.0
+		var rail_top:= 78.0
+		var rail_bottom:= size.y - 14.0
 		if _tasks_panel != null:
 			rail_bottom = _tasks_panel.position.y - 8.0
-		var count := visible_side.size()
-		var gap := 6.0
-		var columns := 1
-		var button_h := floorf((rail_bottom - rail_top - gap * float(count - 1)) / float(count))
+		var count:= visible_side.size()
+		var gap:= 6.0
+		var columns:= 1
+		var button_h:= floorf((rail_bottom - rail_top - gap * float(count - 1)) / float(count))
 		if button_h < 44.0:
 			columns = 2
-			var rows := int(ceil(float(count) / 2.0))
+			var rows:= int(ceil(float(count) / 2.0))
 			button_h = floorf((rail_bottom - rail_top - gap * float(rows - 1)) / float(rows))
 		button_h = clampf(button_h, 40.0, 64.0)
-		var show_icon := button_h >= 58.0
+		var show_icon:= button_h >= 58.0
 		for i in range(count):
-			var button := visible_side[i]
-			var col := i % columns
-			var row := floori(float(i) / float(columns))
+			var button:= visible_side[i]
+			var col:= i % columns
+			var row:= floori(float(i) / float(columns))
 			button.size = Vector2(92.0, button_h)
 			button.position = Vector2(14.0 + float(col) * 98.0, rail_top + float(row) * (button_h + gap))
 			var icon: Control = button.get_meta("icon_node", null)
@@ -631,8 +613,8 @@ func _layout_zones() -> void:
 				label.size = Vector2(92, 20) if show_icon else Vector2(92, button_h)
 				label.add_theme_font_size_override("font_size", 11 if show_icon else 13)
 
-	# Repères : suivent le décor, mais restent à l'écran (tablette 4:3 = décor recadré sur les côtés)
-	# et ne se cachent jamais sous une carte du HUD (téléphones 16:9, fenêtres basses).
+
+
 	var hud_rects: Array[Rect2] = []
 	for panel in [_room_badge, _project_panel, _tasks_panel, _feedback_panel]:
 		if panel != null and panel.visible:
@@ -643,17 +625,15 @@ func _layout_zones() -> void:
 		hud_rects.append((_life.call("shelf_rect") as Rect2).grow(4.0))
 	for button in _zone_buttons:
 		var r: Rect2 = button.get_meta("zone_rect")
-		var spot := WORKPLACE.zone_spot(_workplace_tier, str(button.get_meta("zone_name")), r.get_center())
-		var target := art_rect.position + spot * art_rect.size
-		var project_marker: Control = button.get_meta("project_marker")
-		button.size = Vector2(72, 72) if project_marker.visible else Vector2(58, 58)
+		var spot:= WORKPLACE.zone_spot(_workplace_tier, str(button.get_meta("zone_name")), r.get_center())
+		var target:= art_rect.position + spot * art_rect.size
+		button.size = Vector2(58, 58)
 		button.position = _free_marker_position(target - button.size * 0.5, button.size, hud_rects)
-		hud_rects.append(button.get_rect().grow(4.0))
 
 	if _context_panel != null and _context_panel.visible:
 		_layout_context_panel(art_rect)
 
-## Position libre la plus proche de l'emplacement voulu : dans l'écran et hors des cartes du HUD.
+
 func _free_marker_position(wanted: Vector2, marker_size: Vector2, huds: Array[Rect2]) -> Vector2:
 	var max_pos := Vector2(maxf(8.0, size.x - marker_size.x - 8.0), maxf(8.0, size.y - marker_size.y - 8.0))
 	var start := wanted.clamp(Vector2(8.0, 8.0), max_pos)
@@ -1075,15 +1055,14 @@ func _refresh_parallel_project_trackers(_cpu_project: Dictionary, _software_proj
 	for child in _parallel_projects_box.get_children():
 		_parallel_projects_box.remove_child(child)
 		child.queue_free()
-	var rows := PRESENTATION.rows()
-	_new_project_action.visible = not rows.is_empty()
+	var rows:= PRESENTATION.rows()
 	for row in rows:
 		_add_project_tracker(("CPU" if str(row.kind) == "CPU" else "Contrat" if str(row.kind) == "CONTRACT" else "Logiciel") + " • " + str(row.name), str(row.detail), float(row.progress), str(row.context))
 	_parallel_projects_box.visible = rows.size() >= 2
 	UI.prepare_touch_scroll_children(_project_scroll)
 	return rows.size()
 
-func _refresh_gameplay_overlays() -> void:
+func _refresh_gameplay_overlays() -> void :
 	if _project_title == null or _project_stage == null or _project_progress == null:
 		return
 	_update_focus()
@@ -1110,10 +1089,9 @@ func _refresh_gameplay_overlays() -> void:
 			launched_product = value
 	var active_software_project: Dictionary = SoftwareManager.projects[0] if not SoftwareManager.projects.is_empty() else {}
 	var active_software_activity: Dictionary = SoftwareManager.active_activity()
-	var tracker_count := _refresh_parallel_project_trackers(active_project, active_software_project, active_software_activity)
-	_refresh_world_markers(active_project, active_software_project)
-	var dual_development := tracker_count >= 2
-	var software_parallel_to_production := not active_job.is_empty() and not active_software_project.is_empty()
+	var tracker_count:= _refresh_parallel_project_trackers(active_project, active_software_project, active_software_activity)
+	var dual_development:= tracker_count >= 2
+	var software_parallel_to_production:= not active_job.is_empty() and not active_software_project.is_empty()
 	if _parallel_projects_box != null and software_parallel_to_production:
 		_parallel_projects_box.visible = true
 	_project_progress.visible = not dual_development
@@ -1124,18 +1102,18 @@ func _refresh_gameplay_overlays() -> void:
 		if _phase_row != null:
 			_phase_row.visible = false
 		_project_title.text = "%d projets actifs" % tracker_count
-		var parallel_blocked := not ResearchManager.cpu_pending_directive(active_project).is_empty() or not (active_project.get("pending_decision", {}) as Dictionary).is_empty() or not SoftwareManager.software_pending_directive(active_software_project).is_empty() or str(active_software_project.get("status", "")) in ["DECISION", "REVIEW"]
+		var parallel_blocked:= not ResearchManager.cpu_pending_directive(active_project).is_empty() or not (active_project.get("pending_decision", {}) as Dictionary).is_empty() or not SoftwareManager.software_pending_directive(active_software_project).is_empty() or str(active_software_project.get("status", "")) in ["DECISION", "REVIEW"]
 		_project_stage.text = "⚠ Choix requis : validez l’orientation avant de reprendre." if parallel_blocked else "Équipe partagée : %d personnes. Pilotez la priorité CPU / Logiciel." % PersonnelManager.count_department("Développement")
 	elif not active_software_project.is_empty() and str(_focus.get("kind", "")) == "project" and str(_focus.get("zone", "")) == "Tableau de planification":
 		_show_software_project_summary(active_software_project)
 	elif not active_project.is_empty():
 		_project_kicker.text = "Projet en cours"
-		var phase_index := clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
+		var phase_index:= clampi(int(active_project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		_refresh_phase_strip(0 if phase_index < 2 else (1 if phase_index == 2 else 2))
-		var phase_progress := float(active_project.get("phase_progress", 0.0))
-		var overall := (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
+		var phase_progress:= float(active_project.get("phase_progress", 0.0))
+		var overall:= (float(phase_index) + phase_progress / 100.0) / float(GameData.PHASES.size()) * 100.0
 		_project_title.text = str(active_project.get("name", "Projet CPU"))
-		# Un seul pourcentage à l'écran : la barre (avancement global). La ligne dit l'étape.
+
 		if not ResearchManager.cpu_pending_directive(active_project).is_empty():
 			_project_stage.text = "⚠ Choix de conception requis — temps en pause"
 		elif not (active_project.get("pending_decision", {}) as Dictionary).is_empty():
@@ -1168,10 +1146,10 @@ func _refresh_gameplay_overlays() -> void:
 	elif not active_software_activity.is_empty():
 		_project_kicker.text = "Activité Software"
 		_refresh_phase_strip(-1)
-		var sw_activity_id := str(active_software_activity.get("id", ""))
-		var sw_data := SoftwareManager.activity_terms(sw_activity_id, str(active_software_activity.get("approach", "BALANCED")))
-		var sw_done := int(active_software_activity.get("months_done", 0))
-		var sw_total := maxi(int(sw_data.get("months", 1)), 1)
+		var sw_activity_id:= str(active_software_activity.get("id", ""))
+		var sw_data:= SoftwareManager.activity_terms(sw_activity_id, str(active_software_activity.get("approach", "BALANCED")))
+		var sw_done:= int(active_software_activity.get("months_done", 0))
+		var sw_total:= maxi(int(sw_data.get("months", 1)), 1)
 		_project_title.text = SOFTWARE_ACTIVITY.label(sw_activity_id)
 		_project_stage.text = str(PRESENTATION.contract(active_software_activity).detail)
 		_project_progress.value = float(sw_data.get("progress", 0.0))
@@ -1183,20 +1161,20 @@ func _refresh_gameplay_overlays() -> void:
 		_project_progress.value = 0.0
 
 	if _tasks_label != null:
-		var nora_text := _nora_message()
+		var nora_text:= _nora_message()
 		_tasks_label.text = nora_text
 	_refresh_objectives()
-	# Pré-lancement : les actualités restent dans Presse. Le garage garde seulement Nora et le projet.
+
 	if _feedback_panel != null:
-		var opening_news_only := not MediaManager.news.is_empty() and str((MediaManager.news[0] as Dictionary).get("headline", "")) == "Une nouvelle société technologique entre sur le marché."
-		var has_feedback := not CompanyManager.alerts.is_empty() or (not MediaManager.news.is_empty() and not opening_news_only)
+		var opening_news_only:= not MediaManager.news.is_empty() and str((MediaManager.news[0] as Dictionary).get("headline", "")) == "Une nouvelle société technologique entre sur le marché."
+		var has_feedback:= not CompanyManager.alerts.is_empty() or ( not MediaManager.news.is_empty() and not opening_news_only)
 		_feedback_panel.visible = CompanyManager.created and _tutorial_step() == 0 and has_feedback
 
 	if _feedback_label != null:
 		if not MediaManager.news.is_empty():
 			var news: Dictionary = MediaManager.news[0]
-			var source := str(news.get("source_name", "Presse"))
-			var headline := str(news.get("headline", "Nouvelle couverture médiatique"))
+			var source:= str(news.get("source_name", "Presse"))
+			var headline:= str(news.get("headline", "Nouvelle couverture médiatique"))
 			_feedback_label.text = "%s\n« %s »" % [source, headline]
 		elif not CompanyManager.alerts.is_empty():
 			_feedback_label.text = str(CompanyManager.alerts[0])
