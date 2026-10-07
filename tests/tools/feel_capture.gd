@@ -127,8 +127,23 @@ func _onglets() -> void:
 		var target := ProjectSettings.globalize_path(SaveManager.save_path())
 		DirAccess.make_dir_recursive_absolute(target.get_base_dir())
 		DirAccess.copy_absolute(source, target)
-	game.call("_load_game_slot", 0)
+	if source != "":
+		game.call("_load_game_slot", 0)
+	else:
+		# Sans sauvegarde : une partie neuve jouée automatiquement pendant N mois (-- --months=72).
+		var months := 72
+		for arg in OS.get_cmdline_user_args():
+			if str(arg).begins_with("--months="):
+				months = int(str(arg).trim_prefix("--months="))
+		game.get("setup_name").text = "Nova Technologies"
+		game.call("_start_new_game")
+		await _frames(6)
+		_autoplay(months)
+		game.call("_refresh_all")
 	await _frames(20)
+	if game.has_method("_close_review_reveal"):
+		game.call("_close_review_reveal")
+	await _frames(6)
 	TimeManager.time_scale = 0.0
 	var names := ["qg", "entreprise", "equipe", "labo", "produits", "marche", "presse"]
 	var screens := [null, "company_screen", "personnel_screen", "lab_screen", "products_screen", "market_screen", "media_screen"]
@@ -177,3 +192,38 @@ func _first_scroll(node: Node) -> ScrollContainer:
 		if found != null:
 			return found
 	return null
+
+## Joueur automatique (même logique que la sonde économique) : enchaîne les CPU et les lance au prix conseillé.
+func _autoplay(months: int) -> void:
+	const DESIGN := preload("res://scripts/CpuDesign.gd")
+	var count := 0
+	for month in range(months):
+		var active := ResearchManager.active_cpu_project()
+		var ready := ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "READY")
+		if active.is_empty() and ProductionManager.get_active_jobs().is_empty() and ready.is_empty():
+			count += 1
+			ResearchManager.start_project("Nova %d" % count, "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED",
+				35000, DESIGN.preset("BALANCED"), {}, {}, "GENERAL", "", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", false)
+			active = ResearchManager.active_cpu_project()
+		if not active.is_empty():
+			var pending := ResearchManager.get_project_decision(str(active.get("id", "")))
+			if not pending.is_empty():
+				ResearchManager.resolve_project_decision(str(active.get("id", "")), "BALANCE" if str(pending.get("type", "")) == "PROTOTYPE_REVIEW" else "APPROVE")
+			var directive := ResearchManager.cpu_pending_directive(active)
+			if not directive.is_empty():
+				ResearchManager.resolve_cpu_directive(str(active.id), "PROVEN")
+		for job_value in ProductionManager.get_active_jobs():
+			var job: Dictionary = job_value
+			if not bool(job.get("_probe_set", false)):
+				ProductionManager.set_strategy(str(job.id), "BALANCED")
+				ProductionManager.set_binning_strategy(str(job.id), "BALANCED")
+				ProductionManager.set_manufacturing_route(str(job.id), "EXTERNAL", "")
+				job["_probe_set"] = true
+		for product_value in ready:
+			var product: Dictionary = product_value
+			ProductManager.launch_product(str(product.id), int(product.get("price", 100)), int(product.get("production_capacity", 100)))
+		SimulationManager.process_month_end()
+		TimeManager.month += 1
+		if TimeManager.month > 12:
+			TimeManager.month = 1
+			TimeManager.year += 1

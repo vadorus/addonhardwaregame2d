@@ -400,27 +400,35 @@ class Curve2DView extends Control:
 		var right := size.x - 16.0
 		var top := 14.0
 		var bottom := size.y - 22.0
-		for level: float in [5.0, 7.0]:
-			var y := bottom - (bottom - top) * level / 10.0
-			draw_line(Vector2(left, y), Vector2(right, y), Color(0.42, 0.34, 0.25, 0.25), 1.0)
-			draw_string(font, Vector2(2.0, y + 4.0), "%d" % int(level), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("6b5640"))
+		# Échelle resserrée autour des notes (un écart de 0,5 point doit se voir), graduée par point entier.
+		var low := 10.0
+		var high := 0.0
+		for point_value in points:
+			low = minf(low, float((point_value as Dictionary).value))
+			high = maxf(high, float((point_value as Dictionary).value))
+		low = clampf(floorf(low) - 1.0, 0.0, 9.0)
+		high = clampf(ceilf(high) + 1.0, low + 1.0, 10.0)
+		var to_y := func(v: float) -> float: return bottom - (bottom - top) * (clampf(v, low, high) - low) / (high - low)
+		for level in range(int(low), int(high) + 1):
+			var y: float = to_y.call(float(level))
+			draw_line(Vector2(left, y), Vector2(right, y), Color(0.42, 0.34, 0.25, 0.18), 1.0)
+			draw_string(font, Vector2(2.0, y + 4.0), "%d" % level, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("6b5640"))
 		var step := (right - left) / float(points.size() - 1)
 		var previous := Vector2.ZERO
 		for i in range(points.size()):
-			var point: Dictionary = points[i]
-			var value := clampf(float(point.value), 0.0, 10.0)
-			var at := Vector2(left + step * i, bottom - (bottom - top) * value / 10.0)
+			var at := Vector2(left + step * i, to_y.call(float((points[i] as Dictionary).value)))
 			if i > 0:
 				draw_line(previous, at, Color("f2a541"), 3.0, true)
 			previous = at
 		for i in range(points.size()):
 			var point: Dictionary = points[i]
-			var value := clampf(float(point.value), 0.0, 10.0)
-			var at := Vector2(left + step * i, bottom - (bottom - top) * value / 10.0)
+			var value := float(point.value)
+			var at := Vector2(left + step * i, to_y.call(value))
 			var tint := Color("2f8a52") if value >= 7.0 else (Color("c98a2b") if value >= 5.0 else Color("b5352d"))
 			draw_circle(at, 6.0, tint)
 			var label := str(point.label)
 			if label.length() > 12:
 				label = label.substr(0, 11) + "…"
 			var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
-			draw_string(font, Vector2(at.x - label_size.x * 0.5, size.y - 6.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("6b5640"))
+			var x := clampf(at.x - label_size.x * 0.5, 0.0, size.x - label_size.x)
+			draw_string(font, Vector2(x, size.y - 6.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("6b5640"))
