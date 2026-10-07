@@ -61,12 +61,21 @@ func _run(profile: String) -> void:
 				launched += 1
 		SimulationManager.process_month_end()
 		months += 1
+		TimeManager.month += 1
+		if TimeManager.month > 12:
+			TimeManager.month = 1
+			TimeManager.year += 1
 		if TimeManager.year != last_year:
 			last_year = TimeManager.year
 			yearly.append("%d: %s €" % [TimeManager.year, _k(Economy.money)])
 	print("[SONDE] ===== %s =====" % profile)
 	print("[SONDE] départ %s € · %d mois joués · %d projets · %d modèles lancés · faillite: %s" % [_k(start_money), months, project_count, launched, str(SimulationManager.is_game_over)])
 	print("[SONDE] argent par année : " + " | ".join(yearly))
+	var on_sale := ProductManager.products.filter(func(p): return str((p as Dictionary).get("status", "")) == "LAUNCHED")
+	var monthly := 0
+	for product in on_sale:
+		monthly += int((product as Dictionary).get("last_month_sales", 0)) * (int((product as Dictionary).get("price", 0)) - int((product as Dictionary).get("unit_cost", 0)))
+	print("[SONDE] en vente : %d modèles · marge brute du dernier mois ≈ %s € · équipe : %d" % [on_sale.size(), _k(monthly), PersonnelManager.staff.size()])
 	for line in _reviews:
 		print("[SONDE] presse " + str(line))
 
