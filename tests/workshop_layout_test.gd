@@ -145,7 +145,8 @@ func _check_fabrication_and_launch_cards() -> bool:
 	if journey != null and journey.visible:
 		var build := _find_button(journey, "Confier la fabrication")
 		if build == null or build.disabled or not build.is_visible_in_tree() or not journey.get_global_rect().encloses(build.get_global_rect()):
-			_fail("I4: the CPU journey fabrication button is missing or needs scrolling")
+			_fail("I4: the CPU journey fabrication button is missing or needs scrolling: %s in %s · boutons : %s" % [
+				str(build.get_global_rect()) if build != null else "absent", str(journey.get_global_rect()), ", ".join(_button_texts(journey))])
 			return false
 		print("[UI] Parcours CPU : bouton de fabrication visible sans défiler (phone 1616x720)")
 		build.pressed.emit()
@@ -284,3 +285,11 @@ func _find_button(root: Node, prefix: String) -> Button:
 		if found != null:
 			return found
 	return null
+
+func _button_texts(root: Node) -> Array[String]:
+	var texts: Array[String] = []
+	for child in root.get_children():
+		if child is Button and (child as Button).is_visible_in_tree():
+			texts.append(str((child as Button).text))
+		texts.append_array(_button_texts(child))
+	return texts
