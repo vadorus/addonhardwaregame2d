@@ -1762,6 +1762,11 @@ func _ready() -> void:
 		_fail(lab_board_error)
 		return
 	print("[CI] Labo (planche 5) : scène, architectures, équipes, gravure, carnet OK")
+	var press_board_error: String = (load("res://tests/scenarios/PressBoardScenario.gd") as Script).call("run", self)
+	if press_board_error != "":
+		_fail(press_board_error)
+		return
+	print("[CI] Presse : piles de coupures par CPU, courbe des notes, Nora compare OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

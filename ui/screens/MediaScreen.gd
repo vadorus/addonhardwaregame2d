@@ -9,6 +9,7 @@ var media_label: Label
 var pager: Control
 var _lists: Dictionary = {}
 var _last_key := "-"
+var press_board: Control
 
 func _ready() -> void:
 	name = "Presse & médias"
@@ -22,12 +23,15 @@ func _ready() -> void:
 func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
-	box.add_child(UI.eyebrow("PRESSE & MÉDIAS"))
-	box.add_child(UI.label("Ce que le marché raconte de votre industrie", 24))
+	# Revue des onglets (07/10) : la scène de la salle de presse (PressBoard) remplace le titre abstrait.
 	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
 	box.add_child(pager)
-	for data in [["TESTS", "Tests de vos produits"], ["BUSINESS", "Business & contrats"], ["ALL", "Tout"]]:
+	for data in [["TESTS", "Tests de vos CPU"], ["BUSINESS", "Business & contrats"], ["ALL", "Tout"]]:
 		var page: VBoxContainer = pager.call("add_page", str(data[0]), str(data[1]))
+		if str(data[0]) == "TESTS":
+			press_board = (load("res://ui/components/PressBoard.gd") as Script).new() as Control
+			page.add_child(press_board)
+			continue
 		var list := VBoxContainer.new()
 		list.add_theme_constant_override("separation", 8)
 		page.add_child(list)
@@ -55,6 +59,8 @@ func refresh() -> void:
 	if key_now == _last_key:
 		return
 	_last_key = key_now
+	if press_board != null and press_board.is_inside_tree():
+		press_board.call("refresh")
 	var lines: Array[String] = []
 	for news_value in items:
 		var news: Dictionary = news_value
@@ -75,13 +81,7 @@ func refresh() -> void:
 			count += 1
 		if count == 0:
 			list.add_child(UI.muted_label("Rien pour l'instant. Lancez un produit : la presse le testera.", 13) if key == "TESTS" else UI.muted_label("Aucune actualité.", 13))
-	if pager != null:
-		var tests := 0
-		for news_value in items:
-			if (news_value as Dictionary).has("review_score"):
-				tests += 1
-		if current_section() == "TESTS" and tests == 0 and not items.is_empty():
-			pager.call("show_page", "BUSINESS")
+	# La page Tests garde sa scène même vide : Nora y explique que la presse attend le premier CPU.
 	UI.prepare_touch_scroll_children(self)
 
 func _source_line(news: Dictionary) -> String:
