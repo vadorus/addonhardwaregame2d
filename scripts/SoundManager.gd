@@ -21,8 +21,14 @@ const MUSIC_TRACKS := {
 	"menu":["menu_ambient.ogg"],
 	"1970s":["1970s_contemplation.ogg", "1970s_calm_piano.ogg"],
 	"1980s":["1980s_calm_ambient.ogg", "1980s_another_august.ogg"],
-	"1990s":["1990s_chill_lofi.ogg", "1990s_apple_cider.ogg"]
+	"1990s":["1990s_chill_lofi.ogg", "1990s_apple_cider.ogg"],
+	# Musiques de saison (07/10/2026) : suivent le thème du moment (scripts/LiveTheme.gd, vraie date).
+	"menu+HALLOWEEN":["menu_halloween.ogg"],
+	"menu+FIN_ANNEE":["menu_fetes.ogg"],
+	"HALLOWEEN":["halloween_lanternes.ogg", "halloween_caper.ogg", "halloween_hullabaloo.ogg"],
+	"FIN_ANNEE":["fetes_hiver.ogg", "fetes_synthes.ogg", "fetes_jingle_bells.ogg"]
 }
+const LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 ## Silence entre deux morceaux : on respire.
 const MUSIC_GAP := 6.0
 var _track_index := 0
@@ -172,15 +178,40 @@ func current_music_era() -> String:
 	return _current_era
 
 func play_music_for_year(year: int) -> void:
-	_play_era(era_for_year(year))
+	_play_era(music_key(era_for_year(year)))
 
-## Écran d'accueil (avant la création de l'entreprise) : une boucle d'ambiance calme.
+## Écran d'accueil (avant la création de l'entreprise) : une boucle d'ambiance calme
+## (celle de la saison pendant Halloween et les fêtes).
 func play_menu_music() -> void:
-	_play_era("menu")
+	_play_era(music_key("menu"))
 
+## Clé de la liste de lecture : la décennie (ou « menu »), suivie du thème du moment s'il a ses musiques.
+## Hors saison (ou décorations du moment coupées) : la musique calme de la décennie, comme avant.
+func music_key(base: String, theme: String = "-") -> String:
+	var t := LIVE_THEME.current() if theme == "-" else theme
+	if t == "" or not MUSIC_TRACKS.has(t):
+		return base
+	return "%s+%s" % [base, t]
+
+## Morceaux d'une liste de lecture. En saison, les musiques de fête passent en premier et la décennie
+## s'intercale toutes les deux (fête, fête, décennie, fête, décennie…) : le thème domine sans lasser.
 func music_tracks(era: String) -> Array:
+	if era.contains("+") and not MUSIC_TRACKS.has(era):
+		var seasonal := _existing_tracks(era.get_slice("+", 1))
+		var decade := _existing_tracks(era.get_slice("+", 0))
+		var out: Array = []
+		for i in range(seasonal.size()):
+			out.append(seasonal[i])
+			if i >= 1 and i - 1 < decade.size():
+				out.append(decade[i - 1])
+		for j in range(maxi(seasonal.size() - 1, 0), decade.size()):
+			out.append(decade[j])
+		return out
+	return _existing_tracks(era)
+
+func _existing_tracks(key: String) -> Array:
 	var out: Array = []
-	for file_name in MUSIC_TRACKS.get(era, []):
+	for file_name in MUSIC_TRACKS.get(key, []):
 		var path := MUSIC_DIR + str(file_name)
 		if ResourceLoader.exists(path):
 			out.append(path)
@@ -194,6 +225,10 @@ func _play_era(era: String) -> void:
 	if not tracks.is_empty():
 		# On reprend la décennie là où on l'avait laissée (pas toujours le même premier morceau).
 		_play_track(era, _track_index % tracks.size())
+		return
+	if era.contains("+"):
+		_current_era = ""
+		_play_era(era.get_slice("+", 0)) # musiques de saison absentes : la décennie seule
 		return
 	if era == "menu":
 		era = "1970s"
@@ -213,7 +248,7 @@ func _play_track(era: String, index: int) -> void:
 	var stream := load(str(tracks[_track_index])) as AudioStreamOggVorbis
 	if stream == null:
 		return
-	stream.loop = era == "menu"
+	stream.loop = era.begins_with("menu")
 	_music_waiting = false
 	_start_music(stream)
 

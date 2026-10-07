@@ -1581,6 +1581,7 @@ func _menu_toggle_live_theme() -> void:
 	config.set_value("ui", "live_theme", LIVE_THEME.enabled)
 	config.save(SETTINGS_PATH)
 	_refresh_live_theme()
+	_start_music_for_current_year() # la musique de saison suit le même réglage
 	_refresh_all()
 
 func _show_creation_screen() -> void:

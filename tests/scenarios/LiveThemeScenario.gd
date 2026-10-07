@@ -37,6 +37,27 @@ static func _checks(host: Node) -> String:
 			return "Live theme %s is incomplete" % theme
 		if not SoundManager.has_method("play") or not str(LIVE.jingle(theme)).begins_with("fete_"):
 			return "Live theme %s has no jingle" % theme
+	# 3 bis. Musiques de saison (07/10) : 3 morceaux par fête, une boucle de menu, mêlés à la décennie.
+	for theme in ["HALLOWEEN", "FIN_ANNEE"]:
+		LIVE.override = theme
+		if SoundManager.music_key("1970s") != "1970s+%s" % theme or SoundManager.music_key("menu") != "menu+%s" % theme:
+			return "Season music: %s should pick the seasonal playlist (%s)" % [theme, SoundManager.music_key("1970s")]
+		var playlist: Array = SoundManager.music_tracks(SoundManager.music_key("1980s"))
+		var seasonal: Array = SoundManager.music_tracks(theme)
+		if seasonal.size() != 3 or playlist.size() != 5:
+			return "Season music: %s needs 3 tracks mixed with the decade (%d / %d)" % [theme, seasonal.size(), playlist.size()]
+		if playlist[0] != seasonal[0] or playlist[1] != seasonal[1] or not str(playlist[2]).get_file().begins_with("1980s"):
+			return "Season music: %s plays two seasonal tracks, then one of the decade (%s)" % [theme, str(playlist)]
+		var menu_loop: Array = SoundManager.music_tracks(SoundManager.music_key("menu"))
+		if menu_loop.size() != 1 or str(menu_loop[0]).get_file() == "menu_ambient.ogg":
+			return "Season music: %s has its own title-screen loop" % theme
+	LIVE.override = ""
+	LIVE.enabled = false
+	if SoundManager.music_key("1990s") != "1990s" or SoundManager.music_key("menu") != "menu":
+		return "Season music: switching off the theme brings back the calm decade music"
+	LIVE.enabled = true
+	if SoundManager.music_key("1990s", "") != "1990s":
+		return "Season music: out of season, the decade plays alone"
 	# 4. La couche décorative : guirlande en haut et sur les côtés, invisible hors saison, jamais sous le doigt.
 	var overlay := (load("res://ui/LiveThemeOverlay.gd") as Script).new() as Control
 	host.add_child(overlay)

@@ -19,6 +19,23 @@ Ils ont été choisis le 01/10/2026 (lot L) pour une ambiance **calme et détent
 | `1990s_chill_lofi.ogg` | Chill lofi inspired [loop edit] | qubodup | https://opengameart.org/content/chill-lofi-inspired-loop-edit |
 | `1990s_apple_cider.ogg` | Apple Cider | Zane Little Music | https://opengameart.org/content/apple-cider |
 
+### Musiques de saison (ajoutées le 07/10/2026)
+
+Elles suivent le « thème du moment », d'après la vraie date du téléphone :
+- Halloween en octobre ;
+- les fêtes du 1er novembre au 6 janvier.
+
+Le jeu joue deux morceaux de fête, puis un de la décennie, et ainsi de suite. Hors saison, ou si le joueur coupe « Décorations du moment », on revient à la musique calme de la décennie. Ces fichiers sont préparés par `tools/audio/build_seasonal.py`.
+
+| Fichier du jeu | Morceau d'origine | Auteur | Source |
+|---|---|---|---|
+| `menu_halloween.ogg`, `halloween_lanternes.ogg` | Lanterns in the Hollowed Forest (loop) | Tsorthan Grove | https://opengameart.org/content/lanterns-in-the-hollowed-forest |
+| `halloween_caper.ogg` | Caper | Pro Sensory (Alex McCulloch) | https://opengameart.org/content/caper |
+| `halloween_hullabaloo.ogg` | Halloween Hullabaloo | StarlightFrost (« Winter Frost ») | https://opengameart.org/content/halloween-hullabaloo |
+| `menu_fetes.ogg`, `fetes_hiver.ogg` | Wintery loop | Emma_MA | https://opengameart.org/content/wintery-loop |
+| `fetes_synthes.ogg` | Happy synths loop with slight christmas feeling | 3xBlast | https://opengameart.org/content/happy-synths-loop-with-slight-christmas-feeling |
+| `fetes_jingle_bells.ogg` | Jingle Bells | ChristmasSongs | https://opengameart.org/content/jingle-bells |
+
 ## Ambiances du QG (`ambience/`)
 
 | Fichier du jeu | Origine | Auteur | Source |
