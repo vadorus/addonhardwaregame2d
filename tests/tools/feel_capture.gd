@@ -37,6 +37,10 @@ func _ready() -> void:
 			await _shot("intro_%.1fs" % t)
 		get_tree().quit(0)
 		return
+	if moment == "onglets":
+		await _onglets()
+		get_tree().quit(0)
+		return
 	if moment == "titre":
 		await _wait(1.5)
 		await _shot("titre")
@@ -111,3 +115,39 @@ func _atelier() -> void:
 	game.call("open_dialogue", "EUREKA:%s" % str(project.id))
 	await _frames(20)
 	await _shot("atelier_trouvaille")
+
+## Revue des onglets (07/10) : charge une vraie partie (copiée dans le dossier de test, jamais réécrite)
+## avec -- --moment=onglets --save=C:/chemin/tech_empire_save.json, puis photographie chaque onglet.
+func _onglets() -> void:
+	var source := ""
+	for arg in OS.get_cmdline_user_args():
+		if str(arg).begins_with("--save="):
+			source = str(arg).trim_prefix("--save=")
+	if source != "":
+		var target := ProjectSettings.globalize_path(SaveManager.save_path())
+		DirAccess.make_dir_recursive_absolute(target.get_base_dir())
+		DirAccess.copy_absolute(source, target)
+	game.call("_load_game_slot", 0)
+	await _frames(20)
+	TimeManager.time_scale = 0.0
+	var names := ["qg", "entreprise", "equipe", "labo", "produits", "marche", "presse"]
+	for i in range(names.size()):
+		game.call("_show_tab", i)
+		await _frames(30)
+		await _shot("onglet_%d_%s" % [i, names[i]])
+		var scroll := _first_scroll(game.get("tabs").get_current_tab_control())
+		if scroll != null and scroll.get_v_scroll_bar().max_value > scroll.size.y + 40.0:
+			scroll.scroll_vertical = int(scroll.size.y * 0.9)
+			await _frames(10)
+			await _shot("onglet_%d_%s_suite" % [i, names[i]])
+
+func _first_scroll(node: Node) -> ScrollContainer:
+	if node == null:
+		return null
+	if node is ScrollContainer and (node as Control).is_visible_in_tree():
+		return node
+	for child in node.get_children():
+		var found := _first_scroll(child)
+		if found != null:
+			return found
+	return null
