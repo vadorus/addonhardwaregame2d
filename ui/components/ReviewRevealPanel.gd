@@ -43,6 +43,8 @@ var _continue: Button
 var _reviews: Array = []
 var _revealed := 0
 var _silent := false
+## Chaque nouvelle série de tests invalide les minuteries de la précédente (fenêtre fermée puis rouverte vite).
+var _reveal_token := 0
 var _serif: SystemFont
 var _serif_italic: SystemFont
 
@@ -222,6 +224,7 @@ func show_archived(product_name: String, reviews: Array) -> void:
 func show_reviews(product_name: String, reviews: Array, other_models: int = 0, front_page: bool = false) -> void:
 	_reviews = reviews.duplicate(true)
 	_revealed = 0
+	_reveal_token += 1
 	_kicker.text = "LE JOUR J  •  À LA UNE" if front_page else "LE JOUR J"
 	_title.text = "%s est en vente. La presse rend son verdict…" % product_name if not _silent else product_name
 	_subtitle.text = "%d journal(aux) ont testé %s." % [_reviews.size(), product_name]
@@ -244,7 +247,8 @@ func show_reviews(product_name: String, reviews: Array, other_models: int = 0, f
 		card.modulate.a = 0.0
 		_cards.add_child(card)
 	if is_inside_tree() and not _silent and not JUICE.reduced_motion:
-		get_tree().create_timer(0.5).timeout.connect(_reveal_next)
+		var token := _reveal_token
+		get_tree().create_timer(0.5).timeout.connect(func(): _reveal_next(token))
 	else:
 		reveal_all()
 	_silent = false
@@ -266,7 +270,9 @@ func verdict_text() -> String:
 static func score_out_of_ten(score: float) -> int:
 	return clampi(roundi(score / 10.0), 1, 10)
 
-func _reveal_next() -> void:
+func _reveal_next(token: int) -> void:
+	if token != _reveal_token:
+		return
 	if not is_inside_tree() or _revealed >= _reviews.size():
 		_show_verdict()
 		return
@@ -276,7 +282,7 @@ func _reveal_next() -> void:
 	if get_node_or_null("/root/SoundManager") != null:
 		SoundManager.play("review", 0.9 + 0.03 * score)
 	_revealed += 1
-	get_tree().create_timer(REVEAL_STEP).timeout.connect(_reveal_next)
+	get_tree().create_timer(REVEAL_STEP).timeout.connect(func(): _reveal_next(token))
 
 ## Le journal tombe sur la table : il arrive penché et un peu plus grand, puis se pose.
 func _drop(card: Control) -> void:
