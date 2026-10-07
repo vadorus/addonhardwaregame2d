@@ -87,6 +87,18 @@ func _check_project_decision_card() -> bool:
 	for frame in range(4): await get_tree().process_frame
 	game.call("_on_dashboard_navigation", 3, "PROJECT_DECISION")
 	for frame in range(16): await get_tree().process_frame
+	# Reboot R2 : la décision s'ouvre désormais dans le parcours CPU (CpuJourney), plus dans Labo › Projets.
+	var journey: Control = game.get("cpu_journey")
+	if journey != null and journey.visible:
+		var body: Control = journey.get("_body")
+		var first: Control = body.get_child(0) as Control if body != null and body.get_child_count() > 0 else null
+		var view := journey.get_global_rect()
+		print("[I1] parcours CPU : première ligne y %.0f, zone %s" % [first.global_position.y if first != null else -1.0, str(view)])
+		if first == null or not first.visible or first.global_position.y < view.position.y - 1.0 or first.global_position.y > view.position.y + view.size.y * 0.5:
+			_fail("I1: the CPU journey decision opens with its question cut off at the top")
+			return false
+		viewport.queue_free()
+		return true
 	var lab: Control = game.get("lab_screen")
 	var card: Control = lab.get("project_decision_card")
 	print("[I1] carte y %.0f h %.0f, zone %s" % [card.global_position.y, card.size.y, str(lab.get_global_rect())])
