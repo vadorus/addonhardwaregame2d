@@ -5,6 +5,23 @@ Lis-le après `AGENTS.md`, qui reste la règle prioritaire.
 
 Objectif du mois : **la démo pour testeurs fermés, fin octobre**. Seule la branche **CPU** est concernée.
 
+### Les autres documents à lire (le jeu dans son ensemble)
+
+| Sujet | Document |
+|---|---|
+| Vision et concept | `docs/VISION.md` |
+| Game design | `docs/GAME_DESIGN.md` |
+| Bible de conception | `docs/DESIGN_BIBLE.md` |
+| Périmètre jouable CPU | `docs/CPU_VERTICAL_SLICE.md` |
+| Philosophie de simulation | `docs/SIMULATION_PHILOSOPHY.md` |
+| Direction artistique et UX | `docs/UX_ART_DIRECTION.md` |
+| Briefs graphiques (Astra) | `docs/BRIEF_ASTRA_*.md` |
+| Feuilles de route | `docs/ROADMAP_V010.md`, `docs/PLAN_V09_V10.md` |
+| Économie | `docs/V06_PLAYTEST_ECONOMY.md` |
+| Conception détaillée (projets, recherche, lisibilité, référence Device Tycoon) | `docs/design/*.md` |
+| Construire PC et Android | `docs/BUILD_PC_ANDROID.md` |
+| Version Play Store, clé de publication, état de la console | `docs/PUBLICATION_PLAY_STORE.md` |
+
 ---
 
 ## 1. Démarrer

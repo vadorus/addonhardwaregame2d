@@ -40,9 +40,20 @@ godot --headless --path . --install-android-build-template --export-release "And
 - Vérifier la signature : `jarsigner -verify -certs build\android\TechEmpire-playstore.aab`
   doit afficher `CN=Tech Empire, O=vadorus, L=Tourcoing, C=FR`.
 
-## Encore à faire pour la fiche Play Store
+## État de la Play Console (07/10/2026 au soir)
 
-- Politique de confidentialité (URL publique), questionnaire de classification du contenu, section
-  « Sécurité des données ».
-- Icône 512 × 512, bannière 1024 × 500, captures d'écran téléphone (au moins 2).
-- Test fermé : 12 testeurs inscrits pendant 14 jours d'affilée avant la production (nouveau compte personnel).
+Fait (rien n'est encore envoyé pour examen) :
+- Les 10 déclarations « Contenu de l'appli » sont enregistrées : politique de confidentialité, accès à l'appli,
+  annonces, classification du contenu, public cible, sécurité des données, etc.
+- Classification IARC : PEGI 3 en Europe, avec une référence rare à l'alcool (le champagne du décor du Nouvel An).
+- Public cible : 13 ans et plus.
+- La fiche Play Store fr-FR est complète : textes, icône 512 × 512, bannière 1024 × 500 et captures.
+
+Encore à faire :
+- Envoyer un AAB sur la piste de test fermé (Alpha) et créer la liste de testeurs.
+- Garder 12 testeurs inscrits pendant 14 jours d'affilée avant de demander la production (compte personnel récent).
+- Mettre un lien vers la politique de confidentialité dans le jeu lui-même.
+- Quand les DLC payants arriveront, mettre à jour « Accès à l'appli » (informations de connexion), la classification
+  (achats intégrés) et « Sécurité des données » (paiements). Il faudra aussi ajouter la bibliothèque Google Play Billing.
+- Bandeau « vérification des développeurs Android » : enregistrer le package et les clés utilisés hors Play.
+  Priorité faible.
