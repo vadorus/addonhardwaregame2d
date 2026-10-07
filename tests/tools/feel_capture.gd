@@ -30,6 +30,11 @@ func _ready() -> void:
 	game = (load("res://main.tscn") as PackedScene).instantiate() as Control
 	add_child(game)
 	await _frames(8)
+	if moment == "titre":
+		await _wait(1.5)
+		await _shot("titre")
+		get_tree().quit(0)
+		return
 	game.get("setup_name").text = "Nova Technologies"
 	game.call("_start_new_game")
 	await _frames(12)
@@ -75,6 +80,27 @@ func _etabli() -> void:
 		await _shot("etabli_%d" % i)
 
 func _atelier() -> void:
-	game.call("_show_first_cpu_workshop")
-	await _frames(25)
-	await _shot("atelier_0")
+	const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+	ResearchManager.start_project("Nova 1", "CPU", MarketManager.default_segment(), "INTERNAL", "BALANCED", 45000,
+		CPU_DESIGN.preset("BALANCED"), {}, {}, "GENERAL", "", "BALANCED", "STANDARD", "NONE", "SHARED", "NONE", true)
+	var project: Dictionary = ResearchManager.projects[0]
+	project["cockpit_directive_pending"] = {}
+	project["status"] = "DEVELOPMENT"
+	game.call("_refresh_all")
+	game.call("_show_tab", 0)
+	await _frames(10)
+	TimeManager.time_scale = 1.0
+	var garage: Control = game.get("dashboard_screen").get("dashboard_garage")
+	var crew: Control = garage.call("crew") if garage != null and garage.has_method("crew") else null
+	await _wait(4.0)
+	await _shot("atelier_bulles")
+	if crew != null:
+		crew.set("_spark_timer", 0.0)
+	await _wait(2.5)
+	await _shot("atelier_etincelle")
+	TimeManager.time_scale = 0.0
+	var template: Dictionary = (load("res://scripts/WorkshopDiscoveries.gd") as Script).get("TEMPLATES")[0]
+	project["discovery_pending"] = {"id":str(template.id), "text":str(template.text), "impact":(template.impact as Dictionary).duplicate()}
+	game.call("open_dialogue", "EUREKA:%s" % str(project.id))
+	await _frames(20)
+	await _shot("atelier_trouvaille")
