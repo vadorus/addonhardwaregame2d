@@ -1645,7 +1645,7 @@ func get_state() -> Dictionary:
 		"projects":projects,
 		"cpu_generation_proposals":cpu_generation_proposals,
 		"cpu_generation_context":cpu_generation_context,
-		"discovery_notebook":discovery_notebook,
+		"discovery_notebook":discovery_notebook.duplicate(true),
 		"technologies":technologies,
 		"cpu_research_domains":cpu_research_domains,
 		"research_teams":1,
