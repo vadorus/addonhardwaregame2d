@@ -3232,6 +3232,21 @@ func _build_review_layer() -> void:
 	review_layer.visible = false
 	review_layer.z_index = 100
 	add_child(review_layer)
+	# Le jour J (maquette validée le 07/10) : le journal du matin sur le bureau, assombri, derrière les tests.
+	var press_art := "res://assets/art/v010/J3_moments/moment_presse.webp"
+	if ResourceLoader.exists(press_art):
+		var backdrop := TextureRect.new()
+		backdrop.texture = load(press_art)
+		backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		review_layer.add_child(backdrop)
+		var shade := ColorRect.new()
+		shade.color = Color(0.17, 0.12, 0.08, 0.55)
+		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		review_layer.add_child(shade)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	review_layer.add_child(center)

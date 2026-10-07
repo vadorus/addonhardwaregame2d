@@ -96,7 +96,7 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 		var tone := _tone_for_score(review_score)
 		var text := _review_text(outlet, product, tone, review_score, benchmark_rank, benchmark_total, comparison)
 		published.append({"source_name":str(outlet.name), "channel_label":channel_label(str(outlet.channel)), "score":review_score,
-			"headline":str(text.headline), "comparison_summary":comparison_summary, "why":why, "channel":str(outlet.channel),
+			"headline":str(text.headline), "body":str(text.body), "comparison_summary":comparison_summary, "why":why, "channel":str(outlet.channel),
 			"product_id":str(product.get("id", "")), "segment":str(product.get("target_segment", ""))})
 		add_news(
 			channel_label(str(outlet.channel)),
