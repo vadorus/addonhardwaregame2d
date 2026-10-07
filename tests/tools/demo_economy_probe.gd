@@ -75,7 +75,7 @@ func _run(profile: String) -> void:
 	var monthly := 0
 	for product in on_sale:
 		monthly += int((product as Dictionary).get("last_month_sales", 0)) * (int((product as Dictionary).get("price", 0)) - int((product as Dictionary).get("unit_cost", 0)))
-	print("[SONDE] en vente : %d modèles · marge brute du dernier mois ≈ %s € · équipe : %d" % [on_sale.size(), _k(monthly), PersonnelManager.staff.size()])
+	print("[SONDE] en vente : %d modeles, marge brute du dernier mois %s EUR, equipe : %d" % [on_sale.size(), _k(monthly), PersonnelManager.staff.size()])
 	for line in _reviews:
 		print("[SONDE] presse " + str(line))
 

@@ -219,7 +219,7 @@ func _outlet_score(outlet: Dictionary, product: Dictionary, _segment_scores: Dic
 const PRESS_PAR_START := 56.0
 const PRESS_RELATIVE_GAIN := 0.8
 const PRESS_PART_CAP := 12.0
-const PRESS_NOVELTY_BONUS := 9.0
+const PRESS_NOVELTY_BONUS := 7.0
 const PRESS_EXPECTED_PROGRESS := 4.0
 const PRESS_TOO_SOON_MONTHS := 10
 
