@@ -9,6 +9,7 @@ signal advanced_requested(spec: Dictionary)
 signal cancel_requested
 
 const UI := preload("res://ui/UiKit.gd")
+const JUICE := preload("res://ui/Juice.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CATALOG := preload("res://scripts/ArchitectureCatalog.gd")
 const CHIP := preload("res://ui/ChipPreview.gd")
@@ -23,6 +24,11 @@ const CREAM := Color("f6e3c6")
 const GOOD_TEXT := Color("2f7a3a")
 const BAD_TEXT := Color("b3261e")
 const STEPS := ["Gamme", "Architecture", "Objectif", "Modèles", "Budget"]
+## D3 (07/10) : maquette « L'établi » validée — la puce vit dans le garage, Camille réagit à chaque étape.
+const GARAGE_ART := "res://assets/art/v010/J1_decors/decor_0_garage.webp"
+const CAMILLE_THINK := "res://assets/art/v010/J2_personnages/perso_03_reflexion.png"
+const CAMILLE_JOY := "res://assets/art/v010/J2_personnages/perso_03_joie.png"
+const AXIS_COLORS := {"performance":Color("e8743b"), "efficiency":Color("3a9fd6"), "reliability":Color("4caf6a")}
 const CORE_STEPS := [1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64]
 const FREQ_FACTORS := [0.4, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
 const CACHE_KB_STEPS := [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
@@ -69,6 +75,13 @@ var _step_pills: Array[Button] = []
 var _content: VBoxContainer
 var _scroll: ScrollContainer
 var _chip: Control
+var _stage: Control
+var _chip_holder: Control
+var _camille: TextureRect
+var _bubble: PanelContainer
+var _bubble_label: Label
+var _puff: Label
+var _launch_layer: Control
 var _name_label: Label
 var _profile_label: Label
 var _meters: Dictionary = {}
@@ -150,14 +163,79 @@ func _build_header() -> Control:
 
 func _build_chip_column() -> Control:
 	var col := VBoxContainer.new()
-	col.custom_minimum_size.x = 190
+	col.custom_minimum_size.x = 300
 	col.add_theme_constant_override("separation", 4)
 	var frame := PanelContainer.new()
-	frame.add_theme_stylebox_override("panel", UI.stylebox(Color("2b1f15"), 14, 0, UI.APP_LINE, 6))
+	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	frame.clip_contents = true
+	frame.add_theme_stylebox_override("panel", UI.stylebox(Color("2b1f15"), 14, 0, UI.APP_LINE, 0))
 	col.add_child(frame)
+	_stage = Control.new()
+	_stage.clip_contents = true
+	_stage.custom_minimum_size = Vector2(290, 280)
+	_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(_stage)
+	if ResourceLoader.exists(GARAGE_ART):
+		var garage := TextureRect.new()
+		garage.texture = load(GARAGE_ART)
+		garage.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		garage.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		garage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		garage.modulate = Color(0.78, 0.72, 0.66)
+		garage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stage.add_child(garage)
+	_chip_holder = Control.new()
+	_place(_chip_holder, Vector2(0.5, 0.36), Vector2(180, 150))
+	_chip_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stage.add_child(_chip_holder)
 	_chip = CHIP.new()
-	_chip.custom_minimum_size = Vector2(170, 150)
-	frame.add_child(_chip)
+	_chip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_chip_holder.add_child(_chip)
+	# Étincelles du fer à souder, près de la puce.
+	for spark in [[Vector2(0.24, 0.52), 1.1, 0.0], [Vector2(0.30, 0.56), 1.4, 0.5], [Vector2(0.21, 0.58), 0.9, 0.2]]:
+		var dot := ColorRect.new()
+		dot.color = Color("ffd27a")
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_place(dot, spark[0], Vector2(6, 6))
+		_stage.add_child(dot)
+		dot.set_meta("spark", spark)
+	_puff = UI.label("", 15)
+	_puff.add_theme_color_override("font_outline_color", Color("2b1f15"))
+	_puff.add_theme_constant_override("outline_size", 6)
+	_puff.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_puff.modulate.a = 0.0
+	_place(_puff, Vector2(0.5, 0.18), Vector2(260, 24))
+	_stage.add_child(_puff)
+	_camille = TextureRect.new()
+	_camille.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_camille.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_camille.anchor_top = 1.0
+	_camille.anchor_bottom = 1.0
+	_camille.offset_left = 2
+	_camille.offset_right = 92
+	_camille.offset_top = -132
+	_camille.offset_bottom = -2
+	_camille.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ResourceLoader.exists(CAMILLE_THINK):
+		_camille.texture = load(CAMILLE_THINK)
+	_stage.add_child(_camille)
+	_bubble = PanelContainer.new()
+	_bubble.add_theme_stylebox_override("panel", UI.stylebox(Color("fff8ec"), 14, 0, Color("fff8ec"), 9))
+	_bubble.anchor_left = 0.0
+	_bubble.anchor_right = 1.0
+	_bubble.anchor_top = 1.0
+	_bubble.anchor_bottom = 1.0
+	_bubble.offset_left = 88
+	_bubble.offset_right = -8
+	_bubble.offset_top = -128
+	_bubble.offset_bottom = -64
+	_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stage.add_child(_bubble)
+	_bubble_label = UI.label("", 13)
+	_bubble_label.add_theme_color_override("font_color", WOOD)
+	_bubble_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_bubble_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_bubble.add_child(_bubble_label)
 	_name_label = UI.label("", 16)
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -167,6 +245,140 @@ func _build_chip_column() -> Control:
 	_profile_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_profile_label)
 	return col
+
+## Place un nœud par son centre, en proportion de la scène (la scène suit la taille de l'écran).
+static func _place(node: Control, center: Vector2, size_px: Vector2) -> void:
+	node.anchor_left = center.x
+	node.anchor_right = center.x
+	node.anchor_top = center.y
+	node.anchor_bottom = center.y
+	node.offset_left = -size_px.x * 0.5
+	node.offset_right = size_px.x * 0.5
+	node.offset_top = -size_px.y * 0.5
+	node.offset_bottom = size_px.y * 0.5
+
+## La scène s'anime quand l'établi est ouvert : la puce flotte, le fer à souder crépite, Camille respire.
+func _start_stage_life() -> void:
+	if not is_inside_tree() or JUICE.reduced_motion or _chip == null:
+		return
+	if _chip.has_meta("float"):
+		return
+	_chip.set_meta("float", true)
+	_chip.pivot_offset = _chip_holder.size * 0.5
+	var float_tween := _chip.create_tween().set_loops().set_trans(Tween.TRANS_SINE)
+	float_tween.tween_property(_chip, "position:y", -8.0, 2.1)
+	float_tween.parallel().tween_property(_chip, "rotation", 0.025, 2.1)
+	float_tween.tween_property(_chip, "position:y", 0.0, 2.1)
+	float_tween.parallel().tween_property(_chip, "rotation", -0.025, 2.1)
+	for child in _stage.get_children():
+		if child.has_meta("spark"):
+			var data: Array = child.get_meta("spark")
+			var spark_tween := (child as CanvasItem).create_tween().set_loops()
+			spark_tween.tween_interval(float(data[2]))
+			spark_tween.tween_property(child, "modulate:a", 1.0, float(data[1]) * 0.35)
+			spark_tween.tween_property(child, "modulate:a", 0.0, float(data[1]) * 0.65)
+	_camille.pivot_offset = Vector2(45, 130)
+	var sway := _camille.create_tween().set_loops().set_trans(Tween.TRANS_SINE)
+	sway.tween_property(_camille, "rotation", 0.025, 1.6)
+	sway.tween_property(_camille, "rotation", -0.025, 1.6)
+
+## Ce que dit Camille à chaque étape (et selon le choix en cours).
+func camille_line() -> String:
+	match step:
+		0:
+			return "Une suite de notre gamme… ou une nouvelle ?" if line_choice != "NEW" else "Une toute nouvelle gamme ? J'ai déjà des idées de nom !"
+		1:
+			return "Celle-là, on la connaît par cœur." if ArchitectureManager.maturity_of(arch_id) >= 50.0 else "Une architecture qu'on maîtrise mal encore… ça va chauffer à l'atelier !"
+		2:
+			return "Où l'équipe met-elle son énergie ? Tout pousser à fond, ça n'existe pas."
+		3:
+			return "Sur chaque plaquette, des puces sortent meilleures que d'autres : une gamme, c'est ça."
+		_:
+			return "Tout le monde est prêt. On se lance ?"
+
+func _say(text: String) -> void:
+	if _bubble_label == null or _bubble_label.text == text:
+		return
+	_bubble_label.text = text
+	JUICE.pop_in(_bubble, 0.25)
+
+## Petit mot qui s'envole de la puce après un réglage (« Perf ▲ », « Chaleur ▼ »…).
+func _show_puff(changes: Array) -> void:
+	if _puff == null or changes.is_empty() or not is_inside_tree() or JUICE.reduced_motion:
+		return
+	var first: Dictionary = changes[0]
+	_puff.text = str(first.get("text", ""))
+	_puff.add_theme_color_override("font_color", Color("7be0a8") if bool(first.get("good", true)) else Color("ff9b8a"))
+	_puff.position.y = _puff.position.y
+	var base_y := _stage.size.y * 0.18 - 12.0
+	_puff.position.y = base_y
+	_puff.modulate.a = 1.0
+	var tween := _puff.create_tween().set_parallel(true)
+	tween.tween_property(_puff, "position:y", base_y - 34.0, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_puff, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	_chip.pivot_offset = _chip_holder.size * 0.5
+	_chip.scale = Vector2(0.9, 0.9)
+	_chip.create_tween().tween_property(_chip, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## Le lancement est fêté : la puce jaillit, des confettis aux couleurs des trois axes, puis l'établi se ferme.
+func play_launch(name_text: String) -> void:
+	if _launch_layer != null:
+		_launch_layer.queue_free()
+	_launch_layer = Control.new()
+	_launch_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_launch_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_launch_layer)
+	var shade := ColorRect.new()
+	shade.color = Color("fff8ec")
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_launch_layer.add_child(shade)
+	var center := Control.new()
+	_place(center, Vector2(0.5, 0.42), Vector2(10, 10))
+	_launch_layer.add_child(center)
+	var colors := [Color("e8743b"), Color("3a9fd6"), Color("4caf6a"), Color("f2a541")]
+	for i in range(12):
+		var dot := ColorRect.new()
+		dot.color = colors[i % colors.size()]
+		dot.size = Vector2(12, 12)
+		dot.position = Vector2(-6, -6)
+		center.add_child(dot)
+		var angle := TAU * float(i) / 12.0
+		var tween := dot.create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(dot, "position", Vector2(cos(angle), sin(angle)) * 190.0, 0.9)
+		tween.tween_property(dot, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	var big := CHIP.new()
+	big.size = Vector2(220, 190)
+	big.position = Vector2(-110, -95)
+	big.call("set_design", current_design())
+	center.add_child(big)
+	big.pivot_offset = Vector2(110, 95)
+	big.scale = Vector2(0.4, 0.4)
+	big.rotation = -0.2
+	var pop := big.create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_property(big, "scale", Vector2.ONE, 0.7)
+	pop.tween_property(big, "rotation", 0.0, 0.7)
+	var title := UI.label("%s est lancé !" % name_text, 30)
+	title.add_theme_color_override("font_color", WOOD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_place(title, Vector2(0.5, 0.70), Vector2(900, 44))
+	_launch_layer.add_child(title)
+	var sub := UI.muted_label("Camille réunit l'équipe autour de l'établi.", 16)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_place(sub, Vector2(0.5, 0.79), Vector2(900, 26))
+	_launch_layer.add_child(sub)
+	JUICE.pop_in(title, 0.4)
+	var done := func():
+		if _launch_layer != null:
+			_launch_layer.queue_free()
+			_launch_layer = null
+		close()
+	_launch_layer.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			done.call())
+	if is_inside_tree() and not JUICE.reduced_motion:
+		get_tree().create_timer(2.2).timeout.connect(done)
+	else:
+		done.call()
 
 func _build_live_bar() -> Control:
 	var bar := PanelContainer.new()
@@ -186,7 +398,17 @@ func _build_live_bar() -> Control:
 		meter.max_value = 100
 		box.add_child(meter)
 		row.add_child(box)
-		_meters[key] = [meter, caption]
+		# Trait noir : où était le modèle précédent (maquette L'établi).
+		var marker := ColorRect.new()
+		marker.color = Color(0.23, 0.17, 0.12, 0.75)
+		marker.anchor_top = 0.0
+		marker.anchor_bottom = 1.0
+		marker.offset_top = -3
+		marker.offset_bottom = 3
+		marker.visible = false
+		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		meter.add_child(marker)
+		_meters[key] = [meter, caption, marker]
 	_cost_label = UI.label("", 13)
 	row.add_child(_cost_label)
 	_time_label = UI.label("", 13)
@@ -796,6 +1018,25 @@ func _restore_design_state(saved: Dictionary) -> void:
 	budget = int(saved.budget)
 
 ## Les chiffres que la fiche d'impact compare : performance, chaleur, fiabilité, coût, durée, sortie de caisse.
+## Le dernier modèle « signature » lancé (de la même gamme si possible) : {name, metrics} ou vide.
+func reference_metrics() -> Dictionary:
+	var line := selected_line()
+	var best: Dictionary = {}
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("sector", "")) != "CPU" or str(product.get("company", CompanyManager.company_name)) != CompanyManager.company_name:
+			continue
+		if not str(product.get("status", "")) in ["LAUNCHED", "RETIRED", "DISCONTINUED"]:
+			continue
+		if str(product.get("sku_tier", "SIGNATURE")) != "SIGNATURE":
+			continue
+		var same_line := not line.is_empty() and str(product.get("line_id", "")) == str(line.get("id", ""))
+		if best.is_empty() or same_line or int(product.get("generation_index", 0)) >= int(best.get("generation_index", 0)):
+			best = product
+	if best.is_empty():
+		return {}
+	return {"name":str(best.get("name", "")), "metrics":best.get("metrics", {}), "generation_index":int(best.get("generation_index", 0))}
+
 func impact_snapshot() -> Dictionary:
 	var design := current_design()
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
@@ -1106,16 +1347,30 @@ func _refresh_live() -> void:
 	last_change = [] if previous.is_empty() else IMPACT.chips(previous, snap)
 	_last_snapshot = snap
 	var names := {"performance":"Performance", "efficiency":"Efficacité", "reliability":"Fiabilité"}
+	var reference := reference_metrics()
+	_say(camille_line())
+	_show_puff(last_change)
+	_start_stage_life()
 	for key in _meters.keys():
 		var meter: ProgressBar = _meters[key][0]
 		var caption: Label = _meters[key][1]
+		var marker: ColorRect = _meters[key][2]
+		var ref_value := float((reference.get("metrics", {}) as Dictionary).get(key, -1.0))
+		marker.visible = ref_value >= 0.0
+		if marker.visible:
+			marker.anchor_left = clampf(ref_value / 100.0, 0.0, 1.0)
+			marker.anchor_right = marker.anchor_left
+			marker.offset_left = -1
+			marker.offset_right = 1
 		var value := float(snap.get(key, 0.0))
 		var before := float(previous.get(key, value))
-		var color := UI.APP_GREEN if value >= 65.0 else (AMBER if value >= 45.0 else UI.APP_RED)
+		var color: Color = AXIS_COLORS.get(key, UI.APP_GREEN)
 		meter.add_theme_stylebox_override("fill", UI.stylebox(color, 5, 0, color, 0))
 		meter.add_theme_stylebox_override("background", UI.stylebox(Color("ead9c0"), 5, 0, UI.APP_LINE, 0))
 		var gap := int(round(value - before))
 		caption.text = "%s  %d" % [str(names[key]), int(round(value))] + ("" if gap == 0 else "  (%s%d)" % ["+" if gap > 0 else "−", absi(gap)])
+		if marker.visible:
+			caption.text += "   ·  %s %d" % [str(reference.get("name", "")), int(round(ref_value))]
 		if gap == 0:
 			caption.add_theme_color_override("font_color", UI.APP_MUTED)
 		else:

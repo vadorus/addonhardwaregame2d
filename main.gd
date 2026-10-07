@@ -1589,7 +1589,8 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	if line_id == "":
 		line_id = ArchitectureManager.create_line(str(spec.get("new_line_name", "Nova")), str(spec.get("segment", "")), arch_id)
 	ArchitectureManager.register_project(str(spec.get("name", "Nova CPU")), line_id, arch_id, spec.get("model_tiers", []))
-	cpu_stepper.call("close")
+	# Maquette « L'établi » : le lancement est fêté, puis l'établi se ferme tout seul (ou d'une touche).
+	cpu_stepper.call("play_launch", str(spec.get("name", "Nova CPU")))
 	SoundManager.play("launch")
 	TimeManager.time_scale = 1.0
 	status_label.text = "%s entre en développement." % str(spec.get("name", "Nova CPU"))
