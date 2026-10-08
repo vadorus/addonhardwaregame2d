@@ -293,6 +293,8 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 
 Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert, et une capture rendue relue.
 
+> **Pour Codex, à partir du 08/10 au soir : suivre `docs/PLAN_CODEX_2026-10-08.md`** (liste unique et ordonnée). Les tableaux ci-dessous détaillent chaque étape.
+
 ### Plan complet jusqu'à la démo de fin octobre (décidé le 08/10, 14 h)
 
 Le plan réunit la refonte d'interface (planches 1 à 8), la revue des événements et la conception Software (Claude Doc « Tech Empire — Branche Software : audit, architecture et plan »).
@@ -457,6 +459,20 @@ Principe : jeu gratuit, puis achat unique de la version complète, extensions de
 | **M4** | Avant Steam | **Steam** : GodotSteam, un DLC par produit (droit seul), succès Steam. | Le DLC acheté est reconnu sans connexion après la première vérification | Test manuel sur un compte Steam de test |
 | **M5** | Après M1 | **Premiers cosmétiques** : finitions de boîtier (couleurs, logos, matières) et un thème de garage, **sans aucun effet sur les notes ni les ventes** ; défis du moment gratuits, calés sur la vraie date, qui donnent aussi des cosmétiques. | Une finition payante n'a aucun effet chiffré | Scénario : notes et ventes identiques avec ou sans cosmétique |
 | **M6** | Avant la démo, puis en continu | **Rétention** : le premier CPU lancé en moins de 10 minutes de jeu ; un résumé de Nora « ce qui vous attend » au retour ; un palier visible à chaque semaine de jeu (déménagement, 2e génération, Logiciel). | Mesuré avec les testeurs (temps jusqu'au premier jour J) | Scénario : le parcours guidé atteint le jour J en moins de N actions |
+
+### Plan audio (décidé le 08/10, 20 h)
+
+Source : `docs/AUDIT_AUDIO_2026-10-08.md`. Les musiques sont déjà normalisées à −20 LUFS. En revanche, il n'y a aucun bus audio (pas d'atténuation, pas de limiteur), aucune musique après 1990 et pas d'état « tension ».
+
+| Étape | Quand | Contenu | Critère de réussite | Test |
+|---|---|---|---|---|
+| **A1** | Avant la démo (nécessaire à G2) | **Bus audio** : `default_bus_layout.tres` avec `Master` (limiteur à −1 dB), `Musique`, `Ambiances` et `Effets`. Chaque lecteur de `SoundManager` va sur son bus ; les volumes des réglages pilotent les bus. Fonction `duck(bus, db, duree)` pour l'atténuation. | Réglages de volume inchangés pour le joueur ; plus de saturation sur le Pixel | Scénario : les lecteurs sont sur le bon bus, `duck()` baisse puis rétablit le volume du bus |
+| **A2** | Avant la démo | **Jour J et célébrations** : musique à −12 dB pendant le suspense, puis le jingle `review_good` ou `review_bad`, et remontée en 1,5 s ; −8 dB pendant 2 s aux célébrations ; −6 dB pour la musique et −10 dB pour les ambiances quand un menu est ouvert. | Le suspense du jour J s'entend sur le Pixel | Scénario : séquence d'atténuation (valeurs de volume du bus aux étapes clés) |
+| **A3** | Après la démo | **État « tension »** : un filtre passe-bas (≈ 1,2 kHz) et −3 dB sur le bus Musique quand il reste moins de 3 mois de trésorerie, pendant un rappel ou une crise de réputation ; retour quand la cause disparaît. | Audible mais discret | Scénario : l'entrée et la sortie de l'état suivent la cause |
+| **A4** | Après la démo | **Voix et formats** : 8 voix d'effets sur mobile et 12 sur PC, en coupant le son le plus ancien et le moins prioritaire ; effets courts réimportés en WAV QOA ; 3 ambiances audibles au plus sur mobile ; volume séparé pour les ambiances dans les réglages. | Aucun son coupé au hasard ; latence des clics réduite | Scénario : priorités de voix ; réglage des ambiances conservé |
+| **A5** | Après la démo (avec Astra ou une banque libre CC0) | **Musiques 2000s, 2010s et 2020s**, dans le même esprit calme, normalisées à −20 LUFS ; `era_for_year` étendu. Mettre à jour `assets/audio/CREDITS.md`. | Chaque époque a ses morceaux | Test : chaque époque renvoie au moins 2 morceaux existants |
+
+Ordre conseillé (audio) : A1 et A2 avant la démo, avec G2 ; A3 à A5 après la démo.
 
 Ordre conseillé (monétisation) : M0 dès que possible (ça oriente le contenu de la démo) ; M6 avec la démo ; M1, M2 et M5 après la démo ; M3 avant la sortie publique Android ; M4 avant Steam. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
 
