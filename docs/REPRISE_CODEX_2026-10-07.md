@@ -319,6 +319,8 @@ Le plan réunit la refonte d'interface (planches 1 à 8), la revue des événeme
 
 **Pour Codex, à partir du point 2** : un commit par point, un test déterministe chaque fois, le smoke test et les quatre tests de la CI au vert. Claude relit chaque commit avant que l'APK parte sur le Pixel.
 
+**Points 2 à 5 faits par Codex (08/10, `9eb7fd0` → `7901b64`, détail dans `RETOUR_CODEX_2026-10-08_POINTS_2_5.md`).** Relecture de Claude le 08/10 à 17 h : code relu, aucune anomalie bloquante. Relancés sous Linux et réussis : import, démarrage, smoke, branding, les trois tests de mise en page et d'équilibrage de la CI, parcours CPU, carrières interactives, prototype, aperçu logiciel, finances, expérience complète, sauvegarde. Captures Entreprise, Marché et Presse relues. Reste le point 6 (APK, puis test fermé).
+
 Historique des tâches précédentes :
 
 1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
