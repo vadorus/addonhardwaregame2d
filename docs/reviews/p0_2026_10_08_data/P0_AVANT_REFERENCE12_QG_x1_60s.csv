@@ -1,0 +1,2 @@
+series,type,index,screen,mean_ms,p50_ms,p95_ms,p99_ms,worst_ms,over_50,over_100,simulation_ms,refresh_ms,other_ms,tab_ms,checkpoint,result,commit,fps_setting,reference_sha,process_mean_ms,slow_screen
+jeu_x1_60s,summary,0,QG,33.3425205792321,33.3370018005371,34.1990013122559,34.6160011291504,120.449996948242,2,2,,,,,,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,17.4077399926715,

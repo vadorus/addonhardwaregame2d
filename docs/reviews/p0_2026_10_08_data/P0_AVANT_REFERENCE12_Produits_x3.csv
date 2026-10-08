@@ -1,0 +1,14 @@
+series,type,index,screen,mean_ms,p50_ms,p95_ms,p99_ms,worst_ms,over_50,over_100,simulation_ms,refresh_ms,other_ms,tab_ms,checkpoint,result,commit,fps_setting,reference_sha,process_mean_ms,slow_screen
+mois_x3,month,1,Produits,,,,,161.928,,,52.223,76.574,33.131,,1992-04,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,2,Produits,,,,,133.002,,,44.88,54.824,33.298,,1992-05,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,3,Produits,,,,,132.637,,,48.291,51.167,33.179,,1992-06,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,4,Produits,,,,,148.84,,,44.832,71.247,32.761,,1992-07,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,5,Produits,,,,,128.177,,,43.641,51.635,32.901,,1992-08,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,6,Produits,,,,,134.754,,,49.597,51.938,33.219,,1992-09,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,7,Produits,,,,,158.413,,,45.558,78.618,34.237,,1992-10,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,8,Produits,,,,,130.959,,,46.169,51.415,33.375,,1992-11,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,9,Produits,,,,,149.29,,,40.662,75.422,33.206,,1992-12,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,10,Produits,,,,,150.26,,,45.374,72.885,32.001,,1993-01,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,11,Produits,,,,,144.269,,,36.639,73.475,34.155,,1993-02,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,month,12,Produits,,,,,129.529,,,45.262,50.189,34.078,,1993-03,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Produits
+mois_x3,summary,0,Produits,33.6114837045139,33.3279991149902,34.2210006713867,34.7019996643066,161.927993774414,13,13,,,,,5e177b5ae3b08324ede4e9760f53717ad544040e1265d7777a175eed6b42fff8,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,25.9361012632045,

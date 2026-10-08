@@ -1,0 +1,14 @@
+series,type,index,screen,mean_ms,p50_ms,p95_ms,p99_ms,worst_ms,over_50,over_100,simulation_ms,refresh_ms,other_ms,tab_ms,checkpoint,result,commit,fps_setting,reference_sha,process_mean_ms,slow_screen
+mois_x3,month,1,Entreprise,,,,,297.655,,,55.419,83.984,216.355,,1992-04,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,
+mois_x3,month,2,Entreprise,,,,,164.196,,,42.995,88.718,32.483,,1992-05,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,3,Entreprise,,,,,191.656,,,47.051,111.335,33.27,,1992-06,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,4,Entreprise,,,,,170.567,,,50.879,85.867,33.821,,1992-07,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,5,Entreprise,,,,,166.326,,,44.125,88.901,33.3,,1992-08,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,6,Entreprise,,,,,184.833,,,45.464,105.046,34.323,,1992-09,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,7,Entreprise,,,,,165.372,,,46.278,86.132,32.962,,1992-10,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,8,Entreprise,,,,,166.736,,,47.309,85.809,33.618,,1992-11,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,9,Entreprise,,,,,184.935,,,47.078,104.006,33.851,,1992-12,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,10,Entreprise,,,,,163.881,,,43.778,86.869,33.234,,1993-01,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,11,Entreprise,,,,,166.227,,,44.16,87.746,34.321,,1993-02,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,month,12,Entreprise,,,,,164.377,,,43.986,87.893,32.498,,1993-03,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,Entreprise
+mois_x3,summary,0,Entreprise,33.8268821607298,33.3320007324219,34.2099990844727,34.7529983520508,297.654998779297,13,13,,,,,5e177b5ae3b08324ede4e9760f53717ad544040e1265d7777a175eed6b42fff8,OK,0469df0dfd4fcfef8fbf3962140fd84db7d11b26,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,29.7191117197735,
