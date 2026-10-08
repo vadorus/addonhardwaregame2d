@@ -153,8 +153,8 @@ func sync_interface_unlocks() -> Array:
 			or int(workplace.get("tier", 0)) > 0 or int(workplace.get("upgrade_reminder_at", -1)) >= 0 \
 			or months_operated >= 6 or bool(workplace_upgrade_recommendation().get("recommended", false))
 		rules["CO_BUDGETS"] = has_launched_product or not SoftwareManager.active_products().is_empty() or months_operated >= 24
-		rules["CO_DIVISIONS"] = staff_count >= 10 or DivisionManager.get_active_division_keys().size() >= 2
-		rules["CO_GROUP"] = Economy.money >= 5000000 or not CompanyManager.subsidiaries.is_empty()
+		rules["CO_DIVISIONS"] = int(workplace.get("tier", 0)) > 0 and (staff_count >= 10 or DivisionManager.get_active_division_keys().size() >= 2)
+		rules["CO_GROUP"] = int(workplace.get("tier", 0)) > 0 and (Economy.money >= 5000000 or not CompanyManager.subsidiaries.is_empty())
 	for feature_value in rules.keys():
 		var feature := str(feature_value)
 		if bool(rules[feature]) and not is_interface_feature_unlocked(feature):

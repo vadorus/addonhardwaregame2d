@@ -1807,6 +1807,11 @@ func _ready() -> void:
 		_fail(remaining_events_error)
 		return
 	print("[CI] Événements restants : études, pénalités, rappels, arbitrages, salons OK")
+	var garage_company_error: String = (load("res://tests/scenarios/GarageCompanyScenario.gd") as Script).call("run", self)
+	if garage_company_error != "":
+		_fail(garage_company_error)
+		return
+	print("[CI] Entreprise au garage : pages et délégation masquées, anciens états préservés OK")
 	var lot_zero_error: String = (load("res://tests/scenarios/SoftwareLotZeroScenario.gd") as Script).call("run", self)
 	if lot_zero_error != "":
 		_fail(lot_zero_error)

@@ -15,6 +15,7 @@ var company_rep_label: Label
 var empire_box: VBoxContainer
 var division_label: Label
 var division_delegation_group: VBoxContainer
+var department_delegation_group: VBoxContainer
 var division_director_select: OptionButton
 var division_control_select: OptionButton
 var division_priority_select: OptionButton
@@ -289,10 +290,13 @@ func _build() -> void:
 	apply.pressed.connect(_apply_policies)
 	box.add_child(apply)
 
-	box.add_child(UI.section("Délégation des départements"))
+	department_delegation_group = VBoxContainer.new()
+	department_delegation_group.add_theme_constant_override("separation", 12)
+	box.add_child(department_delegation_group)
+	department_delegation_group.add_child(UI.section("Délégation des départements"))
 	var department_grid := GridContainer.new()
 	department_grid.columns = 2
-	box.add_child(department_grid)
+	department_delegation_group.add_child(department_grid)
 	department_grid.add_child(UI.label("Département", 14))
 	department_select = OptionButton.new()
 	UI.fill_text(department_select, ["R&D","Développement","Production","Marketing","Support","Finance"])
@@ -308,7 +312,7 @@ func _build() -> void:
 	var delegate_button := Button.new()
 	delegate_button.text = "Affecter responsable et autonomie"
 	delegate_button.pressed.connect(_apply_department)
-	box.add_child(delegate_button)
+	department_delegation_group.add_child(delegate_button)
 
 	box.add_child(UI.section("Groupe / filiales"))
 	# Lot F2 : les filiales existantes (rachetées ou créées), avec mandat, capital et revente.
@@ -466,7 +470,7 @@ func _install_pages(box: VBoxContainer) -> void:
 		{"key":"OVERVIEW", "label":"Aperçu", "start":company_rep_label},
 		{"key":"WORKPLACE", "label":"Locaux & RH", "start":executive_section},
 		{"key":"DIVISIONS", "label":"Divisions", "start":divisions_section},
-		{"key":"BUDGETS", "label":"Budgets & délégation", "start":_child_with_text(box, "Budgets mensuels")},
+		{"key":"BUDGETS", "label":"Budgets", "start":_child_with_text(box, "Budgets mensuels")},
 		{"key":"GROUP", "label":"Groupe", "start":_child_with_text(box, "Groupe / filiales")},
 	])
 
@@ -495,20 +499,27 @@ func _refresh_objectives() -> void:
 const PAGE_UNLOCKS := [
 	["WORKPLACE", "CO_WORKPLACE", "Locaux & RH quand l'équipe grandit"],
 	["BUDGETS", "CO_BUDGETS", "Budgets après votre premier lancement"],
-	["DIVISIONS", "CO_DIVISIONS", "Divisions à 10 salariés"],
-	["GROUP", "CO_GROUP", "Groupe à 5 M€ de trésorerie"],
+	["DIVISIONS", "CO_DIVISIONS", "Divisions hors du garage, à 10 salariés"],
+	["GROUP", "CO_GROUP", "Groupe hors du garage, à 5 M€ de trésorerie"],
 ]
+
+func _garage_company() -> bool:
+	return int(ExecutiveManager.workplace.get("tier", 0)) == 0
 
 ## Lot A (29/09) : l'Entreprise s'ouvrait avec 5 sous-pages au mois 2. Elles arrivent maintenant une à une.
 func _refresh_page_unlocks() -> void:
 	if pager == null:
 		return
 	var upcoming: Array[String] = []
+	department_delegation_group.visible = not _garage_company()
 	for entry_value in PAGE_UNLOCKS:
 		var entry: Array = entry_value
 		var open := ExecutiveManager.is_interface_feature_unlocked(str(entry[1]))
 		# Page ouverte par une décision : elle reste visible tant que le joueur la consulte.
 		var shown := open or str(pager.get("current")) == str(entry[0])
+		# Les drapeaux d'une ancienne partie sont conservés, mais le garage reste simple.
+		if _garage_company() and str(entry[0]) in ["DIVISIONS", "GROUP"]:
+			shown = false
 		pager.call("set_page_available", str(entry[0]), shown)
 		if not open and upcoming.size() < 2:
 			upcoming.append(str(entry[2]))
@@ -516,6 +527,10 @@ func _refresh_page_unlocks() -> void:
 
 func show_section(key: String) -> void:
 	if pager != null:
+		if _garage_company() and key in ["DIVISIONS", "GROUP"]:
+			pager.call("show_page", "OVERVIEW")
+			_refresh_page_unlocks()
+			return
 		# Une décision peut viser une page encore cachée : on l'ouvre plutôt que de laisser le joueur perdu.
 		pager.call("set_page_available", key, true)
 		pager.call("show_page", key)
@@ -621,7 +636,7 @@ func _refresh_division_delegation() -> void:
 	if division_delegation_group == null:
 		return
 	var sector := "CPU"
-	var available := DivisionManager.delegation_available(sector)
+	var available := not _garage_company() and DivisionManager.delegation_available(sector)
 	division_delegation_group.visible = available
 	var division := DivisionManager.get_division(sector)
 	if not available:
