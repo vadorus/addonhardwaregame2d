@@ -85,6 +85,11 @@ static func run(_host: Node) -> String:
 	var old := {"id":"PROD-OLD", "name":"CI OLD", "sector":"CPU", "status":"LAUNCHED", "generation_id":"GEN-OLD", "units_sold_total":100,
 		"metrics":{"performance":68.0, "reliability":57.5, "efficiency":58.5}, "firmware_history":history, "firmware_version":6}
 	ProductManager.products.append(old)
-	if ProductManager.release_firmware("PROD-OLD", "PERFORMANCE"):
+	var stacked := ProductManager.release_firmware("PROD-OLD", "PERFORMANCE")
+	# Ne pas laisser de faux produits incomplets à la simulation qui tourne après ce scénario.
+	ProductManager.products.erase(product)
+	ProductManager.products.erase(old)
+	TimeManager.time_scale = 0.0
+	if stacked:
 		return "Lot 0: an old save with five performance firmwares can still stack performance"
 	return ""

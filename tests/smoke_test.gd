@@ -1827,6 +1827,11 @@ func _ready() -> void:
 		_fail(lot_zero_error)
 		return
 	print("[CI] Lot 0 Software : prix, serveurs, contrats, firmware plafonné OK")
+	var confirm_error: String = (load("res://tests/scenarios/ConfirmGuardScenario.gd") as Script).call("run", self)
+	if confirm_error != "":
+		_fail(confirm_error)
+		return
+	print("[CI] Confirmation tactile protégée contre le double appui OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

@@ -58,6 +58,11 @@ var _promote_button: Button
 var _revise_button: Button
 var _market_button: Button
 var _armed: Button
+## Audit des entrées (08/10) : une confirmation « toucher encore » ne doit pas partir sur un double appui
+## involontaire ni rester armée indéfiniment.
+const CONFIRM_MIN_DELAY_MS := 350
+const CONFIRM_TIMEOUT_S := 5.0
+var _armed_at_ms := 0
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
@@ -1078,12 +1083,20 @@ func _on_month_navigate(target: String, product_id: String) -> void:
 ## Ce qui coûte ou ne se défait pas : un premier toucher montre ce qu'il restera en caisse,
 ## un second confirme. Toucher ailleurs (ou un nouveau mois) annule.
 func _arm_or_run(button: Button, run: Callable, needs_confirm: bool = true) -> void:
+	if needs_confirm and _armed == button and Time.get_ticks_msec() - _armed_at_ms < CONFIRM_MIN_DELAY_MS:
+		return # rebond ou double appui trop rapide : ce n'est pas une confirmation
 	if not needs_confirm or _armed == button:
 		_disarm()
 		run.call()
 		return
 	_disarm()
 	_armed = button
+	_armed_at_ms = Time.get_ticks_msec()
+	if is_inside_tree():
+		var armed_at := _armed_at_ms
+		get_tree().create_timer(CONFIRM_TIMEOUT_S).timeout.connect(func():
+			if _armed == button and _armed_at_ms == armed_at:
+				_disarm())
 	button.set_meta("base_text", button.text)
 	var cost := int(button.get_meta("cost", 0))
 	if cost > 0:
