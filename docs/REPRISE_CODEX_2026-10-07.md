@@ -414,7 +414,31 @@ Règles : un commit par étape, des captures avant/après relues (et jugées par
 | **R6** | Après la démo | **Ombres et décors.** Ombres des panneaux pré-dessinées en 9-patch (ou supprimées sur mobile) ; une seule saison de décor chargée à la fois (libérer la précédente au changement de saison). | Mémoire stable au changement de saison ; rendu identique à l'œil | Scénario : changement de saison, mémoire des textures qui n'augmente pas |
 | **Mesure Pixel** | Avec le prochain APK | Temps d'image au QG et dans l'onglet le plus chargé, chauffe et batterie sur 15 minutes, avant et après R1 et R2. Noter les chiffres ici. | — | Humain (Alexandre + Claude) |
 
-Ordre conseillé (rendu) : R1 et R2 avec C2, C3, T2 et T3 avant la démo, puis la mesure Pixel ; on décide de R3 selon ce que montre le téléphone ; R4 à R6 après la démo. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
+Ordre conseillé (rendu) : R1 et R2 avec C2, C3, T2 et T3 avant la démo, puis la mesure Pixel ; on décide de R3 selon ce que montre le téléphone ; R4 à R6 après la démo.
+
+### Plan de correction game design, économie et sensations (décidé le 08/10, 19 h 30)
+
+Source : `docs/AUDIT_GAME_DESIGN_2026-10-08.md` (boucles en organigramme, modèle chiffré, liste de contrôle des sensations).
+
+Constats de la sonde de carrière (4 graines, 1971 → 2030) :
+- **Standard** : la stratégie adaptée fait **faillite en février 1973 sur 3 graines sur 4** ;
+- **Accessible** : la même stratégie finit à **190–214 M€** ;
+- **aucune partie n'atteint la 1re place** ;
+- `balance_ceiling_test` ne contrôle que les 24 premiers mois.
+
+Règles : un commit par étape, un test déterministe, la CI au vert, et la sonde de carrière relancée avec les résultats avant/après dans le message de commit.
+
+| Étape | Quand | Contenu | Critère de réussite | Test |
+|---|---|---|---|---|
+| **G1** | Avant la démo | **Falaise de trésorerie (F1).** Comprendre pourquoi la stratégie adaptée meurt en 1973 en Standard (embauches, budget de R&D, paiements choisis), puis ajouter l'**alerte d'autonomie** : chaque embauche ou budget de R&D montre les mois de trésorerie *après* la décision ; orange sous 3 mois, rouge et confirmation sous 1 mois. Ajuster le coût de démarrage si l'automate n'est pas seul en cause. | En Standard, la stratégie adaptée passe 1976 sur au moins 5 graines sur 6 ; l'alerte apparaît avant toute faillite évitable | Scénario : une embauche qui ramène l'autonomie sous 3 mois affiche l'alerte ; la sonde de carrière confirme le critère |
+| **G2** | Avant la démo | **Sensations du jour J et des records.** La pause de suspense de 600 ms avant les notes, les notes une à une, de petits confettis (au plus 120) au premier CPU, aux records de ventes et à la 1re place, et le décompte du résultat à la clôture du mois. Tout est coupé en animations réduites. | Alexandre juge le jour J plus fort sur le Pixel ; aucun effet en animations réduites | Scénario : en animations réduites, aucun nœud de particules n'est créé ; la séquence du jour J garde l'ordre des notes |
+| **G3** | Après la démo | **Garde-fous de carrière dans la CI.** `career_probe` réduit à 2 graines × 2 difficultés, avec des seuils : Accessible ≤ 3× Standard à stratégie égale ; la stratégie adaptée en Standard vivante en 2000 sur au moins 1 graine sur 2 ; la stratégie figée qui décline après 2000 (voulu). | Seuils tenus | Nouveau test `career_guard_test` (court, nocturne si trop long pour chaque commit) |
+| **G4** | Après la démo | **Puits proportionnels (F2).** Impôt sur les bénéfices de 25 % au-delà de 200 k€ par an (annoncé en décembre, prélevé en janvier) ; coût de développement × 1,25 par génération ; entretien des gammes de plus de 36 mois (0,5 % de leur chiffre d'affaires par mois). Nouveaux champs de sauvegarde avec migration. | Accessible adapté entre 30 et 300 M€ en 2030 ; Standard adapté entre 10 et 100 M€ | G3 + scénario de l'impôt (seuil, annonce, prélèvement) |
+| **G5** | Après la démo | **Une 1re place atteignable (F3).** Les rivaux réagissent quand notre part dépasse 25 % (baisse de prix de 0,4 point par point au-dessus) ; le joueur adapté peut atteindre la 1re place vers 1985–1995 sur au moins 1 graine sur 2, puis doit se battre pour la garder. Objectif affiché par Nora (« 2e mondial : il manque 3 points de part de marché »). | Critère de rang tenu dans la sonde | G3 étendu au rang |
+| **G6** | Après la démo | **Comprendre son déclin (F4).** Quand la gamme vieillit ou que l'architecture est dépassée, Nora l'annonce avec un chiffre (« notre meilleur CPU fait 72 % du leader ») et une piste : refresh, nouvelle architecture ou retrait. Lié au refresh de gamme à cadrer avec Alexandre. | Pas de baisse de chiffre d'affaires de plus de 2 ans sans explication | Scénario : une gamme sous 80 % du leader déclenche l'annonce |
+| **G7** | Après la démo | **Moins d'attente (F6).** Pendant le développement, une petite décision optionnelle tous les 2 à 3 mois (trouvaille, échantillon client, presse), en réutilisant les événements existants. Jamais bloquante. | Au moins 3 décisions par an en moyenne sur la carrière | La colonne `decisions` de la sonde |
+
+Ordre conseillé (game design) : G1 et G2 avant la démo ; G3 en premier après la démo (il sert de filet aux autres), puis G4, G5, G6 et G7. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
 
 Historique des tâches précédentes :
 
