@@ -292,7 +292,7 @@ Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert,
    - **Non fait** : renommer les doublons des anciennes sauvegardes (ils sont référencés par les produits et la presse ; à décider avec Alexandre).
 7. ✅ **Confidentialité dans le jeu** (08/10) : Menu > « Confidentialité ».
    - Le texte est dans `scripts/PrivacyPolicy.gd`, et `PrivacyScenario` vérifie que l'export ne demande aucune permission Android.
-   - **À faire par Alexandre** : recopier dans `ONLINE_URL` l'adresse déclarée dans la Play Console, pour afficher le bouton « Version en ligne ».
+   - `ONLINE_URL` pointe vers la page publiée sur GitHub Pages (branche `gh-pages`, `confidentialite.html`). Elle fait le même engagement et doit rester cohérente avec le texte du jeu.
 8. **Élasticité des prix** : la demande doit réagir au prix de façon lisible. Ce point est lié à la tâche 3.
 9. **Plateformes / sockets / refresh** : une gamme qui vieillit et un rafraîchissement de gamme. À cadrer avec Alexandre avant de coder.
 

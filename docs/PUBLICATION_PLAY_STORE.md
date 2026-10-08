@@ -52,7 +52,7 @@ Fait (rien n'est encore envoyé pour examen) :
 Encore à faire :
 - Envoyer un AAB sur la piste de test fermé (Alpha) et créer la liste de testeurs.
 - Garder 12 testeurs inscrits pendant 14 jours d'affilée avant de demander la production (compte personnel récent).
-- ✅ Politique de confidentialité lisible dans le jeu (Menu > Confidentialité, 08/10). Reste à recopier l'URL de la Play Console dans `scripts/PrivacyPolicy.gd` (`ONLINE_URL`).
+- ✅ Politique de confidentialité lisible dans le jeu (Menu > Confidentialité, 08/10). Le bouton « Version en ligne » ouvre https://vadorus.github.io/addonhardwaregame2d/confidentialite.html (branche `gh-pages`).
 - Quand les DLC payants arriveront, mettre à jour « Accès à l'appli » (informations de connexion), la classification
   (achats intégrés) et « Sécurité des données » (paiements). Il faudra aussi ajouter la bibliothèque Google Play Billing.
 - Bandeau « vérification des développeurs Android » : enregistrer le package et les clés utilisés hors Play.

@@ -2,9 +2,9 @@ extends RefCounted
 ## Politique de confidentialité affichée DANS le jeu (exigence Google Play, 08/10).
 ## Le jeu ne demande aucune permission Android (pas d'accès réseau) : il ne peut rien envoyer.
 ## `ONLINE_URL` : l'adresse déclarée dans la Play Console (Contenu de l'appli > Règles de confidentialité).
-## Vide tant qu'Alexandre ne l'a pas recopiée ici : le bouton « version en ligne » reste alors caché.
+## Page publiée sur GitHub Pages (branche gh-pages) le 07/10 ; vide = bouton « version en ligne » caché.
 
-const ONLINE_URL := ""
+const ONLINE_URL := "https://vadorus.github.io/addonhardwaregame2d/confidentialite.html"
 const TITLE := "Confidentialité"
 const UPDATED := "8 octobre 2026"
 
