@@ -33,6 +33,7 @@ func reset_all(company_name: String, starting_sector: String, difficulty: String
 func process_month_end() -> Dictionary:
 	if is_game_over:
 		return {}
+	PerfProbe.begin_span("simulation")
 	CompanyManager.process_month()
 	DivisionManager.process_month()
 	var active := ResearchManager.active_departments()
@@ -77,6 +78,8 @@ func process_month_end() -> Dictionary:
 	CompanyManager.SUBSIDIARIES.process_month()
 	Objectives.process_month()
 	var report := Economy.close_month()
+	PerfProbe.end_span("simulation")
+	PerfProbe.mark_month(report)
 	month_processed.emit(report)
 	if Economy.money <= 0:
 		is_game_over = true

@@ -228,6 +228,7 @@ func _ready():
 	live_overlay.set("title_visible", func() -> bool: return setup_layer != null and setup_layer.visible)
 	add_child(live_overlay)
 	_connect_signals()
+	PerfProbe.attach_game(self)
 	TimeManager.month_changed.connect(_on_month_changed_music)
 	_start_music_for_current_year()
 	MediaManager.reviews_published.connect(_on_reviews_published)
@@ -2699,6 +2700,7 @@ func _flush_refresh_all():
 	_refresh_all()
 
 func _refresh_all():
+	PerfProbe.begin_span("ui_all")
 	_refresh_all_pending = false
 	_refresh_navigation_progression()
 	_refresh_top(); _refresh_research(); _refresh_products(); _refresh_market()
@@ -2707,6 +2709,7 @@ func _refresh_all():
 	_refresh_screen(personnel_screen, "refresh")
 	_refresh_screen(media_screen, "refresh")
 	call_deferred("_check_moments")
+	PerfProbe.end_span("ui_all")
 
 ## Plusieurs signaux dans la même image (fin de mois) ne coûtent qu'une reconstruction.
 func _request_refresh_part(part: String) -> void:
@@ -2715,6 +2718,7 @@ func _request_refresh_part(part: String) -> void:
 	_pending_parts[part] = true
 
 func _flush_refresh_parts() -> void:
+	PerfProbe.begin_span("ui_parts")
 	var parts := _pending_parts.keys()
 	_pending_parts.clear()
 	for part in parts:
@@ -2723,6 +2727,7 @@ func _flush_refresh_parts() -> void:
 			"market": _refresh_market()
 			"media": _refresh_screen(media_screen, "refresh")
 			"personnel": _refresh_screen(personnel_screen, "refresh")
+	PerfProbe.end_span("ui_parts")
 
 ## Reconstruit l'écran s'il est affiché ; sinon le marque en retard (reconstruit à son affichage).
 func _refresh_screen(screen: Control, method: String) -> void:
@@ -2730,11 +2735,14 @@ func _refresh_screen(screen: Control, method: String) -> void:
 		return
 	if screen.is_visible_in_tree() or not is_inside_tree():
 		_stale_screens.erase(screen)
+		PerfProbe.begin_span("screen:" + screen.name)
 		screen.call(method)
+		PerfProbe.end_span("screen:" + screen.name)
 	else:
 		_stale_screens[screen] = method
 
 func _flush_stale_screens() -> void:
+	PerfProbe.begin_span("ui_stale")
 	for screen in _stale_screens.keys():
 		if is_instance_valid(screen) and (screen as Control).is_visible_in_tree():
 			var method := str(_stale_screens[screen])
@@ -2743,6 +2751,7 @@ func _flush_stale_screens() -> void:
 				_refresh_research_now()
 			else:
 				(screen as Control).call(method)
+	PerfProbe.end_span("ui_stale")
 
 func _refresh_navigation_progression():
 	if tabs == null:
@@ -3231,6 +3240,10 @@ func _build_menu_layer() -> void:
 	privacy_button.name = "PrivacyButton"
 	privacy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.add_child(privacy_button)
+	var version_button := _menu_button("v%s" % str(ProjectSettings.get_setting("application/config/version", "0")), PerfProbe.secret_tap)
+	version_button.custom_minimum_size.x = 92
+	version_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(version_button)
 	box.add_child(_menu_button("Sauvegarder et quitter", _menu_quit))
 	privacy_panel = (load("res://ui/components/PrivacyPanel.gd") as Script).new() as Control
 	add_child(privacy_panel)
