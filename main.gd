@@ -135,6 +135,11 @@ var cpu_metric_labels: Dictionary = {}
 var nav_buttons: Array[Button] = []
 var speed_buttons: Array[Button] = []
 var _refresh_all_pending := false
+## Audit perf (08/10) : un onglet caché n'est plus reconstruit à chaque signal. On note qu'il est
+## « en retard » et on le reconstruit une seule fois quand il redevient visible. Mesuré sur une partie
+## de 7 ans : la fin de mois passait de ~1 s à quelques dizaines de ms avec l'interface ouverte.
+var _stale_screens := {}
+var _pending_parts := {}
 # V0.9 — navigation unique : barre d'icônes fixe en bas, bandeau du haut réduit sur téléphone.
 var bottom_dock: Control
 var header_panel: PanelContainer
@@ -279,30 +284,24 @@ func _connect_signals():
 	CompanyManager.reputation_changed.connect(_request_refresh_all)
 	DivisionManager.divisions_changed.connect(_request_refresh_all)
 	PersonnelManager.staff_changed.connect(_request_refresh_all)
-	PersonnelManager.candidate_changed.connect(func(_c):
-		if personnel_screen != null:
-			personnel_screen.call("refresh")
-	)
+	PersonnelManager.candidate_changed.connect(func(_c): _request_refresh_part("personnel"))
 	ExecutiveManager.executive_changed.connect(_request_refresh_all)
 	SoftwareManager.software_changed.connect(_request_refresh_all)
 	SoftwareManager.software_launched.connect(_on_software_launched)
 	ResearchManager.projects_changed.connect(_request_refresh_all)
 	ResearchManager.generation_proposals_changed.connect(func(_plans): _refresh_generation_plan_options())
 	ResearchManager.phase_report_created.connect(func(_p,_r): _request_refresh_all())
-	ResearchManager.research_changed.connect(_refresh_research)
+	ResearchManager.research_changed.connect(func(): _request_refresh_part("research"))
 	ResearchManager.research_event_created.connect(_on_research_event)
-	SupplierManager.suppliers_changed.connect(_refresh_research)
-	SupplierManager.contracts_changed.connect(_refresh_research)
+	SupplierManager.suppliers_changed.connect(func(): _request_refresh_part("research"))
+	SupplierManager.contracts_changed.connect(func(): _request_refresh_part("research"))
 	ProductionManager.jobs_changed.connect(_request_refresh_all)
 	FoundryManager.foundries_changed.connect(_request_refresh_all)
 	ProductManager.products_changed.connect(_request_refresh_all)
-	AfterSalesManager.cases_changed.connect(_refresh_market)
+	AfterSalesManager.cases_changed.connect(func(): _request_refresh_part("market"))
 	AfterSalesManager.field_experience_changed.connect(_request_refresh_all)
 	MarketManager.market_changed.connect(_request_refresh_all)
-	MediaManager.news_changed.connect(func():
-		if media_screen != null:
-			media_screen.call("refresh")
-	)
+	MediaManager.news_changed.connect(func(): _request_refresh_part("media"))
 	PatentManager.patents_changed.connect(_request_refresh_all)
 	SaveManager.save_completed.connect(_on_save_message)
 	SimulationManager.game_over.connect(_on_game_over)
@@ -447,6 +446,7 @@ func _build_ui():
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.tab_changed.connect(func(_index): _update_nav_state())
+	tabs.tab_changed.connect(func(_index): call_deferred("_flush_stale_screens"))
 	root_box.add_child(tabs)
 	_create_dashboard_tab()
 	_create_company_tab()
@@ -2702,15 +2702,47 @@ func _refresh_all():
 	_refresh_all_pending = false
 	_refresh_navigation_progression()
 	_refresh_top(); _refresh_research(); _refresh_products(); _refresh_market()
-	if dashboard_screen != null:
-		dashboard_screen.call("refresh")
-	if company_screen != null:
-		company_screen.call("refresh")
-	if personnel_screen != null:
-		personnel_screen.call("refresh")
-	if media_screen != null:
-		media_screen.call("refresh")
+	_refresh_screen(dashboard_screen, "refresh")
+	_refresh_screen(company_screen, "refresh")
+	_refresh_screen(personnel_screen, "refresh")
+	_refresh_screen(media_screen, "refresh")
 	call_deferred("_check_moments")
+
+## Plusieurs signaux dans la même image (fin de mois) ne coûtent qu'une reconstruction.
+func _request_refresh_part(part: String) -> void:
+	if _pending_parts.is_empty():
+		call_deferred("_flush_refresh_parts")
+	_pending_parts[part] = true
+
+func _flush_refresh_parts() -> void:
+	var parts := _pending_parts.keys()
+	_pending_parts.clear()
+	for part in parts:
+		match str(part):
+			"research": _refresh_research()
+			"market": _refresh_market()
+			"media": _refresh_screen(media_screen, "refresh")
+			"personnel": _refresh_screen(personnel_screen, "refresh")
+
+## Reconstruit l'écran s'il est affiché ; sinon le marque en retard (reconstruit à son affichage).
+func _refresh_screen(screen: Control, method: String) -> void:
+	if screen == null:
+		return
+	if screen.is_visible_in_tree() or not is_inside_tree():
+		_stale_screens.erase(screen)
+		screen.call(method)
+	else:
+		_stale_screens[screen] = method
+
+func _flush_stale_screens() -> void:
+	for screen in _stale_screens.keys():
+		if is_instance_valid(screen) and (screen as Control).is_visible_in_tree():
+			var method := str(_stale_screens[screen])
+			_stale_screens.erase(screen)
+			if method == "_refresh_research_now":
+				_refresh_research_now()
+			else:
+				(screen as Control).call(method)
 
 func _refresh_navigation_progression():
 	if tabs == null:
@@ -2775,6 +2807,13 @@ func _start_cpu_concept_program():
 func _refresh_research():
 	if lab_screen == null:
 		return
+	if not lab_screen.is_visible_in_tree() and is_inside_tree():
+		_stale_screens[lab_screen] = "_refresh_research_now"
+		return
+	_refresh_research_now()
+
+func _refresh_research_now():
+	_stale_screens.erase(lab_screen)
 	if rd_segment != null:
 		_refresh_segment_options(rd_segment)
 	_refresh_cpu_node_options()
@@ -2825,8 +2864,7 @@ func _file_patent(): status_label.text="Brevet déposé." if PatentManager.file_
 func _toggle_patent_license(): PatentManager.toggle_license_first(); _refresh_all()
 
 func _refresh_products():
-	if products_screen != null:
-		products_screen.call("refresh")
+	_refresh_screen(products_screen, "refresh")
 
 func _on_products_action(action: String, payload: Dictionary):
 	match action:
@@ -2994,8 +3032,7 @@ func _on_products_action(action: String, payload: Dictionary):
 	_refresh_all()
 
 func _refresh_market():
-	if market_screen != null:
-		market_screen.call("refresh")
+	_refresh_screen(market_screen, "refresh")
 
 func _select_meta(option: OptionButton, wanted: String):
 	for i in range(option.item_count):

@@ -18,6 +18,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _process(delta: float) -> void:
+	# Audit perf (08/10) : un portrait caché (onglet fermé, liste repliée) ne se redessine plus à chaque image.
+	if not is_visible_in_tree() or preload("res://ui/Juice.gd").reduced_motion:
+		return
 	_t += delta
 	queue_redraw()
 
