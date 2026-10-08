@@ -6,20 +6,18 @@ const INTERACTIONS := preload("res://scripts/Interactions.gd")
 static func run() -> String:
 	SimulationManager.reset_all("CI Garage Business", "CPU", "STANDARD")
 	ExecutiveManager.months_operated = 3
-	# V0.10 / I2 : personne ne vient avant le premier CPU en vente (le novice a son premier projet à mener).
-	for _i in range(4):
-		GarageBusiness.process_month()
-	if not GarageBusiness.open_offers().is_empty():
-		return "I2: no client offer before the first CPU is on sale"
-	var first_cpu := {"id":"I2-CPU", "name":"Garage 1", "sector":"CPU", "status":"LAUNCHED", "company":CompanyManager.company_name,
-		"price":120, "unit_cost":40, "production_capacity":300, "months_on_market":3, "target_segment":"EMBEDDED",
-		"metrics":{"performance":80.0, "efficiency":80.0, "reliability":85.0, "usability":70.0, "innovation":70.0, "ecosystem":60.0, "sustainability":60.0}}
-	ProductManager.products.append(first_cpu)
-	# 1. Une fois le premier CPU en vente, un client arrive vite.
+	# L'étude peut financer le tout premier CPU, sans attendre ses ventes.
 	for _i in range(3):
 		GarageBusiness.process_month()
 		if not GarageBusiness.open_offers().is_empty():
 			break
+	if GarageBusiness.open_offers().size() != 1:
+		return "Garage business: an optional study should be offered before the first CPU launch"
+	var first_cpu := {"id":"I2-CPU", "name":"Garage 1", "sector":"CPU", "status":"LAUNCHED", "company":CompanyManager.company_name,
+		"price":120, "unit_cost":40, "production_capacity":300, "months_on_market":3, "target_segment":"EMBEDDED",
+		"metrics":{"performance":80.0, "efficiency":80.0, "reliability":85.0, "usability":70.0, "innovation":70.0, "ecosystem":60.0, "sustainability":60.0}}
+	ProductManager.products.append(first_cpu)
+	# 1. Le lancement ne masque pas l'étude déjà proposée.
 	var offers := GarageBusiness.open_offers()
 	if offers.size() != 1:
 		return "Garage business: a design contract offer should appear after a few months (got %d)" % offers.size()

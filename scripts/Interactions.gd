@@ -386,7 +386,7 @@ static func dialogue(key: String) -> Dictionary:
 			var price := int(contract.get("unit_price", 0))
 			return {"key":key, "person":_person("CLIENT:%s" % str(contract.get("customer", ""))), "mood":"HAPPY", "kicker":"UN CLIENT PASSE AU GARAGE",
 				"text":"Bonjour ! Votre %s nous intéresse. Il nous en faudrait %d par mois pendant %d mois, à %s € pièce. Vous pouvez suivre ?" % [str(contract.get("product_name", "CPU")), units, int(contract.get("remaining_months", 12)), _money(price)],
-				"note":"Votre capacité : %d unités/mois • ce contrat : %s €/mois de ventes" % [int(product.get("production_capacity", 0)), _money(units * price)],
+				"note":"Votre capacité : %d unités/mois • ce contrat : %s €/mois de ventes\n%s" % [int(product.get("production_capacity", 0)), _money(units * price), MarketManager.contract_penalty_text(contract)],
 				"choices":[
 					{"id":"SIGN", "label":"Marché conclu !", "hint":"Clientèle pro +2 • honorez-le jusqu'au bout pour gagner leur confiance", "primary":true},
 					{"id":"DECLINE", "label":"Désolé, pas cette fois.", "hint":"Le client repart ; aucune pénalité"},

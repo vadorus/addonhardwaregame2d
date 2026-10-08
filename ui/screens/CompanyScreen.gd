@@ -26,6 +26,8 @@ var division_growth_bias: SpinBox
 var division_mandate_label: Label
 var division_escalation_select: OptionButton
 var division_escalation_label: Label
+var follow_recommendation: Button
+var keep_current: Button
 var executive_label: Label
 var workplace_label: Label
 var workplace_defer_button: Button
@@ -169,11 +171,11 @@ func _build() -> void:
 	var escalation_actions := HFlowContainer.new()
 	escalation_actions.add_theme_constant_override("h_separation", 8)
 	division_delegation_group.add_child(escalation_actions)
-	var follow_recommendation := Button.new()
+	follow_recommendation = Button.new()
 	follow_recommendation.text = "Suivre la recommandation"
 	follow_recommendation.pressed.connect(func(): _resolve_division_escalation(true))
 	escalation_actions.add_child(follow_recommendation)
-	var keep_current := Button.new()
+	keep_current = Button.new()
 	keep_current.text = "Conserver ma décision / clôturer"
 	keep_current.pressed.connect(func(): _resolve_division_escalation(false))
 	escalation_actions.add_child(keep_current)
@@ -718,10 +720,15 @@ func _refresh_division_escalations() -> void:
 	_refresh_division_escalation()
 
 func _refresh_division_escalation() -> void:
+	follow_recommendation.visible = false
+	keep_current.visible = division_escalation_select.item_count > 0
 	if division_escalation_select.item_count == 0:
 		division_escalation_label.text = "Aucun arbitrage en attente. Le directeur gère les décisions courantes à l'intérieur de son mandat."
 		return
 	var escalation := DivisionManager.get_escalation(UI.option_meta(division_escalation_select))
+	var ack_only := str(escalation.get("recommended_action", "ACK_ONLY")) == "ACK_ONLY"
+	follow_recommendation.visible = not ack_only
+	keep_current.text = "Bien noté / clôturer le signalement" if ack_only else "Conserver ma décision / clôturer"
 	division_escalation_label.text = "%s\nGravité %.0f/100\n%s\n\nRecommandation : %s" % [
 		str(escalation.get("title", "")), float(escalation.get("severity", 0.0)),
 		str(escalation.get("text", "")), str(escalation.get("recommendation", ""))

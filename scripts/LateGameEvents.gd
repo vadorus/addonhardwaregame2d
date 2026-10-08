@@ -148,9 +148,11 @@ static func open_expo() -> Dictionary:
 
 static func expo_cost(choice: String) -> int:
 	var monthly := _recent_monthly_revenue()
+	# Petit stand en 1985, salon international en 2010 ; le CA conserve son poids.
+	var era := clampf(float(TimeManager.year - 1985) / 25.0, 0.0, 1.0)
 	match choice:
-		"PRESENT": return maxi(250_000, int(round(monthly * 0.75)))
-		"LEAK": return maxi(100_000, int(round(monthly * 0.30)))
+		"PRESENT": return maxi(int(round(lerpf(15_000.0, 250_000.0, era))), int(round(monthly * 0.75)))
+		"LEAK": return maxi(int(round(lerpf(6_000.0, 100_000.0, era))), int(round(monthly * 0.30)))
 	return 0
 
 static func resolve_expo(choice: String, automatic := false) -> bool:

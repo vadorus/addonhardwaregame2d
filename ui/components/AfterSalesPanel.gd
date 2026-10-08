@@ -177,7 +177,7 @@ func _refresh_decision(case_data: Dictionary, quote: Dictionary) -> void:
 		options = [
 			{"id":"CORRECT","label":fix_label,"cost":int(quote.get("corrective_cost", 0)),"delay_months":0,"risk_label":"modéré","description":"Traite la cause identifiée et améliore les unités futures, avec un coût maîtrisé."},
 			{"id":"EXCHANGE","label":"Échanger les unités touchées","cost":int(quote.get("exchange_cost", 0)),"delay_months":0,"risk_label":"faible","description":"Protège directement les clients concernés sans rappeler tout le parc."},
-			{"id":"RECALL","label":"Rappel complet","cost":int(quote.get("recall_cost", 0)),"delay_months":0,"risk_label":"fort impact","description":"Réponse la plus lourde : coûteuse et visible, mais ferme la crise rapidement."}
+			{"id":"RECALL","label":"Rappel complet","cost":int(quote.get("recall_cost", 0)),"delay_months":0,"risk_label":"fort impact","description":"Ferme la crise rapidement. " + AfterSalesManager.recall_capacity_text(case_data)}
 		]
 		_case_action_ids = ["correct_case", "exchange_case", "recall_case"]
 		recommendation = "Le diagnostic est établi. Comparez coût, portée et confiance à long terme."

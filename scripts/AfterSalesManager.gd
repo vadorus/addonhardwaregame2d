@@ -5,6 +5,8 @@ signal case_created(case_data)
 signal field_experience_changed
 
 const ISSUE_TYPES := ["MANUFACTURING", "THERMAL", "STABILITY", "FIRMWARE"]
+const RECALL_CAPACITY_FACTOR := 0.72
+const THERMAL_RECALL_CAPACITY_FACTOR := 0.88
 
 const ISSUE_LABELS := {
 	"MANUFACTURING":"Défaut de fabrication",
@@ -87,6 +89,18 @@ func recall_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
 	var basis := _case_cost_basis(case_data, product)
 	var severity := float(case_data.get("severity", 40.0))
 	return maxi(15000, int(round(float(basis.get("cost_value", 0.0)) * (0.18 + severity / 420.0))))
+
+func recall_capacity(product: Dictionary, issue_type: String) -> int:
+	var capacity := int(product.get("production_capacity", 1))
+	if issue_type == "THERMAL":
+		capacity = maxi(1, int(float(capacity) * THERMAL_RECALL_CAPACITY_FACTOR))
+	return maxi(1, int(float(capacity) * RECALL_CAPACITY_FACTOR))
+
+func recall_capacity_text(case_data: Dictionary) -> String:
+	var lines: Array[String] = ["Capacité durablement réduite de 28 % (réduction thermique supplémentaire de 12 % si concerné)."]
+	for product in _case_products(case_data):
+		lines.append("%s : %d → %d unités/mois." % [str(product.get("name", "CPU")), int(product.get("production_capacity", 1)), recall_capacity(product, str(case_data.get("issue_type", "STABILITY")))])
+	return " ".join(lines)
 
 func exchange_cost(case_data: Dictionary, product: Dictionary = {}) -> int:
 	var basis := _case_cost_basis(case_data, product)
@@ -513,8 +527,9 @@ func recall_product(case_id: String) -> bool:
 	Economy.add_expense(cost, "Rappel produit — %s" % str(product.get("name", "Produit")))
 	for target_value in _case_products(case_data, product):
 		var target: Dictionary = target_value
+		var capacity_after := recall_capacity(target, str(case_data.get("issue_type", "STABILITY")))
 		_apply_fix_to_product(target, str(case_data.get("issue_type", "STABILITY")), severity, true)
-		target["production_capacity"] = maxi(1, int(float(target.get("production_capacity", 1)) * 0.72))
+		target["production_capacity"] = capacity_after
 	case_data["status"] = "RECALLED"
 	case_data["action"] = "RECALL"
 	case_data["history"].push_front("Rappel volontaire lancé pour %s €." % cost)
@@ -537,7 +552,7 @@ func _apply_fix_to_product(product: Dictionary, issue_type: String, severity: fl
 		"THERMAL":
 			metrics["efficiency"] = clampf(float(metrics.get("efficiency", 55.0)) + 1.4 * strength, 0.0, 100.0)
 			metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + 2.0 * strength, 0.0, 100.0)
-			product["production_capacity"] = maxi(1, int(float(product.get("production_capacity", 1)) * (0.94 if not strong else 0.88)))
+			product["production_capacity"] = maxi(1, int(float(product.get("production_capacity", 1)) * (0.94 if not strong else THERMAL_RECALL_CAPACITY_FACTOR)))
 		"FIRMWARE":
 			metrics["reliability"] = clampf(float(metrics.get("reliability", 55.0)) + 2.8 * strength, 0.0, 100.0)
 			metrics["performance"] = clampf(float(metrics.get("performance", 55.0)) - (0.5 if not strong else 0.9), 0.0, 100.0)

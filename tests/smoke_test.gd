@@ -1802,6 +1802,11 @@ func _ready() -> void:
 		_fail(events_error)
 		return
 	print("[CI] Revue des événements : SAV, validation, prototype, trouvailles, RH OK")
+	var remaining_events_error: String = (load("res://tests/scenarios/RemainingEventsScenario.gd") as Script).call("run", self)
+	if remaining_events_error != "":
+		_fail(remaining_events_error)
+		return
+	print("[CI] Événements restants : études, pénalités, rappels, arbitrages, salons OK")
 	var lot_zero_error: String = (load("res://tests/scenarios/SoftwareLotZeroScenario.gd") as Script).call("run", self)
 	if lot_zero_error != "":
 		_fail(lot_zero_error)

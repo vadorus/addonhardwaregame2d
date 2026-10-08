@@ -2415,6 +2415,12 @@ func active_contract_for(product_id: String) -> Dictionary:
 			return contract
 	return {}
 
+func contract_shortfall_penalty(contract: Dictionary, shortfall: int) -> int:
+	return int(round(float(maxi(shortfall, 0) * int(contract.get("unit_price", 0))) * float(contract.get("penalty_rate", 0.08))))
+
+func contract_penalty_text(contract: Dictionary) -> String:
+	return "Livraison incomplète : pénalité de %.0f %% de la valeur des unités manquantes ; réputation clientèle pro jusqu'à −1,5 et fiabilité jusqu'à −0,8 par mois, selon la part non livrée." % (float(contract.get("penalty_rate", 0.08)) * 100.0)
+
 func advance_contract(product_id: String, delivered_units: int = -1, capacity: int = -1):
 	for contract in contracts:
 		if str(contract.get("product_id", "")) == product_id and str(contract.get("status", "")) == "ACTIVE":
@@ -2426,7 +2432,7 @@ func advance_contract(product_id: String, delivered_units: int = -1, capacity: i
 			if delivered_units >= 0 and delivered_units < promised:
 				contract["missed_months"] = int(contract.get("missed_months", 0)) + 1
 				var shortfall := promised - delivered_units
-				var penalty := int(round(float(shortfall * int(contract.get("unit_price", 0))) * float(contract.get("penalty_rate", 0.08))))
+				var penalty := contract_shortfall_penalty(contract, shortfall)
 				if penalty > 0:
 					Economy.add_expense(penalty, "Pénalité contrat — %s" % str(contract.get("customer", "")))
 				var severity := clampf(float(shortfall) / maxf(float(promised), 1.0), 0.0, 1.0)

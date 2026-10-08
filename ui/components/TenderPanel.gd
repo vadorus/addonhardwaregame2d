@@ -122,6 +122,7 @@ func _refresh_detail() -> void:
 			UI.money(int(tender.get("max_unit_price", 0))), float(tender.get("penalty_rate", 0.0)) * 100.0
 		]
 	]
+	lines.append(MarketManager.contract_penalty_text(tender))
 	var rival_interest := MarketManager.estimated_rival_tender_interest(tender)
 	lines.append("Concurrence estimée : %d entreprise(s) susceptible(s) de répondre. Leurs offres restent confidentielles jusqu'à la décision." % rival_interest)
 	var status := str(tender.get("status", "OPEN"))
@@ -185,6 +186,7 @@ func _refresh_contracts() -> void:
 					monthly_revenue += int(contract.get("units_per_month", 0)) * int(contract.get("unit_price", 0))
 				current.append("%s — %s%s" % [line, str(CONTRACT_STATUS.get(status, status)),
 					(" (encore %d mois)" % int(contract.get("remaining_months", 0))) if status == "ACTIVE" else ""])
+				current.append("  " + MarketManager.contract_penalty_text(contract))
 			"COMPLETED":
 				completed += 1
 				finished.append(line + " — terminé")

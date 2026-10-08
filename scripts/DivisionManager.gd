@@ -387,6 +387,8 @@ func resolve_escalation(escalation_id: String, apply_recommendation: bool) -> bo
 		return false
 	var sector := str(escalation.get("sector", "CPU"))
 	var action := str(escalation.get("recommended_action", "ACK_ONLY"))
+	# Un signalement sans mesure automatique ne peut jamais être marqué « appliqué ».
+	apply_recommendation = apply_recommendation and action != "ACK_ONLY"
 	if apply_recommendation:
 		match action:
 			"RETURN_DIRECT":

@@ -175,8 +175,12 @@ func options_for(value: Dictionary) -> Array:
 			options.append(_free("Prendre le temps d'en parler", "Gratuit : un entretien apaise la situation.", "HR_DISCUSS", true))
 			options.append(_paid("Geste financier", "Prime ou action collective : effet plus fort sur le moral.", "HR_BONUS", ExecutiveManager.hr_bonus_cost(sid)))
 		"ARBITRAGE":
-			options.append(_free("Suivre la recommandation", "La division applique la mesure proposée.", "DIV_APPLY", true))
-			options.append(_free("Garder la décision actuelle", "Rien ne change, le dossier est clos.", "DIV_KEEP"))
+			var escalation := DivisionManager.get_escalation(sid)
+			if str(escalation.get("recommended_action", "ACK_ONLY")) == "ACK_ONLY":
+				options.append(_free("Bien noté, clôturer le signalement", "Aucune mesure automatique. Le choix du produit ou du fournisseur reste à faire dans son dossier.", "DIV_KEEP", true))
+			else:
+				options.append(_free("Suivre la recommandation", "La division applique la mesure proposée.", "DIV_APPLY", true))
+				options.append(_free("Garder la décision actuelle", "Rien ne change, le dossier est clos.", "DIV_KEEP"))
 		"SAV":
 			var case_data: Dictionary = AfterSalesManager.get_case(sid)
 			var product: Dictionary = ProductManager.get_product(str(case_data.get("product_id", "")))
@@ -190,7 +194,7 @@ func options_for(value: Dictionary) -> Array:
 				if str(case_data.get("status", "")) == "OPEN":
 					options.append(_free("Surveiller sans agir", "Gratuit, mais la confiance peut s'éroder si les retours montent.", "SAV_MONITOR"))
 			if not case_data.is_empty() and not product.is_empty():
-				options.append(_paid("Rappel produit", "Solution radicale : coûteuse mais la crise est traitée ouvertement.", "SAV_RECALL", AfterSalesManager.recall_cost(case_data, product)))
+				options.append(_paid("Rappel produit", "La crise est traitée ouvertement. " + AfterSalesManager.recall_capacity_text(case_data), "SAV_RECALL", AfterSalesManager.recall_cost(case_data, product)))
 		"MENACE":
 			var threat: Dictionary = MarketManager.get_market_threat(sid)
 			if not threat.is_empty():

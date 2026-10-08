@@ -66,8 +66,8 @@ func study_window_open() -> bool:
 	if not CompanyManager.created or ExecutiveManager.months_operated < 2:
 		return false
 	# Une activité de garage : elle s'efface quand l'entreprise vit de ses propres CPU.
-	# V0.10 / I2 : pas de sous-traitance pendant le tout premier projet, ni par-dessus une offre pro en attente.
-	if not MarketManager.b2b_offers_open() or MarketManager.b2b_offer_waiting():
+	# Les études financent aussi le premier CPU ; une seule offre client à la fois.
+	if MarketManager.b2b_offer_waiting():
 		return false
 	var generations := ProductManager.cpu_generations.size()
 	return PersonnelManager.staff.size() < 12 and (generations < 3 or Economy.money < 300000)
