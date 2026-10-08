@@ -64,7 +64,7 @@ Le tactile et la manette n'ont pas de fichier d'audit à part : leurs constats s
 | 11 | **Diagnostic ciblé** | **Seulement si un seuil est dépassé** : on lit dans le CSV *quelle partie* coûte (simulation, reconstruction d'un écran précis, rendu), on reproduit ce cas, et on corrige ce point-là. C4 (réutiliser les lignes d'Entreprise et Produits) ou R3 (fonds superposés) ne sont appliqués **que si le diagnostic les désigne** ; jamais de refonte d'office | Selon le diagnostic |
 | 12 | **T7** | Sensibilité du défilement réglée d'après l'essai sur le Pixel | Petite |
 
-## Protocole de mesure sur le Pixel (demandé par Alexandre le 08/10)
+## Protocole de mesure sur le Pixel — référence officielle de validation des performances (validé par Alexandre le 08/10, 20 h 11)
 
 Les images par seconde au repos ne suffisent pas. On compare **avant** (APK témoin : P0 seul, sans les optimisations de la phase 1) et **après** (APK de la phase 1), dans **les mêmes conditions** :
 - **la même copie de sauvegarde**, rechargée avant chaque série (jamais la partie d'Alexandre elle-même) ; la copie est gardée à part dans le dossier de travail de Claude, avec sa date ;
@@ -91,8 +91,16 @@ Les trois situations :
 - Pour chaque série : moyenne, médiane, 95e et 99e centile, pire image, et nombre d'images de plus de 50 ms (interruptions visibles) et de plus de 100 ms (saccades nettes).
 - Il écrit `user://perf_<date>.csv` (une ligne par évènement, avec le commit, le réglage de fluidité et le nom de la série) et affiche un résumé à l'écran.
 - **Aucun envoi réseau.**
+- **Scénario reproductible** : un mode « série automatique » (bouton dans le résumé de P0) recharge la copie de sauvegarde de référence, ouvre l'écran voulu, met la vitesse ×3 et laisse passer 12 fins de mois **sans aucune action du joueur ni décision prise par l'outil**.
+  - Si une décision met le temps en pause (directive, revue, choix de fabrication…), P0 **arrête la série et l'écrit dans le CSV et à l'écran** (« série interrompue : décision en attente au mois N »). Il ne contourne jamais le jeu en silence.
+  - La sauvegarde de référence est choisie (ou préparée) pour ne contenir aucune décision en attente pendant ces 12 mois ; une série interrompue n'est pas comptée.
+  - Le hasard de la simulation repart de l'état enregistré dans la sauvegarde : deux séries sur la même copie donnent les mêmes évènements. Si ce n'est pas le cas, P0 le signale (la somme de contrôle de l'état en fin de série diffère).
+- **Mesure légère** : pendant une série, les valeurs restent **en mémoire**, dans des tableaux préalloués, sans fichier ni texte formaté. Le CSV est écrit **à la fin de chaque série**, une fois les 12 mois terminés, puis le résumé est affiché. Ce que coûte la mesure elle-même est mesuré une fois (série avec et sans P0 sur PC) et noté.
 - Inactif, il ne coûte rien : aucune mesure, aucun fichier.
-- Test : un scénario simule 2 fins de mois et 1 changement d'onglet, puis vérifie les lignes du CSV et la séparation entre simulation et reconstruction.
+- Tests :
+  - un scénario simule 2 fins de mois et 1 changement d'onglet, puis vérifie les lignes du CSV et la séparation entre simulation et reconstruction ;
+  - un deuxième scénario place une décision bloquante au mois 2 et vérifie que la série s'arrête avec le bon message ;
+  - un troisième vérifie qu'aucun fichier n'est écrit avant la fin de la série.
 
 **Seuils** (sur le Pixel). Un seuil dépassé déclenche un **diagnostic ciblé**, pas une refonte :
 
@@ -122,6 +130,10 @@ Les chiffres mesurés sont notés dans `docs/REPRISE_CODEX_2026-10-07.md` (ligne
 | Refresh de gamme | À concevoir séparément |
 
 Codex **peut** régler la difficulté Accessible par défaut dans la démo. Le reste (prix, limite gratuite, extension) **n'entre pas dans le code** avant la confirmation d'Alexandre (étapes M1/M2).
+
+**Phase 1 figée (décision d'Alexandre, 08/10, 20 h 11)** : plus aucun chantier n'est ajouté à la phase 1. On termine ce qui est prévu, on mesure, puis on juge sur les résultats réels. Rappel : 120 images/s au repos (le Pixel 10 affiche jusqu'à 120 Hz) ne prouvent pas l'absence d'à-coups en fin de mois ; seules les mesures P0 tranchent.
+
+**Difficulté** : Accessible par défaut tant que G1 n'est pas validé. Le but n'est pas de rendre le jeu facile, mais de donner aux nouveaux joueurs une première expérience qui leur donne envie de continuer.
 
 **Objectif d'Alexandre pour la démo** : une démo agréable à jouer, compréhensible et stable, pas seulement un jeu qui passe ses tests. Une étape n'est finie que si elle sert cet objectif.
 
