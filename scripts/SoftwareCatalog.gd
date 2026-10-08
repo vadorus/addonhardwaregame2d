@@ -37,8 +37,8 @@ const FAMILIES := {
 		"pitch":"Un OS peut devenir le cœur de votre écosystème, mais il coûte cher à maintenir et à rendre compatible.",
 		"settings":["compatibility", "usability", "stability", "ecosystem"]},
 	"SERVER":{"label":"Serveurs & bases de données", "unlock_year":1977, "stem":"Server", "base_months":7,
-		"base_dev_month":15500, "reference_price":180.0, "base_users":430, "growth":0.15,
-		"aging_per_year":0.28, "support_rate":0.085,
+		"base_dev_month":15500, "reference_price":220.0, "base_users":430, "growth":0.15,
+		"aging_per_year":0.28, "support_rate":0.050,
 		"pitch":"Logiciels critiques pour entreprises : peu de clients, gros contrats, sécurité et disponibilité essentielles.",
 		"settings":["performance", "reliability", "security", "scalability"]}
 }
@@ -166,9 +166,11 @@ static func supported_licenses(cohorts: Array) -> int:
 	for count in cohorts: total += maxi(int(count), 0)
 	return total
 
-static func support_monthly_cost(family_id: String, supported_users: int) -> int:
+## Lot 0 (08/10) : le support se paie sur le prix réellement encaissé. Calculé sur le prix de
+## référence, il rendait le Premium dominant (+45 % de recettes sans surcoût de support).
+static func support_monthly_cost(family_id: String, supported_users: int, price_paid: float = 0.0) -> int:
 	var rate := float(family(family_id).get("support_rate", 0.05))
-	var price := float(family(family_id).get("reference_price", 50.0))
+	var price := price_paid if price_paid > 0.0 else float(family(family_id).get("reference_price", 50.0))
 	return int(round(float(maxi(supported_users, 0)) * price * rate))
 static func year_f(year: int, month: int) -> float:
 	return float(year) + float(month - 1) / 12.0

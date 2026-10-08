@@ -925,7 +925,7 @@ func _process_sales() -> void:
 			var cohorts: Array = product.support_cohorts
 			cohorts[CAT.SUPPORT_MONTHS - 1] = licenses
 			product["supported_users"] = CAT.supported_licenses(cohorts)
-			var support_raw := CAT.support_monthly_cost(family_id, int(product.supported_users))
+			var support_raw := CAT.support_monthly_cost(family_id, int(product.supported_users), float(product.get("price", 0.0)))
 			var support := Economy.quoted_expense(support_raw, "Support software")
 			product["licenses_last"] = licenses; product["licenses_total"] = int(product.licenses_total) + licenses
 			product["revenue_last"] = revenue; product["support_last"] = support; product["margin_last"] = revenue - support

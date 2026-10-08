@@ -249,7 +249,7 @@ func _add_compact_status() -> void :
 			box.add_child(UI.eyebrow("PRÊT À SORTIR"))
 			box.add_child(UI.label(str(project.get("name", "Produit Software")), 17))
 			var metrics: Dictionary = project.get("metrics", {})
-			box.add_child(UI.muted_label("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Compat./perf. %.0f • bugs %d" % [
+			box.add_child(UI.muted_label("Fonctions %.0f • Ergonomie %.0f • Stabilité %.0f • Performances %.0f • bugs %d" % [
 				float(metrics.get("features", 0.0)),
 				float(metrics.get("usability", 0.0)),
 				float(metrics.get("stability", 0.0)),
@@ -466,9 +466,9 @@ func _show_activities() -> void :
 			var terms:= SoftwareManager.activity_terms(activity_id, approach_id)
 			var check:= SoftwareManager.can_start_activity(activity_id, approach_id)
 			var button:= Button.new()
-			button.text = "%s\n~%d mois • net estimé %s €\nXP %d • %s" % [
+			button.text = "%s\n%s • net estimé %s €\nXP %d • %s" % [
 				PLAY.approach_label(approach_id),
-				int(terms.get("calendar_months", 1)),
+				_months_text(int(terms.get("calendar_months", 1))),
 				UI.money(int(terms.get("net_estimate", 0))),
 				int(terms.get("xp", 0)),
 				str(PLAY.approach(approach_id).get("risk_label", ""))
@@ -616,7 +616,7 @@ func _rebuild_settings() -> void :
 			var feature:= PLAY.utility_feature(feature_id)
 			var check:= CheckBox.new()
 			check.text = str(feature.get("label", feature_id))
-			check.custom_minimum_size = Vector2(300, 44)
+			check.custom_minimum_size = Vector2(240, 44)
 			check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			check.tooltip_text = "%d mois de complexité • risque bugs %d" % [
 				int(feature.get("months", 1)), int(feature.get("bugs", 0))
@@ -679,8 +679,8 @@ func _refresh_product_preview() -> void :
 		var check:= SoftwareManager.can_start_utility(features, target_id)
 		var metrics: Dictionary = preview.get("metrics", {})
 		lines.append("%s • %d fonctionnalité(s)" % [PLAY.utility_target_label(target_id), features.size()])
-		lines.append("~%d mois avec cette équipe • %s €/mois • budget estimé %s €" % [
-			int(preview.get("calendar_months", preview.get("months", 0))),
+		lines.append("%s avec cette équipe • %s €/mois • budget estimé %s €" % [
+			_months_text(int(preview.get("calendar_months", preview.get("months", 0)))),
 			UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
 			UI.money(int(preview.get("total_cost", 0)))
 		])
@@ -707,8 +707,8 @@ func _refresh_product_preview() -> void :
 	var preview:= SoftwareManager.preview(family_id, levels, price_mode)
 	var check:= SoftwareManager.can_start(family_id, levels)
 	var state:= SoftwareManager.family_state(family_id)
-	lines.append("%d mois • %s €/mois • coût total estimé %s €" % [
-		int(preview.get("calendar_months", preview.get("months", 0))),
+	lines.append("%s • %s €/mois • coût total estimé %s €" % [
+		_months_text(int(preview.get("calendar_months", preview.get("months", 0)))),
 		UI.money(int(preview.get("monthly_cash_cost", preview.get("monthly_cost", 0)))),
 		UI.money(int(preview.get("total_cost", 0)))
 	])
@@ -764,3 +764,9 @@ func _toggle_product(product_id: String, active: bool) -> void :
 	else:
 		status_changed.emit("Terminez la maintenance en cours avant de suspendre ce produit.")
 	_show_software_choice()
+
+## Lot 0 (08/10) : sans développeur affecté, la durée valait -1 et s'affichait « ~-1 mois ».
+static func _months_text(months: int) -> String:
+	if months < 0:
+		return "aucun développeur affecté"
+	return "~%d mois" % months

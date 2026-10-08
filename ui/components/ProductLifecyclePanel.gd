@@ -1127,14 +1127,22 @@ func _refresh_manage_costs() -> void:
 	_revise_button.text = "Valider le stepping — %s €" % UI.money(revision_cost)
 	_revise_button.set_meta("cost", revision_cost)
 	var firmware_cost := ProductManager.firmware_cost(product, UI.option_meta(firmware_select))
-	firmware_release_button.text = ("Publier le firmware — %s €" % UI.money(firmware_cost)) if ProductManager.firmware_available(product) else "Publier le firmware (bloqué)"
+	var firmware_key := UI.option_meta(firmware_select)
+	if not ProductManager.firmware_available(product):
+		firmware_release_button.text = "Publier le firmware (bloqué)"
+	elif ProductManager.firmware_block_reason(product, firmware_key) != "":
+		firmware_release_button.text = "Firmware : plus de marge sur cette puce"
+	else:
+		firmware_release_button.text = "Publier le firmware — %s €" % UI.money(firmware_cost)
+	firmware_release_button.disabled = ProductManager.firmware_block_reason(product, firmware_key) != ""
 	firmware_release_button.set_meta("cost", firmware_cost)
 	var software_cost := ProductManager.control_software_cost(product)
-	control_software_button.text = ("Logiciel de contrôle pour toute la génération — %s €" % UI.money(software_cost)) if ProductManager.control_software_available(product) else "Logiciel de contrôle (bloqué)"
+	control_software_button.text = ("Logiciel de contrôle pour toute la génération — %s €" % UI.money(software_cost)) if ProductManager.control_software_block_reason(product) == "" else ("Logiciel de contrôle à jour" if ProductManager.control_software_available(product) else "Logiciel de contrôle (bloqué)")
 	control_software_button.set_meta("cost", software_cost)
+	control_software_button.disabled = ProductManager.control_software_block_reason(product) != ""
 	_capacity_apply_button.set_meta("cost", _capacity_change_cost())
 	var locks: Array[String] = []
-	var firmware_reason := ProductManager.firmware_block_reason(product)
+	var firmware_reason := ProductManager.firmware_block_reason(product, firmware_key)
 	if firmware_reason != "":
 		locks.append("Firmware — " + firmware_reason)
 	var software_reason := ProductManager.control_software_block_reason(product)

@@ -1802,6 +1802,11 @@ func _ready() -> void:
 		_fail(events_error)
 		return
 	print("[CI] Revue des événements : SAV, validation, prototype, trouvailles, RH OK")
+	var lot_zero_error: String = (load("res://tests/scenarios/SoftwareLotZeroScenario.gd") as Script).call("run", self)
+	if lot_zero_error != "":
+		_fail(lot_zero_error)
+		return
+	print("[CI] Lot 0 Software : prix, serveurs, contrats, firmware plafonné OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

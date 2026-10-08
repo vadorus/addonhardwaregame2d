@@ -17,8 +17,8 @@ const APPROACHES := {
 	"FAST": {
 		"label": "Rapide",
 		"months_delta": -1,
-		"cost_factor": 0.85,
-		"payout_factor": 1.00,
+		"cost_factor": 1.10,
+		"payout_factor": 0.75,
 		"xp_factor": 0.35,
 		"reputation_factor": 0.55,
 		"bug_pressure": 12,
@@ -38,8 +38,8 @@ const APPROACHES := {
 		"label": "Soigné",
 		"months_delta": 1,
 		"cost_factor": 1.10,
-		"payout_factor": 1.05,
-		"xp_factor": 2.40,
+		"payout_factor": 1.10,
+		"xp_factor": 1.60,
 		"reputation_factor": 1.50,
 		"bug_pressure": 0,
 		"risk_label": "risque faible"
@@ -140,6 +140,10 @@ static func utility_target(id: String) -> Dictionary:
 	return UTILITY_TARGETS.get(id, UTILITY_TARGETS.HOME)
 
 static func utility_target_label(id: String) -> String:
+	# Lot 0 (08/10) : avant la micro-informatique (1977), il n'y a pas encore de particuliers équipés ;
+	# ce public est celui des passionnés et des universités (mêmes attentes : simple et abordable).
+	if id == "HOME" and TimeManager.year < 1977:
+		return "Passionnés et universités"
 	return str(utility_target(id).get("label", id))
 
 static func contract_terms(base: Dictionary, approach_id: String) -> Dictionary:

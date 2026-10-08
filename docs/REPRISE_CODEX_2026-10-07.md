@@ -293,6 +293,34 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 
 Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert, et une capture rendue relue.
 
+### Plan complet jusqu'à la démo de fin octobre (décidé le 08/10, 14 h)
+
+Le plan réunit la refonte d'interface (planches 1 à 8), la revue des événements et la conception Software (Claude Doc « Tech Empire — Branche Software : audit, architecture et plan »).
+
+| Ordre | Bloc | Contenu | Pourquoi maintenant |
+|---|---|---|---|
+| 1 | **Software, lot 0** | Support calculé sur le prix réel ; approches de contrat équilibrées ; libellés « ~-1 mois » et « Compat./perf. » ; pas de public « particuliers » avant 1977 ; **firmware plafonné par génération** ; `software_choice_preview_test` réparé | Un testeur peut empiler le firmware à l'infini ou gagner sans réfléchir en Premium |
+| 2 | **Événements restants** | Contrat d'étude ouvert avant le premier lancement ; pénalités B2B annoncées ; capacité du rappel affichée ; arbitrages à choix identiques ; coût des salons selon l'époque | Chaque choix doit faire ce qu'il annonce |
+| 3 | **Entreprise au garage** | Masquer Divisions, Groupe et délégation tant que l'entreprise est un garage | Un débutant ne doit pas voir des pages vides |
+| 4 | **Élasticité des prix** | La demande réagit au prix de façon lisible, cohérente avec « Vaut-il son prix ? » | L'économie est jugée trop facile |
+| 5 | **Labo et Presse sur `SceneHeader`** | Code des scènes unifié | Entretien, aucun effet visible |
+| 6 | **Livraison démo** | APK sur le Pixel (avec sauvegarde d'abord) ; AAB signé ; piste de test fermé avec la liste des testeurs | Attend Alexandre pour l'envoi et les adresses |
+| Après la démo | Software lots 1 à 8 ; gamme vieillissante / refresh (à cadrer avec Alexandre) ; renommer les doublons de noms des anciennes sauvegardes | Nouvelles mécaniques, pas avant la validation de la tranche CPU |
+
+**Lot 0 Software fait le 08/10 (Claude)** :
+- support logiciel sur le prix payé (`SoftwareCatalog.support_monthly_cost`, 3e paramètre) ;
+- serveurs : prix 220 €, support 5 % ;
+- approches de contrat « Rapide » (coût ×1,10, paiement ×0,75) et « Soigné » (paiement ×1,10, XP ×1,6) ;
+- public « Passionnés et universités » avant 1977 ;
+- « aucun développeur affecté » au lieu de « ~-1 mois », « Performances » au lieu de « Compat./perf. » ;
+- firmware plafonné par produit (`FIRMWARE_GAIN_CAPS`, `firmware_effect`, migration `_firmware_gain_from_history`), logiciel de contrôle limité à la v3 ;
+- `software_choice_preview_test` réécrit pour l'interface actuelle ;
+- test `SoftwareLotZeroScenario` (smoke).
+
+**Pour Codex, à partir du point 2** : un commit par point, un test déterministe chaque fois, le smoke test et les quatre tests de la CI au vert. Claude relit chaque commit avant que l'APK parte sur le Pixel.
+
+Historique des tâches précédentes :
+
 1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
 2. ✅ **Finition → planche 6** (08/10), voir §2 bis.
 3. ✅ **Marché → planche 8** (08/10), voir §2 bis.

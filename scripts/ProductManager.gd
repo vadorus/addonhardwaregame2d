@@ -28,6 +28,10 @@ const FIRMWARE_TYPES := {
 	"BALANCED":{"label":"Firmware équilibré","cost":7500,"performance":0.5,"reliability":1.3,"efficiency":0.4,"support":0.20},
 	"PERFORMANCE":{"label":"Firmware performance","cost":8500,"performance":1.6,"reliability":-0.5,"efficiency":-0.3,"support":0.08}
 }
+## Lot 0 Software (08/10) : un firmware ne fait qu'exploiter une puce existante. Les gains cumulés
+## par produit sont plafonnés ; au-delà, publier ne sert plus à rien (plus d'empilement infini).
+const FIRMWARE_GAIN_CAPS := {"performance":3.0, "reliability":5.0, "efficiency":2.0}
+const CONTROL_SOFTWARE_MAX_VERSION := 3
 
 var products: Array = []
 var cpu_generations: Array = []
@@ -243,6 +247,8 @@ func _ensure_lifecycle_fields(product: Dictionary) -> void:
 	product["revision_label"] = str(product.get("revision_label", "A0"))
 	product["firmware_version"] = maxi(int(product.get("firmware_version", 1)), 1)
 	product["firmware_profile"] = str(product.get("firmware_profile", "ORIGINAL"))
+	if typeof(product.get("firmware_gain", null)) != TYPE_DICTIONARY:
+		product["firmware_gain"] = _firmware_gain_from_history(product.firmware_history)
 	var launch_plan_value = product.get("launch_plan", {})
 	product["launch_plan"] = launch_plan_value.duplicate(true) if typeof(launch_plan_value) == TYPE_DICTIONARY else {}
 	var feedback_value = product.get("last_market_feedback", {})
@@ -398,13 +404,45 @@ func control_software_cost(product: Dictionary) -> int:
 	var next_version := int((product.get("control_software", {}) as Dictionary).get("version", 0)) + 1
 	return 9000 + supported * 2200 + maxi(next_version - 1, 0) * 3500
 
-func firmware_block_reason(product: Dictionary) -> String:
+## Migration : les sauvegardes d'avant le 08/10 ont des firmwares déjà appliqués ; on reconstitue
+## les gains positifs consommés à partir de l'historique (profils à valeurs fixes).
+static func _firmware_gain_from_history(history: Array) -> Dictionary:
+	var gain := {"performance":0.0, "reliability":0.0, "efficiency":0.0}
+	for entry in history:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var data: Dictionary = FIRMWARE_TYPES.get(str(entry.get("profile", "")), {})
+		for axis in gain.keys():
+			gain[axis] = minf(float(gain[axis]) + maxf(float(data.get(axis, 0.0)), 0.0), float(FIRMWARE_GAIN_CAPS[axis]))
+	return gain
+
+## Effet réel d'un firmware sur ce produit : les gains sont rognés à la marge restante.
+func firmware_effect(product: Dictionary, firmware_type: String) -> Dictionary:
+	var data: Dictionary = FIRMWARE_TYPES.get(firmware_type, {})
+	var gain: Dictionary = product.get("firmware_gain", {})
+	if typeof(gain) != TYPE_DICTIONARY or gain.is_empty():
+		gain = _firmware_gain_from_history(product.get("firmware_history", []))
+	var effect := {"useful":false}
+	for axis in FIRMWARE_GAIN_CAPS.keys():
+		var delta := float(data.get(axis, 0.0))
+		if delta > 0.0:
+			delta = minf(delta, maxf(float(FIRMWARE_GAIN_CAPS[axis]) - float(gain.get(axis, 0.0)), 0.0))
+			if delta >= 0.1:
+				effect["useful"] = true
+		effect[axis] = delta
+	return effect
+
+func firmware_block_reason(product: Dictionary, firmware_type: String = "") -> String:
 	if firmware_available(product):
+		if firmware_type != "" and not bool(firmware_effect(product, firmware_type).get("useful", false)):
+			return "%s n'apporte plus rien : les firmwares précédents ont déjà tiré le meilleur de cette puce. Seule une nouvelle révision du silicium peut aller plus loin." % firmware_label(firmware_type)
 		return ""
 	return "Bloqué : savoir-faire logiciel 12 et architecture des circuits 24 nécessaires (actuellement %.0f et %.0f). Ils montent avec la R&D." % [float(ResearchManager.technologies.get("software", 0.0)), ResearchManager.get_cpu_capability("ARCHITECTURE")]
 
 func control_software_block_reason(product: Dictionary) -> String:
 	if control_software_available(product):
+		if int((product.get("control_software", {}) as Dictionary).get("version", 0)) >= CONTROL_SOFTWARE_MAX_VERSION:
+			return "La v%d est la dernière utile pour cette génération : le logiciel tire déjà le meilleur de ces puces." % CONTROL_SOFTWARE_MAX_VERSION
 		return ""
 	return "Bloqué : savoir-faire logiciel 18 et intégration 24 nécessaires (actuellement %.0f et %.0f)." % [float(ResearchManager.technologies.get("software", 0.0)), float(ResearchManager.technologies.get("integration", 0.0))]
 
@@ -416,15 +454,22 @@ func release_firmware(product_id: String, firmware_type: String) -> bool:
 		return false
 	_ensure_lifecycle_fields(product)
 	var data: Dictionary = FIRMWARE_TYPES[firmware_type]
+	var effect := firmware_effect(product, firmware_type)
+	if not bool(effect.get("useful", false)):
+		return false
 	var version := int(product.get("firmware_version", 1)) + 1
 	var cost := firmware_cost(product, firmware_type)
 	if not Economy.can_afford(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU"))):
 		return false
 	Economy.add_expense(cost, "Firmware / microcode — %s" % str(product.get("name", "CPU")))
 	var metrics: Dictionary = product.get("metrics", {})
-	metrics["performance"] = clampf(float(metrics.get("performance", 50.0)) + float(data.performance), 0.0, 98.0)
-	metrics["reliability"] = clampf(float(metrics.get("reliability", 50.0)) + float(data.reliability), 0.0, 98.0)
-	metrics["efficiency"] = clampf(float(metrics.get("efficiency", 50.0)) + float(data.efficiency), 0.0, 98.0)
+	var gain: Dictionary = product.get("firmware_gain", {})
+	for axis in FIRMWARE_GAIN_CAPS.keys():
+		var delta := float(effect.get(axis, 0.0))
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + delta, 0.0, 98.0)
+		if delta > 0.0:
+			gain[axis] = float(gain.get(axis, 0.0)) + delta
+	product["firmware_gain"] = gain
 	product["metrics"] = metrics
 	product["firmware_version"] = version
 	product["firmware_profile"] = firmware_type
@@ -458,6 +503,8 @@ func release_control_software(product_id: String) -> bool:
 			supported.append(str(candidate.get("id", "")))
 	var software: Dictionary = product.get("control_software", {}).duplicate(true)
 	var next_version := int(software.get("version", 0)) + 1
+	if next_version > CONTROL_SOFTWARE_MAX_VERSION:
+		return false
 	var cost := control_software_cost(product)
 	if not Economy.can_afford(cost, "Logiciel de contrôle CPU — %s" % str(product.get("generation_name", product.get("name", "CPU")))):
 		return false
