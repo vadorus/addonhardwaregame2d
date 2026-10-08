@@ -1,0 +1,6 @@
+series,type,index,screen,mean_ms,p50_ms,p95_ms,p99_ms,worst_ms,over_50,over_100,simulation_ms,refresh_ms,other_ms,tab_ms,checkpoint,result,commit,fps_setting,reference_sha,process_mean_ms,slow_screen
+jeu_x1_60s,detail,716,QG,,,,,,,,,0.0,,,1992-4,OK,8ace65b4ed92038b7c22c5e4a5eeee1d52b6a15c,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,MONTH_CLOSED_23.94s
+jeu_x1_60s,detail,717,QG,,,,,,,,52.575,119.875,33.894,14.548999786377,1992-5,OK,8ace65b4ed92038b7c22c5e4a5eeee1d52b6a15c,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,SLOW_FRAME_23.94s
+jeu_x1_60s,detail,1435,QG,,,,,,,,,0.0,,,1992-5,OK,8ace65b4ed92038b7c22c5e4a5eeee1d52b6a15c,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,MONTH_CLOSED_47.94s
+jeu_x1_60s,detail,1436,QG,,,,,,,,42.285,110.047,34.521,13.8269996643066,1992-6,OK,8ace65b4ed92038b7c22c5e4a5eeee1d52b6a15c,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,,SLOW_FRAME_47.94s
+jeu_x1_60s,summary,0,QG,33.3453471925524,33.3349990844727,34.1879997253418,34.5190010070801,119.875,2,2,,,,,,OK,8ace65b4ed92038b7c22c5e4a5eeee1d52b6a15c,30,5b839da1ebf8974ee3cf2251bbeb5960047d54feb94e3f73eb2e6a54db4d472d,17.7512950372696,
