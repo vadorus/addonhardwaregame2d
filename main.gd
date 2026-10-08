@@ -262,22 +262,42 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_back_request()
 
 func _process(_delta):
-	if CompanyManager.created and TimeManager.time_scale > 0.0:
-		var blocker := _blocking_company_decision()
-		if not blocker.is_empty():
-			TimeManager.time_scale = 0.0
-			status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+	# C3 : la date et les décisions sont vérifiées par événements, pas par image.
 	for button in speed_buttons:
 		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
-	if CompanyManager.created:
-		if header_compact:
-			date_label.text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		else:
-			date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		if reputation_label != null:
-			reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+	if CompanyManager.created and reputation_label != null:
+		reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+
+func _refresh_clock_date() -> void:
+	if not CompanyManager.created or date_label == null:
+		return
+	var next_text := ""
+	if header_compact:
+		next_text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	else:
+		next_text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	if date_label.text != next_text:
+		date_label.text = next_text
+
+func _pause_for_blocker_if_running() -> void:
+	if not CompanyManager.created or TimeManager.time_scale <= 0.0:
+		return
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+
+func _on_day_changed(_day: int, _month: int, _year: int) -> void:
+	_refresh_clock_date()
+	_pause_for_blocker_if_running()
 
 func _connect_signals():
+	TimeManager.day_changed.connect(_on_day_changed)
+	ResearchManager.projects_changed.connect(_pause_for_blocker_if_running)
+	ResearchManager.research_changed.connect(_pause_for_blocker_if_running)
+	SoftwareManager.software_changed.connect(_pause_for_blocker_if_running)
+	ProductionManager.jobs_changed.connect(_pause_for_blocker_if_running)
+	ProductManager.products_changed.connect(_pause_for_blocker_if_running)
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
 	Objectives.objective_completed.connect(_on_objective_completed)
@@ -2227,6 +2247,7 @@ func _update_nav_state():
 
 func _update_responsive_layout():
 	header_compact = size.x < 1220.0
+	_refresh_clock_date()
 	if header_brand_box != null:
 		header_brand_box.custom_minimum_size.x = 150.0 if header_compact else 235.0
 		for word in header_wordmark:
