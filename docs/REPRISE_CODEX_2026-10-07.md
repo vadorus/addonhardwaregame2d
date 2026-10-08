@@ -438,7 +438,27 @@ Règles : un commit par étape, un test déterministe, la CI au vert, et la sond
 | **G6** | Après la démo | **Comprendre son déclin (F4).** Quand la gamme vieillit ou que l'architecture est dépassée, Nora l'annonce avec un chiffre (« notre meilleur CPU fait 72 % du leader ») et une piste : refresh, nouvelle architecture ou retrait. Lié au refresh de gamme à cadrer avec Alexandre. | Pas de baisse de chiffre d'affaires de plus de 2 ans sans explication | Scénario : une gamme sous 80 % du leader déclenche l'annonce |
 | **G7** | Après la démo | **Moins d'attente (F6).** Pendant le développement, une petite décision optionnelle tous les 2 à 3 mois (trouvaille, échantillon client, presse), en réutilisant les événements existants. Jamais bloquante. | Au moins 3 décisions par an en moyenne sur la carrière | La colonne `decisions` de la sonde |
 
-Ordre conseillé (game design) : G1 et G2 avant la démo ; G3 en premier après la démo (il sert de filet aux autres), puis G4, G5, G6 et G7. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
+Ordre conseillé (game design) : G1 et G2 avant la démo ; G3 en premier après la démo (il sert de filet aux autres), puis G4, G5, G6 et G7.
+
+### Plan monétisation (proposition du 08/10, 19 h 45)
+
+Source : `docs/MONETISATION_2026-10-08.md`.
+
+Principe : jeu gratuit, puis achat unique de la version complète, extensions de branches et cosmétiques purement visuels. Pas de passe de saison, de boîte à butin, d'énergie, de monnaie premium ni de publicité. Tout le contenu est livré dans le jeu ; un droit, vérifié localement, en ouvre l'accès, hors ligne.
+
+**Rien de payant dans la démo de fin octobre.**
+
+| Étape | Quand | Contenu | Critère de réussite | Test |
+|---|---|---|---|---|
+| **M0** | Avant la démo | **Décisions d'Alexandre** : la limite gratuite (option A recommandée : 1971–1985 gratuit), les prix et la première extension. Rien à coder. | Décisions notées ici | — |
+| **M1** | Après la démo | **Couche des droits** : `scripts/Entitlements.gd` (liste fermée de produits, `owns()`, signal, cache local `user://entitlements.cfg`) et `FakeStore`. `CompanyBranches` et les finitions lisent `owns()`. | Le jeu reste entièrement jouable hors ligne ; une sauvegarde faite avec une extension s'ouvre sans elle (éléments figés, mention « nécessite l'extension ») | `EntitlementsScenario` : posséder ou ne pas posséder, cache hors ligne, sauvegarde ouverte sans l'extension |
+| **M2** | Après M1 | **Limite gratuite et écran de version complète** : une seule proposition au moment choisi (1985 avec l'option A), bouton « Plus tard » toujours visible, pas de rappel avant le palier suivant ; la partie continue après l'achat sans rien perdre. | Aucune fenêtre d'achat en dehors des moments prévus | Scénario : la proposition ne revient pas dans les 12 mois de jeu suivants ; après l'achat factice, la carrière continue |
+| **M3** | Avant la sortie publique Android | **Google Play Billing** : plugin officiel pour Godot 4, achats non consommables, confirmation sous 3 jours, « Restaurer les achats » dans le menu. Mise à jour de la page de confidentialité, de la section « Sécurité des données » et de la classification (« achats intégrés »). **Rien n'est envoyé à Google sans l'accord d'Alexandre.** | Achat, puis restauration après réinstallation, sur la piste de test interne | Test manuel sur le Pixel avec un compte testeur de licence ; `PrivacyScenario` mis à jour |
+| **M4** | Avant Steam | **Steam** : GodotSteam, un DLC par produit (droit seul), succès Steam. | Le DLC acheté est reconnu sans connexion après la première vérification | Test manuel sur un compte Steam de test |
+| **M5** | Après M1 | **Premiers cosmétiques** : finitions de boîtier (couleurs, logos, matières) et un thème de garage, **sans aucun effet sur les notes ni les ventes** ; défis du moment gratuits, calés sur la vraie date, qui donnent aussi des cosmétiques. | Une finition payante n'a aucun effet chiffré | Scénario : notes et ventes identiques avec ou sans cosmétique |
+| **M6** | Avant la démo, puis en continu | **Rétention** : le premier CPU lancé en moins de 10 minutes de jeu ; un résumé de Nora « ce qui vous attend » au retour ; un palier visible à chaque semaine de jeu (déménagement, 2e génération, Logiciel). | Mesuré avec les testeurs (temps jusqu'au premier jour J) | Scénario : le parcours guidé atteint le jour J en moins de N actions |
+
+Ordre conseillé (monétisation) : M0 dès que possible (ça oriente le contenu de la démo) ; M6 avec la démo ; M1, M2 et M5 après la démo ; M3 avant la sortie publique Android ; M4 avant Steam. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
 
 Historique des tâches précédentes :
 
