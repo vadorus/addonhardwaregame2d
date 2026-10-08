@@ -53,7 +53,7 @@ func refresh() -> void:
 				_open[group_key] = not bool(_shown_groups.get(group_key, false))
 				refresh())
 			_headers[key] = header
-		var desired_header: String = "%s  %s (%d)  %s" % [ICONS[key], ADVISOR.GROUP_LABELS[key], items.size(), "−" if is_open else "+"]
+		var desired_header: String = "%s  %s (%d)  %s" % [ICONS[key], ADVISOR.GROUP_LABELS[key], items.size(), "▴" if is_open else "▾"]
 		if header.text != desired_header:
 			header.text = desired_header
 		_place_visible(header, position)
