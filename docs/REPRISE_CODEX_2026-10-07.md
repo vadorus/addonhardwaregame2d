@@ -288,7 +288,9 @@ Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert,
 6. **Noms de projets uniques.**
    - Deux « Nova 1 » ont été observés dans une même partie.
    - Il faut une numérotation automatique et une migration des sauvegardes existantes.
-7. **Lien vers la politique de confidentialité dans le jeu** (menu ou options). Google l'exige.
+7. ✅ **Confidentialité dans le jeu** (08/10) : Menu > « Confidentialité ».
+   - Le texte est dans `scripts/PrivacyPolicy.gd`, et `PrivacyScenario` vérifie que l'export ne demande aucune permission Android.
+   - **À faire par Alexandre** : recopier dans `ONLINE_URL` l'adresse déclarée dans la Play Console, pour afficher le bouton « Version en ligne ».
 8. **Élasticité des prix** : la demande doit réagir au prix de façon lisible. Ce point est lié à la tâche 3.
 9. **Plateformes / sockets / refresh** : une gamme qui vieillit et un rafraîchissement de gamme. À cadrer avec Alexandre avant de coder.
 

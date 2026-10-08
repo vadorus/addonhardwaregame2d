@@ -1787,6 +1787,11 @@ func _ready() -> void:
 		_fail(branches_error)
 		return
 	print("[CI] Carte de l'entreprise (planche 7) : CPU et logiciel jouables, vitrines fermées OK")
+	var privacy_error: String = (load("res://tests/scenarios/PrivacyScenario.gd") as Script).call("run", self)
+	if privacy_error != "":
+		_fail(privacy_error)
+		return
+	print("[CI] Confidentialité : lisible dans le jeu, aucune permission Android OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

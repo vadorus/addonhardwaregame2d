@@ -3179,10 +3179,27 @@ func _build_menu_layer() -> void:
 	menu_motion_button = _menu_button("Animations : %s" % ("réduites" if JUICE.reduced_motion else "complètes"), _menu_toggle_motion)
 	menu_motion_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	visual_row.add_child(menu_motion_button)
+	# 08/10 : Google Play exige l'accès à la politique de confidentialité depuis le jeu.
+	var info_row := HBoxContainer.new()
+	info_row.add_theme_constant_override("separation", 8)
+	box.add_child(info_row)
 	menu_fullscreen_button = _menu_button("Plein écran", _menu_toggle_fullscreen)
 	menu_fullscreen_button.visible = not _is_mobile()
-	box.add_child(menu_fullscreen_button)
+	menu_fullscreen_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(menu_fullscreen_button)
+	var privacy_button := _menu_button("Confidentialité", open_privacy)
+	privacy_button.name = "PrivacyButton"
+	privacy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(privacy_button)
 	box.add_child(_menu_button("Sauvegarder et quitter", _menu_quit))
+	privacy_panel = (load("res://ui/components/PrivacyPanel.gd") as Script).new() as Control
+	add_child(privacy_panel)
+
+var privacy_panel: Control
+
+func open_privacy() -> void:
+	if privacy_panel != null:
+		privacy_panel.call("open")
 
 func _menu_button(text: String, action: Callable, primary: bool = false) -> Button:
 	var button := Button.new()
