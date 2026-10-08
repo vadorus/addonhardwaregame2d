@@ -201,16 +201,30 @@ func set_viewport_width(width: float) -> void:
 
 func refresh() -> void:
 	if industrialization_panel != null:
+		var diag_industrialization_us := Time.get_ticks_usec()
 		industrialization_panel.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "industrialization", diag_industrialization_us)
 	if lifecycle_panel != null:
+		var diag_lifecycle_us := Time.get_ticks_usec()
 		lifecycle_panel.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "lifecycle", diag_lifecycle_us)
 	if after_sales_panel != null:
+		var diag_after_sales_us := Time.get_ticks_usec()
 		after_sales_panel.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "after_sales", diag_after_sales_us)
 	if components_panel != null and components_panel.visible:
+		var diag_components_us := Time.get_ticks_usec()
 		components_panel.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "components", diag_components_us)
+	var diag_board_us := Time.get_ticks_usec()
 	_refresh_board()
+	PerfProbe.record_refresh_detail("Produits", "board", diag_board_us)
+	var diag_scene_us := Time.get_ticks_usec()
 	_refresh_scene()
+	PerfProbe.record_refresh_detail("Produits", "scene", diag_scene_us)
+	var diag_badges_us := Time.get_ticks_usec()
 	_refresh_mode_badges()
+	PerfProbe.record_refresh_detail("Produits", "badges", diag_badges_us)
 
 func _refresh_mode_badges() -> void:
 	if mode_buttons.is_empty():

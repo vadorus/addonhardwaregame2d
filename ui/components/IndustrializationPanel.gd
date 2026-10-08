@@ -89,17 +89,27 @@ func set_viewport_width(width: float) -> void:
 func refresh() -> void:
 	if _jobs_box == null:
 		return
+	var diag_industry_signature_us := Time.get_ticks_usec()
 	var signature := _state_signature()
+	PerfProbe.record_refresh_detail("Produits", "industry_signature", diag_industry_signature_us)
 	if signature == _signature:
 		return
 	_signature = signature
 	_team_label.text = _team_text()
 	_team_toggle.text = _team_toggle_text()
 	_go_buttons.clear()
+	var diag_industry_jobs_us := Time.get_ticks_usec()
 	_rebuild_jobs()
+	PerfProbe.record_refresh_detail("Produits", "industry_jobs", diag_industry_jobs_us)
+	var diag_industry_fab_us := Time.get_ticks_usec()
 	_rebuild_fab()
+	PerfProbe.record_refresh_detail("Produits", "industry_fab", diag_industry_fab_us)
+	var diag_industry_done_us := Time.get_ticks_usec()
 	_rebuild_done()
+	PerfProbe.record_refresh_detail("Produits", "industry_done", diag_industry_done_us)
+	var diag_industry_foundries_us := Time.get_ticks_usec()
 	_rebuild_foundries()
+	PerfProbe.record_refresh_detail("Produits", "industry_foundries", diag_industry_foundries_us)
 	UI.prepare_touch_scroll_children(self)
 
 func _force_refresh() -> void:

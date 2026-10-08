@@ -30,6 +30,7 @@ var _frame_count := 0
 var _pending_month: Dictionary = {}
 var _month_count := 0
 var _month_rows: Array[Dictionary] = []
+var _diagnostic_rows: Array[Dictionary] = []
 var _tab_rows: Array[Dictionary] = []
 var _span_starts: Dictionary = {}
 var _frame_sim_ms := 0.0
@@ -211,6 +212,7 @@ func _reset_measurement(name: String, screen_name: String) -> void:
 	_series = name
 	_screen_name = screen_name
 	_month_rows.clear()
+	_diagnostic_rows.clear()
 	_tab_rows.clear()
 	_month_count = 0
 	_tab_step = 0
@@ -304,7 +306,26 @@ func end_span(name: String) -> void:
 	elif name.begins_with("screen:"):
 		_frame_screens[name.trim_prefix("screen:")] = elapsed
 
+func record_refresh_detail(screen: String, part: String, start_us: int) -> void:
+	if not enabled or _state == "idle":
+		return
+	_diagnostic_rows.append({
+		"index": _month_count + 1,
+		"screen": screen,
+		"part": part,
+		"ms": float(Time.get_ticks_usec() - start_us) / 1000.0,
+		"year": TimeManager.year,
+		"month": TimeManager.month
+	})
+
 func mark_month(report: Dictionary) -> void:
+	if enabled and _state == "timed":
+		_diagnostic_rows.append({
+			"index": _frame_count, "screen": _screen_name,
+			"part": "MONTH_CLOSED_%.2fs" % (float(Time.get_ticks_usec() - _start_us) / 1000000.0),
+			"ms": 0.0, "year": TimeManager.year, "month": TimeManager.month
+		})
+		return
 	if not enabled or _state != "months":
 		return
 	_flush_pending_month()
@@ -351,6 +372,13 @@ func _process(_delta: float) -> void:
 		_frame_values[_frame_count] = elapsed_ms
 		_process_values[_frame_count] = float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
 		_frame_count += 1
+		if elapsed_ms >= 100.0:
+			_diagnostic_rows.append({
+				"index": _frame_count, "screen": _screen_name, "part": "SLOW_FRAME_%.2fs" % (float(now - _start_us) / 1000000.0),
+				"ms": elapsed_ms, "year": TimeManager.year, "month": TimeManager.month,
+				"sim_ms": _frame_sim_ms, "ui_ms": _frame_ui_ms,
+				"process_ms": _process_values[_frame_count-1]
+			})
 		if elapsed_ms > _max_month_frame:
 			_max_month_frame = elapsed_ms
 			_max_month_sim = _frame_sim_ms
@@ -464,6 +492,14 @@ func _write_csv(result: String, stats: Dictionary, checkpoint: String) -> void:
 			str(row.get("simulation_ms",0)), str(row.get("refresh_ms",0)),
 			str(row.get("other_ms",0)), "", str(row.get("checkpoint","")),
 			result, commit, str(Engine.max_fps), _reference_hash, "", str(row.get("slow_screen", ""))
+		]))
+	for item in _diagnostic_rows:
+		var segment: Dictionary = item
+		file.store_csv_line(PackedStringArray([
+			_series, "detail", str(segment.get("index",0)), str(segment.get("screen","")),
+			"", "", "", "", "", "", "", str(segment.get("sim_ms","")),
+			str(segment.get("ms",0.0)), str(segment.get("ui_ms","")), str(segment.get("process_ms","")), str(segment.get("year",0)) + "-" + str(segment.get("month",0)),
+			result, commit, str(Engine.max_fps), _reference_hash, "", str(segment.get("part",""))
 		]))
 	for t in _tab_rows:
 		var row: Dictionary = t

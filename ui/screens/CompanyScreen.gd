@@ -396,18 +396,25 @@ func _refresh_reputation_bars() -> void:
 func _refresh_empire() -> void:
 	if empire_box == null:
 		return
+	var diag_empire_clear_us := Time.get_ticks_usec()
 	for child in empire_box.get_children():
 		empire_box.remove_child(child)
 		child.queue_free()
+	PerfProbe.record_refresh_detail("Entreprise", "empire_clear", diag_empire_clear_us)
+	var diag_empire_header_us := Time.get_ticks_usec()
 	var data: Dictionary = CompanyManager.CAREER.summary()
 	var meter := UI.meter_row(str(data.get("title", "Carrière")), "Marque, technologie, marché, finances et groupe")
 	UI.set_meter(meter, float(data.get("score", 0.0)), "%.1f/100" % float(data.get("score", 0.0)))
 	empire_box.add_child(meter)
+	PerfProbe.record_refresh_detail("Entreprise", "empire_header", diag_empire_header_us)
+	var diag_empire_lines_us := Time.get_ticks_usec()
 	for line_value in CompanyManager.CAREER.empire_lines():
 		var line := UI.muted_label(str(line_value), 12)
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empire_box.add_child(line)
 
+	PerfProbe.record_refresh_detail("Entreprise", "empire_lines", diag_empire_lines_us)
+	var diag_empire_ranking_us := Time.get_ticks_usec()
 	empire_box.add_child(UI.eyebrow("CLASSEMENT MONDIAL"))
 	var ranking: Array = CompanyManager.CAREER.global_ranking()
 	for i in range(mini(ranking.size(), 5)):
@@ -416,6 +423,8 @@ func _refresh_empire() -> void:
 		UI.set_meter(rank_row, float(entry.get("score", 0.0)), "%.1f pts" % float(entry.get("score", 0.0)))
 		empire_box.add_child(rank_row)
 
+	PerfProbe.record_refresh_detail("Entreprise", "empire_ranking", diag_empire_ranking_us)
+	var diag_empire_trophies_us := Time.get_ticks_usec()
 	empire_box.add_child(UI.eyebrow("TROPHÉES DE CARRIÈRE"))
 	for trophy_value in CompanyManager.CAREER.trophy_rows():
 		var trophy: Dictionary = trophy_value
@@ -425,6 +434,7 @@ func _refresh_empire() -> void:
 		trophy_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empire_box.add_child(trophy_line)
 	UI.prepare_touch_scroll_children(empire_box)
+	PerfProbe.record_refresh_detail("Entreprise", "empire_trophies", diag_empire_trophies_us)
 
 func _child_with_text(box: Node, text: String) -> Node:
 	for child in box.get_children():
@@ -554,18 +564,34 @@ func show_section_for_context(context: String) -> void:
 func refresh() -> void:
 	if company_rep_label == null or not CompanyManager.created:
 		return
+	var diag_scene_us := Time.get_ticks_usec()
 	_refresh_scene()
+	PerfProbe.record_refresh_detail("Entreprise", "scene", diag_scene_us)
+	var diag_unlocks_us := Time.get_ticks_usec()
 	_refresh_page_unlocks()
+	PerfProbe.record_refresh_detail("Entreprise", "unlocks", diag_unlocks_us)
+	var diag_reputation_us := Time.get_ticks_usec()
 	_refresh_reputation_bars()
+	PerfProbe.record_refresh_detail("Entreprise", "reputation", diag_reputation_us)
+	var diag_empire_us := Time.get_ticks_usec()
 	_refresh_empire()
+	PerfProbe.record_refresh_detail("Entreprise", "empire", diag_empire_us)
 	if subsidiaries_panel != null:
+		var diag_subsidiaries_us := Time.get_ticks_usec()
 		subsidiaries_panel.call("refresh")
+		PerfProbe.record_refresh_detail("Entreprise", "subsidiaries", diag_subsidiaries_us)
+	var diag_subsidiary_sectors_us := Time.get_ticks_usec()
 	_fill_subsidiary_sectors()
+	PerfProbe.record_refresh_detail("Entreprise", "subsidiary_sectors", diag_subsidiary_sectors_us)
+	var diag_objectives_us := Time.get_ticks_usec()
 	_refresh_objectives()
+	PerfProbe.record_refresh_detail("Entreprise", "objectives", diag_objectives_us)
 
 	var brief := ExecutiveManager.get_executive_brief()
 	# Deux lignes : la situation et le conseil. Les décisions elles-mêmes s'ouvrent en carte depuis le garage.
+	var diag_executive_brief_us := Time.get_ticks_usec()
 	executive_label.text = "%s\n%s" % [str(brief.get("headline", "")), str(brief.get("text", ""))]
+	PerfProbe.record_refresh_detail("Entreprise", "executive_brief", diag_executive_brief_us)
 
 	var workspace := ExecutiveManager.workplace_data()
 	var upgrade := ExecutiveManager.next_workplace_upgrade()
@@ -601,14 +627,22 @@ func refresh() -> void:
 	if benefit_cost_label != null:
 		benefit_cost_label.text = "Coût actuel des avantages : %s €/mois" % UI.money(ExecutiveManager.monthly_benefit_cost())
 	workplace_defer_button.visible = not upgrade.is_empty()
+	var diag_workplace_and_meters_us := Time.get_ticks_usec()
 	workplace_defer_button.disabled = bool(recommendation.get("snoozed", false))
+	PerfProbe.record_refresh_detail("Entreprise", "workplace_and_meters", diag_workplace_and_meters_us)
 
+	var diag_benefit_controls_us := Time.get_ticks_usec()
 	for benefit_key_value in benefit_controls.keys():
 		var benefit_key := str(benefit_key_value)
 		UI.select_meta(benefit_controls[benefit_key], str(ExecutiveManager.benefit_policy.get(benefit_key, "NONE")))
+	PerfProbe.record_refresh_detail("Entreprise", "benefit_controls", diag_benefit_controls_us)
 
+	var diag_hr_cases_us := Time.get_ticks_usec()
 	_refresh_hr_cases()
+	PerfProbe.record_refresh_detail("Entreprise", "hr_cases", diag_hr_cases_us)
+	var diag_financial_advice_us := Time.get_ticks_usec()
 	_refresh_financial_advice()
+	PerfProbe.record_refresh_detail("Entreprise", "financial_advice", diag_financial_advice_us)
 
 	var division_lines: Array[String] = []
 	for sector_value in DivisionManager.get_active_division_keys():
@@ -622,15 +656,25 @@ func refresh() -> void:
 			str(strategy_labels.get(strategy, strategy.to_lower()))
 		])
 	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
+	var diag_division_data_us := Time.get_ticks_usec()
 	division_label.text = "\n".join(division_lines)
+	PerfProbe.record_refresh_detail("Entreprise", "division_data", diag_division_data_us)
+	var diag_division_delegation_us := Time.get_ticks_usec()
 	_refresh_division_delegation()
+	PerfProbe.record_refresh_detail("Entreprise", "division_delegation", diag_division_delegation_us)
 
+	var diag_policy_controls_us := Time.get_ticks_usec()
 	policy_marketing.value = float(CompanyManager.policies.marketing_budget)
+	var diag_marketing_hint_us := Time.get_ticks_usec()
 	_refresh_marketing_hint()
+	PerfProbe.record_refresh_detail("Entreprise", "marketing_hint", diag_marketing_hint_us)
 	policy_support.value = float(CompanyManager.policies.support_budget)
 	policy_environment.value = float(CompanyManager.policies.environment_budget)
 	UI.select_meta(policy_support_level, str(CompanyManager.policies.support_level))
+	PerfProbe.record_refresh_detail("Entreprise", "policy_controls", diag_policy_controls_us)
+	var diag_leader_choices_us := Time.get_ticks_usec()
 	_refresh_leader_choices()
+	PerfProbe.record_refresh_detail("Entreprise", "leader_choices", diag_leader_choices_us)
 
 func _refresh_division_delegation() -> void:
 	if division_delegation_group == null:
@@ -957,14 +1001,18 @@ func company_line() -> String:
 
 func _refresh_scene() -> void:
 	if scene != null:
+		var diag_scene_hero_us := Time.get_ticks_usec()
 		var data := CAREER.summary()
 		var tier := int(ExecutiveManager.workplace_data().get("tier", 0))
 		scene.call("set_scene", WORKPLACE.seasonal_art_path(tier, TimeManager.month), "L'ENTREPRISE")
 		scene.call("set_speaker", WORKPLACE.character_path(WORKPLACE.NORA_LOOK, "bureau"))
 		scene.call("set_line", company_line())
 		scene.call("set_hero", "1er" if int(data.rank) == 1 else "%de" % int(data.rank), "constructeur mondial sur %d" % int(data.ranking_size), "Voir l'aperçu")
+		PerfProbe.record_refresh_detail("Entreprise", "scene_hero", diag_scene_hero_us)
 	if branch_map != null:
+		var diag_branch_us := Time.get_ticks_usec()
 		branch_map.call("refresh")
+		PerfProbe.record_refresh_detail("Entreprise", "branch_map", diag_branch_us)
 
 func _on_branch_open(context: String) -> void:
 	match context:
