@@ -327,10 +327,16 @@ func set_viewport_width(width: float) -> void:
 		product_pulse_panel.call("set_viewport_width", width)
 
 func refresh() -> void:
+	var diag_life_list_us := Time.get_ticks_usec()
 	_refresh_product_list()
+	PerfProbe.record_refresh_detail("Produits", "lifecycle_product_list", diag_life_list_us)
+	var diag_life_launch_us := Time.get_ticks_usec()
 	refresh_launch_card()
+	PerfProbe.record_refresh_detail("Produits", "lifecycle_launch_card", diag_life_launch_us)
 	if _month_card != null:
+		var diag_life_month_us := Time.get_ticks_usec()
 		_month_card.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "lifecycle_month_card", diag_life_month_us)
 
 ## V0.10 / I4 : ce qu'un novice doit savoir avant de lancer, en trois chiffres.
 func launch_card_data() -> Dictionary:
@@ -411,8 +417,12 @@ func _refresh_product_list() -> void:
 		UI.select_meta(product_select, _default_product_id())
 		if product_select.selected < 0:
 			product_select.select(0)
+	var diag_range_us := Time.get_ticks_usec()
 	_refresh_range()
+	PerfProbe.record_refresh_detail("Produits", "lifecycle_range", diag_range_us)
+	var diag_details_us := Time.get_ticks_usec()
 	_refresh_product_details()
+	PerfProbe.record_refresh_detail("Produits", "lifecycle_details", diag_details_us)
 
 static func _status_label(status: String) -> String:
 	return str(STATUS_LABELS.get(status, status.capitalize()))
@@ -502,7 +512,9 @@ func _refresh_range() -> void:
 	var selected_id := UI.option_meta(product_select) if product_select.item_count > 0 else ""
 	if _portfolio != null:
 		_portfolio.set("selected_id", selected_id)
+		var diag_portfolio_us := Time.get_ticks_usec()
 		_portfolio.call("refresh")
+		PerfProbe.record_refresh_detail("Produits", "portfolio", diag_portfolio_us)
 	# I5 : les modèles en vente sont dans le portefeuille ; les cartes de génération ne servent plus
 	# qu'à choisir un modèle prêt à lancer.
 	var any_on_market := launched > 0
