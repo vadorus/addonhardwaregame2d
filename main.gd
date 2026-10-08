@@ -1182,6 +1182,13 @@ func _create_market_tab():
 
 func _on_market_action(action: String, payload: Dictionary):
 	match action:
+		"update_price":
+			# Planche 8 (08/10) : le conseil de prix de Nora se suit depuis Marché.
+			_on_products_action(action, payload)
+			if market_screen != null:
+				market_screen.call("refresh")
+		"status":
+			status_label.text = str(payload.get("text", ""))
 		"attack_rival":
 			# I5 : l'offensive se prépare maintenant dans Marché.
 			_on_products_action(action, payload)

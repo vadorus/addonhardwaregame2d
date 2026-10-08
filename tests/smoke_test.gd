@@ -1777,6 +1777,11 @@ func _ready() -> void:
 		_fail(finishing_error)
 		return
 	print("[CI] Finition (planche 6) : trois pistes, retouches, une fois par génération, sauvegarde, presse OK")
+	var market_voices_error: String = (load("res://tests/scenarios/MarketVoicesScenario.gd") as Script).call("run", self)
+	if market_voices_error != "":
+		_fail(market_voices_error)
+		return
+	print("[CI] Voix du monde (planche 8) : espéré/obtenu, vaut-il son prix, conseil de Nora, quatre voix OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)
