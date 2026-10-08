@@ -26,9 +26,9 @@ Hypothèse à tester : **2 branches complexes pilotées directement**, avec opti
 - branche stabilisée/faible activité : moindre attention ;
 - compétence de management et progrès d'interface peuvent augmenter modérément la capacité, sans rendre 15 divisions directes viables.
 
-Le joueur choisit librement ses branches **pilotées directement**. Les autres fonctionnent avec un **directeur désigné** et un mandat. Il doit pouvoir reprendre une branche et en déléguer une autre, sans réinitialiser projets, équipe, contrats, soutien produits ni marque.
+Le joueur choisit librement ses branches **pilotées directement**. Les autres restent opérationnelles en **gestion automatique courante, sans devoir recruter ni configurer un directeur**. Il peut reprendre une branche et en automatiser une autre, sans réinitialiser projets, équipe, contrats, soutien produits ni marque. **Nommer un directeur qualifié est une amélioration optionnelle du pilotage**, pas un prérequis d'autonomie.
 
-Au-delà de la limite d'attention, l'interface demande de désigner un directeur sur les branches excédentaires. S'il manque un salarié qualifié, proposer responsable intérimaire/supervision restreinte ou recrutement, avec coût et risques visibles ; ne pas créer instantanément un directeur expert gratuit. Il ne doit pas être possible de contourner la limite en laissant des branches sans responsable ni en choisissant un mode non opérant.
+Au-delà de la limite d'attention, les branches excédentaires passent automatiquement en gestion courante ; **aucune boîte de dialogue obligatoire de recrutement ou de paramétrage**. Le socle est une routine institutionnelle prudente (avec frais généraux normaux), pas un expert gratuit. Sans directeur compétent, l'autonomie est moins inventive et moins performante ; le joueur peut recruter ou promouvoir pour augmenter la qualité du pilotage. Pas de blocage des branches sans chef nommé.
 
 ## 3. Modes
 
@@ -36,15 +36,15 @@ Au-delà de la limite d'attention, l'interface demande de désigner un directeur
 |---|---|---|
 | **DIRECT** | Projets et grandes décisions de gameplay, développement interactif, lancement, support | Simulation produit habituelle, comme aujourd'hui |
 | **SUPERVISÉ** | Détermine stratégie et approuve certaines décisions majeures ; peut ouvrir un projet pour le piloter ponctuellement | Directeur gère les opérations récurrentes et prépare les décisions |
-| **AUTONOME** | Mandat stratégique, allocation du capital, remplacement du directeur, exceptions majeures | Directeur planifie et exécute les projets successifs, mises à jour, ventes, contrats et soutien produit selon ses compétences et ses limites |
+| **AUTONOME** | Ne fait rien au quotidien sauf exception ou demande de changement d'orientation ; peut nommer un directeur, fixer un mandat | Système de gestion courante (ou directeur nommé) poursuit projets, versions, ventes et support par les mêmes règles que le joueur, mais avec initiative limitée en l'absence d'expertise |
 
-Le mode autonome **doit être opérant** : il ne suffit pas d'ajouter des bonus, d'afficher des alertes ou de trier des décisions. La division doit progresser réellement, générer les flux de trésorerie et pouvoir faire des choix admissibles sans un clic du CEO chaque mois.
+Le mode autonome **doit être opérant sans configuration préalable** : il ne suffit pas d'ajouter des bonus, d'afficher des alertes ou de trier des décisions. La division doit progresser réellement, générer les flux de trésorerie et pouvoir faire des choix admissibles sans un clic du CEO chaque mois.
 
 Rendre le contrôle réversible depuis l'écran Entreprise → Divisions. Changer de mode **ne réinitialise pas** le pipeline et n'accorde pas un bonus rétroactif. Une passation peut générer un léger effet temporaire intelligible, sans punir excessivement les expérimentations.
 
 ## 4. Directeur : personne et non mode magique
 
-Un directeur est un personnage de l'entreprise : identité, expérience, compétences techniques/financières/humaines, risque, affinité secteur, expérience de management, loyauté et traits de comportement **en jeu**. Exemple : excellent ingénieur CPU devenu directeur novice, ou expert financier efficace mais techniquement prudent.
+Un directeur nommé est une **option de spécialisation et d'optimisation**, pas une condition d'accès à l'automatisation. Lorsqu'il est nommé, c'est un personnage de l'entreprise : identité, expérience, compétences techniques/financières/humaines, risque, affinité secteur, expérience de management, loyauté et traits de comportement **en jeu**. Exemple : excellent ingénieur CPU devenu directeur novice, ou expert financier efficace mais techniquement prudent.
 
 Chaque directeur a une **politique accessible et modifiable** :
 - priorité : performance, innovation, fiabilité, efficacité, croissance ;
@@ -153,3 +153,79 @@ Prochaine architecture : étendre `DivisionManager` avec **policy planner déter
 4. Spécialité du directeur et maturité de la division : impact raisonnable, sans rendre l'autonomie punitive.
 
 Privilégier l'option qui produit **le plus de décisions intéressantes à long terme**, pas celle qui affiche le plus de paramètres.
+
+
+## 12. Correction d'orientation validée le 8 octobre : automatisation d'abord
+
+**Cette section prévaut sur toute formulation ancienne suggérant qu'une division supplémentaire exige un directeur nommé ou des paramètres de mandat.** La demande du joueur est de simplifier le système et d'éviter plusieurs modes de difficulté figés. Dès que le joueur dépasse le nombre acceptable de branches dirigées (hypothèse : deux, éventuellement trois après essais), une branche sort du pilotage direct et continue **automatiquement** ses opérations de base. Le joueur choisit quelle branche il conserve en direct. Aucune démarche administrative pour assurer la survie de l'autre branche.
+
+### Trois mécanismes à dissocier
+
+1. **Gestion automatique interne** : la division et ses salariés appartiennent au groupe. Une politique minimale de continuité (finir le projet en cours, ventes, maintenance, support de parc, mise à niveau prudente et renouvellement de gamme raisonnable) fonctionne sans administrateur explicite.
+2. **Directeur nommé** : personnage du groupe qui améliore et spécialise cette autonomie ; coût salarial, expérience, faculté de déléguer des choix plus ambitieux, risques personnels. Son recrutement n'est **pas un verrou**.
+3. **Sous-traitance industrielle/externe** : prestataire tiers effectuant une tâche de conception, de fabrication, de test, d'hébergement, de support ou de R&D. Cette opération implique prix, qualité, délai, dépendance, confidentialité et compétence du partenaire. Elle **ne doit jamais être confondue avec une branche automatique**.
+
+### Algorithme de continuité sans résultats miraculeux
+
+Une division laissée en pilotage automatique :
+- achève les contrats et produits déjà engagés, gère les retours et le support existant ;
+- continue les cycles commerciaux, la maintenance, les patchs et des améliorations modestes ;
+- peut préparer/remplacer une gamme vieillissante en fonction de fonds disponibles, maturité et mandat par défaut ;
+- choisit des projets de taille raisonnable sur ses compétences connues ; n'invente pas une technologie jamais recherchée par le groupe ;
+- peut générer **des bénéfices comme des pertes** suivant marché, position concurrentielle, investissements et compétence ;
+- subit des retards, prend du retard technologique ou perd des clients si son budget est trop faible ou ses choix sont inadaptés ;
+- ne bénéficie pas d'un mécanisme de rattrapage invisible ni de performances offertes gratuitement.
+
+La simulation doit être identique économiquement à celle du joueur : mêmes prix, mêmes coûts, mêmes délais, mêmes limitations techniques et mêmes risques. Si le joueur dirige en personne, il a davantage de choix *et de risques*, pas un bonus de puissance arbitraire.
+
+Le groupe expose seulement un **résumé des divisions automatiques** et signale les exceptions dépassant leurs pouvoirs financiers ou les risques majeurs. Les décisions routinières ne doivent pas envahir la boîte du CEO.
+
+### Activation progressive à tester
+
+- Au lancement : une branche directe, le reste verrouillé selon la progression historique.
+- À 2 branches : essayer en gameplay le choix libre de pilotage direct des deux **ou** d'une seule, toutes les autres restant automatiques.
+- À 3 branches et plus : passage automatique à 2 branches directes (hypothèse), avec choix utilisateur des deux emplacements de pilotage. Tester la possibilité d'une 3e branche directe légère sur Pixel.
+- À 10–15 branches : vue synthétique groupe, changement de contrôle en un geste, journal de passation, aucune perte d'historique.
+
+L'automatisation est un **système de confort intégré au jeu**, non un réglage « facile » versus « difficile ». Ce n'est pas le nombre de divisions qu'on possède qui mesure la difficulté, mais la profondeur des décisions qu'on veut prendre soi-même.
+
+## 13. Chaîne de valeur entre branches et commandes internes
+
+Exemple de **fiction de gestion industrielle**, sans simulation tactique de systèmes militaires : une future branche navale/défense décroche un contrat de système informatique embarqué destiné à un sous-marin. Elle a besoin d'un CPU compatible avec contraintes de fiabilité, consommation, stabilité à long terme et sécurité de la chaîne d'approvisionnement.
+
+La division concernée peut :
+- **réutiliser un CPU commercial** déjà développé dans le groupe, avec adaptations logicielles et qualification supplémentaires ;
+- **commander une variante CPU dédiée** auprès de la branche CPU, exploitant les connaissances et outils préalablement débloqués, mais mobilisant R&D, validation et capacité de production réelles ;
+- **acheter des composants ou licences externes**, sous réserve des exigences du client et des fournisseurs disponibles ;
+- **concevoir en interne mais faire fabriquer chez une fonderie partenaire**, ce qui sépare souveraineté de conception et souveraineté de fabrication ;
+- utiliser une **fab interne** si la société en possède une, avec coûts fixes, capacités et limitations technologiques ;
+- choisir une **fonderie extérieure qualifiée et contrôlée**, ce qui peut être acceptable pour un marché sensible si la traçabilité, la certification et la vérification satisfont les exigences.
+
+### Scores et flux à suivre
+
+Chaque sous-projet comporte : `required_technologies`, `owned_ip`, `licensed_ip`, `hardware_compatibility`, `internal_capacity`, `fabrication_route`, `qualification_level`, `supply_chain_assurance`, `lead_time`, `cost`, `technical_performance`, `reliability`, `support_horizon`, `compliance_for_target_market`.
+
+**La propriété de la fab n'accorde pas automatiquement un score de sécurité maximal.** La confiance dépend aussi du personnel, des audits, de la provenance des pièces/outils, du contrôle de la chaîne de possession, des inspections, de la validation, de la gestion de confidentialité et de la continuité d'approvisionnement. Inversement, un fournisseur externe qualifié peut être digne de confiance. Il faut éviter l'équation fausse « tout fabriqué chez soi = 100 % sûr ».
+
+Proposition de gamification : **maîtrise de la chaîne** en 4 sous-scores lisibles — maîtrise du design/IP, contrôle/traçabilité de la fabrication, assurance/qualification, dépendance fournisseurs. Le score global est spécifique aux exigences du contrat et explicable dans l'aperçu, sans technologies de sécurité sensibles réelles à implémenter.
+
+Les ramifications interbranches :
+- La branche CPU reçoit un **contrat interne** et mobilise réellement ses ressources ;
+- La branche navale/défense paie au prix de transfert interne ou via allocation analytique ; **interdiction de compter deux fois le bénéfice consolidé du groupe** ;
+- Le CPU personnalisé gagne des caractéristiques pertinentes pour l'usage ciblé, **pas des bonus de puissance universels** ;
+- Software peut proposer pilotes, firmwares, outils de diagnostic ou correctifs adaptés aux CPU existants ;
+- Fonderie/production engage le même stock de capacité pour projets commerciaux et internes ;
+- La réussite apporte expérience, crédibilité client et parfois propriété intellectuelle réutilisable, mais peut détourner des ressources de la gamme grand public.
+
+**Le prix du choix** : la solution la plus intégrée peut coûter beaucoup plus cher en investissements, être technologiquement moins avancée ou prendre du retard. Le fournisseur externe peut offrir meilleur rendement/coût/vitesse malgré une dépendance plus forte. Tous les chemins doivent être jouables et défendables.
+
+### Essais de validation à ajouter après tranche CPU
+
+1. Deux divisions actives, une automatique **sans leader nommé** : ventes, SAV et progression continue, sans entrée CEO obligatoire.
+2. Commutation CPU → Software → CPU : les projets et les versions restent cohérents ; seules les futures décisions changent de propriétaire.
+3. Sur plusieurs années, divisions automatiques normalement compétentes **mais non surpuissantes**, avec possibilité vérifiée de profits, pertes et retard.
+4. Un contrat interne spécialisé utilise **uniquement** des technologies réellement possédées/licenciées et des ressources disponibles.
+5. Trois voies de fourniture : composant standard du groupe, variante sur mesure interne, fournisseur externe qualifié ; coûts/délais/fiabilité et maîtrise de chaîne varient.
+6. Fab interne **non suffisante** pour satisfaire automatiquement un client exigeant ; audits/qualifications nécessaires ; une chaîne tierce vérifiée peut être acceptée.
+7. Pas de double comptabilité : consolidation bénéfice net groupe sans double revenus internes ; coûts et transfert par division traçables.
+8. Anciennes sauvegardes : pas de nouveau verrou si le joueur possède déjà des divisions en mode `DIRECT`.
