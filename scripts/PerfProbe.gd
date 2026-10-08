@@ -266,7 +266,8 @@ func _next_tab() -> void:
 	if _tab_step >= TAB_ORDER.size() * 3:
 		_finish("OK")
 		return
-	var tab_id: int = TAB_ORDER[_tab_step]
+	# Trois cycles complets : revenir a l'indice 0 apres chacun des sept onglets.
+	var tab_id: int = TAB_ORDER[_tab_step % TAB_ORDER.size()]
 	_tab_request_us = Time.get_ticks_usec()
 	_tab_request_index = tab_id
 	_tab_step += 1
@@ -487,7 +488,7 @@ func _build_commit() -> String:
 		var file := FileAccess.open("res://perf_build_commit.txt", FileAccess.READ)
 		if file != null:
 			return file.get_as_text().strip_edges()
-	return "P0-base-1326476 (SHA export non renseigne)"
+	return "SHA export non renseigne"
 
 func _report(msg: String) -> void:
 	last_result = msg

@@ -46,11 +46,27 @@ func _ready() -> void:
 	check(PerfProbe.last_result.contains("mois 2"), "Wrong blocking month in report")
 	check(FileAccess.file_exists(PerfProbe.last_csv_path), "Interrupted series missing final CSV")
 	check(FileAccess.get_sha256(original) == original_sha, "Original ci_tests save unexpectedly modified")
+	# Reproduire les trois tours de 7 onglets (le deuxieme tour declenchait un index 7 hors limites).
+	PerfProbe.start_tab_series()
+	# RenderingServer.frame_post_draw n'emet pas en mode --headless : simuler
+	# ici la presentation de 21 images, sans sauter les index 7 et 14.
+	for i in range(21):
+		for wait in range(2):
+			await get_tree().process_frame
+		if PerfProbe._tab_rows.size() == i and PerfProbe._state == "tabs":
+			PerfProbe._tab_presented()
+	for wait in range(3):
+		await get_tree().process_frame
+	check(PerfProbe._state == "idle", "Three-tab-round series never completed")
+	check(PerfProbe._tab_rows.size() == 21, "Expected 21 tab transitions, got %d" % PerfProbe._tab_rows.size())
+	check(PerfProbe.last_result == "OK", "Tab series final status must be OK")
+	check(FileAccess.file_exists(PerfProbe.last_csv_path), "Tab series CSV missing")
+	check(FileAccess.get_sha256(original) == original_sha, "Tab series modified original test save")
 	# Test done; do not re-enable writes to the personal save or continue running.
 	PerfProbe.set_process(false)
 	TimeManager.time_scale = 0.0
 	if failures.is_empty():
-		print("[CI] P0 real integration passed: isolated reference, month hook, blocker, no live-file writes")
+		print("[CI] P0 real integration passed: isolated reference, month hook, blocker, 21 tabs, no live-file writes")
 		get_tree().quit(0)
 	else:
 		for failure in failures:

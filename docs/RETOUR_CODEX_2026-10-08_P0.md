@@ -66,3 +66,11 @@ P0 prêt pour relecture technique et premier APK témoin ; validation sur Pixel 
 - Nouveau `tests/perf_probe_panel_test.tscn` : contrôle, après construction réelle, la visibilité du panneau, sa hauteur non nulle, sa présence dans la fenêtre et les dix commandes.
 - Test PC : PASS (hauteur scroll 650 px, panneau 601 px, dix boutons). La confirmation visuelle sur Pixel est à effectuer après reconstruction du correctif.
 - Lors de la première vérification de la version P0, un appui automatisé mal positionné a déclenché la vitesse x3 au lieu d'ouvrir le menu. Les sauvegardes d'origine ont été restaurées depuis la copie avant installation et vérifiées en SHA-256 octet par octet ; la référence P0 existe séparément.
+
+## Correctif des trois tours d'onglets (validation Pixel)
+
+- La première série QG au repos sur Pixel, plafonnée à 30 FPS, a créé son CSV avec une moyenne de 33,24 ms par image, p95 de 34,18 ms, p99 de 34,55 ms, pire image de 34,99 ms, zéro image au-dessus de 50 ms. Cette série ne mesure pas les fins de mois.
+- La première série des trois tours s'arrêtait au huitième appui, car `_tab_step` était utilisé directement comme index (valeur 7 hors limites). Le correctif utilise un index modulo sept, sans changer la limite de 21 transitions.
+- Le test d'intégration rejoue les 21 transitions ; en headless, il simule le signal de présentation d'image qui n'est pas émis par le serveur de rendu désactivé.
+- L'export Android inclut maintenant explicitement `perf_build_commit.txt` pour que le CSV connaisse la révision exacte. Ce fichier est généré localement lors de la construction, jamais versionné.
+- La nouvelle version doit encore être construite, installée avec la clé commune et revalidée en réel avant de déclarer la mesure des transitions acquise.
