@@ -25,17 +25,18 @@ static func _checks(board: Control) -> String:
 	var next: Dictionary = board.call("next_architecture")
 	if next.is_empty() or ArchitectureManager.owned.has(str(next.get("id", ""))):
 		return "Lab board: the next architecture is one we do not have yet"
-	var hero: Button = board.get("_hero_button")
+	var scene: Control = board.get("scene")
+	var hero := str(scene.call("hero_button_text"))
 	var active := ResearchManager.active_cpu_project()
-	if active.is_empty() and not hero.text.contains("Concevoir"):
-		return "Lab board: with a free workbench the hero button designs a new CPU (%s)" % hero.text
-	if not active.is_empty() and not ["Voir le projet", "Choisir maintenant", "Décider"].has(hero.text):
-		return "Lab board: with a project running the hero button leads to it (%s)" % hero.text
-	if not active.is_empty() and not ResearchManager.cpu_pending_directive(active).is_empty() and hero.text != "Choisir maintenant":
-		return "Lab board: a project waiting for a design choice says so (%s)" % hero.text
-	var line: Label = board.get("_scene_line")
-	if not line.text.begins_with("Camille"):
-		return "Lab board: Camille speaks in the scene (%s)" % line.text
+	if active.is_empty() and not hero.contains("Concevoir"):
+		return "Lab board: with a free workbench the hero button designs a new CPU (%s)" % hero
+	if not active.is_empty() and not ["Voir le projet", "Choisir maintenant", "Décider"].has(hero):
+		return "Lab board: with a project running the hero button leads to it (%s)" % hero
+	if not active.is_empty() and not ResearchManager.cpu_pending_directive(active).is_empty() and hero != "Choisir maintenant":
+		return "Lab board: a project waiting for a design choice says so (%s)" % hero
+	var line := str(scene.call("line_text"))
+	if not line.begins_with("Camille"):
+		return "Lab board: Camille speaks in the scene (%s)" % line
 	if (board.get("_process_row") as Node).get_child_count() < 2:
 		return "Lab board: the process path shows reached and next nodes"
 	# Un même visage partout : Camille a son visage réservé, et deux salariés n'ont pas le même.

@@ -1817,6 +1817,11 @@ func _ready() -> void:
 		_fail(price_elasticity_error)
 		return
 	print("[CI] Élasticité : courbe continue, prévisions et jauge cohérentes OK")
+	var shared_scenes_error: String = (load("res://tests/scenarios/SharedScenesScenario.gd") as Script).call("run", self)
+	if shared_scenes_error != "":
+		_fail(shared_scenes_error)
+		return
+	print("[CI] Scènes communes : actions Labo, progression et notes Presse conservées OK")
 	var lot_zero_error: String = (load("res://tests/scenarios/SoftwareLotZeroScenario.gd") as Script).call("run", self)
 	if lot_zero_error != "":
 		_fail(lot_zero_error)

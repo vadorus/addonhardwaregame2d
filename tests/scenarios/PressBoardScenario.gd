@@ -25,16 +25,16 @@ static func _checks(host: Node) -> String:
 	var board: Control = script.new() as Control
 	host.add_child(board)
 	var piles: VBoxContainer = board.get("_piles")
-	var line: Label = board.get("_scene_line")
+	var line := str((board.get("scene") as Control).call("line_text"))
 	var ok_piles := piles.get_child_count() == 2
-	var ok_line := line.text.begins_with("Nora") and line.text.contains("Nova 2") and line.text.contains("Mieux que Nova 1")
+	var ok_line := line.begins_with("Nora") and line.contains("Nova 2") and line.contains("Mieux que Nova 1")
 	var ok_curve := (board.get("_curve_card") as Control).visible
 	host.remove_child(board)
 	board.queue_free()
 	if not ok_piles:
 		return "Press: two piles expected"
 	if not ok_line:
-		return "Press: Nora compares the last CPU with the previous one (%s)" % line.text
+		return "Press: Nora compares the last CPU with the previous one (%s)" % line
 	if not ok_curve:
 		return "Press: the score curve appears from the second CPU"
 	return ""

@@ -7,6 +7,7 @@ extends VBoxContainer
 ## Rien n'est inventé : chaque chiffre vient de ArchitectureManager, ResearchTeams, ResearchManager.
 
 const UI := preload("res://ui/UiKit.gd")
+const SCENE := preload("res://ui/components/SceneHeader.gd")
 const TEAMS := preload("res://scripts/ResearchTeams.gd")
 const CATALOG := preload("res://scripts/ArchitectureCatalog.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
@@ -31,12 +32,7 @@ const AXIS_ROLES := {"ARCHITECTURE":"Architecture et performance", "EFFICIENCY":
 ## Demandes à l'écran Labo : {"type":"OPEN_STEPPER"|"SHOW_PROJECTS"|"SHOW_RESEARCH"|"CONCEPT"|"MESSAGE", …}
 signal board_action(action: Dictionary)
 
-var _scene_line: Label
-var _scene_face: TextureRect
-var _hero_title: Label
-var _hero_detail: Label
-var _hero_bar: ProgressBar
-var _hero_button: Button
+var scene: SCENE
 var _arch_row: HBoxContainer
 var _arch_hint: Label
 var _teams_grid: GridContainer
@@ -71,95 +67,12 @@ func set_viewport_width(width: float) -> void:
 # --- Construction ----------------------------------------------------------------
 
 func _build_scene() -> void:
-	var scene := PanelContainer.new()
-	scene.custom_minimum_size.y = 176
-	scene.add_theme_stylebox_override("panel", _box(Color("2b1f15"), 18, 0))
-	scene.clip_contents = true
+	scene = SCENE.new({"height":176, "face_size":Vector2(118, 168), "face_top":10,
+		"veil_alpha":0.15, "hero_width":270, "hero_separation":6, "value_size":16,
+		"text_alignment":HORIZONTAL_ALIGNMENT_LEFT, "wrap_value":true, "button_height":44, "button_size":15})
 	add_child(scene)
-	var art := TextureRect.new()
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if ResourceLoader.exists(SCENE_ART):
-		art.texture = load(SCENE_ART)
-	scene.add_child(art)
-	# Voile : sombre à gauche (où l'on lit), le labo reste visible à droite.
-	var veil := TextureRect.new()
-	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	veil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	veil.stretch_mode = TextureRect.STRETCH_SCALE
-	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.13, 0.09, 0.06, 0.92))
-	gradient.set_color(1, Color(0.13, 0.09, 0.06, 0.15))
-	var gradient_texture := GradientTexture2D.new()
-	gradient_texture.gradient = gradient
-	gradient_texture.fill_from = Vector2(0.0, 0.5)
-	gradient_texture.fill_to = Vector2(1.0, 0.5)
-	veil.texture = gradient_texture
-	scene.add_child(veil)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	scene.add_child(row)
-	var face_margin := MarginContainer.new()
-	face_margin.add_theme_constant_override("margin_left", 14)
-	face_margin.add_theme_constant_override("margin_top", 10)
-	row.add_child(face_margin)
-	_scene_face = TextureRect.new()
-	_scene_face.custom_minimum_size = Vector2(118, 168)
-	_scene_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_scene_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_scene_face.size_flags_vertical = Control.SIZE_SHRINK_END
-	face_margin.add_child(_scene_face)
-
-	var words := VBoxContainer.new()
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.alignment = BoxContainer.ALIGNMENT_CENTER
-	words.add_theme_constant_override("separation", 6)
-	row.add_child(words)
-	var kicker := _text("LE LABO DE RECHERCHE", 12, ORANGE)
-	words.add_child(kicker)
-	var bubble := PanelContainer.new()
-	bubble.add_theme_stylebox_override("panel", _box(PAPER, 14, 10))
-	words.add_child(bubble)
-	_scene_line = _text("", 15, INK)
-	_scene_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	bubble.add_child(_scene_line)
-
-	var hero_margin := MarginContainer.new()
-	for side in ["margin_right", "margin_top", "margin_bottom"]:
-		hero_margin.add_theme_constant_override(side, 14)
-	row.add_child(hero_margin)
-	var hero := PanelContainer.new()
-	hero.custom_minimum_size.x = 270
-	hero.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hero.add_theme_stylebox_override("panel", _box(Color(0.17, 0.12, 0.08, 0.86), 14, 12))
-	hero_margin.add_child(hero)
-	var hero_box := VBoxContainer.new()
-	hero_box.add_theme_constant_override("separation", 6)
-	hero.add_child(hero_box)
-	_hero_title = _text("", 16, Color("f6e7cf"))
-	_hero_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hero_box.add_child(_hero_title)
-	_hero_detail = _text("", 12, Color("e3cfb0"))
-	_hero_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hero_box.add_child(_hero_detail)
-	_hero_bar = ProgressBar.new()
-	_hero_bar.show_percentage = false
-	_hero_bar.custom_minimum_size.y = 8
-	_hero_bar.add_theme_stylebox_override("background", _box(Color(1, 1, 1, 0.18), 99, 0))
-	_hero_bar.add_theme_stylebox_override("fill", _box(ORANGE, 99, 0))
-	hero_box.add_child(_hero_bar)
-	_hero_button = Button.new()
-	_hero_button.custom_minimum_size.y = 44
-	_hero_button.add_theme_font_size_override("font_size", 15)
-	_hero_button.add_theme_color_override("font_color", Color.WHITE)
-	_hero_button.add_theme_color_override("font_hover_color", Color.WHITE)
-	_hero_button.add_theme_stylebox_override("normal", _box(Color("138a4a"), 12, 8))
-	_hero_button.add_theme_stylebox_override("hover", _box(Color("0f7a40"), 12, 8))
-	_hero_button.add_theme_stylebox_override("pressed", _box(Color("0b6634"), 12, 8))
-	_hero_button.pressed.connect(_on_hero_pressed)
-	hero_box.add_child(_hero_button)
+	scene.set_scene(SCENE_ART, "LE LABO DE RECHERCHE")
+	scene.hero_pressed.connect(_on_hero_pressed)
 
 func _build_architectures() -> void:
 	var card := _paper_card()
@@ -238,7 +151,7 @@ func _build_side() -> void:
 # --- Données ---------------------------------------------------------------------
 
 func refresh() -> void:
-	if _scene_line == null or not CompanyManager.created:
+	if scene == null or not CompanyManager.created:
 		return
 	TEAMS.ensure_assignments()
 	var looks := WORKPLACE.assign_looks(PersonnelManager.staff)
@@ -252,44 +165,49 @@ func _refresh_scene() -> void:
 	var project := ResearchManager.active_cpu_project()
 	var next := next_architecture()
 	var pose := "reflexion"
+	var line := ""
+	var title := ""
+	var detail := ""
+	var button := ""
 	if not project.is_empty():
 		var phase_index := clampi(int(project.get("phase_index", 0)), 0, GameData.PHASES.size() - 1)
 		var progress := clampf(float(project.get("phase_progress", 0.0)), 0.0, 100.0)
 		var directive := ResearchManager.cpu_pending_directive(project)
 		var decision_value = project.get("pending_decision", {})
 		var decision: Dictionary = decision_value if typeof(decision_value) == TYPE_DICTIONARY else {}
-		_hero_title.text = "En cours : %s" % str(project.get("name", ""))
-		_hero_bar.visible = true
-		_hero_bar.value = progress
+		title = "En cours : %s" % str(project.get("name", ""))
+		scene.set_progress(progress)
 		_hero_action = {"type":"SHOW_PROJECTS"}
 		if not directive.is_empty():
 			# Le projet est à l'arrêt tant que le joueur n'a pas choisi : on le dit, et le bouton y mène.
-			_scene_line.text = "Camille : « On attend votre choix pour avancer : %s. »" % str(directive.get("title", "l'orientation de la phase")).to_lower()
-			_hero_detail.text = "Choix de conception requis — le projet attend"
-			_hero_button.text = "Choisir maintenant"
+			line = "Camille : « On attend votre choix pour avancer : %s. »" % str(directive.get("title", "l'orientation de la phase")).to_lower()
+			detail = "Choix de conception requis — le projet attend"
+			button = "Choisir maintenant"
 			_hero_action = {"type":"OPEN_COCKPIT"}
 		elif not decision.is_empty():
-			_scene_line.text = "Camille : « Le prototype est sur le banc. À vous de trancher. »"
-			_hero_detail.text = "Décision prototype / validation"
-			_hero_button.text = "Décider"
+			line = "Camille : « Le prototype est sur le banc. À vous de trancher. »"
+			detail = "Décision prototype / validation"
+			button = "Décider"
 			_hero_action = {"type":"PROJECT_DECISION"}
 		else:
-			_scene_line.text = "Camille : « On avance sur %s. Phase « %s » : on en est à %d %%. »" % [str(project.get("name", "")), str(GameData.PHASES[phase_index]), int(progress)]
-			_hero_detail.text = "Phase %d sur %d — %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
-			_hero_button.text = "Voir le projet"
+			line = "Camille : « On avance sur %s. Phase « %s » : on en est à %d %%. »" % [str(project.get("name", "")), str(GameData.PHASES[phase_index]), int(progress)]
+			detail = "Phase %d sur %d — %s" % [phase_index + 1, GameData.PHASES.size(), str(GameData.PHASES[phase_index])]
+			button = "Voir le projet"
 	else:
 		if not next.is_empty():
-			_scene_line.text = "Camille : « La %s arrive %s. Plus nos équipes sont fortes, plus elle arrive tôt. »" % [str(next.get("short", "")), _eta_text(next)]
+			line = "Camille : « La %s arrive %s. Plus nos équipes sont fortes, plus elle arrive tôt. »" % [str(next.get("short", "")), _eta_text(next)]
 		else:
-			_scene_line.text = "Camille : « On ne choisit pas une architecture dans un catalogue : on la fabrique avec les gens qu'on a. »"
-		_hero_title.text = "L'établi est libre"
-		_hero_detail.text = "Sur %s : %s" % [str(CATALOG.get_by_id(ArchitectureManager.latest_id()).get("name", "")).to_lower(), ArchitectureManager.maturity_label(ArchitectureManager.latest_id()).to_lower()]
-		_hero_bar.visible = false
-		_hero_button.text = "✚  Concevoir un nouveau processeur"
+			line = "Camille : « On ne choisit pas une architecture dans un catalogue : on la fabrique avec les gens qu'on a. »"
+		title = "L'établi est libre"
+		detail = "Sur %s : %s" % [str(CATALOG.get_by_id(ArchitectureManager.latest_id()).get("name", "")).to_lower(), ArchitectureManager.maturity_label(ArchitectureManager.latest_id()).to_lower()]
+		scene.set_progress(0.0, false)
+		button = "✚  Concevoir un nouveau processeur"
 		_hero_action = {"type":"OPEN_STEPPER"}
 		pose = "joie"
 	var path := WORKPLACE.character_path(WORKPLACE.cast_look(CAMILLE), pose)
-	_scene_face.texture = load(path) if ResourceLoader.exists(path) else null
+	scene.set_speaker(path)
+	scene.set_line(line)
+	scene.set_hero(title, detail, button)
 
 var _hero_action: Dictionary = {"type":"OPEN_STEPPER"}
 

@@ -5,6 +5,7 @@ extends VBoxContainer
 ## Les données viennent de MediaManager.news (les tests publiés au lancement) : rien n'est recalculé ici.
 
 const UI := preload("res://ui/UiKit.gd")
+const SCENE := preload("res://ui/components/SceneHeader.gd")
 const EXPLAIN := preload("res://scripts/ReviewExplainer.gd")
 const SCENE_ART := "res://assets/art/v010/J3_moments/moment_presse.webp"
 const NORA_OK := "res://assets/art/v010/J2_personnages/perso_04_joie.png"
@@ -19,10 +20,7 @@ const ORANGE := Color("f2a541")
 const GOOD := Color("2f7f46")
 const BAD := Color("b5352d")
 
-var _scene_line: Label
-var _nora: TextureRect
-var _hero_score: Label
-var _hero_caption: Label
+var scene: SCENE
 var _curve: Curve2DView
 var _curve_card: Control
 var _piles: VBoxContainer
@@ -101,82 +99,16 @@ func refresh(force: bool = false) -> void:
 # --- Scène ---------------------------------------------------------------------
 
 func _build_scene() -> void:
-	var scene := PanelContainer.new()
-	scene.custom_minimum_size.y = 168
-	scene.clip_contents = true
-	scene.add_theme_stylebox_override("panel", _box(Color("2b1f15"), 18, 0))
+	scene = SCENE.new({"height":168, "face_size":Vector2(112, 160), "hero_width":190,
+		"value_size":40, "hero_alignment":BoxContainer.ALIGNMENT_CENTER})
 	add_child(scene)
-	var art := TextureRect.new()
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if ResourceLoader.exists(SCENE_ART):
-		art.texture = load(SCENE_ART)
-	scene.add_child(art)
-	var veil := TextureRect.new()
-	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	veil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	veil.stretch_mode = TextureRect.STRETCH_SCALE
-	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.13, 0.09, 0.06, 0.92))
-	gradient.set_color(1, Color(0.13, 0.09, 0.06, 0.2))
-	var texture := GradientTexture2D.new()
-	texture.gradient = gradient
-	texture.fill_from = Vector2(0.0, 0.5)
-	texture.fill_to = Vector2(1.0, 0.5)
-	veil.texture = texture
-	scene.add_child(veil)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	scene.add_child(row)
-	var face_margin := MarginContainer.new()
-	face_margin.add_theme_constant_override("margin_left", 14)
-	face_margin.add_theme_constant_override("margin_top", 8)
-	row.add_child(face_margin)
-	_nora = TextureRect.new()
-	_nora.custom_minimum_size = Vector2(112, 160)
-	_nora.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_nora.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_nora.size_flags_vertical = Control.SIZE_SHRINK_END
-	face_margin.add_child(_nora)
-	var words := VBoxContainer.new()
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.alignment = BoxContainer.ALIGNMENT_CENTER
-	words.add_theme_constant_override("separation", 6)
-	row.add_child(words)
-	words.add_child(_text("LA SALLE DE PRESSE", 12, ORANGE))
-	var bubble := PanelContainer.new()
-	bubble.add_theme_stylebox_override("panel", _box(PAPER, 14, 10))
-	words.add_child(bubble)
-	_scene_line = _text("", 15, INK)
-	_scene_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	bubble.add_child(_scene_line)
-	var hero_margin := MarginContainer.new()
-	for side in ["margin_right", "margin_top", "margin_bottom"]:
-		hero_margin.add_theme_constant_override(side, 14)
-	row.add_child(hero_margin)
-	var hero := PanelContainer.new()
-	hero.custom_minimum_size = Vector2(190, 0)
-	hero.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hero.add_theme_stylebox_override("panel", _box(Color(0.17, 0.12, 0.08, 0.86), 14, 12))
-	hero_margin.add_child(hero)
-	var hero_box := VBoxContainer.new()
-	hero_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	hero.add_child(hero_box)
-	_hero_score = _text("—", 40, Color("f6e7cf"))
-	_hero_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_box.add_child(_hero_score)
-	_hero_caption = _text("", 12, Color("e3cfb0"))
-	_hero_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hero_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hero_box.add_child(_hero_caption)
+	scene.set_scene(SCENE_ART, "LA SALLE DE PRESSE")
 
 func _refresh_scene(products: Array) -> void:
 	if products.is_empty():
-		_scene_line.text = "Nora : « Les journalistes attendent notre premier CPU. Le jour du lancement, ils le testeront tous. »"
-		_hero_score.text = "—"
-		_hero_caption.text = "pas encore de test"
-		_nora.texture = load(NORA_HMM) if ResourceLoader.exists(NORA_HMM) else null
+		scene.set_line("Nora : « Les journalistes attendent notre premier CPU. Le jour du lancement, ils le testeront tous. »")
+		scene.set_hero("—", "pas encore de test")
+		scene.set_speaker(NORA_HMM)
 		return
 	var last: Dictionary = products[0]
 	var score := snappedf(float(last.average) / 10.0, 0.1)
@@ -192,12 +124,10 @@ func _refresh_scene(products: Array) -> void:
 			line += " Comme %s : elle attend une vraie nouveauté." % str((products[1] as Dictionary).name)
 	else:
 		line += " Un premier essai, la presse s'en souviendra."
-	_scene_line.text = line + " »"
-	_hero_score.text = "%s/10" % _num(score)
-	_hero_score.add_theme_color_override("font_color", Color("9be0b4") if score >= 7.0 else (Color("f6d28b") if score >= 5.0 else Color("f3a19a")))
-	_hero_caption.text = "%s · %02d/%d" % [str(last.name), int(last.month), int(last.year)]
-	var path := NORA_OK if score >= 6.5 else NORA_HMM
-	_nora.texture = load(path) if ResourceLoader.exists(path) else null
+	scene.set_line(line + " »")
+	scene.set_hero("%s/10" % _num(score), "%s · %02d/%d" % [str(last.name), int(last.month), int(last.year)], "",
+		Color("9be0b4") if score >= 7.0 else (Color("f6d28b") if score >= 5.0 else Color("f3a19a")))
+	scene.set_speaker(NORA_OK if score >= 6.5 else NORA_HMM)
 
 func _refresh_curve(products: Array) -> void:
 	var points: Array = []
@@ -289,6 +219,8 @@ func _clipping(review: Dictionary) -> Control:
 		verdict.add_child(_text("− %s" % str(worst[2]), 13, BAD))
 	if verdict.get_child_count() > 0:
 		box.add_child(verdict)
+	else:
+		verdict.free()
 	return clip
 
 func _mini_clipping(review: Dictionary) -> Control:
