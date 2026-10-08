@@ -48,6 +48,8 @@ Le tactile et la manette n'ont pas de fichier d'audit à part : leurs constats s
 
 | # | Étape | En une phrase | Taille |
 |---|---|---|---|
+| 0 | **P0** | **D'abord la mesure** : l'outil de mesure intégré (voir « Protocole de mesure sur le Pixel » plus bas), seul dans son commit, **avant toute optimisation de la phase 1**. Ce commit sert de **version témoin** : Claude en tire un premier APK pour mesurer l'« avant » | Petite |
+| — | *Mesure « avant »* | Claude construit l'APK témoin (P0 seul), sauvegarde la partie du Pixel, installe, et mesure avec Alexandre selon le protocole | — |
 | 1 | **C3** | Ne plus chercher à chaque image une décision bloquante ; reformater la date seulement quand elle change | Petite |
 | 2 | **C2** | Animations économes (battement partagé à environ 20 Hz, arrêt quand le nœud est caché) et mode basse consommation en pause | Moyenne |
 | 3 | **R1** | Limite d'images par seconde (30 sur mobile, 60 sur PC) et réglage « Fluidité » dans le menu | Petite |
@@ -58,35 +60,52 @@ Le tactile et la manette n'ont pas de fichier d'audit à part : leurs constats s
 | 8 | **G2 + A2** | Jour J : 600 ms de suspense avec la musique atténuée, notes une à une, jingle ; confettis légers aux records ; décompte de fin de mois | Moyenne |
 | 9 | **R2** | Compression des grandes images (ASTC/ETC2 sur Android, BC7 sur PC), icônes sans compression ; captures avant/après **à faire juger par Alexandre** | Moyenne |
 | 10 | **M6** | Le premier jour J atteignable en moins de 10 minutes (mesurer, puis raccourcir si besoin) ; résumé de Nora au retour en jeu | Petite |
-| 10 bis | **P0** | **Mesure de fluidité intégrée**, pour comparer sur le Pixel sans profileur branché (voir « Protocole de mesure sur le Pixel » plus bas) | Petite |
-| — | *Ensuite* | Claude relit tout, construit l'APK (clé du PC du bureau), sauvegarde la partie du Pixel, installe, puis mesure avec Alexandre selon le protocole ci-dessous | — |
-| 11 | **C4 / R3** | **Seulement si le protocole de mesure le justifie** (seuils plus bas) : réutiliser les lignes des onglets Entreprise et Produits au lieu de les recréer, et retirer les fonds peints sous d'autres fonds | Moyenne |
+| — | *Mesure « après »* | Claude relit tout, construit l'APK de la phase 1, installe, puis mesure avec Alexandre **dans exactement les mêmes conditions** que la mesure « avant » | — |
+| 11 | **Diagnostic ciblé** | **Seulement si un seuil est dépassé** : on lit dans le CSV *quelle partie* coûte (simulation, reconstruction d'un écran précis, rendu), on reproduit ce cas, et on corrige ce point-là. C4 (réutiliser les lignes d'Entreprise et Produits) ou R3 (fonds superposés) ne sont appliqués **que si le diagnostic les désigne** ; jamais de refonte d'office | Selon le diagnostic |
 | 12 | **T7** | Sensibilité du défilement réglée d'après l'essai sur le Pixel | Petite |
 
 ## Protocole de mesure sur le Pixel (demandé par Alexandre le 08/10)
 
-Les images par seconde au repos ne suffisent pas. On compare **avant et après** la phase 1, sur la même sauvegarde copiée (jamais la partie d'Alexandre elle-même), dans **trois situations** :
+Les images par seconde au repos ne suffisent pas. On compare **avant** (APK témoin : P0 seul, sans les optimisations de la phase 1) et **après** (APK de la phase 1), dans **les mêmes conditions** :
+- **la même copie de sauvegarde**, rechargée avant chaque série (jamais la partie d'Alexandre elle-même) ; la copie est gardée à part dans le dossier de travail de Claude, avec sa date ;
+- le même téléphone, chargé à plus de 50 %, hors mode économie d'énergie, applications en arrière-plan fermées, luminosité fixe ;
+- la même échelle d'interface et le même réglage de fluidité (30 images/s si R1 est présent : noter le réglage dans le CSV) ;
+- les séries dans le même ordre : repos, fins de mois, changements d'onglets.
+
+Les trois situations :
 
 | Situation | Comment | Ce qu'on relève |
 |---|---|---|
-| **Repos** | QG affiché, temps en pause, 30 s | Images par seconde moyennes, chauffe ressentie |
-| **Fins de mois à vitesse ×3** | QG affiché, vitesse ×3, 12 fins de mois de suite ; puis la même chose avec l'onglet **Entreprise** ouvert, puis **Produits** | Pire temps d'image à chaque fin de mois (l'à-coup) et médiane des 12 |
+| **Repos** | QG affiché, temps en pause, 30 s ; puis 60 s de jeu à ×1 | Images par seconde moyennes **et** temps d'image du 95e et du 99e centile, pire image, nombre d'**interruptions visibles** (images de plus de 50 ms) ; chauffe ressentie |
+| **Fins de mois à vitesse ×3** | Pour **chacun** des trois écrans (QG, **Entreprise**, **Produits**) : recharger la copie, vitesse ×3, 12 fins de mois de suite. **36 observations** au total | Pour chaque fin de mois : la pire image, et sa décomposition (temps de simulation, temps de reconstruction de l'écran, reste du rendu) ; puis médiane et pire valeur par écran |
 | **Changements d'onglets** | Passer 3 fois par les 7 onglets, dans l'ordre, temps en pause | Temps entre l'appui et l'affichage complet de l'onglet (pire et médiane, par onglet) |
 
 **L'outil, étape P0** : `scripts/PerfProbe.gd`, un autoload inactif par défaut.
 - Il s'active seulement par un réglage caché (Menu, puis 5 appuis sur la version) ou par l'argument `--perf-probe`.
-- Il enregistre le temps de chaque image, marque les fins de mois (signal `month_processed`) et les changements d'onglet (`tabs.tab_changed`, jusqu'à la première image affichée après le rafraîchissement).
-- Il écrit `user://perf_<date>.csv` et un résumé à l'écran : médiane et pire valeur par situation.
+- Il enregistre le temps de chaque image (`Performance.TIME_PROCESS` et la durée réelle entre deux images).
+- Il **sépare les causes** d'un ralentissement :
+  - la simulation : durée de `SimulationManager.process_month_end()` ;
+  - la reconstruction de l'interface : durée de `_refresh_all()`, de `_flush_refresh_parts()` et du `refresh()` de chaque écran, avec le nom de l'écran ;
+  - le rendu : le reste du temps de l'image.
+- Il marque les fins de mois (signal `month_processed`) et les changements d'onglet (`tabs.tab_changed`), qu'il mesure jusqu'à la première image affichée après le rafraîchissement.
+- Pour chaque série : moyenne, médiane, 95e et 99e centile, pire image, et nombre d'images de plus de 50 ms (interruptions visibles) et de plus de 100 ms (saccades nettes).
+- Il écrit `user://perf_<date>.csv` (une ligne par évènement, avec le commit, le réglage de fluidité et le nom de la série) et affiche un résumé à l'écran.
 - **Aucun envoi réseau.**
-- Test : un scénario simule 2 fins de mois et 1 changement d'onglet, puis vérifie les lignes du CSV.
+- Inactif, il ne coûte rien : aucune mesure, aucun fichier.
+- Test : un scénario simule 2 fins de mois et 1 changement d'onglet, puis vérifie les lignes du CSV et la séparation entre simulation et reconstruction.
 
-**Seuils de décision** (sur le Pixel) :
+**Seuils** (sur le Pixel). Un seuil dépassé déclenche un **diagnostic ciblé**, pas une refonte :
 
-| Mesure | Correct | C4 / R3 nécessaires avant la démo |
+| Mesure | Correct | Diagnostic à lancer si |
 |---|---|---|
-| Pire image d'une fin de mois à ×3 | ≤ 100 ms (à peine visible) | > 150 ms sur au moins 3 des 12 mois, ou > 250 ms une seule fois |
-| Changement d'onglet | ≤ 150 ms | > 250 ms sur Entreprise ou Produits |
-| Repos | ≥ 30 images/s stables | < 30 images/s : regarder d'abord R1/R2, puis R3 |
+| Pire image d'une fin de mois à ×3, par écran | ≤ 100 ms (à peine visible) | > 150 ms sur au moins 3 des 12 mois, ou > 250 ms une seule fois |
+| Changement d'onglet | ≤ 150 ms | > 250 ms sur un onglet |
+| Jeu à ×1 | 99e centile ≤ 50 ms ; au plus 1 interruption visible par minute | Plus de 1 interruption visible par minute, ou 30 images/s non tenues |
+
+Lecture du diagnostic :
+- **la simulation domine** : on regarde le gestionnaire le plus lent (chronométrage par gestionnaire, comme dans l'audit d'architecture) ;
+- **la reconstruction d'un écran domine** : on corrige cet écran (C4 s'il s'agit d'Entreprise ou de Produits) ;
+- **le rendu domine** : R2 d'abord, puis R3.
 
 Les chiffres mesurés sont notés dans `docs/REPRISE_CODEX_2026-10-07.md` (ligne « Mesure Pixel »), avec la version de l'APK.
 
@@ -97,11 +116,14 @@ Les chiffres mesurés sont notés dans `docs/REPRISE_CODEX_2026-10-07.md` (ligne
 | Limite gratuite | Jusqu'en 1985 |
 | Version complète | 4,99 €, à tester |
 | Première extension | Mobile, à confirmer |
-| Difficulté de la démo | Accessible par défaut, à réévaluer après G1 |
-| Titre Play Store | « Tech Empire » |
+| Difficulté de la démo | **Accessible par défaut : autorisé** (à réévaluer après G1) |
+| Titre Play Store | « Tech Empire » : candidat privilégié |
+| Mesures sur le Pixel avec P0 | **Principe validé** (avant/après, mêmes conditions, diagnostic ciblé) |
 | Refresh de gamme | À concevoir séparément |
 
-Codex peut s'en servir comme hypothèses (par exemple, régler la difficulté Accessible par défaut dans la démo), mais **ne les grave nulle part comme définitives** : prix, limite gratuite et extension n'entrent dans le code qu'avec M1/M2, après confirmation.
+Codex **peut** régler la difficulté Accessible par défaut dans la démo. Le reste (prix, limite gratuite, extension) **n'entre pas dans le code** avant la confirmation d'Alexandre (étapes M1/M2).
+
+**Objectif d'Alexandre pour la démo** : une démo agréable à jouer, compréhensible et stable, pas seulement un jeu qui passe ses tests. Une étape n'est finie que si elle sert cet objectif.
 
 ## Phase 2 — après la démo (dans cet ordre)
 
