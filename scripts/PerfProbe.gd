@@ -98,10 +98,22 @@ func _build_panel() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_panel_layer.add_child(center)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(540, 0)
+	# Sur Android, une hauteur minimale nulle collapse ce ScrollContainer :
+	# le fond de P0 s'affichait, mais aucun bouton n'etait visible.
+	var available_height := get_viewport().get_visible_rect().size.y
+	scroll.custom_minimum_size = Vector2(560, maxf(240.0, minf(650.0, available_height - 64.0)))
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	scroll.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	center.add_child(scroll)
 	_panel = PanelContainer.new()
+	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.10, 0.13, 0.17, 1.0)
+	style.set_corner_radius_all(12)
+	style.set_content_margin_all(14)
+	_panel.add_theme_stylebox_override("panel", style)
 	scroll.add_child(_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 5)

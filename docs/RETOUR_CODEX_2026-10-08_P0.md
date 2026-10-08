@@ -58,3 +58,11 @@ Ce résultat ne mesure ni les FPS de l'application ni la consommation électriqu
 
 ## Verdict
 P0 prêt pour relecture technique et premier APK témoin ; validation sur Pixel encore nécessaire.
+
+## Correctif P0 après premier essai Pixel
+
+- L'APK initial au commit `498466b` était correctement signé, installé et sa sauvegarde sauvegardée, mais l'activation P0 affichait seulement le voile sombre : le `ScrollContainer` du panneau avait une hauteur minimale nulle en paysage.
+- Le correctif fixe une hauteur de fenêtre bornée par la taille du viewport, une largeur explicite et un fond de panneau lisible. Les contrôles restent défilables sur petit écran.
+- Nouveau `tests/perf_probe_panel_test.tscn` : contrôle, après construction réelle, la visibilité du panneau, sa hauteur non nulle, sa présence dans la fenêtre et les dix commandes.
+- Test PC : PASS (hauteur scroll 650 px, panneau 601 px, dix boutons). La confirmation visuelle sur Pixel est à effectuer après reconstruction du correctif.
+- Lors de la première vérification de la version P0, un appui automatisé mal positionné a déclenché la vitesse x3 au lieu d'ouvrir le menu. Les sauvegardes d'origine ont été restaurées depuis la copie avant installation et vérifiées en SHA-256 octet par octet ; la référence P0 existe séparément.
