@@ -1,8 +1,15 @@
 extends ScrollContainer
 
 signal status_changed(message: String)
+## Planche 7 (08/10) : la carte des branches ouvre le labo ou le coin logiciel.
+signal navigate_requested(tab_index: int, context: String)
 
 const UI := preload("res://ui/UiKit.gd")
+const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
+const CAREER := preload("res://scripts/CareerPrestige.gd")
+
+var scene: Control
+var branch_map: Control
 
 var company_rep_label: Label
 var empire_box: VBoxContainer
@@ -56,11 +63,14 @@ func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
 
-	box.add_child(UI.eyebrow("ENTREPRISE"))
-	box.add_child(UI.label("Piloter l'organisation sans perdre la vision du dirigeant", 24))
-	var intro := UI.muted_label("Réputation, divisions, délégation, RH, finances et locaux sont regroupés ici.", 12)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(intro)
+	# Revue des onglets (08/10) : une scène, puis la carte de l'entreprise (planche 7) ; les réglages
+	# (réputation, locaux, budgets, divisions, groupe) restent dans les sous-pages en dessous.
+	scene = (load("res://ui/components/SceneHeader.gd") as Script).new() as Control
+	scene.connect("hero_pressed", func(): show_section("OVERVIEW"))
+	box.add_child(scene)
+	branch_map = (load("res://ui/components/BranchMap.gd") as Script).new() as Control
+	branch_map.connect("open_requested", _on_branch_open)
+	box.add_child(branch_map)
 
 	company_rep_label = UI.section("Image de l'entreprise")
 	box.add_child(company_rep_label)
@@ -527,6 +537,7 @@ func show_section_for_context(context: String) -> void:
 func refresh() -> void:
 	if company_rep_label == null or not CompanyManager.created:
 		return
+	_refresh_scene()
 	_refresh_page_unlocks()
 	_refresh_reputation_bars()
 	_refresh_empire()
@@ -909,3 +920,33 @@ func _fill_subsidiary_sectors() -> void:
 
 func _status(message: String) -> void:
 	status_changed.emit(message)
+
+func set_viewport_width(width: float) -> void:
+	if branch_map != null:
+		branch_map.call("set_viewport_width", width)
+
+## La phrase de Nora en tête de l'onglet : l'âge, les CPU en vente, la place au classement mondial.
+func company_line() -> String:
+	var data := CAREER.summary()
+	var years := int(data.years)
+	var age := "un an à peine" if years <= 1 else "%d ans" % years
+	return "Nora : « %s : %s, %d CPU en vente, %s constructeur mondial. Le tronc, c'est le CPU ; les branches viendront. »" % [
+		CompanyManager.company_name, age, int(data.products), "1er" if int(data.rank) == 1 else "%de" % int(data.rank)]
+
+func _refresh_scene() -> void:
+	if scene != null:
+		var data := CAREER.summary()
+		var tier := int(ExecutiveManager.workplace_data().get("tier", 0))
+		scene.call("set_scene", WORKPLACE.seasonal_art_path(tier, TimeManager.month), "L'ENTREPRISE")
+		scene.call("set_speaker", WORKPLACE.character_path(WORKPLACE.NORA_LOOK, "bureau"))
+		scene.call("set_line", company_line())
+		scene.call("set_hero", "1er" if int(data.rank) == 1 else "%de" % int(data.rank), "constructeur mondial sur %d" % int(data.ranking_size), "Voir l'aperçu")
+	if branch_map != null:
+		branch_map.call("refresh")
+
+func _on_branch_open(context: String) -> void:
+	match context:
+		"LAB":
+			navigate_requested.emit(3, "")
+		"SOFTWARE":
+			navigate_requested.emit(0, "SOFTWARE")

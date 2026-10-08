@@ -192,6 +192,17 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 - **Test** : `MarketVoicesScenario` (smoke).
 - **Limite** : les cartes « public » sont des archétypes (revendeur, fabricant client, club, ingénieur) dont le texte dépend des chiffres. Ce ne sont pas encore des clients persistants.
 
+**Planche 7 « La carte de l'entreprise »**, en tête de l'onglet Entreprise.
+
+- `scripts/CompanyBranches.gd` décrit les branches :
+  - **jouables** : CPU (le tronc), qui ouvre le labo, et Logiciel, qui ouvre le coin logiciel ;
+  - **« Version complète »** : Défense en 1980, Aérospatial en 1990 ;
+  - **« Extension à venir »** : Mobile, Consoles, Cartes mères, Serveurs ;
+  - **aucune mécanique** n'est ajoutée hors CPU (`AGENTS.md`). Ce sont les emplacements des futurs DLC payants.
+- `ui/components/BranchMap.gd` : l'arbre est dessiné (tronc et branches), un bouton par nœud, et une fiche à droite (statut, texte, points, phrase, bouton).
+  - `CompanyScreen` gagne le signal `navigate_requested`, branché sur `_on_dashboard_navigation`, une scène de Nora (âge, CPU en vente, rang mondial) et `set_viewport_width`.
+- **Test** : `CompanyBranchesScenario` (smoke).
+
 
 
 ## 3. Où en est la revue des onglets
@@ -205,7 +216,7 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 | Équipe | ✅ refait, capture relue le 08/10. Pas encore vu sur le Pixel. | (règle commune) |
 | Produits / parcours CPU | ✅ planches 4 et 6 faites (08/10) : scène de Noah, `ProductionBoard` (fabrication), `FinishingBoard` (finition avant le jour J). | 4 Fabrication, 6 Finition |
 | Marché | ✅ planche 8 faite (08/10) : scène de Nora + `MarketBoard` (espéré/obtenu, vaut-il son prix, quatre voix). | 8 Voix du monde |
-| Entreprise | ❌ à refaire | 7 Carte des branches |
+| Entreprise | ✅ planche 7 faite (08/10) : scène de Nora + `BranchMap`. Les sous-pages restent à simplifier. | 7 Carte des branches |
 | Tableau de bord / atelier | déjà proche des planches 1 et 2 | 1, 2 |
 
 ---
@@ -271,9 +282,8 @@ Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert,
 1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
 2. ✅ **Finition → planche 6** (08/10), voir §2 bis.
 3. ✅ **Marché → planche 8** (08/10), voir §2 bis.
-4. **Entreprise.**
-   - Une version « garage » simplifiée au début, puis la carte des branches de la planche 7.
-   - Seul le CPU est jouable. Les autres nœuds sont marqués « Extension à venir », **sans aucun gameplay GPU ni mobile** (`AGENTS.md`).
+4. ✅ **Entreprise → planche 7** (08/10), voir §2 bis. La version « garage simplifiée » reste à faire, voir le point 4 bis.
+4 bis. **Entreprise, sous-pages** : masquer Divisions, Groupe et délégation tant que l'entreprise est un garage. Les déverrouillages actuels sont dans `PAGE_UNLOCKS`.
 5. **Passer Labo et Presse sur `SceneHeader`**, pour unifier le code. Leurs scènes sont aujourd'hui codées à la main dans chaque board.
 6. **Noms de projets uniques.**
    - Deux « Nova 1 » ont été observés dans une même partie.

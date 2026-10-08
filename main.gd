@@ -562,6 +562,7 @@ func _create_company_tab():
 	company_screen.connect("status_changed", func(message: String):
 		status_label.text = message
 	)
+	company_screen.connect("navigate_requested", _on_dashboard_navigation)
 	tabs.add_child(company_screen)
 
 func _create_personnel_tab():
@@ -2248,6 +2249,8 @@ func _update_responsive_layout():
 		products_screen.call("set_viewport_width", size.x)
 	if market_screen != null and market_screen.has_method("set_viewport_width"):
 		market_screen.call("set_viewport_width", size.x)
+	if company_screen != null and company_screen.has_method("set_viewport_width"):
+		company_screen.call("set_viewport_width", size.x)
 	if personnel_screen != null and personnel_screen.has_method("set_viewport_width"):
 		personnel_screen.call("set_viewport_width", size.x)
 	if launch_moment_panel != null and launch_moment_panel.has_method("set_viewport_width"):
