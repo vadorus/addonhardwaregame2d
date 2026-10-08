@@ -53,6 +53,7 @@ func add_expense(amount: int, category: String = "Autres dépenses"):
 	transaction_recorded.emit("expense", category, charged)
 
 func close_month() -> Dictionary:
+	var diag_economy_bookkeeping_us := Time.get_ticks_usec()
 	var report := {
 		"income": monthly_income,
 		"expenses": monthly_expenses,
@@ -70,7 +71,10 @@ func close_month() -> Dictionary:
 	monthly_expenses = 0
 	income_breakdown = {}
 	expense_breakdown = {}
+	PerfProbe.record_refresh_detail("Simulation", "economy_bookkeeping", diag_economy_bookkeeping_us)
+	var diag_economy_ui_us := Time.get_ticks_usec()
 	month_closed.emit(report)
+	PerfProbe.record_refresh_detail("Simulation", "economy_month_closed_callbacks", diag_economy_ui_us)
 	return report
 
 func get_state() -> Dictionary:
