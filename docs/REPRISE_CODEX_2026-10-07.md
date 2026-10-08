@@ -342,12 +342,59 @@ Règles pour chaque étape :
 | **C4** | Avant la démo si le Pixel saccade, sinon juste après | **Réutiliser les lignes au lieu de tout recréer** dans `CompanyScreen`, puis `ProductsScreen`. Un `RowPool` réutilisable (`acquire()`, `release_all()`, lignes masquées puis réaffichées) ; on ne met à jour que textes, valeurs et couleurs. | nouveau `ui/components/RowPool.gd`, `ui/screens/CompanyScreen.gd`, `ui/screens/ProductsScreen.gd` | `refresh()` d'Entreprise 145 → moins de 30 ms et de Produits 77 → moins de 20 ms (PC) ; nombre de nœuds stable après 20 rafraîchissements | `RowPoolScenario` + temps et nœuds stables dans `screen_refresh_test` |
 | **C5** | Après la démo | **Lecture sans copie.** Recenser les `duplicate(true)` des accesseurs appelés par l'interface (248 dans `scripts/`). Garder la copie seulement quand l'appelant modifie ; sinon, accesseur `*_view()` en lecture seule, documenté. | `scripts/*Manager.gd` | Aucun comportement changé ; moins d'allocations par fin de mois | Tests existants + vérification qu'un écran ne modifie pas l'état (comparaison `get_state()` avant/après rafraîchissement) |
 | **C6** | Après la démo | **Découper `main.gd`** (4 000 lignes). Un contrôleur par onglet (`ui/controllers/LabController.gd`, `ProductsController.gd`, `MarketController.gd`…) reçoit les actions de son écran et ses rafraîchissements ; `main.gd` ne garde que la coquille, la navigation et les fenêtres. Une étape par onglet, sans changer le rendu. | `main.gd`, nouveaux `ui/controllers/` | `main.gd` sous 2 000 lignes ; aucun test cassé | Tests existants à chaque étape |
-| **C7** | Avant Steam | **Entrées unifiées.** Un `InputRouter` unique : tactile et souris traduits au même endroit, actions `ui_*` et focus pour la manette et le Steam Deck. On retire les tests faits à la main dans `NotificationFeed`, `GarageHub`, `CrewMember` et `main`. | nouveau `ui/InputRouter.gd`, fichiers cités | On peut jouer une partie au clavier ou à la manette ; le tactile est inchangé sur le Pixel | `InputRouterScenario` (évènements simulés tactile, souris et manette) |
+| **C7** | Avant Steam | **Entrées unifiées** (détaillé dans le plan tactile et manette ci-dessous, étapes T4 et T5). Un `InputRouter` unique : tactile et souris traduits au même endroit, actions `ui_*` et focus pour la manette et le Steam Deck. On retire les tests faits à la main dans `NotificationFeed`, `GarageHub`, `CrewMember` et `main`. | nouveau `ui/InputRouter.gd`, fichiers cités | On peut jouer une partie au clavier ou à la manette ; le tactile est inchangé sur le Pixel | `InputRouterScenario` (évènements simulés tactile, souris et manette) |
 | **C8** | Quand l'état grossira (plusieurs divisions) | **Sauvegarde en arrière-plan.** Copie de l'état sur le fil principal, puis `JSON.stringify` et écriture atomique par `WorkerThreadPool` ; pas de deuxième sauvegarde tant que la première n'est pas finie. | `scripts/SaveManager.gd` | Sauvegarde identique octet par octet à la version actuelle ; aucun gel visible | Test d'intégrité : sauvegarder, recharger, comparer |
 | **C9** | Au fil de l'eau | **Anciens tests en échec hors CI** : `complete_layout_test`, `project_brief_world_test` (API d'interface disparues) ; `r1_visual_test`, `r2_visual_test` (rendu réel nécessaire). Les réécrire pour l'interface actuelle ou les retirer avec une note. | `tests/` | Plus aucun test du dossier en échec silencieux | — |
 | **Mesure Pixel** | Avec le prochain APK | Profileur Godot en débogage à distance : temps d'image au QG, fin de mois à ×3, onglet Entreprise ouvert. Noter les chiffres ici. | — | Plus d'à-coup visible au QG en fin de mois | Humain (Alexandre + Claude) |
 
-Ordre conseillé : C2 et C3 (petits, sans risque), puis la mesure Pixel avec l'APK. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
+Ordre conseillé (performance) : C2 et C3 (petits, sans risque), puis la mesure Pixel avec l'APK.
+
+### Plan de correction tactile, souris et manette (décidé le 08/10, 19 h)
+
+**Constats mesurés le 08/10** (Pixel simulé en paysage 2400×1080, échelle mobile 1,15, environ 420 ppp, donc **1 px logique ≈ 0,104 mm**, 8 mm ≈ 77 px, 6 mm ≈ 58 px) :
+
+| Constat | Mesure | Gravité |
+|---|---|---|
+| Zones tactiles trop petites | Sur les 7 onglets : **72 zones sous 6 mm, 54 entre 6 et 8 mm, 1 seule au-dessus de 8 mm**. Les plus petites : les onglets « Le public / Les pros / Les concurrents / La presse » du Marché (3,3 mm), les sous-onglets d'Entreprise, d'Équipe et de Presse (4,2 à 4,4 mm), les boutons de vitesse et le menu ☰ (4,6 mm) | Élevée |
+| Double appui sur « Toucher encore pour confirmer » qui confirmait une action payante | Aucun délai minimal | ✅ corrigé (`8aba103`, 350 ms, retombe seul après 5 s, `ConfirmGuardScenario`) |
+| Infobulles invisibles sur téléphone | 26 `tooltip_text` (dont la complexité et le risque de bugs des fonctions logicielles) | Moyenne |
+| Aucune navigation clavier ou manette | 22 `focus_mode = FOCUS_NONE`, une seule action `InputMap` utilisée (`ui_cancel`), aucun raccourci (pas même Espace pour la pause) | Moyenne (Élevée avant Steam) |
+| Tactile et souris testés à la main | 4 endroits : `NotificationFeed`, `GarageHub`, `CrewMember`, `main` (écran d'intro) | Faible |
+| Aucun retour haptique | Pas de `Input.vibrate_handheld` | Faible |
+| Zone morte du défilement à 4 px (≈ 0,4 mm) | Un léger glissement du doigt annule un appui sur un bouton placé dans une liste. Choix volontaire (`LabDepthScenario` l'impose) pour un défilement réactif | À trancher sur le Pixel |
+
+**Hors sujet pour ce jeu** : joystick virtuel, *coyote time*, courbes d'accélération de visée. Tech Empire se joue au toucher sur des menus. Leurs équivalents utiles sont la tolérance d'appui, l'appui long, la protection contre le double appui et la vitesse de défilement à la manette ; ils sont repris ci-dessous.
+
+**Architecture visée : une seule couche d'entrée**
+
+`ui/InputRouter.gd` (autoload léger) :
+- **Mode d'entrée courant** : `TOUCH`, `MOUSE_KEYBOARD` ou `GAMEPAD`. Il bascule au dernier évènement reçu (un toucher, une souris qui bouge ou une touche, un bouton ou un stick de manette) et émet le signal `mode_changed(mode)`.
+  - L'interface s'adapte à ce signal : en manette, le focus est visible et le texte dit « Ⓐ Confirmer » ; au toucher, les zones sont agrandies ; en souris, les infobulles restent.
+- **Actions nommées** dans l'`InputMap` : `ui_accept`, `ui_cancel`, les flèches et `ui_focus_next/prev` (déjà fournies par Godot), plus `te_pause`, `te_speed_up`, `te_speed_down`, `te_tab_next`, `te_tab_prev`, `te_menu`.
+  - Clavier par défaut : Espace, `+`, `-`, Tab et Maj+Tab, Échap.
+  - Manette par défaut : Start, gâchettes, LB/RB, Select.
+  - Les écrans écoutent les **actions**, jamais les touches ou les boutons physiques.
+- **Gestes tactiles** traduits à un seul endroit :
+  - *appui* : relâché à moins de 12 px du point de départ (≈ 1,25 mm) et en moins de 450 ms ;
+  - *appui long* : maintenu 450 ms sans bouger, il ouvre l'explication qu'une infobulle donnerait à la souris ;
+  - *glissement* : au-delà du seuil, il est laissé au défilement.
+- Les quatre traitements faits à la main sont remplacés par un appel au routeur, sans changer leur comportement.
+
+**Étapes**
+
+Mêmes règles que le plan performance : un commit par étape, un test déterministe, la CI au vert et des captures avant/après relues.
+
+| Étape | Quand | Contenu | Critère de réussite | Test |
+|---|---|---|---|---|
+| **T1** ✅ | Fait (`8aba103`) | Protection des confirmations contre le double appui | Un double appui < 350 ms ne confirme pas ; une seconde touche volontaire confirme | `ConfirmGuardScenario` |
+| **T2** | Avant la démo | **Zones tactiles d'au moins 6 mm partout, 8 mm pour les actions principales**, seulement sur téléphone (`OS.has_feature("mobile")`, ou un réglage « Grandes zones tactiles » sur PC). Une fonction `UI.touch_target(control, kind)` relève la hauteur minimale (secondaire 58 px, principale 77 px) et l'écart entre deux zones (8 px au moins). D'abord : sous-onglets (`ScenePager` ou équivalent), onglets du Marché, boutons de vitesse et ☰, puis « Lancer », « Valider » et « Confirmer ». | Plus aucune zone sous 6 mm dans les 7 onglets ; mises en page 1280×720 et 1600×720 sans débordement | `TouchTargetScenario` : le même balayage que la mesure ci-dessus, en échec sous 6 mm ; `garage_layout_test` et `workshop_layout_test` au vert |
+| **T3** | Avant la démo | **Infobulles accessibles au toucher.** Un appui long (450 ms) sur un contrôle qui a un `tooltip_text` affiche ce texte dans une bulle, comme au survol. | Les 26 explications sont lisibles sur le Pixel | Scénario : appui long simulé, bulle visible avec le bon texte ; un appui court ne l'ouvre pas |
+| **T4** | Après la démo | **`InputRouter` et actions nommées** (architecture ci-dessus). Raccourcis PC : Espace (pause), `+`/`-` (vitesse), Tab (onglet suivant), Échap (fermer). Les quatre traitements faits à la main passent par le routeur. | Pause, vitesse et onglets fonctionnent au clavier ; le tactile est inchangé | `InputRouterScenario` : évènements simulés tactile, souris, clavier et manette, bascule de mode, actions reçues |
+| **T5** | Avant Steam | **Navigation à la manette et au Steam Deck.** Focus activé sur les contrôles interactifs (au lieu de `FOCUS_NONE`), ordre de focus logique par écran, focus visible, défilement des listes au stick (vitesse croissante tant qu'il est maintenu, zone morte de 0,2), Ⓐ et Ⓑ pour confirmer et annuler. | Une partie complète (créer la société, concevoir, fabriquer, lancer) se joue sans souris | Scénario : enchaînement d'actions `ui_*` simulées jusqu'au lancement d'un CPU |
+| **T6** | Après la démo | **Retours haptiques** (option, active par défaut sur téléphone) : 15 ms sur une confirmation, 30 ms au jour J et au lancement, double impulsion courte sur une erreur. Demande la permission Android `VIBRATE` : mettre à jour `export_presets.cfg`, `PrivacyScenario` (qui vérifie aujourd'hui « aucune permission »), le texte de confidentialité et, si besoin, la fiche Play Console. | Vibrations ressenties sur le Pixel ; désactivables | Scénario : l'option coupée n'appelle jamais la vibration ; `PrivacyScenario` mis à jour |
+| **T7** | Avec le prochain APK | **Zone morte du défilement** : essayer 4, 8 et 12 px sur le Pixel. Garder la plus petite valeur pour laquelle un appui sur un bouton d'une liste n'est jamais annulé. | Choix noté ici, puis `LabDepthScenario` ajusté | Humain sur le Pixel, puis test ajusté |
+
+Ordre conseillé (entrées) : T2 et T3 avant la démo, juste après C2 et C3 ; T7 avec le prochain APK ; T4, T6 puis T5 après la démo. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
 
 Historique des tâches précédentes :
 
