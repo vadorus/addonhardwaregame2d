@@ -78,6 +78,8 @@ Non-régression : smoke, branding, mise en page du garage et de l'atelier, plafo
 
 ## Plan proposé, sans casser la démo
 
+> Plan de correction officiel, étapes C1 à C9 avec critères et tests : `docs/REPRISE_CODEX_2026-10-07.md`, §5 « Plan de correction performance et architecture ». La liste ci-dessous en est le résumé d'origine.
+
 - **P2 (après la démo, prioritaire)** : réutiliser les nœuds au lieu de tout reconstruire, d'abord dans `CompanyScreen` puis dans `ProductsScreen`.
   - On garde un réservoir de lignes par liste (`RowPool` : `acquire()` / `release_all()`) et on ne met à jour que les textes et les valeurs.
   - Objectif : moins de 10 ms par reconstruction sur PC.

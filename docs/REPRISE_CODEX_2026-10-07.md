@@ -321,6 +321,34 @@ Le plan réunit la refonte d'interface (planches 1 à 8), la revue des événeme
 
 **Points 2 à 5 faits par Codex (08/10, `9eb7fd0` → `7901b64`, détail dans `RETOUR_CODEX_2026-10-08_POINTS_2_5.md`).** Relecture de Claude le 08/10 à 17 h : code relu, aucune anomalie bloquante. Relancés sous Linux et réussis : import, démarrage, smoke, branding, les trois tests de mise en page et d'équilibrage de la CI, parcours CPU, carrières interactives, prototype, aperçu logiciel, finances, expérience complète, sauvegarde. Captures Entreprise, Marché et Presse relues. Reste le point 6 (APK, puis test fermé).
 
+### Plan de correction performance et architecture (décidé le 08/10, 18 h)
+
+Source : `docs/AUDIT_ARCHITECTURE_2026-10-08.md`. Mesures sur une partie de 7 ans (15 CPU en vente) ; sur le Pixel, compter 2 à 4 fois plus lent.
+
+Règles pour chaque étape :
+- un commit par étape ;
+- un test déterministe ;
+- smoke, branding et les trois tests de mise en page et d'équilibrage de la CI au vert ;
+- `tests/screen_refresh_test.tscn` au vert dès que l'interface change ;
+- la mesure avant/après notée dans le message de commit ;
+- aucun changement de rendu non voulu (captures avant/après relues) ;
+- aucun nouveau champ de sauvegarde sans migration.
+
+| Étape | Quand | Contenu | Fichiers | Critère de réussite | Test |
+|---|---|---|---|---|---|
+| **C1** ✅ | Fait (`ff149a0`) | Onglets cachés marqués « en retard » et reconstruits à leur affichage ; signaux d'une même image regroupés ; `Portrait` immobile quand il est caché | `main.gd`, `ui/Portrait.gd` | Fin de mois 984 → 59 ms ; `_refresh_all` 561 → 25 ms | `screen_refresh_test` |
+| **C2** | Avant la démo | **Animations économes.** Les `_process` qui appellent `queue_redraw()` à chaque image (`CrewMember`, `CpuBench`, `ProjectVisual`, `ComponentArt`, `GarageLife`, `LiveThemeOverlay`) passent par un battement partagé à environ 20 Hz et s'arrêtent quand le nœud est caché. `OS.low_processor_usage_mode` est activé quand le temps est en pause ou qu'un menu couvre l'écran, et désactivé à la reprise. | nouveau `ui/AnimationClock.gd` (autoload léger ou statique), nœuds cités | Rendu identique à l'œil ; moins de redessins par seconde au QG en pause (compteur dans le test) | `AnimationClockScenario` : un nœud caché ne redessine pas, la pause active le mode basse consommation, la reprise le coupe |
+| **C3** | Avant la démo | **Plus de vérification à chaque image.** `main._process` ne recherche plus une décision bloquante à chaque image : la recherche passe sur le changement de jour de `TimeManager` et sur les signaux de décision. La date et la réputation de l'en-tête ne sont reformatées que si elles changent. | `main.gd`, `scripts/TimeManager.gd` (signal de jour s'il manque) | Une décision bloque toujours le temps le jour même ; plus aucune copie profonde par image | Scénario : une directive en attente met le temps en pause au jour suivant ; la date affichée reste juste |
+| **C4** | Avant la démo si le Pixel saccade, sinon juste après | **Réutiliser les lignes au lieu de tout recréer** dans `CompanyScreen`, puis `ProductsScreen`. Un `RowPool` réutilisable (`acquire()`, `release_all()`, lignes masquées puis réaffichées) ; on ne met à jour que textes, valeurs et couleurs. | nouveau `ui/components/RowPool.gd`, `ui/screens/CompanyScreen.gd`, `ui/screens/ProductsScreen.gd` | `refresh()` d'Entreprise 145 → moins de 30 ms et de Produits 77 → moins de 20 ms (PC) ; nombre de nœuds stable après 20 rafraîchissements | `RowPoolScenario` + temps et nœuds stables dans `screen_refresh_test` |
+| **C5** | Après la démo | **Lecture sans copie.** Recenser les `duplicate(true)` des accesseurs appelés par l'interface (248 dans `scripts/`). Garder la copie seulement quand l'appelant modifie ; sinon, accesseur `*_view()` en lecture seule, documenté. | `scripts/*Manager.gd` | Aucun comportement changé ; moins d'allocations par fin de mois | Tests existants + vérification qu'un écran ne modifie pas l'état (comparaison `get_state()` avant/après rafraîchissement) |
+| **C6** | Après la démo | **Découper `main.gd`** (4 000 lignes). Un contrôleur par onglet (`ui/controllers/LabController.gd`, `ProductsController.gd`, `MarketController.gd`…) reçoit les actions de son écran et ses rafraîchissements ; `main.gd` ne garde que la coquille, la navigation et les fenêtres. Une étape par onglet, sans changer le rendu. | `main.gd`, nouveaux `ui/controllers/` | `main.gd` sous 2 000 lignes ; aucun test cassé | Tests existants à chaque étape |
+| **C7** | Avant Steam | **Entrées unifiées.** Un `InputRouter` unique : tactile et souris traduits au même endroit, actions `ui_*` et focus pour la manette et le Steam Deck. On retire les tests faits à la main dans `NotificationFeed`, `GarageHub`, `CrewMember` et `main`. | nouveau `ui/InputRouter.gd`, fichiers cités | On peut jouer une partie au clavier ou à la manette ; le tactile est inchangé sur le Pixel | `InputRouterScenario` (évènements simulés tactile, souris et manette) |
+| **C8** | Quand l'état grossira (plusieurs divisions) | **Sauvegarde en arrière-plan.** Copie de l'état sur le fil principal, puis `JSON.stringify` et écriture atomique par `WorkerThreadPool` ; pas de deuxième sauvegarde tant que la première n'est pas finie. | `scripts/SaveManager.gd` | Sauvegarde identique octet par octet à la version actuelle ; aucun gel visible | Test d'intégrité : sauvegarder, recharger, comparer |
+| **C9** | Au fil de l'eau | **Anciens tests en échec hors CI** : `complete_layout_test`, `project_brief_world_test` (API d'interface disparues) ; `r1_visual_test`, `r2_visual_test` (rendu réel nécessaire). Les réécrire pour l'interface actuelle ou les retirer avec une note. | `tests/` | Plus aucun test du dossier en échec silencieux | — |
+| **Mesure Pixel** | Avec le prochain APK | Profileur Godot en débogage à distance : temps d'image au QG, fin de mois à ×3, onglet Entreprise ouvert. Noter les chiffres ici. | — | Plus d'à-coup visible au QG en fin de mois | Humain (Alexandre + Claude) |
+
+Ordre conseillé : C2 et C3 (petits, sans risque), puis la mesure Pixel avec l'APK. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
+
 Historique des tâches précédentes :
 
 1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
