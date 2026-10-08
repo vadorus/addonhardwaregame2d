@@ -158,6 +158,28 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
   - `workshop_layout_test` presse désormais « Lancer la fabrication » (toujours visible sans défiler en 1616×720).
 - **Limite connue** : le délai affiché ne compte pas les retards aléatoires des fondeurs, qui restent une surprise possible.
 
+**Planche 6 « La finition »**, juste avant le lancement dans le parcours CPU.
+
+- `scripts/CpuFinish.gd` : trois pistes (Sobre et pro, Vitrine, Économique), 4 couleurs, 3 logos et un dessin caché.
+  - Les effets sont modestes et lisibles :
+    - **Vitrine** : la puce coûte environ 6 % de plus, la presse donne +2 ;
+    - **Économique** : la puce coûte environ 8 % de moins, sobriété −1 et fiabilité −1 ;
+    - **dessin caché** : presse +1.
+  - La couleur et le logo sont purement esthétiques.
+- `ProductManager.apply_cpu_finish(generation_id, finish)` pose la finition une seule fois, sur toutes les puces prêtes de la génération ; `generation_needs_finish()` dit s'il en reste à habiller.
+  - Champs ajoutés aux produits : `finish`, `finish_press`.
+  - **Anciennes sauvegardes** : une puce déjà lancée sans `finish` compte comme « sobre », sans effet. Une puce prête sans `finish` passe par la finition dans le parcours CPU. Aucune migration n'est nécessaire.
+- `MediaManager.review_breakdown` ajoute le facteur « finish », libellé « Finition du boîtier » dans `ReviewExplainer`.
+- `ui/components/FinishingBoard.gd` : le boîtier dessiné (pattes, encoche, capot doré, logo, inscriptions), la puce au microscope, les pistes de Camille, les retouches, l'effet en clair et « Valider la finition ».
+  - Dans le parcours CPU, l'étape « Lancer » commence par la finition.
+  - `main.gd` traite l'action `apply_finish`.
+- **Tests** :
+  - `FinishingScenario` (smoke) couvre les effets, l'application unique, la sauvegarde et la presse ;
+  - `workshop_layout_test` passe par « Valider la finition », dont le bouton est visible sans défiler en 1616×720.
+- **Volontairement laissé de côté** : renommer la gamme à la finition (« Nova / Astra / Orion », « 2 / 200 / II » sur la planche). C'est à faire avec la tâche « noms de projets uniques ».
+- **Point de vigilance** : depuis Produits > Vendre, on peut encore lancer sans passer par la finition (puce « sobre »).
+
+
 ## 3. Où en est la revue des onglets
 
 **Décision d'Alexandre (07/10, 17 h 05).** Les planches de maquettes du midi sont plus proches de la cible que les onglets actuels. Il faut **refaire les onglets d'après les planches**, pas les retoucher par petits bouts.
@@ -167,7 +189,7 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 | Labo | ✅ refait. Validé sur le Pixel par Alexandre. | 5 |
 | Presse | ✅ refait. Pas encore vu sur le Pixel : l'APK du Pixel date d'avant. | 3 |
 | Équipe | ✅ refait, capture relue le 08/10. Pas encore vu sur le Pixel. | (règle commune) |
-| Produits | 🟡 planche 4 faite (08/10) : scène de Noah + `ProductionBoard`, aussi dans le parcours CPU. Finition à faire. | 4 Fabrication, 6 Finition |
+| Produits / parcours CPU | ✅ planches 4 et 6 faites (08/10) : scène de Noah, `ProductionBoard` (fabrication), `FinishingBoard` (finition avant le jour J). | 4 Fabrication, 6 Finition |
 | Marché | ❌ à refaire | 8 Voix du monde |
 | Entreprise | ❌ à refaire | 7 Carte des branches |
 | Tableau de bord / atelier | déjà proche des planches 1 et 2 | 1, 2 |
@@ -233,9 +255,7 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert, et une capture rendue relue.
 
 1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
-2. **Produits → planche 6 (Finition)**. La planche 4 est faite le 08/10, voir §2 bis.
-   - Finition : boîtier, nom, numéro, « la puce au microscope », les trois pistes de Camille, puis « Valider la finition ».
-   - Critère : un écran entre la fabrication et le jour J, sans nouveau paramètre de simulation (purement cosmétique au début).
+2. ✅ **Finition → planche 6** (08/10), voir §2 bis.
 3. **Marché → planche 8.**
    - Jauge « vaut ce qu'il coûte », calculée à partir du prix comparé à la performance et aux rivaux.
    - Bouton de baisse de prix qui modifie réellement le prix.

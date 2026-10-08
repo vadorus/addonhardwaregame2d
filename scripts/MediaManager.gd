@@ -255,6 +255,11 @@ func review_breakdown(outlet: Dictionary, product: Dictionary, benchmark_rank: i
 		var rank_bonus := (1.0 - float(maxi(benchmark_rank - 1, 0)) / float(maxi(benchmark_total - 1, 1))) * 12.0 - 4.0
 		parts.append({"key":"rank", "points":rank_bonus})
 		raw += rank_bonus
+	# Planche 6 (08/10) : un capot doré ou un dessin caché dans le silicium fait parler de la puce.
+	var finish_points := float(product.get("finish_press", 0.0))
+	if absf(finish_points) > 0.001:
+		parts.append({"key":"finish", "points":finish_points})
+		raw += finish_points
 	if channel == "VIDEO_CREATOR":
 		var overclock := float(product.get("oc_headroom_pct", 0.0)) * 0.35
 		if absf(overclock) > 0.001:

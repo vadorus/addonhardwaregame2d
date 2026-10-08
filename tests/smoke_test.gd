@@ -1772,6 +1772,11 @@ func _ready() -> void:
 		_fail(production_board_error)
 		return
 	print("[CI] Fabrication (planche 4) : face au marché, fondeurs, plaquette, gamme, lancement OK")
+	var finishing_error: String = (load("res://tests/scenarios/FinishingScenario.gd") as Script).call("run", self)
+	if finishing_error != "":
+		_fail(finishing_error)
+		return
+	print("[CI] Finition (planche 6) : trois pistes, retouches, une fois par génération, sauvegarde, presse OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

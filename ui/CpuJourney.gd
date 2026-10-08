@@ -279,6 +279,23 @@ func _model_selector() -> void:
 	_body.add_child(select)
 
 func _build_launch() -> void:
+	# Planche 6 (08/10) : avant le jour J, on habille la puce (boîtier, couleur, logo, dessin caché).
+	var generation_id := str((_state.product as Dictionary).get("generation_id", ""))
+	if generation_id != "" and ProductManager.generation_needs_finish(generation_id):
+		_body.add_child(_label("Dernière étape avant le jour J : la finition", 23))
+		var signature: Dictionary = _state.product
+		for candidate in _state.products:
+			if str(candidate.get("generation_id", "")) == generation_id and str(candidate.get("sku_tier", "")) == "SIGNATURE":
+				signature = candidate
+		var board: Control = (load("res://ui/components/FinishingBoard.gd") as Script).new() as Control
+		board.name = "FinishingBoard"
+		_body.add_child(board)
+		board.call("set_viewport_width", get_viewport_rect().size.x)
+		board.call("set_generation", generation_id, signature)
+		board.connect("finish_requested", func(id: String, finish: Dictionary):
+			product_action.emit("apply_finish", {"generation_id":id, "finish":finish})
+			refresh())
+		return
 	_body.add_child(_label("Votre CPU est prêt à rencontrer ses clients", 23))
 	_model_selector()
 	var product: Dictionary = _state.product

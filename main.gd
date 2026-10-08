@@ -1,6 +1,7 @@
 extends Control
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_FINISH := preload("res://scripts/CpuFinish.gd")
 const UI := preload("res://ui/UiKit.gd")
 const LOOK := preload("res://ui/WorkshopStyle.gd")
 const NAV_FEATURES := ["QG", "COMPANY", "TEAM", "LAB", "PRODUCTS", "MARKET", "PRESS"]
@@ -2830,6 +2831,11 @@ func _on_products_action(action: String, payload: Dictionary):
 			review_layer.visible = true
 			JUICE.fade_in(review_layer, 0.2)
 			review_panel.call("show_archived", str(reviewed.get("name", "CPU")), archived)
+		"apply_finish":
+			var finish_payload: Dictionary = payload.get("finish", {})
+			if ProductManager.apply_cpu_finish(str(payload.get("generation_id", "")), finish_payload):
+				status_label.text = "Camille : finition « %s » validée. Place au jour J !" % str((CPU_FINISH.PISTES.get(str(finish_payload.get("piste", "SOBRE")), CPU_FINISH.PISTES.SOBRE) as Dictionary).label)
+			_refresh_all()
 		"apply_industrialization":
 			if payload.is_empty():
 				status_label.text = "Aucun CPU en industrialisation."

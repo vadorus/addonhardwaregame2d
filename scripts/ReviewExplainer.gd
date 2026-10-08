@@ -5,7 +5,7 @@ extends RefCounted
 
 const FACTOR_LABELS := {
 	"price":"Prix", "brand":"Image de marque", "rank":"Classement au banc d'essai",
-	"overclock":"Marge d'overclocking", "interview":"Votre interview",
+	"overclock":"Marge d'overclocking", "interview":"Votre interview", "finish":"Finition du boîtier",
 	"novelty":"Effet nouveauté (premier CPU)", "too_soon":"Suite trop rapprochée"
 }
 

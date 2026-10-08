@@ -3,6 +3,7 @@ const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 const CPU_PRODUCT_LINE := preload("res://scripts/CpuProductLine.gd")
+const CPU_FINISH := preload("res://scripts/CpuFinish.gd")
 
 signal products_changed
 signal product_launched(product)
@@ -127,6 +128,29 @@ func preview_cpu_range(project: Dictionary, industrialization: Dictionary) -> Ar
 		product["company"] = CompanyManager.company_name
 		result.append(product)
 	return result
+
+## Planche 6 : pose la finition choisie sur toutes les puces prêtes d'une génération (une seule fois).
+func apply_cpu_finish(generation_id: String, finish: Dictionary) -> bool:
+	var changed := false
+	for product_value in products:
+		var product: Dictionary = product_value
+		if str(product.get("generation_id", "")) != generation_id or str(product.get("status", "")) != "READY":
+			continue
+		if CPU_FINISH.apply(product, finish):
+			changed = true
+	if changed:
+		_refresh_cpu_launch_forecasts(generation_id)
+		products_changed.emit()
+	return changed
+
+## Une génération dont des puces prêtes n'ont pas encore reçu leur finition.
+func generation_needs_finish(generation_id: String) -> bool:
+	for product_value in products:
+		var product: Dictionary = product_value
+		if str(product.get("generation_id", "")) == generation_id and str(product.get("status", "")) == "READY" \
+				and str(product.get("sector", "")) == "CPU" and not product.has("finish"):
+			return true
+	return false
 
 func _create_single_product(project: Dictionary) -> void:
 	var sector := str(project.get("sector", "CPU"))

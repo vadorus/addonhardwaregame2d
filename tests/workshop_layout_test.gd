@@ -162,6 +162,14 @@ func _check_fabrication_and_launch_cards() -> bool:
 		for frame in range(4): await get_tree().process_frame
 		game.call("_on_dashboard_navigation", 4, "PRODUCT_LAUNCH")
 		for frame in range(16): await get_tree().process_frame
+		# Planche 6 (08/10) : la finition passe d'abord, son bouton vert aussi visible sans défiler.
+		var finish := _find_button(journey, "Valider la finition")
+		if finish == null or not finish.is_visible_in_tree() or not journey.get_global_rect().encloses(finish.get_global_rect()):
+			_fail("I4: the finishing step is missing or its button needs scrolling: %s" % ", ".join(_button_texts(journey)))
+			return false
+		print("[UI] Parcours CPU : finition, bouton visible sans défiler (phone 1616x720)")
+		finish.pressed.emit()
+		for frame in range(16): await get_tree().process_frame
 		var launch := _find_button(journey, "Lancer ")
 		if launch == null or not launch.is_visible_in_tree() or not journey.get_global_rect().encloses(launch.get_global_rect()):
 			_fail("I4: the CPU journey launch button is missing or needs scrolling")
