@@ -23,6 +23,7 @@ var _card: PanelContainer
 var _card_box: VBoxContainer
 var _cta: Button
 var _node_buttons := {}
+var _last_content_signature := ""
 
 func _init() -> void:
 	add_theme_constant_override("separation", 14)
@@ -61,7 +62,30 @@ func select(key: String) -> void:
 func cta_button() -> Button:
 	return _cta if _cta != null and is_instance_valid(_cta) else null
 
+func _content_signature() -> String:
+	var parts: Array[String] = [selected]
+	for entry_value in BRANCHES.NODES:
+		var entry: Dictionary = entry_value
+		# Le héros (nom et rang) est actualisé indépendamment par CompanyScreen.
+		parts.append(str(entry.key))
+		parts.append(str(entry.glyph))
+		parts.append(str(entry.label))
+		parts.append(str(entry.kind))
+		parts.append(BRANCHES.tag(entry))
+		parts.append(BRANCHES.status(entry, TimeManager.year))
+		parts.append(str(BRANCHES.can_open(entry)))
+		parts.append(str(entry.text))
+		parts.append(str(entry.points))
+		parts.append(str(entry.teaser))
+		parts.append(str(entry.cta))
+		parts.append(str(entry.context))
+		parts.append(str(entry.pos))
+	return "|".join(parts)
+
 func refresh() -> void:
+	var signature := _content_signature()
+	if signature == _last_content_signature:
+		return
 	for entry_value in BRANCHES.NODES:
 		var entry: Dictionary = entry_value
 		var button: Button = _node_buttons[str(entry.key)]
@@ -78,6 +102,7 @@ func refresh() -> void:
 			button.add_theme_color_override(color_name, style.ink)
 	_place_nodes()
 	_build_card()
+	_last_content_signature = signature
 
 func _place_nodes() -> void:
 	for entry_value in BRANCHES.NODES:
