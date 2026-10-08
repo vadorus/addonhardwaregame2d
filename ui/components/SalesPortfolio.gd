@@ -16,20 +16,44 @@ const OPEN_SELLING_MAX := 6
 var selected_id := ""
 var _open := {}
 var _lines := {}
+var _last_content_signature := ""
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
 
+func _visible_signature(groups: Dictionary) -> String:
+	var parts: Array[String] = [selected_id]
+	for key in ADVISOR.GROUPS:
+		var items: Array = groups[key]
+		if items.is_empty():
+			continue
+		var default_open: bool = key == "EXAMINE" or (key == "SELLING" and items.size() <= OPEN_SELLING_MAX)
+		var is_open: bool = bool(_open.get(key, default_open))
+		parts.append(str(key))
+		parts.append(str(items.size()))
+		parts.append(str(is_open))
+		if not is_open:
+			continue
+		for item_value in items:
+			var item: Dictionary = item_value
+			parts.append(str((item.product as Dictionary).get("id", "")))
+			parts.append(_line_label(item, key))
+	return "|".join(parts)
+
 func refresh() -> void:
+	var groups := ADVISOR.portfolio()
+	var signature := _visible_signature(groups)
+	if signature == _last_content_signature:
+		return
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
 	_lines.clear()
-	var groups := ADVISOR.portfolio()
 	var total := 0
 	for key in ADVISOR.GROUPS:
 		total += (groups[key] as Array).size()
 	if total == 0:
+		_last_content_signature = signature
 		return
 	for key in ADVISOR.GROUPS:
 		var items: Array = groups[key]
@@ -54,15 +78,11 @@ func refresh() -> void:
 			continue
 		for item_value in items:
 			add_child(_line(item_value, key))
+	_last_content_signature = signature
 
-func _line(item: Dictionary, group: String) -> Control:
+func _line_label(item: Dictionary, group: String) -> String:
 	var product: Dictionary = item.product
 	var signals: Array = item.signals
-	var product_id := str(product.get("id", ""))
-	var button := Button.new()
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size.y = 52
-	button.clip_text = true
 	var feedback: Dictionary = product.get("last_market_feedback", {})
 	var parts: Array[String] = ["%s  —  %s" % [str(product.get("name", "CPU")), str(product.get("sku_label", ""))]]
 	if group in ["EXAMINE", "SELLING", "CLEARANCE"]:
@@ -76,7 +96,17 @@ func _line(item: Dictionary, group: String) -> Control:
 	if not signals.is_empty():
 		var first: Dictionary = signals[0]
 		parts.append("⚠ " + str(SHORT.get(str(first.kind), "à examiner")) + (" (plafond des locaux)" if bool(first.get("portfolio_only", false)) else ""))
-	button.text = "   •   ".join(parts)
+	return "   •   ".join(parts)
+
+func _line(item: Dictionary, group: String) -> Control:
+	var product: Dictionary = item.product
+	var signals: Array = item.signals
+	var product_id := str(product.get("id", ""))
+	var button := Button.new()
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size.y = 52
+	button.clip_text = true
+	button.text = _line_label(item, group)
 	var active := product_id == selected_id
 	var bg := AMBER if active else (Color("fbe8cc") if group == "EXAMINE" else Color("f3e8d8"))
 	for state in ["normal", "hover", "pressed", "focus"]:
