@@ -1,4 +1,4 @@
-# Tech Empire — Essai A/B ciblé BranchMap / SalesPortfolio (Pixel 10)
+﻿# Tech Empire — Essai A/B ciblé BranchMap / SalesPortfolio (Pixel 10)
 
 Date : 8 octobre 2026. **Verdict : BranchMap validé, SalesPortfolio non concluant.** Aucun découpage de grands scripts, ni modification de la simulation.
 
@@ -75,7 +75,8 @@ L'écart moyen est d'environ **0,07 s** : trop faible pour conclure à une amél
 
 - `p0_diag_refresh_2026_10_08_data/diag_pixel_Entreprise.csv`, `diag_pixel_Produits.csv` — avant.
 - `c4_branchmap_sales_2026_10_08_data/after_pixel_Entreprise.csv`, `after_pixel_Produits.csv` — après.
-- `c4_branchmap_sales_2026_10_08_data/cold_before.log`, `cold_after.log` — 3 démarrages par APK.
+- `c4_branchmap_sales_2026_10_08_data/cold_before.txt`, `cold_after.txt` — 3 démarrages par APK.
 - Rapport de diagnostic antérieur : [P0_DIAGNOSTIC_CIBLE_2026-10-08.md](P0_DIAGNOSTIC_CIBLE_2026-10-08.md).
 
 **Décision technique appliquée :** fusion par avance rapide de BranchMap seul dans la branche de démo (`73bbc7a`). SalesPortfolio reste uniquement dans sa branche expérimentale. La grosse refactorisation de `main.gd` et `MarketManager.gd` reste après la démo (C6). Ne pas conclure que la phase 1 entière est validée par cette seule comparaison.
+
