@@ -394,7 +394,27 @@ Mêmes règles que le plan performance : un commit par étape, un test détermin
 | **T6** | Après la démo | **Retours haptiques** (option, active par défaut sur téléphone) : 15 ms sur une confirmation, 30 ms au jour J et au lancement, double impulsion courte sur une erreur. Demande la permission Android `VIBRATE` : mettre à jour `export_presets.cfg`, `PrivacyScenario` (qui vérifie aujourd'hui « aucune permission »), le texte de confidentialité et, si besoin, la fiche Play Console. | Vibrations ressenties sur le Pixel ; désactivables | Scénario : l'option coupée n'appelle jamais la vibration ; `PrivacyScenario` mis à jour |
 | **T7** | Avec le prochain APK | **Zone morte du défilement** : essayer 4, 8 et 12 px sur le Pixel. Garder la plus petite valeur pour laquelle un appui sur un bouton d'une liste n'est jamais annulé. | Choix noté ici, puis `LabDepthScenario` ajusté | Humain sur le Pixel, puis test ajusté |
 
-Ordre conseillé (entrées) : T2 et T3 avant la démo, juste après C2 et C3 ; T7 avec le prochain APK ; T4, T6 puis T5 après la démo. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
+Ordre conseillé (entrées) : T2 et T3 avant la démo, juste après C2 et C3 ; T7 avec le prochain APK ; T4, T6 puis T5 après la démo.
+
+### Plan de correction du rendu et des textures (décidé le 08/10, 19 h)
+
+Source : `docs/AUDIT_RENDU_2026-10-08.md`.
+
+Mesures sur 7 ans de partie, en 1600×720 avec OpenGL : **300 à 370 appels de rendu par image**, une surface dessinée de **7 à 10 fois l'écran**, **52 à 71 Mo de textures** non compressées en mémoire vidéo. Il n'y a aucun shader personnalisé ni aucune lumière ; le coût vient du remplissage et du nombre d'appels.
+
+Règles : un commit par étape, des captures avant/après relues (et jugées par Alexandre pour tout ce qui touche à l'image), la mesure avant/après dans le message de commit, et la CI au vert.
+
+| Étape | Quand | Contenu | Critère de réussite | Test |
+|---|---|---|---|---|
+| **R1** | Avant la démo | **Cadence plafonnée.** `application/run/max_fps` à 60 sur PC et 30 sur mobile, avec un réglage « Fluidité : 30 / 60 images/s » dans le menu, enregistré dans `user://settings.cfg`. À combiner avec le mode basse consommation de C2. | Le Pixel reste à 30 images/s ou plus, chauffe moins ; le réglage est conservé | Scénario : le réglage applique et conserve `Engine.max_fps` |
+| **R2** | Avant la démo | **Compression des grandes images.** Décors, moments clés et bandeaux en *VRAM Compressed*, avec mipmaps et taille limitée à 2048 px. Portraits en VRAM Compressed, sans mipmaps. Icônes et pictogrammes en *Lossless*. Dans l'export Windows, garder S3TC/BPTC ; dans les deux exports Android, cocher ETC2/ASTC. | Mémoire des textures ≤ 30 Mo après avoir visité tous les onglets ; aucun défaut visible sur les captures jugées par Alexandre | `TextureBudgetScenario` : charge les écrans et vérifie `RENDER_TEXTURE_MEM_USED` ≤ 30 Mo ; contrôle des `.import` (mode attendu par dossier) |
+| **R3** | Avant la démo si le Pixel saccade, sinon après | **Moins de surfaces empilées.** Supprimer les fonds pleins cachés sous d'autres fonds (cartes posées sur des cartes de même couleur, fond plein sous un décor opaque), passer les conteneurs purement structurels en `StyleBoxEmpty`, découper le bandeau de scène pour ne pas peindre deux fois sous le texte. | Recouvrement ≤ 4× au QG (cible finale 3×) | Le balayage de la mesure ci-dessus devient un scénario, en échec au-dessus du seuil |
+| **R4** | Après la démo | **Moins d'appels de rendu.** Une palette fermée de `StyleBox` partagées (`UI.stylebox()` mis en cache par couleur, rayon et bordure au lieu d'en créer une par panneau) ; les petites icônes regroupées dans un atlas (`AtlasTexture`) ; les `_draw()` répétés (barres, jauges) regroupés en un seul nœud qui dessine toutes ses lignes. | ≤ 150 appels de rendu dans chaque onglet | Le scénario de R3 vérifie aussi `RENDER_TOTAL_DRAW_CALLS_IN_FRAME` |
+| **R5** | Après la démo | **Un seul pipeline.** `renderer/rendering_method="gl_compatibility"` aussi sur PC, pour que le PC, le Pixel et les tests aient le même rendu, avec moins de mémoire et un démarrage plus rapide. Garder la possibilité de revenir à Forward+ si une future branche en a besoin. | Captures PC identiques à l'œil ; démarrage plus rapide | Captures avant/après ; `--quit-after 2` sans erreur |
+| **R6** | Après la démo | **Ombres et décors.** Ombres des panneaux pré-dessinées en 9-patch (ou supprimées sur mobile) ; une seule saison de décor chargée à la fois (libérer la précédente au changement de saison). | Mémoire stable au changement de saison ; rendu identique à l'œil | Scénario : changement de saison, mémoire des textures qui n'augmente pas |
+| **Mesure Pixel** | Avec le prochain APK | Temps d'image au QG et dans l'onglet le plus chargé, chauffe et batterie sur 15 minutes, avant et après R1 et R2. Noter les chiffres ici. | — | Humain (Alexandre + Claude) |
+
+Ordre conseillé (rendu) : R1 et R2 avec C2, C3, T2 et T3 avant la démo, puis la mesure Pixel ; on décide de R3 selon ce que montre le téléphone ; R4 à R6 après la démo. On décide de C4 avant la démo selon ce que montre le téléphone ; le reste vient après.
 
 Historique des tâches précédentes :
 
