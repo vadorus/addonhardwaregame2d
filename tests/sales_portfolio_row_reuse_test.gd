@@ -1,117 +1,102 @@
 extends Node
-
+## Test autonome : aucun fichier build/, aucune sauvegarde réelle, aucun produit personnel.
 var failures: Array[String] = []
 
-func expect(condition: bool, message: String) -> void:
+func expect(condition: bool, description: String) -> void:
 	if not condition:
-		failures.append(message)
+		failures.append(description)
+
+func fake_cpu(id: String, name: String, status: String, price: int) -> Dictionary:
+	return {
+		"id": id, "name": name, "sku_label": "Test",
+		"sector": "CPU", "status": status,
+		"price": price, "last_month_sales": 5,
+		"last_market_feedback": {"net_contribution": 400},
+		"months_on_market": 0, "generation_index": 1,
+		"last_month_lost_sales": 0, "clearance_months_remaining": 0
+	}
 
 func _ready() -> void:
-	SaveManager.use_test_folder()
+	# Le projet ne doit pas écrire de sauvegarde pour un test de rendu.
 	SaveManager.writes_enabled = false
-	var reference := "res://build/p0_reference_candidate.json"
-	if DirAccess.copy_absolute(ProjectSettings.globalize_path(reference), ProjectSettings.globalize_path(SaveManager.save_path())) != OK:
-		push_error("P0 reference unavailable")
-		get_tree().quit(1)
-		return
-	var source_sha := FileAccess.get_sha256(reference)
-	var game: Control = (load("res://main.tscn") as PackedScene).instantiate()
-	add_child(game)
-	for i in range(5):
-		await get_tree().process_frame
-	game.call("_load_game_slot", 0)
-	for i in range(3):
-		await get_tree().process_frame
-
+	ProductManager.products = [
+		fake_cpu("fixture_cpu_a", "CPU Alpha", "LAUNCHED", 200),
+		fake_cpu("fixture_cpu_b", "CPU Beta", "LAUNCHED", 250),
+		fake_cpu("fixture_cpu_c", "CPU Archive", "RETIRED", 150)
+	]
 	var portfolio: Control = (load("res://ui/components/SalesPortfolio.gd") as Script).new()
 	add_child(portfolio)
-	for key in ["EXAMINE", "SELLING", "CLEARANCE", "ARCHIVE"]:
-		portfolio.call("open_group", key, true)
+	for group in ["EXAMINE", "SELLING", "CLEARANCE", "ARCHIVE"]:
+		portfolio.call("open_group", group, true)
 	portfolio.call("refresh")
-	var first: Dictionary = portfolio.get("_lines")
-	expect(first.size() > 0, "No models in reference portfolio")
-	var kept: Dictionary = {}
-	for product_id in first.keys():
-		kept[product_id] = (first[product_id] as Button).get_instance_id()
-	var header: Button = (portfolio.get("_headers") as Dictionary).get("SELLING") as Button
-	expect(header != null, "SELLING header missing")
-	var header_id := header.get_instance_id() if header != null else 0
-	var changed_texts := 0
-	var reused_checks := 0
-	var before_text: Dictionary = {}
-	for product_id in kept:
-		before_text[product_id] = (first[product_id] as Button).text
-
-	for month in range(12):
-		TimeManager.time_scale = 3.0
-		TimeManager.day = 30
-		TimeManager._next_day()
-		TimeManager.time_scale = 0.0
-		portfolio.call("refresh")
-		var lines: Dictionary = portfolio.get("_lines")
-		for product_id in kept:
-			if not lines.has(product_id):
-				continue
-			reused_checks += 1
-			var row: Button = lines[product_id] as Button
-			expect(row.get_instance_id() == int(kept[product_id]), "Month %d recreated model %s" % [month + 1, product_id])
-			if row.text != str(before_text.get(product_id, "")):
-				changed_texts += 1
-				before_text[product_id] = row.text
-		if header != null:
-			expect(header.get_instance_id() == header_id, "Month %d recreated SELLING header" % (month + 1))
-	expect(reused_checks > 30, "Not enough stable model comparisons")
-	expect(changed_texts > 0, "Product commercial labels never updated despite 12 months")
-
 	var lines: Dictionary = portfolio.get("_lines")
-	var sample_id := str(kept.keys()[0]) if not kept.is_empty() else ""
-	var before_id := int(kept.get(sample_id, 0))
-	if not sample_id.is_empty() and lines.has(sample_id):
-		var control: Button = lines[sample_id] as Button
-		portfolio.set("selected_id", sample_id)
+	expect(lines.size() == 3, "All three fake models should appear")
+	var identities := {}
+	for id in lines:
+		identities[id] = (lines[id] as Button).get_instance_id()
+	var selling_header: Button = (portfolio.get("_headers") as Dictionary).get("SELLING") as Button
+	expect(selling_header != null, "SELLING header missing")
+	var header_id := selling_header.get_instance_id() if selling_header != null else 0
+	var original: Button = lines.get("fixture_cpu_a") as Button
+	var updates := 0
+	var previous_text := original.text if original != null else ""
+	for month in range(12):
+		var product: Dictionary = ProductManager.products[0]
+		product["last_month_sales"] = 10 + month
+		product["price"] = 200 + month * 3
+		product["last_market_feedback"] = {"net_contribution": 400 + month * 100}
 		portfolio.call("refresh")
-		expect((lines[sample_id] as Button).get_instance_id() == before_id, "Selection recreated model control")
-		expect(control.get_theme_stylebox("normal") != null, "Selected style not present")
-		var model: Dictionary = {}
-		for value in ProductManager.products:
-			var product: Dictionary = value
-			if str(product.get("id", "")) == sample_id:
-				model = product
-				break
-		if not model.is_empty():
-			var old_name := str(model.get("name", ""))
-			model["name"] = old_name + " [check-unique]"
-			portfolio.call("refresh")
-			expect((lines[sample_id] as Button).get_instance_id() == before_id, "Name update recreated control")
-			expect(control.text.contains("[check-unique]"), "Visible name not updated")
-			model["name"] = old_name
-			portfolio.call("refresh")
+		lines = portfolio.get("_lines")
+		for id in identities:
+			expect(lines.has(id), "Model disappeared at update %d: %s" % [month, id])
+			if lines.has(id):
+				expect((lines[id] as Button).get_instance_id() == int(identities[id]),
+					"Button recreated at update %d: %s" % [month, id])
+		if original != null and original.text != previous_text:
+			updates += 1
+			previous_text = original.text
+		if selling_header != null:
+			expect(selling_header.get_instance_id() == header_id, "Header recreated")
+	expect(updates == 12, "Sales/price changes did not update row every month")
+	expect(original != null and original.text.contains("233"), "Final price not shown")
+
+	portfolio.set("selected_id", "fixture_cpu_a")
+	portfolio.call("refresh")
+	expect((lines["fixture_cpu_a"] as Button).get_instance_id() == int(identities["fixture_cpu_a"]),
+		"Selecting a model recreated its row")
+	ProductManager.products[0]["name"] = "CPU Alpha Renamed"
+	portfolio.call("refresh")
+	expect(original.text.contains("Renamed"), "Name change not displayed")
 
 	portfolio.call("open_group", "SELLING", false)
-	var hidden_lines: Dictionary = portfolio.get("_lines")
-	var any_hidden := false
-	for id in kept:
-		if hidden_lines.has(id) and not (hidden_lines[id] as Button).visible:
-			any_hidden = true
-			break
-	expect(any_hidden, "Collapsing a group did not hide model controls")
+	expect(not original.visible, "Collapsed group still visible")
 	portfolio.call("open_group", "SELLING", true)
-	for id in kept:
-		if (portfolio.get("_lines") as Dictionary).has(id):
-			expect(((portfolio.get("_lines") as Dictionary)[id] as Button).get_instance_id() == int(kept[id]), "Group collapse/expand recreated row %s" % id)
-	if header != null:
-		var before_open := bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false))
-		header.emit_signal("pressed")
-		expect(bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false)) != before_open, "Header click did not toggle")
-		header.emit_signal("pressed")
-		expect(bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false)) == before_open, "Header click no longer toggles twice")
+	expect(original.visible and original.get_instance_id() == int(identities["fixture_cpu_a"]),
+		"Group reopening recreated row")
+	if selling_header != null:
+		var was_open: bool = bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false))
+		selling_header.emit_signal("pressed")
+		expect(bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false)) != was_open,
+			"Header click did not toggle")
+		selling_header.emit_signal("pressed")
+		expect(bool((portfolio.get("_shown_groups") as Dictionary).get("SELLING", false)) == was_open,
+			"Second header click did not restore state")
 
-	expect(FileAccess.get_sha256(reference) == source_sha, "Reference save file mutated")
-	expect(not SaveManager.writes_enabled, "Test unexpectedly enabled writes")
+	ProductManager.products[1]["status"] = "RETIRED"
+	portfolio.call("refresh")
+	expect((lines["fixture_cpu_b"] as Button).get_instance_id() == int(identities["fixture_cpu_b"]),
+		"Moving a model to archive recreated row")
+	ProductManager.products.remove_at(1)
+	portfolio.call("refresh")
+	expect(not (portfolio.get("_lines") as Dictionary).has("fixture_cpu_b"),
+		"Deleted model retained in portfolio")
+	expect(not SaveManager.writes_enabled, "Test enabled live save writes")
+	ProductManager.products.clear()
+	portfolio.queue_free()
 	if failures.is_empty():
-		print("[CI] SalesPortfolio row reuse PASS : months=12 reused_checks=", reused_checks, " changed_labels=", changed_texts, " models=", kept.size())
+		print("[CI] SalesPortfolio autonomous row reuse PASS: 12 changes, stable rows, groups, removal")
 		get_tree().quit(0)
 	else:
 		for failure in failures:
-			push_error("[CI] SalesPortfolio reuse: " + failure)
+			push_error("[CI] SalesPortfolio: " + failure)
 		get_tree().quit(1)
