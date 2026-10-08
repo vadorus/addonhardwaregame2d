@@ -58,9 +58,50 @@ Le tactile et la manette n'ont pas de fichier d'audit à part : leurs constats s
 | 8 | **G2 + A2** | Jour J : 600 ms de suspense avec la musique atténuée, notes une à une, jingle ; confettis légers aux records ; décompte de fin de mois | Moyenne |
 | 9 | **R2** | Compression des grandes images (ASTC/ETC2 sur Android, BC7 sur PC), icônes sans compression ; captures avant/après **à faire juger par Alexandre** | Moyenne |
 | 10 | **M6** | Le premier jour J atteignable en moins de 10 minutes (mesurer, puis raccourcir si besoin) ; résumé de Nora au retour en jeu | Petite |
-| — | *Ensuite* | Claude relit tout, construit l'APK (clé du PC du bureau), sauvegarde la partie du Pixel, installe, et mesure avec Alexandre (temps d'image, chauffe, ressenti) | — |
-| 11 | **C4 / R3** | **Seulement si le Pixel saccade** : réutiliser les lignes des onglets Entreprise et Produits au lieu de les recréer, et retirer les fonds peints sous d'autres fonds | Moyenne |
+| 10 bis | **P0** | **Mesure de fluidité intégrée**, pour comparer sur le Pixel sans profileur branché (voir « Protocole de mesure sur le Pixel » plus bas) | Petite |
+| — | *Ensuite* | Claude relit tout, construit l'APK (clé du PC du bureau), sauvegarde la partie du Pixel, installe, puis mesure avec Alexandre selon le protocole ci-dessous | — |
+| 11 | **C4 / R3** | **Seulement si le protocole de mesure le justifie** (seuils plus bas) : réutiliser les lignes des onglets Entreprise et Produits au lieu de les recréer, et retirer les fonds peints sous d'autres fonds | Moyenne |
 | 12 | **T7** | Sensibilité du défilement réglée d'après l'essai sur le Pixel | Petite |
+
+## Protocole de mesure sur le Pixel (demandé par Alexandre le 08/10)
+
+Les images par seconde au repos ne suffisent pas. On compare **avant et après** la phase 1, sur la même sauvegarde copiée (jamais la partie d'Alexandre elle-même), dans **trois situations** :
+
+| Situation | Comment | Ce qu'on relève |
+|---|---|---|
+| **Repos** | QG affiché, temps en pause, 30 s | Images par seconde moyennes, chauffe ressentie |
+| **Fins de mois à vitesse ×3** | QG affiché, vitesse ×3, 12 fins de mois de suite ; puis la même chose avec l'onglet **Entreprise** ouvert, puis **Produits** | Pire temps d'image à chaque fin de mois (l'à-coup) et médiane des 12 |
+| **Changements d'onglets** | Passer 3 fois par les 7 onglets, dans l'ordre, temps en pause | Temps entre l'appui et l'affichage complet de l'onglet (pire et médiane, par onglet) |
+
+**L'outil, étape P0** : `scripts/PerfProbe.gd`, un autoload inactif par défaut.
+- Il s'active seulement par un réglage caché (Menu, puis 5 appuis sur la version) ou par l'argument `--perf-probe`.
+- Il enregistre le temps de chaque image, marque les fins de mois (signal `month_processed`) et les changements d'onglet (`tabs.tab_changed`, jusqu'à la première image affichée après le rafraîchissement).
+- Il écrit `user://perf_<date>.csv` et un résumé à l'écran : médiane et pire valeur par situation.
+- **Aucun envoi réseau.**
+- Test : un scénario simule 2 fins de mois et 1 changement d'onglet, puis vérifie les lignes du CSV.
+
+**Seuils de décision** (sur le Pixel) :
+
+| Mesure | Correct | C4 / R3 nécessaires avant la démo |
+|---|---|---|
+| Pire image d'une fin de mois à ×3 | ≤ 100 ms (à peine visible) | > 150 ms sur au moins 3 des 12 mois, ou > 250 ms une seule fois |
+| Changement d'onglet | ≤ 150 ms | > 250 ms sur Entreprise ou Produits |
+| Repos | ≥ 30 images/s stables | < 30 images/s : regarder d'abord R1/R2, puis R3 |
+
+Les chiffres mesurés sont notés dans `docs/REPRISE_CODEX_2026-10-07.md` (ligne « Mesure Pixel »), avec la version de l'APK.
+
+## Propositions d'Alexandre (08/10, 19 h 53) — non définitives
+
+| Sujet | Proposition actuelle |
+|---|---|
+| Limite gratuite | Jusqu'en 1985 |
+| Version complète | 4,99 €, à tester |
+| Première extension | Mobile, à confirmer |
+| Difficulté de la démo | Accessible par défaut, à réévaluer après G1 |
+| Titre Play Store | « Tech Empire » |
+| Refresh de gamme | À concevoir séparément |
+
+Codex peut s'en servir comme hypothèses (par exemple, régler la difficulté Accessible par défaut dans la démo), mais **ne les grave nulle part comme définitives** : prix, limite gratuite et extension n'entrent dans le code qu'avec M1/M2, après confirmation.
 
 ## Phase 2 — après la démo (dans cet ordre)
 
@@ -91,8 +132,8 @@ Le tactile et la manette n'ont pas de fichier d'audit à part : leurs constats s
 
 ## Ce qui attend Alexandre (Codex ne le tranche pas)
 
-- **M0** : la limite gratuite (1985 recommandé), les prix et la première extension.
-- La difficulté par défaut de la démo (Standard ou Accessible).
-- Le titre et la description de la fiche Play, et « Pixel Graphics » ou « Hand-drawn » sur Steam.
+- **M0** : la limite gratuite, les prix et la première extension (propositions ci-dessus, à confirmer).
+- La difficulté par défaut de la démo (proposition : Accessible, à revoir après G1).
+- La description de la fiche Play (titre proposé : « Tech Empire ») et « Pixel Graphics » ou « Hand-drawn » sur Steam.
 - Le refresh de gamme et les plateformes sur plusieurs générations : à cadrer avant tout code.
 - Les adresses Gmail des testeurs pour le test fermé.

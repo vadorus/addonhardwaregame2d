@@ -15,7 +15,8 @@ Mots-clés visés, dans l'ordre : *tycoon*, *gestion*, *simulation*, *processeur
 
 | # | Titre | Caractères | Pour |
 |---|---|---|---|
-| 1 | **Tech Empire : Tycoon de CPU** (recommandé) | 27 | « Tycoon » est le mot que cherchent les fans du genre ; « CPU » dit tout de suite ce qu'on fait |
+| 0 | **Tech Empire** (proposition d'Alexandre, 08/10) | 11 | Le nom seul, net et mémorisable ; les mots-clés passent alors dans la description courte et les premières lignes |
+| 1 | Tech Empire : Tycoon de CPU | 27 | « Tycoon » est le mot que cherchent les fans du genre ; « CPU » dit tout de suite ce qu'on fait |
 | 2 | Tech Empire – Gestion hardware | 30 | Large ; « gestion » est très cherché en français |
 | 3 | Tech Empire : Crée tes puces | 28 | Le plus chaleureux, mais en tutoiement (à adapter si on garde le « vous ») |
 
