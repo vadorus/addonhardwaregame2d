@@ -763,28 +763,32 @@ func price_score(product: Dictionary, segment: String = "") -> float:
 	var ratio: float = float(product.get("price", 1)) / maxf(reference, 1.0)
 	return clampf(118.0 - ratio * 58.0, 5.0, 100.0)
 
-func price_demand_multiplier(product: Dictionary, segment: String = "") -> float:
-	# Le score de prix mesure l'attractivité, mais ne suffit pas à modéliser
-	# l'élasticité réelle. Un produit à 3–5x le prix du marché doit perdre
-	# presque toute sa demande, même s'il est techniquement excellent.
+const PRICE_RATIO_EXPENSIVE := 1.12
+const PRICE_RATIO_BARGAIN := 0.90
+## Courbe continue ; la jauge et les ventes utilisent les mêmes repères.
+const PRICE_DEMAND_POINTS := [
+	Vector2(0.75, 1.12), Vector2(PRICE_RATIO_BARGAIN, 1.10), Vector2(1.0, 1.0),
+	Vector2(PRICE_RATIO_EXPENSIVE, 0.80), Vector2(1.25, 0.55), Vector2(1.50, 0.28),
+	Vector2(2.0, 0.06), Vector2(3.0, 0.008), Vector2(5.0, 0.0005)
+]
+
+func product_price_ratio(product: Dictionary, segment: String = "") -> float:
 	var target := normalize_segment(segment if segment != "" else str(product.get("target_segment", default_segment())))
 	var reference := maxf(segment_reference_price(target, str(product.get("sector", "CPU"))), 1.0)
-	var ratio := float(product.get("price", 1)) / reference
-	if ratio <= 0.75:
-		return 1.12
-	if ratio <= 1.0:
-		return lerpf(1.08, 1.0, (ratio - 0.75) / 0.25)
-	if ratio <= 1.25:
-		return lerpf(1.0, 0.72, (ratio - 1.0) / 0.25)
-	if ratio <= 1.50:
-		return lerpf(0.72, 0.38, (ratio - 1.25) / 0.25)
-	if ratio <= 2.0:
-		return lerpf(0.38, 0.10, (ratio - 1.50) / 0.50)
-	if ratio <= 3.0:
-		return lerpf(0.10, 0.015, ratio - 2.0)
-	if ratio <= 5.0:
-		return lerpf(0.015, 0.001, (ratio - 3.0) / 2.0)
-	return 0.0005
+	return maxf(float(product.get("price", 1)), 0.0) / reference
+
+func price_demand_factor_for_ratio(ratio: float) -> float:
+	if ratio <= PRICE_DEMAND_POINTS[0].x:
+		return PRICE_DEMAND_POINTS[0].y
+	for i in range(1, PRICE_DEMAND_POINTS.size()):
+		var left: Vector2 = PRICE_DEMAND_POINTS[i - 1]
+		var right: Vector2 = PRICE_DEMAND_POINTS[i]
+		if ratio <= right.x:
+			return lerpf(left.y, right.y, (ratio - left.x) / (right.x - left.x))
+	return 0.0005 * pow(5.0 / ratio, 2.0)
+
+func price_demand_multiplier(product: Dictionary, segment: String = "") -> float:
+	return price_demand_factor_for_ratio(product_price_ratio(product, segment))
 
 func evaluate_product(product: Dictionary, segment: String) -> float:
 	var target := normalize_segment(segment)
@@ -1155,7 +1159,7 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 		# du meilleur SKU avant application du plafond de marque.
 		var breadth_factor := 1.0 + minf(float(maxi(ids.size() - 1, 0)) * 0.14, 0.35)
 		var family_potential := int(round(float(best_units) * breadth_factor))
-		var conversion := clampf(weighted_conversion / maxf(conversion_weight, 0.001), 0.05, 1.12)
+		var conversion := clampf(weighted_conversion / maxf(conversion_weight, 0.001), 0.0, 1.12)
 		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion * attack_segment_boost(segment))))
 		var portfolio_units := mini(requested_units, mini(family_potential, share_cap_units))
 		var portfolio_share := float(portfolio_units) / float(market_units)

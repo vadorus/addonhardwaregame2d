@@ -124,6 +124,9 @@ func _build_left() -> void:
 	var value_text := _text(str(value.text), 12, INK)
 	value_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_left_box.add_child(value_text)
+	var demand_text := _text(str(value.demand_text), 11, MUTED)
+	demand_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_left_box.add_child(demand_text)
 	var say := HBoxContainer.new()
 	say.add_theme_constant_override("separation", 8)
 	_left_box.add_child(say)

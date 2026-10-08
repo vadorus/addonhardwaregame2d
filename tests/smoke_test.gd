@@ -1812,6 +1812,11 @@ func _ready() -> void:
 		_fail(garage_company_error)
 		return
 	print("[CI] Entreprise au garage : pages et délégation masquées, anciens états préservés OK")
+	var price_elasticity_error: String = (load("res://tests/scenarios/PriceElasticityScenario.gd") as Script).call("run", self)
+	if price_elasticity_error != "":
+		_fail(price_elasticity_error)
+		return
+	print("[CI] Élasticité : courbe continue, prévisions et jauge cohérentes OK")
 	var lot_zero_error: String = (load("res://tests/scenarios/SoftwareLotZeroScenario.gd") as Script).call("run", self)
 	if lot_zero_error != "":
 		_fail(lot_zero_error)

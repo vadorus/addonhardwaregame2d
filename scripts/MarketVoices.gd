@@ -13,8 +13,8 @@ const ZONES := {
 	"BARGAIN":{"label":"Bonne affaire", "tone":"good"},
 }
 ## Repères de la jauge, en rapport prix / prix de référence du segment.
-const RATIO_EXPENSIVE := 1.12
-const RATIO_BARGAIN := 0.90
+const RATIO_EXPENSIVE := preload("res://scripts/MarketManager.gd").PRICE_RATIO_EXPENSIVE
+const RATIO_BARGAIN := preload("res://scripts/MarketManager.gd").PRICE_RATIO_BARGAIN
 const GAUGE_LEFT_RATIO := 1.60
 const GAUGE_SPAN := 1.0
 const PUBLIC_VOICES := {
@@ -74,11 +74,14 @@ static func _round_price(value: float) -> int:
 static func value_read(product: Dictionary) -> Dictionary:
 	var price := int(product.get("price", 1))
 	var reference := reference_price(product)
-	var ratio := float(price) / reference
+	var ratio := MarketManager.product_price_ratio(product)
 	var zone := zone_for_ratio(ratio)
 	var estimate := _round_price(reference)
 	var result := {"price":price, "ratio":ratio, "zone":zone, "zone_label":str(ZONES[zone].label), "tone":str(ZONES[zone].tone),
 		"position":gauge_position(ratio), "estimate":estimate, "suggested":0}
+	var factor := MarketManager.price_demand_multiplier(product)
+	result["demand_factor"] = factor
+	result["demand_text"] = "Effet direct du prix : %+.0f %% sur la demande (avant la limite de production)." % ((factor - 1.0) * 100.0)
 	var name := str(product.get("name", "Le CPU"))
 	match zone:
 		"TOO_EXPENSIVE":
@@ -87,7 +90,7 @@ static func value_read(product: Dictionary) -> Dictionary:
 			result["text"] = "Le public estime %s à %d € : à %d €, c'est une bonne affaire." % [name, estimate, price]
 		_:
 			result["text"] = "Le public estime %s à %d € : à %d €, c'est juste." % [name, estimate, price]
-	var floor_price := int(product.get("unit_cost", 0)) + 2
+	var floor_price := int(ceil(float(int(product.get("unit_cost", 0)) + 2) / (1.0 - MarketManager.distributor_share())))
 	var suggested := 0
 	var now_month := month_at_price(product, price)
 	if zone == "TOO_EXPENSIVE" and int(now_month.demand) >= int(now_month.capacity):
@@ -97,6 +100,10 @@ static func value_read(product: Dictionary) -> Dictionary:
 		return result
 	if zone == "TOO_EXPENSIVE":
 		suggested = maxi(_round_price(reference * 1.05), floor_price)
+		if suggested >= price:
+			result["now"] = now_month
+			result["nora"] = "Le public le trouve cher, mais une baisse couvrirait mal le coût de fabrication et la part du revendeur. Il faut d'abord réduire les coûts."
+			return result
 	elif zone == "BARGAIN" and ratio < 0.82:
 		suggested = _round_price(reference * 0.95)
 	if suggested > 0 and suggested != price:
@@ -108,7 +115,7 @@ static func value_read(product: Dictionary) -> Dictionary:
 		var gain := int(then.contribution) - int(now.contribution)
 		if suggested < price:
 			result["nora"] = "À %d €, on vendrait environ %d puces par mois au lieu de %d. On gagne %d € de moins par puce, %s." % [
-				suggested, int(then.units), int(now.units), price - suggested,
+				suggested, int(then.units), int(now.units), int(now.margin) - int(then.margin),
 				"mais %s € de plus sur le mois" % _money(gain) if gain > 0 else "et le mois rapporterait %s € de moins : à vous de voir" % _money(-gain)]
 		else:
 			result["nora"] = "On le brade : à %d €, on en vendrait environ %d au lieu de %d, et le mois rapporterait %s € %s." % [
