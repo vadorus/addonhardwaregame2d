@@ -143,14 +143,8 @@ func _check_fabrication_and_launch_cards() -> bool:
 	# visible sans défiler, à la taille du Pixel.
 	var journey: Control = game.get("cpu_journey")
 	if journey != null and journey.visible:
-		var balanced := _find_button(journey, str(ProductionManager.STRATEGIES.BALANCED.label))
-		if balanced == null or not journey.get_global_rect().encloses(balanced.get_global_rect()):
-			_fail("I4: the balanced fabrication choice needs scrolling: %s in %s · boutons : %s" % [
-				str(balanced.get_global_rect()) if balanced != null else "absent", str(journey.get_global_rect()), ", ".join(_button_texts(journey))])
-			return false
-		balanced.pressed.emit()
-		for frame in range(4): await get_tree().process_frame
-		var build := _find_button(journey, "Confier la fabrication")
+		# Planche 4 (08/10) : le CPU face au marché et le choix du fondeur tiennent dans l'écran, bouton vert compris.
+		var build := _find_button(journey, "Lancer la fabrication")
 		if build == null or build.disabled or not build.is_visible_in_tree() or not journey.get_global_rect().encloses(build.get_global_rect()):
 			_fail("I4: the CPU journey fabrication button is missing or needs scrolling: %s in %s · boutons : %s" % [
 				str(build.get_global_rect()) if build != null else "absent", str(journey.get_global_rect()), ", ".join(_button_texts(journey))])

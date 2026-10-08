@@ -43,6 +43,8 @@ var _team_details: VBoxContainer
 var _team_toggle: Button
 var _signature := ""
 var _narrow := false
+## Produits > Fabriquer (08/10) : la planche 4 (ProductionBoard) montre déjà le CPU qui attend son usine.
+var hide_waiting := false
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 12)
@@ -106,7 +108,7 @@ func _force_refresh() -> void:
 
 ## Ne reconstruit la page que si quelque chose de visible a changé (pas de saut de défilement).
 func _state_signature() -> String:
-	var parts: Array[String] = [str(_narrow), str(ProductionManager.jobs.size())]
+	var parts: Array[String] = [str(_narrow), str(hide_waiting), str(ProductionManager.jobs.size())]
 	for job_value in ProductionManager.jobs:
 		var job: Dictionary = job_value
 		parts.append("%s|%s|%d|%s|%s|%s" % [str(job.get("id", "")), str(job.get("status", "")), int(float(job.get("progress", 0.0))),
@@ -142,6 +144,10 @@ func _team_text() -> String:
 func _rebuild_jobs() -> void:
 	_clear(_jobs_box)
 	var active := ProductionManager.get_active_jobs()
+	if hide_waiting:
+		active = active.filter(func(job): return bool(job.get("route_selected", false)) or bool(job.get("route_committed", false)))
+		if active.is_empty() and not ProductionManager.get_active_jobs().is_empty():
+			return
 	if active.is_empty():
 		var empty := UI.muted_label("Aucun CPU en préparation d'usine. Quand un projet du Labo termine son prototype, il arrive ici pour être fabriqué.", 13)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

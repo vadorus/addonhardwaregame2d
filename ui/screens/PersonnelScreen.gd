@@ -166,7 +166,10 @@ func team_diagnosis() -> Dictionary:
 	if not low.is_empty():
 		line = "Nora : « %s n'a pas le moral (%d/100). Une formation ou une augmentation, sinon on risque de le perdre. »" % [str(low.get("name", "")), int(low.get("morale", 0))]
 	elif not free_researchers.is_empty():
-		line = "Nora : « %d chercheur(s) n'ont pas d'équipe. Au labo, rangez-les dans Vitesse, Énergie ou Fiabilité : sinon ils ne font rien avancer. »" % free_researchers.size()
+		if free_researchers.size() == 1:
+			line = "Nora : « %s n'a pas d'équipe de recherche. Au labo, donnez-lui une équipe (Vitesse, Énergie ou Fiabilité) : sinon son travail ne fait rien avancer. »" % str(free_researchers[0].get("name", ""))
+		else:
+			line = "Nora : « %d chercheurs n'ont pas d'équipe. Au labo, rangez-les dans Vitesse, Énergie ou Fiabilité : sinon ils ne font rien avancer. »" % free_researchers.size()
 	elif dev < 3 and not ResearchManager.active_cpu_project().is_empty():
 		line = "Nora : « Le développement est à %d. Un ingénieur de plus, et le CPU en cours sortirait plus vite. »" % dev
 	else:
@@ -219,8 +222,8 @@ func _department_summary(department: String, members: Array) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.add_child(UI.eyebrow("%s — %s" % [department.to_upper(), _department_purpose(department)]))
-	box.add_child(UI.label("%d personne(s) • compétence moyenne %.0f • moral moyen %.0f • %s €/mois de salaires" % [
-		members.size(), skill_sum / count, morale_sum / count, UI.money(payroll)], 14))
+	box.add_child(UI.label("%d %s • compétence moyenne %.0f • moral moyen %.0f • %s €/mois de salaires" % [
+		members.size(), "personne" if members.size() <= 1 else "personnes", skill_sum / count, morale_sum / count, UI.money(payroll)], 14))
 	return box
 
 func _toggle_more(button: Button, hidden: Control) -> void:
@@ -238,7 +241,7 @@ func refresh() -> void:
 		scene.call("set_speaker", WORKPLACE.character_path(WORKPLACE.NORA_LOOK, "reflexion"))
 		var diagnosis := team_diagnosis()
 		scene.call("set_line", str(diagnosis.line))
-		scene.call("set_hero", "%d" % int(diagnosis.people), "personne(s) · %s €/mois de salaires" % UI.money(int(diagnosis.payroll)), "Recruter")
+		scene.call("set_hero", "%d" % int(diagnosis.people), "%s · %s €/mois de salaires" % ["personne" if int(diagnosis.people) <= 1 else "personnes", UI.money(int(diagnosis.payroll))], "Recruter")
 	var rd_count := PersonnelManager.count_department("R&D")
 	var dev_count := PersonnelManager.count_department("Développement")
 	team_explainer_label.text = "R&D — INVENTER ET APPRENDRE\n%d personne(s). Travaille sur l'architecture, l'efficacité et la fiabilité. Ce savoir-faire améliore les générations présentes et futures.\n\nDÉVELOPPEMENT CPU — TRANSFORMER L'IDÉE EN PRODUIT\n%d personne(s). Leur compétence, leur charge et leur expérience influencent directement la vitesse, la qualité et la confiance du projet CPU.\n\nÉquipe Développement : %.0f/100 • confiance actuelle %.0f%% • capacité %.0f%%." % [

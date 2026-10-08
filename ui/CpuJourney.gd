@@ -248,46 +248,22 @@ func _build_benchmarks() -> void:
 
 func _build_production() -> void:
 	var job: Dictionary = _state.job
-	_body.add_child(_label("Du prototype aux premières séries", 23))
 	if bool(job.get("route_selected", false)):
+		_body.add_child(_label("Du prototype aux premières séries", 23))
 		var quote := ProductionManager.manufacturing_route_quote(str(job.id))
 		_body.add_child(_label("%s prépare la fabrication.\nAvancement : %.0f %% · %d mois écoulés" % [str(quote.get("provider_name", "L'usine")), float(job.get("progress", 0.0)), int(job.get("months_spent", 0))], 17))
 		_body.add_child(_label(str(job.get("route_error", "")), 14, ACCENT))
 		return
-	_body.add_child(_label("Choisissez l'usine et le compromis de fabrication. Les frais sont engagés lorsque la préparation démarre.", 14, MUTED))
-	var provider := OptionButton.new()
-	provider.custom_minimum_size.y = 48
-	_body.add_child(provider)
-	var node_nm := int(job.get("node_nm", 10000))
-	var providers: Array = FoundryManager.available_external_foundries(node_nm).duplicate()
-	if FoundryManager.internal_supports_node(node_nm): providers.append("INTERNAL")
-	for id in providers:
-		var quote := FoundryManager.route_quote("INTERNAL" if str(id) == "INTERNAL" else "EXTERNAL", str(id), node_nm)
-		provider.add_item(str(quote.get("provider_name", id)))
-		provider.set_item_metadata(provider.item_count - 1, str(id))
-		if str(id) == str(job.get("foundry_id", "")): provider.select(provider.item_count - 1)
-	if providers.is_empty():
-		_body.add_child(_label("Aucune usine disponible pour cette gravure.", 16, ACCENT))
-		return
-	for strategy in ["ECONOMY", "BALANCED", "QUALITY", "SPEED"]:
-		var data: Dictionary = ProductionManager.STRATEGIES[strategy]
-		var hints := {"ECONOMY":"Moins cher, plus lent, davantage de défauts.", "BALANCED":"Équilibre entre délai et qualité.", "QUALITY":"Plus cher, meilleur rendement et moins de défauts.", "SPEED":"Plus rapide, qualité et rendement en retrait."}
-		_body.add_child(_button(str(data.label) + "\n" + str(hints[strategy]), func():
-			_preview_production(job, str(provider.get_item_metadata(provider.selected)), strategy)))
-
-func _preview_production(job: Dictionary, provider: String, strategy: String) -> void:
-	_clear(_body)
-	var mode := "INTERNAL" if provider == "INTERNAL" else "EXTERNAL"
-	var quote := FoundryManager.route_quote(mode, provider, int(job.node_nm))
-	var data: Dictionary = ProductionManager.STRATEGIES[strategy]
-	var monthly := int(round(float(job.get("monthly_cost", 0)) * float(data.cost) * float(quote.get("cost_factor", 1.0))))
-	_body.add_child(_label(str(data.label) + " chez " + str(quote.get("provider_name", provider)), 22))
-	_body.add_child(_label("Préparation estimée : %s €/mois\nRendement : %+.1f points · défauts : %+.1f points\nVitesse de préparation : ×%.2f" % [UI.money(monthly), float(data.get("yield", 0)) * 100, float(data.defect) * 100, float(data.speed)], 17))
-	_body.add_child(_label("Ces écarts sont ceux de la stratégie par rapport à l'équilibre. La gravure, l'usine et l'équipe déterminent le résultat final.", 13, MUTED))
-	_body.add_child(_button("Confier la fabrication", func():
-		product_action.emit("apply_industrialization", {"job_id":str(job.id), "provider":provider, "mode":mode, "strategy":strategy, "binning":"BALANCED"})
-		refresh(), true))
-	_body.add_child(_button("Revoir les possibilités", refresh))
+	_body.add_child(_label("Le prototype est validé : place à l'usine", 23))
+	# Planche 4 (08/10) : le CPU face au marché, le choix du fondeur et la gamme qui sortira, en une vue.
+	var board: Control = (load("res://ui/components/ProductionBoard.gd") as Script).new() as Control
+	board.name = "ProductionBoard"
+	_body.add_child(board)
+	board.call("set_viewport_width", get_viewport_rect().size.x)
+	board.call("set_job", str(job.id))
+	board.connect("launch_requested", func(payload: Dictionary):
+		product_action.emit("apply_industrialization", payload)
+		refresh())
 
 func _model_selector() -> void:
 	if _state.products.size() < 2: return

@@ -3,6 +3,7 @@ extends ScrollContainer
 signal action_requested(action: String, payload: Dictionary)
 
 const UI := preload("res://ui/UiKit.gd")
+const WORKPLACE := preload("res://ui/WorkplaceArt.gd")
 
 var mode_grid: GridContainer
 var mode_buttons := {}
@@ -12,6 +13,10 @@ var industrialization_panel: Control
 var lifecycle_panel: Control
 var after_sales_panel: Control
 var components_panel: Control
+## Revue des onglets (08/10) : une scène avec Noah en tête, et la planche 4 quand un prototype attend l'usine.
+var scene: Control
+var production_board: Control
+var _scene_action := ""
 
 func _ready() -> void:
 	name = "Produits"
@@ -45,14 +50,9 @@ func current_section() -> String:
 func _build() -> void:
 	var box := UI.content_box()
 	add_child(box)
-	box.add_child(UI.eyebrow("COCKPIT PRODUIT"))
-	box.add_child(UI.label("Fabriquer, vendre, suivre", 24))
-	var intro := UI.muted_label(
-		"La conception se fait au Laboratoire. Ici, vos CPU sortent de l'usine, trouvent leurs clients et sont suivis après la vente.",
-		12
-	)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(intro)
+	scene = (load("res://ui/components/SceneHeader.gd") as Script).new() as Control
+	scene.connect("hero_pressed", _on_scene_hero)
+	box.add_child(scene)
 
 	# Lot A (29/09) : « Concevoir » ne faisait que renvoyer au Labo, et le SAV existait aussi dans
 	# Marché. Le cockpit garde trois étapes ; le SAV n'existe plus qu'ici.
@@ -67,9 +67,15 @@ func _build() -> void:
 	# V0.10 / Gammes : mémoire, alimentations, boîtiers.
 	_add_mode_button("RANGES", "4  GAMMES")
 
+	production_board = (load("res://ui/components/ProductionBoard.gd") as Script).new() as Control
+	production_board.connect("launch_requested", func(payload: Dictionary): action_requested.emit("apply_industrialization", payload))
+	box.add_child(production_board)
+
 	var industrialization_script: Script = load("res://ui/components/IndustrializationPanel.gd")
 	industrialization_panel = industrialization_script.new() as Control
 	industrialization_panel.connect("action_requested", _relay_action)
+	# La planche 4 remplace la carte « choix à faire » : le panneau garde l'usine et les productions.
+	industrialization_panel.set("hide_waiting", true)
 	box.add_child(industrialization_panel)
 	pages["BUILD"] = industrialization_panel
 
@@ -112,6 +118,74 @@ func _select_mode(mode: String) -> void:
 		button.disabled = key == current_mode
 	if mode == "RANGES" and components_panel != null:
 		components_panel.call("refresh")
+	_refresh_board()
+
+## Le premier CPU qui attend qu'on choisisse son usine (vide sinon).
+func waiting_job() -> Dictionary:
+	for job_value in ProductionManager.get_active_jobs():
+		var job: Dictionary = job_value
+		if not bool(job.get("route_selected", false)) and not bool(job.get("route_committed", false)):
+			return job
+	return {}
+
+func _refresh_board() -> void:
+	if production_board == null:
+		return
+	var job := waiting_job()
+	production_board.visible = current_mode == "BUILD" and not job.is_empty()
+	if production_board.visible:
+		production_board.call("set_job", str(job.get("id", "")))
+
+## Ce que Noah dit en tête de l'onglet : le moment de la fabrication et des ventes, en une phrase.
+func products_diagnosis() -> Dictionary:
+	var job := waiting_job()
+	if not job.is_empty():
+		return {"line":"Noah : « Le prototype de %s est validé. Choisis qui grave nos puces, et on lance l'usine. »" % str(job.get("name", "CPU")),
+			"value":str(job.get("name", "CPU")), "caption":"attend son usine", "button":"Choisir l'usine", "action":"BUILD"}
+	for job_value in ProductionManager.get_active_jobs():
+		var running: Dictionary = job_value
+		return {"line":"Noah : « L'usine prépare %s. Encore un peu de patience avant les premières séries. »" % str(running.get("name", "CPU")),
+			"value":"%.0f %%" % float(running.get("progress", 0.0)), "caption":"préparation de %s" % str(running.get("name", "CPU")), "button":"", "action":""}
+	var ready: Array = []
+	var launched := 0
+	var sold := 0
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("company", CompanyManager.company_name)) != CompanyManager.company_name:
+			continue
+		match str(product.get("status", "")):
+			"READY":
+				ready.append(product)
+			"LAUNCHED":
+				launched += 1
+				sold += int(product.get("last_month_sales", 0))
+	if not ready.is_empty():
+		return {"line":"Noah : « %s sort de l'usine. Il ne lui manque qu'un prix pour partir en rayon. »" % str((ready[0] as Dictionary).get("generation_name", (ready[0] as Dictionary).get("name", "Le CPU"))),
+			"value":"%d" % ready.size(), "caption":"modèle%s prêt%s à lancer" % ["s" if ready.size() > 1 else "", "s" if ready.size() > 1 else ""], "button":"Fixer le prix", "action":"LAUNCH"}
+	if launched > 0:
+		return {"line":"Noah : « %d CPU en rayon. Le mois dernier, %s puces sont parties chez les clients. »" % [launched, UI.money(sold)],
+			"value":UI.money(sold), "caption":"puces vendues le mois dernier", "button":"Voir les ventes", "action":"SELL"}
+	return {"line":"Noah : « Rien à fabriquer pour l'instant. Un nouveau CPU se conçoit au labo, puis il passe par ici. »",
+		"value":"0", "caption":"CPU en vente", "button":"", "action":""}
+
+func _refresh_scene() -> void:
+	if scene == null:
+		return
+	var diagnosis := products_diagnosis()
+	scene.call("set_scene", "res://assets/art/v010/J3_moments/moment_premier_cpu.webp", "LES PRODUITS")
+	scene.call("set_speaker", WORKPLACE.character_path(WORKPLACE.cast_look("Noah Leroy"), "joie" if str(diagnosis.action) in ["BUILD", "LAUNCH"] else "bureau"))
+	scene.call("set_line", str(diagnosis.line))
+	scene.call("set_hero", str(diagnosis.value), str(diagnosis.caption), str(diagnosis.button))
+	_scene_action = str(diagnosis.action)
+
+func _on_scene_hero() -> void:
+	match _scene_action:
+		"BUILD":
+			focus_production()
+		"LAUNCH":
+			focus_product_launch()
+		"SELL":
+			focus_sales()
 
 func set_viewport_width(width: float) -> void:
 	if mode_grid != null:
@@ -122,6 +196,8 @@ func set_viewport_width(width: float) -> void:
 		lifecycle_panel.call("set_viewport_width", width)
 	if components_panel != null:
 		components_panel.call("set_viewport_width", width)
+	if production_board != null:
+		production_board.call("set_viewport_width", width)
 
 func refresh() -> void:
 	if industrialization_panel != null:
@@ -132,6 +208,8 @@ func refresh() -> void:
 		after_sales_panel.call("refresh")
 	if components_panel != null and components_panel.visible:
 		components_panel.call("refresh")
+	_refresh_board()
+	_refresh_scene()
 	_refresh_mode_badges()
 
 func _refresh_mode_badges() -> void:
@@ -184,7 +262,9 @@ func _focus_production_deferred() -> void:
 	if industrialization_panel == null:
 		return
 	await get_tree().process_frame
-	var target: Control = industrialization_panel.call("first_choice_card") if industrialization_panel.has_method("first_choice_card") else null
+	var target: Control = production_board if production_board != null and production_board.visible else null
+	if target == null and industrialization_panel.has_method("first_choice_card"):
+		target = industrialization_panel.call("first_choice_card")
 	if target == null:
 		target = industrialization_panel
 	if get_child_count() > 0 and get_child(0) is Control:

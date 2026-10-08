@@ -136,6 +136,28 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 
 ---
 
+## 2 bis. Ce qui a été fait le 08/10
+
+**Planche 4 « La fabrication »** : le prototype validé face au marché, le choix du fondeur et la gamme qui sortira, en une vue.
+
+- `scripts/ProductionPreview.gd` (modèle pur, sans hasard ni effet sur l'état) :
+  - `foundry_options(job)` : les fondeurs possibles, chacun avec son aperçu et deux mots (« Rapide », « Pas cher », « Soigné », « Risqué »…) ;
+  - `build(job, provider, binning)` : 5 lignes de comparaison (vitesse, sobriété, fiabilité, prix, marge) contre l'ancien modèle de la maison et le meilleur rival du segment, rang au banc d'essai, puces bonnes par plaquette, répartition E / standard / X, délai, coût engagé, phrase de Noah.
+- `ProductionManager` :
+  - le calcul de fin d'industrialisation est extrait dans `_industrialization_result(..., jitter)` (même ordre d'appels au hasard qu'avant) ;
+  - `_monthly_progress()` est partagé ;
+  - nouveau `preview_industrialization(job_id, provider, strategy, binning)`.
+- `ProductManager.preview_cpu_range(project, industrialization)` : la gamme qu'on obtiendrait, sans rien créer.
+- `ui/components/ProductionBoard.gd` :
+  - la planche elle-même, avec le signal `launch_requested(payload)` (même charge utile que `apply_industrialization`) ;
+  - utilisée dans le **parcours CPU** (`CpuJourney._build_production`, qui remplace la liste déroulante et les 4 stratégies) et dans **Produits > Fabriquer**.
+- **Produits** : un `SceneHeader` avec Noah et `products_diagnosis()` (usine à choisir / préparation / prix à fixer / ventes du mois).
+- `IndustrializationPanel.hide_waiting` : la carte « choix à faire » n'est plus en double sous la planche. Elle reste disponible quand le panneau est utilisé seul, ce dont dépend `FabricationPageScenario`.
+- **Tests** :
+  - `ProductionBoardScenario` est branché dans le smoke test ;
+  - `workshop_layout_test` presse désormais « Lancer la fabrication » (toujours visible sans défiler en 1616×720).
+- **Limite connue** : le délai affiché ne compte pas les retards aléatoires des fondeurs, qui restent une surprise possible.
+
 ## 3. Où en est la revue des onglets
 
 **Décision d'Alexandre (07/10, 17 h 05).** Les planches de maquettes du midi sont plus proches de la cible que les onglets actuels. Il faut **refaire les onglets d'après les planches**, pas les retoucher par petits bouts.
@@ -144,8 +166,8 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 |---|---|---|
 | Labo | ✅ refait. Validé sur le Pixel par Alexandre. | 5 |
 | Presse | ✅ refait. Pas encore vu sur le Pixel : l'APK du Pixel date d'avant. | 3 |
-| Équipe | ✅ refait. Pas encore vu sur le Pixel. **Capture rendue jamais faite.** | (règle commune) |
-| Produits | ❌ à refaire | 4 Fabrication, 6 Finition |
+| Équipe | ✅ refait, capture relue le 08/10. Pas encore vu sur le Pixel. | (règle commune) |
+| Produits | 🟡 planche 4 faite (08/10) : scène de Noah + `ProductionBoard`, aussi dans le parcours CPU. Finition à faire. | 4 Fabrication, 6 Finition |
 | Marché | ❌ à refaire | 8 Voix du monde |
 | Entreprise | ❌ à refaire | 7 Carte des branches |
 | Tableau de bord / atelier | déjà proche des planches 1 et 2 | 1, 2 |
@@ -210,12 +232,10 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 
 Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert, et une capture rendue relue.
 
-1. **Valider Équipe en capture.**
-   - Lancer `feel_capture --moment=onglets`.
-   - Vérifier que la scène tient en 1280×720 et en portrait téléphone, que les visages sont distincts et que la phrase de Nora correspond au diagnostic.
-2. **Produits → planches 4 et 6.**
-   - Créer un `ProductionBoard` sur le modèle de `LabBoard` / `PressBoard`, en réutilisant `IndustrializationPanel`, `SalesPortfolio` et `ProductLifecyclePanel` plutôt que de les dupliquer.
-   - Critère : depuis un prototype validé, le joueur choisit le fondeur et la répartition E / standard / X, voit le coût total et lance la fabrication sur un seul écran.
+1. ✅ **Valider Équipe en capture** (08/10) : fait, accords corrigés (« 1 personne », phrase de Nora au singulier).
+2. **Produits → planche 6 (Finition)**. La planche 4 est faite le 08/10, voir §2 bis.
+   - Finition : boîtier, nom, numéro, « la puce au microscope », les trois pistes de Camille, puis « Valider la finition ».
+   - Critère : un écran entre la fabrication et le jour J, sans nouveau paramètre de simulation (purement cosmétique au début).
 3. **Marché → planche 8.**
    - Jauge « vaut ce qu'il coûte », calculée à partir du prix comparé à la performance et aux rivaux.
    - Bouton de baisse de prix qui modifie réellement le prix.

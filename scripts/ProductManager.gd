@@ -75,17 +75,7 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 	)
 	var generation_id := "CPU-GEN-%03d" % _next_generation_id
 	_next_generation_id += 1
-	var built := CPU_PRODUCT_LINE.build_range(
-		project,
-		generation_id,
-		generation_index,
-		_base_unit_cost(project),
-		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
-		# V0.10 / H2b : la capacité conseillée tient dans ce que les locaux peuvent sortir.
-		mini(maxi(220, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.028)), premises_production_cap()),
-		float(division.get("maturity", 0.0)),
-		industrialization
-	)
+	var built := _build_cpu_range(project, generation_id, generation_index, industrialization)
 	var generation: Dictionary = built.get("generation", {})
 	var model_ids: Array = []
 	var arch_id := str(project.get("architecture_id", ""))
@@ -112,6 +102,31 @@ func _create_cpu_range(project: Dictionary, industrialization: Dictionary = {}) 
 	else:
 		CompanyManager.add_alert("%s devient une gamme de %d CPU : %s." % [str(project.get("name", "Nouvelle architecture")), model_ids.size(), ", ".join(labels)])
 	cpu_range_created.emit(generation.duplicate(true))
+
+func _build_cpu_range(project: Dictionary, generation_id: String, generation_index: int, industrialization: Dictionary) -> Dictionary:
+	var division := DivisionManager.get_division("CPU")
+	return CPU_PRODUCT_LINE.build_range(
+		project,
+		generation_id,
+		generation_index,
+		_base_unit_cost(project),
+		int(round(MarketManager.segment_reference_price(str(project.get("segment", MarketManager.default_segment())), "CPU"))),
+		# V0.10 / H2b : la capacité conseillée tient dans ce que les locaux peuvent sortir.
+		mini(maxi(220, int(float(MarketManager.segment_market_units(str(project.get("segment", MarketManager.default_segment())))) * 0.028)), premises_production_cap()),
+		float(division.get("maturity", 0.0)),
+		industrialization
+	)
+
+## Planche 4 : la gamme que donnerait une industrialisation (aperçu, rien n'est créé).
+func preview_cpu_range(project: Dictionary, industrialization: Dictionary) -> Array:
+	var division := DivisionManager.get_division("CPU")
+	var built := _build_cpu_range(project, "PREVIEW", int(division.get("generation_count", 0)) + 1, industrialization)
+	var result: Array = []
+	for product_value in built.get("products", []):
+		var product: Dictionary = product_value
+		product["company"] = CompanyManager.company_name
+		result.append(product)
+	return result
 
 func _create_single_product(project: Dictionary) -> void:
 	var sector := str(project.get("sector", "CPU"))
