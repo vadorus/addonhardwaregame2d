@@ -58,7 +58,7 @@ static func roll(project: Dictionary) -> void:
 static func pending_project() -> Dictionary:
 	for project_value in ResearchManager.projects:
 		var project: Dictionary = project_value
-		if not (project.get("discovery_pending", {}) as Dictionary).is_empty():
+		if str(project.get("status", "DEVELOPMENT")) == "DEVELOPMENT" and not (project.get("discovery_pending", {}) as Dictionary).is_empty():
 			return project
 	return {}
 

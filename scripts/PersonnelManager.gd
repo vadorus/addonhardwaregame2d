@@ -301,7 +301,17 @@ func process_month(active_departments: Array):
 	if employee_payroll_base > 0:
 		Economy.add_expense(employee_payroll_base, "Salaires")
 	for dept in CompanyManager.departments:
-		if active_departments.has(dept):
+		# Revue des événements (08/10) : la cohésion ne faisait que monter, le dossier « Tensions dans l'équipe »
+		# ne pouvait jamais s'ouvrir. Une équipe au moral bas (moyenne < 50) perd maintenant de la cohésion.
+		var morale_sum := 0.0
+		var members := 0
+		for member in staff:
+			if str(member.get("department", "")) == str(dept):
+				morale_sum += float(member.get("morale", 75.0))
+				members += 1
+		if members > 0 and morale_sum / float(members) < 50.0:
+			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) - 0.8, 0.0, 100.0)
+		elif active_departments.has(dept):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
 	staff_changed.emit()
 

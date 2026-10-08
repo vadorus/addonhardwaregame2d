@@ -1797,6 +1797,11 @@ func _ready() -> void:
 		_fail(names_error)
 		return
 	print("[CI] Noms de CPU uniques dans une partie OK")
+	var events_error: String = (load("res://tests/scenarios/EventsAuditScenario.gd") as Script).call("run", self)
+	if events_error != "":
+		_fail(events_error)
+		return
+	print("[CI] Revue des événements : SAV, validation, prototype, trouvailles, RH OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

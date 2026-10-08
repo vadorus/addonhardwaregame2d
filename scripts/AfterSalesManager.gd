@@ -417,7 +417,8 @@ func start_investigation(case_id: String) -> bool:
 
 func monitor_case(case_id: String) -> bool:
 	var case_data := get_case(case_id)
-	if case_data.is_empty() or str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED"]:
+	# Revue des événements (08/10) : surveiller ne doit pas effacer une enquête en cours ni un diagnostic payé.
+	if case_data.is_empty() or str(case_data.get("status", "")) in ["RESOLVED", "RECALLED", "CLOSED", "INVESTIGATING", "DIAGNOSED"]:
 		return false
 	case_data["status"] = "MONITORING"
 	case_data["action"] = "MONITOR"
@@ -575,7 +576,9 @@ func process_month():
 		case_data["months_open"] = int(case_data.get("months_open", 0)) + 1
 		if status == "INVESTIGATING":
 			_process_investigation(case_data)
-		elif status == "MONITORING":
+		elif status in ["MONITORING", "OPEN"]:
+			# 08/10 : un dossier grave laissé ouvert pèse autant qu'un dossier « surveillé » ; avant, l'ignorer
+			# coûtait moins cher que le surveiller.
 			_process_monitoring(case_data)
 	cases_changed.emit()
 
@@ -592,15 +595,26 @@ func _process_investigation(case_data: Dictionary):
 		_learn_from_case(case_data, 2.0 + float(case_data.get("severity", 40.0)) * 0.018)
 		CompanyManager.add_alert("SAV : diagnostic terminé pour %s — %s." % [str(case_data.get("product_name", "Produit")), issue_label(str(case_data.get("issue_type", "")))])
 
+## Mois calmes (retours sous 2 %) avant qu'un dossier surveillé se referme tout seul.
+const CALM_MONTHS_TO_CLOSE := 6
+
 func _process_monitoring(case_data: Dictionary):
 	var severity := float(case_data.get("severity", 40.0))
 	var rate := float(case_data.get("last_return_rate", 0.0))
+	if str(case_data.get("status", "")) == "MONITORING":
+		case_data["calm_months"] = int(case_data.get("calm_months", 0)) + 1 if rate < 0.02 else 0
+		if int(case_data.calm_months) >= CALM_MONTHS_TO_CLOSE:
+			case_data["status"] = "CLOSED"
+			case_data["history"].push_front("Six mois sans signal : le dossier est refermé.")
+			CompanyManager.add_alert("SAV : le dossier %s est refermé, les retours sont redevenus normaux." % str(case_data.get("product_name", "Produit")))
+			return
 	if severity >= 55.0 and rate >= 0.035:
 		var protection := 0.40 if bool(case_data.get("warranty_active", false)) else 1.0
 		CompanyManager.change_reputation({"support":-0.18 * protection, "reliability":-0.12 * protection})
 		case_data["history"].push_front(
 			"La surveillance reste risquée, mais l'extension de garantie limite la perte de confiance." if protection < 1.0
-			else "La surveillance seule commence à peser sur la confiance des clients."
+			else ("Le dossier attend une décision : la confiance des clients s'effrite." if str(case_data.get("status", "")) == "OPEN"
+			else "La surveillance seule commence à peser sur la confiance des clients.")
 		)
 
 func active_departments() -> Array:

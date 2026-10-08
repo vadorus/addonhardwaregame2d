@@ -472,9 +472,18 @@ func _detect_hr_issues():
 				55.0
 			)
 
+## Mois de répit après un dossier RH traité, avant d'en rouvrir un sur le même sujet (08/10 : un dossier
+## « moral » ou « locaux saturés » revenait chaque mois tant que la situation durait).
+const HR_ISSUE_COOLDOWN_MONTHS := 3
+
 func _has_open_issue(issue_type: String, subject_id: String) -> bool:
+	var now := TimeManager.year * 12 + TimeManager.month
 	for issue in hr_issues:
-		if str(issue.get("status", "")) == "OPEN" and str(issue.get("type", "")) == issue_type and str(issue.get("subject_id", "")) == subject_id:
+		if str(issue.get("type", "")) != issue_type or str(issue.get("subject_id", "")) != subject_id:
+			continue
+		if str(issue.get("status", "")) == "OPEN":
+			return true
+		if issue.has("resolved_at") and now - int(issue.resolved_at) < HR_ISSUE_COOLDOWN_MONTHS:
 			return true
 	return false
 
@@ -538,7 +547,13 @@ func resolve_hr_issue(issue_id: String, action: String) -> bool:
 			if not Economy.can_afford(cost, "Action RH exceptionnelle"):
 				return false
 			Economy.add_expense(cost, "Action RH exceptionnelle")
-			if subject_id != "":
+			if str(issue.get("type", "")) == "COHESION" and CompanyManager.departments.has(subject_id):
+				# 08/10 : la prime collective payait 3 500 € sans effet (le département était pris pour un salarié).
+				CompanyManager.departments[subject_id]["cohesion"] = clampf(float(CompanyManager.departments[subject_id].get("cohesion", 30.0)) + 12.0, 0.0, 100.0)
+				for member in PersonnelManager.staff:
+					if str(member.get("department", "")) == subject_id:
+						member["morale"] = clampf(float(member.get("morale", 75.0)) + 3.0, 0.0, 100.0)
+			elif subject_id != "":
 				PersonnelManager.change_employee_morale(subject_id, 14.0)
 			else:
 				PersonnelManager.apply_company_environment(2.5, 0.0)
@@ -546,6 +561,7 @@ func resolve_hr_issue(issue_id: String, action: String) -> bool:
 			return false
 	issue["status"] = "RESOLVED"
 	issue["resolved_action"] = action
+	issue["resolved_at"] = TimeManager.year * 12 + TimeManager.month
 	var history: Array = issue.get("history", [])
 	history.push_front("Résolu par %s." % ("entretien" if action == "DISCUSS" else "mesure financière"))
 	issue["history"] = history
@@ -971,7 +987,7 @@ func get_ceo_decisions() -> Array:
 		decisions.append({
 			"id":"THREAT:%s" % str(threat.get("id", "")),"category":"MENACE","severity":threat_severity,
 			"title":str(threat.get("title", "Menace marché")),"text":"%s • décision sous %d mois • impact encore %d mois." % [str(threat.get("text", "")), maxi(int(threat.get("decision_deadline_months", 3))-int(threat.get("age_months", 0)),0), int(threat.get("remaining_months", 0))],
-			"recommendation":"Réagir coûte %d € ; laisser courir expose à environ %d € de pertes et à l'impact complet." % [MarketManager.threat_response_cost(str(threat.get("id", ""))), MarketManager.threat_ignore_cost(str(threat.get("id", "")))],
+			"recommendation":"Réagir coûte %d € tout de suite ; laisser courir ne coûte rien sur le moment, mais environ %d € de ventes perdues pendant la crise et un peu de réputation." % [MarketManager.threat_response_cost(str(threat.get("id", ""))), MarketManager.threat_ignore_cost(str(threat.get("id", "")))],
 			"target_tab":5,"can_defer":false
 		})
 

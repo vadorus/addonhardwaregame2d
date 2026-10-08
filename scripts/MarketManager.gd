@@ -538,8 +538,22 @@ func production_cost_threat_factor() -> float:
 func threat_response_cost(threat_id: String) -> int:
 	return int(get_market_threat(threat_id).get("response_cost", 0))
 
+## Revue des événements (08/10) : laisser courir n'est plus débité d'un coup (le débit forfaitaire ignorait la
+## trésorerie et rendait la réponse toujours meilleure). Le prix de l'inaction, ce sont les ventes perdues
+## pendant la crise (impact maximal au lieu de l'impact amorti) et la réputation : en voici l'estimation.
 func threat_ignore_cost(threat_id: String) -> int:
-	return int(get_market_threat(threat_id).get("ignore_cost", 0))
+	var threat := get_market_threat(threat_id)
+	if threat.is_empty():
+		return 0
+	var demand_gap := maxf(float(threat.get("mitigated_demand_factor", 1.0)) - float(threat.get("demand_factor", 1.0)), 0.0)
+	var cost_gap := maxf(float(threat.get("cost_factor", 1.0)) - float(threat.get("mitigated_cost_factor", 1.0)), 0.0) * 0.5
+	return int(round(_recent_monthly_revenue() * (demand_gap + cost_gap) * float(maxi(int(threat.get("remaining_months", 0)), 1))))
+
+## La réputation perdue si l'on ne répond pas (annoncée sur la carte).
+func threat_ignore_reputation(threat_id: String) -> String:
+	if str(get_market_threat(threat_id).get("kind", "")) == "PATENT_LAWSUIT":
+		return "clientèle pro −2, prestige −0,5, innovation −1,6"
+	return "clientèle pro −1,2, prestige −0,5"
 
 ## Coût d'une menace : un minimum par époque, mais surtout proportionnel à la taille de l'entreprise.
 ## (Claude, 29/09 : à coût fixe, 40 000 € ne comptaient pas face aux 22 M€ d'une partie de 1985.)
@@ -563,6 +577,11 @@ func _spawn_market_threat(kind: String = "") -> Dictionary:
 	var selected := kind
 	if selected == "" or not MARKET_THREAT_TEMPLATES.has(selected):
 		selected = str(MARKET_THREAT_ORDER[(_next_threat_id - 1) % MARKET_THREAT_ORDER.size()])
+	if selected == "NEW_ENTRANT" and not _can_add_new_market_entrant():
+		# 08/10 : « Nexus Micro arrive » ne doit pas être annoncé si Nexus existe déjà ou a disparu.
+		selected = str(MARKET_THREAT_ORDER[_next_threat_id % MARKET_THREAT_ORDER.size()])
+		if selected == "NEW_ENTRANT":
+			selected = str(MARKET_THREAT_ORDER[0])
 	var template: Dictionary = MARKET_THREAT_TEMPLATES[selected]
 	var threat := {
 		"id":"THREAT-%03d" % _next_threat_id,
@@ -596,14 +615,19 @@ func _spawn_market_threat(kind: String = "") -> Dictionary:
 	market_changed.emit()
 	return threat
 
-func _add_new_market_entrant() -> void:
+func _can_add_new_market_entrant() -> bool:
 	for competitor_value in competitors.get("CPU", []):
 		if str((competitor_value as Dictionary).get("id", "")) == "NEXUS_ENTRANT":
-			return
+			return false
 	# Lot F1 : une société rachetée ou disparue ne renaît pas sous le même nom.
 	for entry_value in corporate_log:
 		if str((entry_value as Dictionary).get("company", "")) == "Nexus Micro":
-			return
+			return false
+	return true
+
+func _add_new_market_entrant() -> void:
+	if not _can_add_new_market_entrant():
+		return
 	var era := era_technology_ceiling()
 	var entrant := {
 		"id":"NEXUS_ENTRANT","sector":"CPU","company":"Nexus Micro","product_prefix":"Nexus",
@@ -624,7 +648,7 @@ func resolve_market_threat(threat_id: String, mitigate: bool) -> bool:
 	var threat := get_market_threat(threat_id)
 	if threat.is_empty() or str(threat.get("status", "")) != "OPEN":
 		return false
-	var cost := int(threat.get("response_cost" if mitigate else "ignore_cost", 0))
+	var cost := int(threat.get("response_cost", 0)) if mitigate else 0
 	if mitigate and not Economy.can_afford(cost):
 		return false
 	if cost > 0:
@@ -636,7 +660,8 @@ func resolve_market_threat(threat_id: String, mitigate: bool) -> bool:
 		if str(threat.get("kind", "")) == "PATENT_LAWSUIT":
 			CompanyManager.change_reputation({"innovation":-1.6,"professional":-0.8})
 	var result_text := "Plan de réponse financé" if mitigate else "Menace laissée sans réponse"
-	CompanyManager.add_alert("%s : %s (%d €)." % [str(threat.get("title", "Menace")), result_text, cost])
+	CompanyManager.add_alert(("%s : %s (%d €)." % [str(threat.get("title", "Menace")), result_text, cost]) if mitigate
+		else "%s : %s, les ventes en pâtiront jusqu'à la fin de la crise." % [str(threat.get("title", "Menace")), result_text])
 	MediaManager.publish_business_event(str(threat.get("title", "Marché")), "%s. L'impact continuera encore %d mois." % [result_text, int(threat.get("remaining_months", 0))], "MARKET_THREAT_RESOLUTION:%s" % str(threat.get("kind", "")))
 	market_changed.emit()
 	return true

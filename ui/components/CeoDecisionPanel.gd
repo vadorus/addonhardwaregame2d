@@ -195,7 +195,7 @@ func options_for(value: Dictionary) -> Array:
 			var threat: Dictionary = MarketManager.get_market_threat(sid)
 			if not threat.is_empty():
 				options.append(_paid("Financer une réponse", "Réduit fortement l'impact pendant le reste de la crise.", "THREAT_MITIGATE", MarketManager.threat_response_cost(sid), true))
-				options.append(_free("Ne pas intervenir", "Les pertes estimées à %s seront comptabilisées et l'impact restera maximal." % eur(MarketManager.threat_ignore_cost(sid)), "THREAT_IGNORE"))
+				options.append(_free("Ne pas intervenir", "Rien à payer, mais l'impact restera maximal : ~%s de ventes perdues sur la crise, %s." % [eur(MarketManager.threat_ignore_cost(sid)), MarketManager.threat_ignore_reputation(sid)], "THREAT_IGNORE"))
 		"MARCHÉ":
 			options.append(_free("Bien noté, on continue", "Le retour reste consultable dans Marché.", "MARKET_ACK", true))
 		"GAMME":

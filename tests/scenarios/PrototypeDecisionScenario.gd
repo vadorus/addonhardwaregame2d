@@ -87,7 +87,9 @@ static func run(host: Node) -> String:
 		return "Pending prototype review did not pause project time and spending"
 
 	var weakness := str(decision.get("weakness", "reliability"))
-	var weakness_before := float(project.get("desired_metrics", {}).get(weakness, 55.0))
+	# 08/10 : l'effet de la revue s'ajoute à l'impact des décisions (celui que la carte annonce), plus aux cibles.
+	var weakness_axis := weakness if weakness in ["performance", "efficiency", "reliability", "innovation"] else "reliability"
+	var weakness_before := float(project.get("cockpit_directive_impact", {}).get(weakness_axis, 0.0))
 	var selected_cost := 0
 	for option_value in decision.get("options", []):
 		var option: Dictionary = option_value
@@ -122,7 +124,7 @@ static func run(host: Node) -> String:
 		lab.queue_free()
 		_restore(research_state, economy_state, company_state)
 		return "Prototype decision history was not recorded"
-	if float(project.get("desired_metrics", {}).get(weakness, 0.0)) <= weakness_before:
+	if float(project.get("cockpit_directive_impact", {}).get(weakness_axis, 0.0)) <= weakness_before:
 		lab.queue_free()
 		_restore(research_state, economy_state, company_state)
 		return "Corrective prototype review did not improve the reported weakness"

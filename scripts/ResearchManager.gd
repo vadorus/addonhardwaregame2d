@@ -722,6 +722,8 @@ func research_budget_factor(total_allocation: int) -> float:
 	var expected_budget := maxf(float(total_allocation) * 6000.0, 6000.0)
 	return clampf(float(continuous_research_budget) / expected_budget, 0.25, 1.80)
 
+const RESEARCH_FOCUS_OTHERS_FACTOR := 0.9
+
 func _process_continuous_research():
 	# Lot E2 : formations, affectations des équipes Vitesse / Énergie / Fiabilité.
 	RESEARCH_TEAMS.process_month()
@@ -733,13 +735,22 @@ func _process_continuous_research():
 	var management := CompanyManager.department_management_modifier("R&D") * DivisionManager.management_modifier("CPU")
 	var budget_factor := research_budget_factor(total_allocation)
 	var total_gain := 0.0
+	# Revue des événements (08/10) : « foncer » sur une découverte était gratuit, donc toujours choisi.
+	# Pendant ces 3 mois, les autres pistes avancent un peu moins vite (l'équipe se concentre).
+	var focus_active := false
+	for focus_key in CPU_RESEARCH_DOMAIN_ORDER:
+		if int((cpu_research_domains[focus_key] as Dictionary).get("momentum_months", 0)) > 0:
+			focus_active = true
 	for key in CPU_RESEARCH_DOMAIN_ORDER:
 		var data: Dictionary = cpu_research_domains[key]
 		var allocated := int(data.get("allocated", 0))
 		if allocated <= 0:
 			continue
 		var before := float(data.get("knowledge", 0.0))
-		var gain := research_month_gain(key, allocated, before, budget_factor, team, management, int(data.get("momentum_months", 0)) > 0)
+		var own_momentum := int(data.get("momentum_months", 0)) > 0
+		var gain := research_month_gain(key, allocated, before, budget_factor, team, management, own_momentum)
+		if focus_active and not own_momentum:
+			gain *= RESEARCH_FOCUS_OTHERS_FACTOR
 		data["knowledge"] = clampf(before + gain, 0.0, 100.0)
 		data["experience"] = clampf(float(data.get("experience", 0.0)) + float(allocated) * 0.16 * management, 0.0, 100.0)
 		data["months"] = int(data.get("months", 0)) + 1
@@ -1629,6 +1640,7 @@ func _calculate_final_metrics(project: Dictionary, team: float, tech: float, bud
 	return metrics
 
 func _complete_project(project: Dictionary, metrics: Dictionary):
+	_shelve_pending_discovery(project)
 	project.final_metrics = metrics.duplicate(true)
 	project.status = "COMPLETED"
 	project.phase_progress = 100.0
@@ -1767,6 +1779,11 @@ func load_state(state: Dictionary):
 	cpu_generation_context = saved_context_value.duplicate(true) if typeof(saved_context_value) == TYPE_DICTIONARY else {}
 	var notebook_value = state.get("discovery_notebook", [])
 	discovery_notebook = (notebook_value as Array).duplicate(true) if typeof(notebook_value) == TYPE_ARRAY else []
+	# Migration 08/10 : une idée restée en suspens sur un CPU déjà terminé passe au carnet (prochain CPU).
+	for loaded_project_value in projects:
+		var loaded_project: Dictionary = loaded_project_value
+		if str(loaded_project.get("status", "")) != "DEVELOPMENT":
+			_shelve_pending_discovery(loaded_project)
 	technologies = state.get("technologies", {}).duplicate(true)
 	if technologies.is_empty():
 		technologies = {"cpu":18.0, "manufacturing":12.0, "software":8.0, "integration":10.0}
@@ -1856,3 +1873,12 @@ func cpu_prototype_comparison(before: Dictionary, after: Dictionary) -> String:
 		var b := float((after.get("metrics", {}) as Dictionary).get(axis, 0.0))
 		parts.append("%s %.1f → %.1f" % [GameData.metric_label(axis), a, b])
 	return "Estimation : " + " • ".join(parts)
+
+## Revue des événements (08/10) : une idée de développeur restée sans réponse à la fin d'un projet
+## n'est plus perdue ni bloquante : elle va dans le carnet de Nora et profitera au CPU suivant.
+func _shelve_pending_discovery(project: Dictionary) -> void:
+	var pending_value = project.get("discovery_pending", {})
+	if typeof(pending_value) != TYPE_DICTIONARY or (pending_value as Dictionary).is_empty():
+		return
+	discovery_notebook.append((pending_value as Dictionary).duplicate(true))
+	project["discovery_pending"] = {}

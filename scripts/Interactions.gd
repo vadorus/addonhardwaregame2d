@@ -198,8 +198,8 @@ static func dialogue(key: String) -> Dictionary:
 			return {"key":key, "person":_person(speaker), "mood":"HAPPY", "kicker":"DÉCOUVERTE R&D",
 				"text":"Bonne nouvelle : on atteint %.0f en %s ! J'ai une piste. Si on s'y consacre à fond pendant 3 mois, on apprend beaucoup plus vite. On fonce ?" % [float(event.get("threshold", 0.0)), ResearchManager.get_cpu_research_label(domain)],
 				"choices":[
-					{"id":"PURSUE", "label":"Fonce, c'est la priorité !", "hint":"Élan de recherche pendant 3 mois + expérience", "primary":true},
-					{"id":"ARCHIVE", "label":"Note-la, on verra plus tard.", "hint":"Le savoir acquis est conservé"},
+					{"id":"PURSUE", "label":"Fonce, c'est la priorité !", "hint":"Cette piste ×1,15 pendant 3 mois, expérience +1,5 • les autres pistes ×0,9 pendant ce temps", "primary":true},
+					{"id":"ARCHIVE", "label":"Note-la, on verra plus tard.", "hint":"Rien ne change : toutes les pistes gardent leur rythme"},
 				]}
 	elif key.begins_with("HR:"):
 		var issue := ExecutiveManager.get_hr_issue(sid)

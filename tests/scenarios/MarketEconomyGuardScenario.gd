@@ -154,11 +154,15 @@ static func run() -> String:
 	MarketManager.market_threats = []
 	var price_war := MarketManager._spawn_market_threat("PRICE_WAR")
 	price_war["age_months"] = int(price_war.get("decision_deadline_months", 3)) - 1
+	# 08/10 : l'inaction n'est plus débitée d'un coup ; elle coûte en ventes (impact maximal) et en réputation.
 	var money_before_ignore := Economy.money
+	var pro_before := float(CompanyManager.reputation.get("professional", 50.0))
 	MarketManager._advance_market_threats()
-	if str(price_war.get("status", "")) != "IGNORED" or Economy.money >= money_before_ignore:
+	if str(price_war.get("status", "")) != "IGNORED" or Economy.money != money_before_ignore \
+			or float(CompanyManager.reputation.get("professional", 50.0)) >= pro_before \
+			or MarketManager.market_threat_demand_factor() > float(price_war.get("demand_factor", 1.0)) + 0.001:
 		_restore(snapshot)
-		return "M4 unanswered threat does not become a costly ignored crisis after its deadline"
+		return "M4 unanswered threat should keep the full demand hit and cost reputation, without a lump-sum debit"
 
 	# 48-month cadence = 2-3 serious threats per decade and at least one in every five-year tranche.
 	MarketManager.market_threats = []

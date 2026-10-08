@@ -50,6 +50,7 @@ static func settle(decision: Dictionary) -> bool:
 		"ARBITRAGE":
 			return DivisionManager.resolve_escalation(sid, false)
 		"SAV":
+			# Un diagnostic payé ou une enquête en cours ne sont jamais écrasés par le choix par défaut.
 			return AfterSalesManager.monitor_case(sid)
 		"MARCHÉ":
 			var product: Dictionary = ProductManager.get_product(sid)

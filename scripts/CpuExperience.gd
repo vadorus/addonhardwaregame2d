@@ -137,4 +137,7 @@ static func _relabel_option(result: Dictionary, id: String, label: String, pitch
 static func _target_label(segment: String) -> String:
 	if segment == "":
 		return "le marché général"
+	# 08/10 : « Mobile Computing », « Home Pc » apparaissaient en anglais ; on prend le libellé du marché.
+	if GameData.SEGMENTS.has(segment):
+		return MarketManager.segment_label(segment).to_lower()
 	return segment.replace("_", " ").capitalize()

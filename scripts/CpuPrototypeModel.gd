@@ -52,7 +52,17 @@ static func milestone(project: Dictionary, phase: int) -> Dictionary:
 		result["title"] = "Le brief de " + str(project.get("name", "votre CPU"))
 		result["question"] = "Quel risque acceptez-vous pour cette génération ? Les estimations ci-dessous suivent votre conception."
 		return result
-	result["title"] = str(context.title) if phase == 2 else "Dernier arbitrage avant validation"
+	if phase != 2:
+		# Revue des événements (08/10) : la phase 4 reprenait les trois boutons de la phase 2. Elle garde
+		# maintenant ses propres choix (dernier effort performance, sobriété, fiabiliser) du catalogue.
+		result["title"] = "Dernier arbitrage avant validation"
+		# Polir l'efficacité réoriente le travail restant sans budget supplémentaire (comme « Réduire la
+		# fréquence » en phase 2) ; le dernier effort performance et la fiabilisation (+1 mois) se paient.
+		for value in result.get("options", []):
+			if typeof(value) == TYPE_DICTIONARY and str(value.get("id", "")) == "POWER":
+				value["cost_once"] = 0
+		return result
+	result["title"] = str(context.title)
 	result["question"] = str(context.detail)
 	var budget := maxi(int(project.get("monthly_cash_cost", 0)), 1000)
 	var options: Array = result.get("options", [])

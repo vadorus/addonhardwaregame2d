@@ -204,6 +204,19 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
   - `CompanyScreen` gagne le signal `navigate_requested`, branché sur `_on_dashboard_navigation`, une scène de Nora (âge, CPU en vente, rang mondial) et `set_viewport_width`.
 - **Test** : `CompanyBranchesScenario` (smoke).
 
+**Revue des événements (après-midi du 08/10)** : chaque choix fait ce qu'il annonce.
+
+- **SAV** (`AfterSalesManager`) : « Surveiller » n'efface plus un diagnostic payé ; un dossier grave laissé ouvert pèse sur la réputation ; un dossier surveillé et calme se referme après 6 mois (`CALM_MONTHS_TO_CLOSE`).
+- **Validation finale** (`DevelopmentGates`) : deux reprises au plus (`MAX_VALIDATION_RECHECKS`), ensuite seul « Valider » est proposé.
+- **Revue prototype** : l'effet annoncé (`prototype_impact`) est exactement celui appliqué, dans `cockpit_directive_impact`.
+- **Phase 4 du CPU** (`CpuPrototypeModel.milestone`) : elle ne recopie plus les boutons de la phase 2 ; elle garde ses choix (dernier effort performance, polir l'efficacité sans surcoût, fiabiliser +1 mois).
+- **Menace marché** (`MarketManager`) : ignorer ne débite plus d'argent ; on affiche une estimation des ventes perdues et la réputation pro baisse. Pas de nouvel entrant si Nexus ne peut pas être ajouté.
+- **Trouvailles** (`ResearchManager`, `WorkshopDiscoveries`) : une idée en suspens à la fin d'un CPU passe au carnet au lieu de bloquer ; poursuivre une piste ralentit les autres (×0,9).
+- **RH** (`ExecutiveManager`, `PersonnelManager`) : un dossier traité ne revient pas avant 3 mois ; la prime collective agit sur la cohésion ; la cohésion baisse si le moral moyen est sous 50.
+- **Test** : `EventsAuditScenario` (smoke). Restent à traiter : contrat d'étude ouvert seulement après le premier lancement, pénalités B2B non annoncées, capacité −28 % du rappel non affichée, arbitrages ACK_ONLY à choix identiques, salon à 250 k€ en 1985.
+
+**Conception Software** : l'audit et le plan (lots 0 à 8) sont dans un Claude Doc partagé avec Alexandre, « Tech Empire — Branche Software : audit, architecture et plan ». Seul le lot 0 (correctifs) passe avant la démo.
+
 
 
 ## 3. Où en est la revue des onglets
