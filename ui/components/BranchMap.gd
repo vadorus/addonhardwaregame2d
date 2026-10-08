@@ -1,4 +1,4 @@
-extends HBoxContainer
+extends BoxContainer
 ## Planche 7 « La carte de l'entreprise » (08/10) : un arbre dont le tronc est le CPU. On touche une branche,
 ## la fiche à droite dit ce qu'elle est, quand elle s'ouvre, et si elle est jouable.
 ## Seules les branches jouables ont un bouton actif (CPU → labo, Logiciel → coin logiciel).

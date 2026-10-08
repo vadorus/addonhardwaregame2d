@@ -1,4 +1,4 @@
-extends HBoxContainer
+extends BoxContainer
 ## Planche 8 « La voix du monde » (08/10) : en tête de l'onglet Marché, ce que le monde dit du dernier CPU.
 ## À gauche : espéré / obtenu, « Vaut-il son prix ? » et le conseil de Nora (baisser ou garder le prix).
 ## À droite : quatre voix — le public, les concurrents, les pros (banc d'essai), la presse.

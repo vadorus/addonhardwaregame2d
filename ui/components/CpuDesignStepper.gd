@@ -508,7 +508,7 @@ func project_name() -> String:
 	if not line.is_empty():
 		return ArchitectureManager.next_model_name(line)
 	var base := new_line_name.strip_edges()
-	return "%s 1" % (base if base != "" else "Nova")
+	return ArchitectureManager.unique_cpu_name("%s 1" % (base if base != "" else "Nova"))
 
 func _default_arch_for_choice() -> String:
 	var line := selected_line()

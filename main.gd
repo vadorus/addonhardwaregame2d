@@ -1764,6 +1764,7 @@ func _open_advanced_from_stepper(spec: Dictionary) -> void:
 
 func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
+	spec["name"] = ArchitectureManager.unique_cpu_name(str(spec.get("name", "Nova CPU")))
 	var ok := ResearchManager.start_project(str(spec.get("name", "Nova CPU")), "CPU",
 		str(spec.get("segment", MarketManager.default_segment())), "INTERNAL", str(spec.get("focus", "BALANCED")),
 		int(spec.get("budget", 45000)), design, {}, {}, str(spec.get("application", "GENERAL")),
@@ -1840,6 +1841,7 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	var project_name := str(spec.get("name", "")).strip_edges()
 	if project_name == "":
 		project_name = "Nova 1"
+	project_name = ArchitectureManager.unique_cpu_name(project_name)
 	var design := CPU_DESIGN.normalize(spec.get("design", CPU_DESIGN.default_design()))
 	var ok := ResearchManager.start_project(
 		project_name,
@@ -2785,6 +2787,7 @@ func _start_project():
 	var name := rd_name.text.strip_edges()
 	if name.is_empty():
 		name = "Nova CPU %d" % (ResearchManager.projects.size() + 1)
+	name = ArchitectureManager.unique_cpu_name(name)
 	var design := _current_cpu_design()
 	var evaluation := CPU_DESIGN.evaluate(design, ResearchManager.get_cpu_capabilities())
 	if not active_cpu_remediation.is_empty():

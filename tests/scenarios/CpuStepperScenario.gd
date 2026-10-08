@@ -40,7 +40,8 @@ static func run(host: Node) -> String:
 	stepper.set("tiers", ["SIGNATURE", "APEX"])
 	var spec: Dictionary = stepper.call("current_spec")
 	stepper.queue_free()
-	if str(spec.architecture_id) != "A4" or (spec.model_tiers as Array).size() != 2 or str(spec.name) != "Nova 1":
+	# 08/10 : « Nova 1 » existe déjà (projet ci-dessus) : la nouvelle gamme propose le premier nom libre.
+	if str(spec.architecture_id) != "A4" or (spec.model_tiers as Array).size() != 2 or str(spec.name) != "Nova 2":
 		return "V0.9 stepper: unexpected spec %s" % str(spec)
 	var count := ResearchManager.projects.size()
 	if not ResearchManager.start_project("Nova Gaming 1", "CPU", str(spec.segment), "INTERNAL", str(spec.focus), int(spec.budget), CpuDesignModel.normalize(spec.design), {}, {}, "GENERAL"):

@@ -1792,6 +1792,11 @@ func _ready() -> void:
 		_fail(privacy_error)
 		return
 	print("[CI] Confidentialité : lisible dans le jeu, aucune permission Android OK")
+	var names_error: String = (load("res://tests/scenarios/UniqueNamesScenario.gd") as Script).call("run", self)
+	if names_error != "":
+		_fail(names_error)
+		return
+	print("[CI] Noms de CPU uniques dans une partie OK")
 	await get_tree().process_frame
 	# Thème du moment (02/10) : la vraie date habille le jeu, le menu peut le couper.
 	var live_theme_error: String = (load("res://tests/scenarios/LiveThemeScenario.gd") as Script).call("run", self)

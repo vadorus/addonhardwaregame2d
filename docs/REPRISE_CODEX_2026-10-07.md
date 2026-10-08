@@ -131,6 +131,7 @@ godot --headless --path . res://tests/tools/demo_economy_probe.tscn -- --tech
 - `PressBoardScenario`
 - `LiveThemeScenario`, adapté à la musique de saison
 
+> ⚠️ La CI refuse **toute ligne `ERROR:`** dans les logs des tests de mise en page. Par exemple, `vertical = true` sur un `HBoxContainer` en produit une : utilisez `BoxContainer`.
 > ⚠️ Un scénario qui rencontre une **erreur d'exécution** GDScript s'interrompt et renvoie `""`, ce qui est lu comme un succès.
 > Après chaque modification, lis aussi la sortie du smoke test (`SCRIPT ERROR`), pas seulement la dernière ligne.
 
@@ -285,9 +286,10 @@ Pour chaque tâche : un test déterministe dans `tests/`, le smoke test au vert,
 4. ✅ **Entreprise → planche 7** (08/10), voir §2 bis. La version « garage simplifiée » reste à faire, voir le point 4 bis.
 4 bis. **Entreprise, sous-pages** : masquer Divisions, Groupe et délégation tant que l'entreprise est un garage. Les déverrouillages actuels sont dans `PAGE_UNLOCKS`.
 5. **Passer Labo et Presse sur `SceneHeader`**, pour unifier le code. Leurs scènes sont aujourd'hui codées à la main dans chaque board.
-6. **Noms de projets uniques.**
-   - Deux « Nova 1 » ont été observés dans une même partie.
-   - Il faut une numérotation automatique et une migration des sauvegardes existantes.
+6. ✅ **Noms de CPU uniques** (08/10) : `ArchitectureManager.unique_cpu_name()` donne au nom le premier numéro libre (« Nova 1 » → « Nova 2 »).
+   - Il est appliqué aux trois points de création (assistant, premier atelier, labo avancé) et à `next_model_name()`.
+   - Tests : `UniqueNamesScenario` ; `CpuStepperScenario` attend désormais « Nova 2 ».
+   - **Non fait** : renommer les doublons des anciennes sauvegardes (ils sont référencés par les produits et la presse ; à décider avec Alexandre).
 7. ✅ **Confidentialité dans le jeu** (08/10) : Menu > « Confidentialité ».
    - Le texte est dans `scripts/PrivacyPolicy.gd`, et `PrivacyScenario` vérifie que l'export ne demande aucune permission Android.
    - **À faire par Alexandre** : recopier dans `ONLINE_URL` l'adresse déclarée dans la Play Console, pour afficher le bouton « Version en ligne ».

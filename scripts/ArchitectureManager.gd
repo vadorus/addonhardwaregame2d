@@ -252,7 +252,41 @@ func get_line(line_id: String) -> Dictionary:
 
 ## Nom proposé pour la prochaine génération d'une gamme : « Nova Gaming 3 ».
 func next_model_name(line: Dictionary) -> String:
-	return "%s %d" % [str(line.get("name", "Nova")), int(line.get("generations", 0)) + 1]
+	return unique_cpu_name("%s %d" % [str(line.get("name", "Nova")), int(line.get("generations", 0)) + 1])
+
+## Revue du 07/10 : deux « Nova 1 » dans une même partie (un nouveau projet nommé comme un projet en cours,
+## ou une gamme recréée sous le même nom). Un nom de CPU est maintenant unique dans la partie.
+func cpu_name_taken(candidate: String) -> bool:
+	var wanted := candidate.strip_edges().to_lower()
+	for project_value in ResearchManager.projects:
+		if str((project_value as Dictionary).get("name", "")).strip_edges().to_lower() == wanted:
+			return true
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("company", CompanyManager.company_name)) != CompanyManager.company_name:
+			continue
+		if str(product.get("generation_name", product.get("name", ""))).strip_edges().to_lower() == wanted:
+			return true
+	return false
+
+## Le nom demandé s'il est libre, sinon le même avec le premier numéro libre (« Nova 1 » → « Nova 2 »…).
+func unique_cpu_name(candidate: String) -> String:
+	var clean := candidate.strip_edges()
+	if clean == "":
+		clean = "Nova 1"
+	if not cpu_name_taken(clean):
+		return clean
+	var base := clean
+	var number := 1
+	var digits := RegEx.create_from_string("^(.*?)\\s*(\\d+)$").search(clean)
+	if digits != null:
+		base = digits.get_string(1).strip_edges()
+		number = int(digits.get_string(2))
+	for next in range(number + 1, number + 200):
+		var proposal := "%s %d" % [base, next]
+		if not cpu_name_taken(proposal):
+			return proposal
+	return "%s %d" % [base, Time.get_ticks_msec() % 100000]
 
 ## Relie un projet qui vient de démarrer à sa gamme et à son architecture.
 func register_project(project_name: String, line_id: String, arch_id: String, tiers: Array) -> void:
