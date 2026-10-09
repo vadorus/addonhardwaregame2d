@@ -3459,11 +3459,16 @@ func _on_node_added(node: Node) -> void:
 	# L'exécution différée laisse les composants définir leur taille initiale.
 	if _is_mobile() and node is Control and is_ancestor_of(node):
 		if node is BaseButton or node is HSlider or node is VSlider or node is SpinBox or node is LineEdit:
-			# Un rafraîchissement ultérieur peut réduire la taille ou changer "Valider".
-			var target_changed := _apply_mobile_touch_target.bind(node)
-			if not (node as Control).minimum_size_changed.is_connected(target_changed):
-				(node as Control).minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
-			_apply_mobile_touch_target.call_deferred(node)
+			if not node.has_meta("_t2_target_registered"):
+				node.set_meta("_t2_target_registered", true)
+				var control := node as Control
+				var min_height: float = UI.TOUCH_PRIMARY if UI.touch_kind(control) == "primary" else UI.TOUCH_SECONDARY
+				if control.custom_minimum_size.x < UI.TOUCH_SECONDARY or control.custom_minimum_size.y < min_height:
+					# Réécouter seulement les éléments dont la taille doit être protégée.
+					var target_changed := _apply_mobile_touch_target.bind(node)
+					if not control.minimum_size_changed.is_connected(target_changed):
+						control.minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
+					_apply_mobile_touch_target.call_deferred(node)
 	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
 	if node is BaseButton and not node.has_meta("silent"):
 		var button := node as BaseButton

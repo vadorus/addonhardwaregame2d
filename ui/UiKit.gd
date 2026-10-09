@@ -26,15 +26,18 @@ static func touch_target(control: Control, kind: String = "secondary", force_mob
 	if control == null or (not force_mobile and not OS.has_feature("mobile")):
 		return
 	var height := TOUCH_PRIMARY if kind == "primary" else TOUCH_SECONDARY
-	var minimum := Vector2(maxf(control.custom_minimum_size.x, TOUCH_SECONDARY), maxf(control.custom_minimum_size.y, height))
-	if minimum != control.custom_minimum_size:
-		control.custom_minimum_size = minimum
 	if control.get_parent() is Container:
 		touch_spacing(control.get_parent() as Container, force_mobile)
+	if control.custom_minimum_size.x >= TOUCH_SECONDARY and control.custom_minimum_size.y >= height:
+		return
+	control.custom_minimum_size = Vector2(maxf(control.custom_minimum_size.x, TOUCH_SECONDARY), maxf(control.custom_minimum_size.y, height))
 
 static func touch_spacing(container: Container, force_mobile: bool = false) -> void:
 	if container == null or (not force_mobile and not OS.has_feature("mobile")):
 		return
+	if container.has_meta("_t2_touch_spacing_done"):
+		return
+	container.set_meta("_t2_touch_spacing_done", true)
 	if container is BoxContainer:
 		container.add_theme_constant_override("separation", maxi(container.get_theme_constant("separation"), TOUCH_GAP))
 	elif container is FlowContainer:
