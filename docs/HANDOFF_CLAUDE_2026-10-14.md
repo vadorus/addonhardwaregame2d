@@ -21,6 +21,12 @@
 - Certaines améliorations audio / rendu et la limitation 30/60 FPS apparaissent dans le code bien qu'anciens audits les signalent absentes.
 - Une carte des futures branches existe ; ni boutique DLC ni vérification des achats réellement opérationnelle n'ont été confirmées.
 
+## Nouveau dossier de planification au 10/10
+
+- [AUD-001 — Audit multidisciplinaire](AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md) : preuves actuelles de code et constats d'audits historiques distincts.
+- [Plan priorisé complet](PLAN_PRIORISE_2026-10-10.md) : codes QA-00, PLAY-00, VIS-00, FTUE-01, CPU-01, BUD-01, CAREER-01, NAR-01, etc. **C'est une proposition** ; le plan de phase 1 du 8 octobre est conservé, ses tâches déjà fusionnées doivent être réconciliées avec Git.
+- **Attention :** aucun nouveau test Godot / Pixel n'a été exécuté pour AUD-001 ; ne pas en tirer une validation du commit de démo.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

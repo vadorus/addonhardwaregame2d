@@ -19,6 +19,16 @@
 - **PR :** [#83 — référentiel documentaire, brouillon](https://github.com/vadorus/addonhardwaregame2d/pull/83). Commit principal `f075c76`, correction README `43a4fcd`.
 - **Statut :** poussé sur branche de documentation et PR brouillon ouverte ; **fusion non effectuée**, revue Claude possible à son retour.
 
+### AUD-001 — 10/10/2026 — Audit de développement et priorités
+
+- **Auteur :** ChatGPT ; **base examinée :** `v013/demo-octobre` @ `c1d4f6e`, version `0.12.2`.
+- **Fichiers ajoutés :** `docs/AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md` et `docs/PLAN_PRIORISE_2026-10-10.md`.
+- **Fichiers de suivi complétés :** `docs/INDEX.md`, `docs/JOURNAL_DEVELOPPEMENT.md` et `docs/HANDOFF_CLAUDE_2026-10-14.md`.
+- **Travaux :** inventaire de la simulation, du gameplay, des scripts narratifs, des écrans, des sauvegardes, des optimisations C4, de la monétisation ; distinction preuves historiques / état présent.
+- **Vérifications réelles :** lecture GitHub et contrôle des liens sur la branche ; **aucun test Godot ni essai Pixel réalisé** pour cet audit documentaire.
+- **Livraison :** ajout sur la **PR #83 en brouillon** ; aucun changement de code de jeu ni fusion.
+- **Suite Claude :** confronter le plan aux modifications ultérieures, valider l'ordre proposé et identifier les nouvelles mesures / captures nécessaires.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :
@@ -27,5 +37,6 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 | --- | --- | --- | --- | --- | --- | --- |
 | DOC-001 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; SHA via Git | Documentation, `README.md` | Non requis (docs) | Non requis | À relire ; pas fusionné |
 
-**Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).
+| AUD-001 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; [PR #83](https://github.com/vadorus/addonhardwaregame2d/pull/83) | Audit + plan priorisé | Non exécuté (audit documentaire) | Non exécuté | À relire ; pas fusionné |
 
+**Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).

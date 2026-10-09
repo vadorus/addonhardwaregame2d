@@ -26,6 +26,11 @@
 
 Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIBLE.md), puis [SIMULATION_PHILOSOPHY.md](SIMULATION_PHILOSOPHY.md), [GAME_DESIGN.md](GAME_DESIGN.md), [CPU_VERTICAL_SLICE.md](CPU_VERTICAL_SLICE.md) et [VISION.md](VISION.md). En cas de contradiction, consigner le conflit dans [DECISIONS.md](DECISIONS.md), ne pas arbitrer tacitement.
 
+## Audit et plan priorisé (10/10)
+
+- [AUD-001 — audit multidisciplinaire sur le HEAD](AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md) — audit **de code + rapports**, pas nouvelle mesure Pixel.
+- [Plan priorisé 2026-10-10](PLAN_PRIORISE_2026-10-10.md) — backlog complet avec dépendances, critères et efforts **proposés** ; n'annule pas la phase 1 officiellement figée.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |
