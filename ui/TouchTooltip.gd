@@ -101,9 +101,12 @@ func _open_if_still_pressed(ticket: int) -> void:
 
 func _show_bubble(message: String, at: Vector2) -> void:
 	var canvas_size := get_viewport().get_visible_rect().size
-	_description.text = message
 	_bubble.custom_minimum_size.x = minf(420.0, maxf(180.0, canvas_size.x - 32.0))
 	_description.custom_minimum_size.x = _bubble.custom_minimum_size.x - 36.0
+	# Le Label calcule ses lignes avec sa largeur courante. Avant le premier
+	# tri du Container, une largeur nulle ferait une ligne par caractere.
+	_description.size.x = _description.custom_minimum_size.x
+	_description.text = message
 	_bubble.visible = true
 	_bubble.reset_size()
 	var size_hint := _bubble.get_combined_minimum_size()

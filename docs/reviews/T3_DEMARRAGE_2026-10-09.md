@@ -1,5 +1,7 @@
 # T3 — Démarrage des infobulles tactiles (9 octobre 2026)
 
+**Complément de reprise :** les contrôles PC/Pixel ciblés et la correction de la première bulle sont documentés dans [T3_PIXEL_ACTIONS_2026-10-09.md](T3_PIXEL_ACTIONS_2026-10-09.md). Les limites ci-dessous décrivent l'état du premier lot.
+
 **Branche locale :** `codex/t3-mobile-tooltips`, fondée sur `v013/demo-octobre` au commit `d014aee`. Aucune fusion, aucun push T3.
 
 ## Objectif du plan

@@ -1,0 +1,211 @@
+{
+	"counts": {
+		"Confirmer": 2,
+		"Lancer": 2,
+		"Valider": 2
+	},
+	"loaded": true,
+	"mobile": true,
+	"records": [
+		{
+			"button": "Valider",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 1
+			},
+			"event": "pressed",
+			"ticks": 38515
+		},
+		{
+			"bubble": false,
+			"button": "Valider",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 1
+			},
+			"event": "release",
+			"ticks": 38526
+		},
+		{
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 1
+			},
+			"event": "tooltip",
+			"message": "Explication T3 : Valider agit seulement avec un appui court.",
+			"ticks": 39173
+		},
+		{
+			"bubble": true,
+			"button": "Valider",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 1
+			},
+			"event": "release",
+			"ticks": 39441
+		},
+		{
+			"button": "Valider",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 2
+			},
+			"event": "pressed",
+			"ticks": 72907
+		},
+		{
+			"bubble": false,
+			"button": "Valider",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 0,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 72913
+		},
+		{
+			"button": "Lancer",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 1,
+				"Valider": 2
+			},
+			"event": "pressed",
+			"ticks": 73107
+		},
+		{
+			"bubble": false,
+			"button": "Lancer",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 1,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 73112
+		},
+		{
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 1,
+				"Valider": 2
+			},
+			"event": "tooltip",
+			"message": "Explication T3 : Lancer agit seulement avec un appui court.",
+			"ticks": 73673
+		},
+		{
+			"bubble": true,
+			"button": "Lancer",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 1,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 73973
+		},
+		{
+			"button": "Lancer",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "pressed",
+			"ticks": 75906
+		},
+		{
+			"bubble": false,
+			"button": "Lancer",
+			"counts": {
+				"Confirmer": 0,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 75911
+		},
+		{
+			"button": "Confirmer",
+			"counts": {
+				"Confirmer": 1,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "pressed",
+			"ticks": 75973
+		},
+		{
+			"bubble": false,
+			"button": "Confirmer",
+			"counts": {
+				"Confirmer": 1,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 75976
+		},
+		{
+			"counts": {
+				"Confirmer": 1,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "tooltip",
+			"message": "Explication T3 : Confirmer agit seulement avec un appui court.",
+			"ticks": 76673
+		},
+		{
+			"bubble": true,
+			"button": "Confirmer",
+			"counts": {
+				"Confirmer": 1,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 76939
+		},
+		{
+			"button": "Confirmer",
+			"counts": {
+				"Confirmer": 2,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "pressed",
+			"ticks": 78906
+		},
+		{
+			"bubble": false,
+			"button": "Confirmer",
+			"counts": {
+				"Confirmer": 2,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "release",
+			"ticks": 78910
+		},
+		{
+			"counts": {
+				"Confirmer": 2,
+				"Lancer": 2,
+				"Valider": 2
+			},
+			"event": "tooltip",
+			"message": "Labo",
+			"ticks": 113815
+		}
+	],
+	"writes_enabled": false
+}
