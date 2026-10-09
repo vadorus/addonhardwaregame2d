@@ -4,6 +4,10 @@
 **Méthode :** lecture ciblée des fichiers actuels, inventaire des scènes/scripts/tests, examen critique des rapports du 6 au 9 octobre. **Ce n'est PAS un nouvel essai du jeu sur Pixel, une campagne complète de tests ni une mesure de FPS.**  
 **But :** distinguer défaut de code, défaut d'ergonomie, défaut d'équilibrage et manque de contenu pour prioriser sans défaire les améliorations validées.
 
+## Complément QA-00 : une exécution réelle a suivi cet audit de code
+
+Cet audit a été complété, **sans remplacement rétrospectif de sa méthode initiale**, par [QA-00 : campagne sur PC, sondes d'économie et de narration](reviews/RETOUR_2026-10-10_QA00.md). Les données nouvelles s'appliquent au **même HEAD `c1d4f6e`**. Résultats : tests CPU/Software/finance passants, problèmes de nettoyage lors du test tactile, faillites précoces en STANDARD pour une graine, accumulation de 225 M€ en ACCESSIBLE avec la stratégie ADAPTEE, 91 corps d'articles répétés sur 100 entrées homogènes. Aucun parcours utilisateur humain ni nouvelle performance Pixel.
+
 ## Synthèse et niveaux de confiance
 
 **Verdict provisoire :** socle d'alpha techniquement jouable, nombreuses mécaniques et tests, mais qualité du jeu à confirmer par une partie humaine reproductible. Le risque dominant pour l'intérêt du joueur est le **temps passé à attendre et répéter des choix proches**, suivi de la lisibilité / cohérence des écrans, de la narration répétitive et de l'équilibrage de carrière. La performance est un **risque mesuré sur certaines anciennes révisions**, pas une permission de refaire l'interface au hasard. La croissance future présente un risque de couplage.

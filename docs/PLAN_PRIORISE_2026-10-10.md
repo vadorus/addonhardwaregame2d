@@ -5,6 +5,12 @@
 **Source d'audit :** [AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md](AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md).  
 **Périmètre immédiat :** démo CPU Android + sauvegardes intactes ; Software déjà présent mais boucle distincte à améliorer **sans ouvrir de nouveaux secteurs**.
 
+## Mise à jour de preuve QA-00 — 10/10
+
+[Résultats de tests réellement exécutés](reviews/RETOUR_2026-10-10_QA00.md) au commit `c1d4f6e` : **12 commandes Godot sorties 0**, avertissement UID à froid non reproduit au re-import, **fuites moteur au test tactile**, budget second CPU/parcours CPU et Software PASS. La sonde `104729` confirme une **forte instabilité d'équilibrage** selon le mode (STANDARD ADAPTEE faillite février 1973, ACCESSIBLE ADAPTEE 225 M€ fin de sonde). La presse donne **9 textes distincts sur 100 articles homogènes**. Une capture QG PC est valide ; les autres onglets sont encore à revoir.
+
+**Arbitrage recommandé après preuve :** avancer `CAREER-01` et `BUD-01` à côté de `PLAY-00`, puis traiter `NAR-00` et `NAR-01` avant toute expansion. **Ne pas modifier les valeurs économiques avant la sonde multi-graines.**
+
 ## Règles de priorisation
 
 - **P0 — Bloquant :** corruption/effacement de partie, crash, mauvais comportement d'un bouton payant/critique, progression impossible, calcul économique faux démontré, tests de base cassés.

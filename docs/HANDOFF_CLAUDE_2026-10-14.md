@@ -27,6 +27,12 @@
 - [Plan priorisé complet](PLAN_PRIORISE_2026-10-10.md) : codes QA-00, PLAY-00, VIS-00, FTUE-01, CPU-01, BUD-01, CAREER-01, NAR-01, etc. **C'est une proposition** ; le plan de phase 1 du 8 octobre est conservé, ses tâches déjà fusionnées doivent être réconciliées avec Git.
 - **Attention :** aucun nouveau test Godot / Pixel n'a été exécuté pour AUD-001 ; ne pas en tirer une validation du commit de démo.
 
+## QA-00 réellement exécuté sur PC le 10/10
+
+[Rapport technique avec résultats, commandes et limites](reviews/RETOUR_2026-10-10_QA00.md).
+
+**Points nécessitant la relecture de Claude :** sortie tactile (RID/ObjectDB leaks), avertissement UID à froid, économie graine 104729 (STANDARD ADAPTEE faillite en 1973, ACCESSIBLE ADAPTEE 225 M€ et rang Empire 3), script `career_probe.gd` qui affiche le faux commit `eff0871`, et presse : 91 corps répétés sur 100 articles homogènes. QG capture PC uniquement ; autres onglets, Pixel et ancienne sauvegarde **non testés**.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

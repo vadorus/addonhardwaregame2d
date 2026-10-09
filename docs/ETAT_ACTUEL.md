@@ -7,6 +7,12 @@
 **Moteur / version du projet :** Godot 4.7.2 / `0.12.2` d'après `project.godot`.  
 **Portée de cette révision :** lecture du dépôt et de preuves existantes. **Aucun nouveau test Godot, build, APK ou essai physique Pixel n'a été exécuté** pour cette photographie.
 
+## QA-00 — vérification réellement exécutée au même HEAD, 10/10/2026
+
+[Rapport réel PC, économie et narration](reviews/RETOUR_2026-10-10_QA00.md) : 12 commandes Godot terminent code 0 ; re-import propre après avertissement UID initial, smoke/budget second CPU/parcours CPU/Software PASS ; scénario cible tactile PASS mais **fuites moteur à la fermeture**. Graîne 104729 : STANDARD ADAPTEE/EN_RETARD faillite 02/1973 ; ACCESSIBLE ADAPTEE 225 M€ ; aucune première place dans la **colonne rang Empire**. Articles gabarits : 100 essais homogènes, 9 corps distincts, 91 répétés après neutralisation des noms. Capture QG PC réussie ; sept onglets **non validés**. **Aucun essai Pixel actuel.**
+
+Cette mise à jour complète mais n'efface pas la photographie statique antérieure.
+
 ## Tableau de statut
 
 | Domaine | Constat au HEAD | Niveau de preuve | Suite |

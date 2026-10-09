@@ -29,6 +29,16 @@
 - **Livraison :** ajout sur la **PR #83 en brouillon** ; aucun changement de code de jeu ni fusion.
 - **Suite Claude :** confronter le plan aux modifications ultérieures, valider l'ordre proposé et identifier les nouvelles mesures / captures nécessaires.
 
+### QA-00 — 10/10/2026 — Contrôles fonctionnels et sondes réelles
+
+- **Responsable :** ChatGPT ; **base de test :** `c1d4f6e`, Godot 4.7.2 stable, copie `TechEmpire-AUD001-20261010` isolée.
+- **Fichiers ajoutés :** `docs/reviews/RETOUR_2026-10-10_QA00.md`.
+- **Résultats :** 12 commandes code 0, import à froid UID transitoire résolu par un second import, test tactile PASS mais fuites à la sortie ; budget second CPU, finance, CPU, Software, smoke PASS.
+- **Sondes :** STANDARD graine 104729 ADAPTEE faillite 02/1973 ; ACCESSIBLE ADAPTEE **225 187 329 €** fin 2030, rang Empire 3 ; 100 articles homogènes → 9 corps distincts seulement.
+- **Visuel :** QG rendu 1280×720. Les autres onglets étaient normalement verrouillés dans la fixture de départ, **non validés visuellement**.
+- **Code / sauvegardes :** aucun fichier suivi du jeu modifié, worktree personnel non utilisé, aucune action sur Pixel.
+- **État Git :** rapport ajouté sur PR #83 brouillon, aucune fusion. Prochains travaux `CAREER-01`, `NAR-00`, `PLAY-00` / `VIS-00`.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :
@@ -38,5 +48,7 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 | DOC-001 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; SHA via Git | Documentation, `README.md` | Non requis (docs) | Non requis | À relire ; pas fusionné |
 
 | AUD-001 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; [PR #83](https://github.com/vadorus/addonhardwaregame2d/pull/83) | Audit + plan priorisé | Non exécuté (audit documentaire) | Non exécuté | À relire ; pas fusionné |
+
+| QA-00 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; [PR #83](https://github.com/vadorus/addonhardwaregame2d/pull/83) | [Rapport tests réels](reviews/RETOUR_2026-10-10_QA00.md) | 12 commandes Godot code 0, limites détaillées | Non testé | PR brouillon ; pas fusionné |
 
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).

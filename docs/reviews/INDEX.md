@@ -4,6 +4,7 @@
 
 | Document | Date | Statut d'usage en octobre | Limites |
 | --- | --- | --- | --- |
+| [QA-00 : PC, économie et narration](RETOUR_2026-10-10_QA00.md) | 10/10 | **Preuve actuelle au SHA c1d4f6e** | 12 commandes code 0 ; avertissement UID initial, fuites au test T2 ; 1 graine pour carrière, pas de Pixel |
 | [P0 Pixel référence 12 mois](P0_PIXEL_REFERENCE12_COMPLET_2026-10-08.md) | 08/10 | **Historique / baseline** | APK antérieur aux optimisations, pas mesure de la démo HEAD |
 | [Validation T2 / C2 / R1 / A1](T2_PIXEL_C2_R1_A1_2026-10-09.md) | 09/10 | **Preuve datée** | Certains écrans et le ressenti audio / animations restent à vérifier |
 | [T3 actions Pixel](T3_PIXEL_ACTIONS_2026-10-09.md) | 09/10 | **Preuve datée**, T3 fusionné ensuite | Complément focus testé sur PC, pas retesté sur Pixel |

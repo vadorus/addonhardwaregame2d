@@ -31,6 +31,10 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 - [AUD-001 — audit multidisciplinaire sur le HEAD](AUDIT_MULTIDISCIPLINAIRE_2026-10-10.md) — audit **de code + rapports**, pas nouvelle mesure Pixel.
 - [Plan priorisé 2026-10-10](PLAN_PRIORISE_2026-10-10.md) — backlog complet avec dépendances, critères et efforts **proposés** ; n'annule pas la phase 1 officiellement figée.
 
+## Première campagne de tests réellement exécutée
+
+- [QA-00 — Godot PC, économie et presse](reviews/RETOUR_2026-10-10_QA00.md), 10/10/2026, commit `c1d4f6e`. Les tests code 0, warnings et défauts mesurés sont séparés ; pas de Pixel ni testeur novice.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |
