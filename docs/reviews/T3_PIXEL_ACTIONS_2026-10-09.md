@@ -2,6 +2,8 @@
 
 9 octobre 2026. Dépôt `vadorus/addonhardwaregame2d`, branche exclusive `codex/t3-mobile-tooltips`. Aucune fusion effectuée. La seule commande Git distante utilisée pour livrer ce lot est `git push origin codex/t3-mobile-tooltips` ; son résultat figure dans le dossier local de livraison.
 
+**Mise à jour focus :** les preuves Pixel ci-dessous concernent le lot `2371e06`. Le correctif ultérieur de perte de focus et ses nouveaux tests PC sont décrits dans le complément à la fin de ce rapport. Le Pixel n'a pas été retesté pour ce complément, conformément à la demande.
+
 ## Changement et provenance
 
 La reprise commence à `054222c041e9efdb14c9c1405b6ca24ecbcb60d0`, copie de travail propre. Les commits T3 `b3612b1` (infobulles) et `054222c` (premiers tests Valider/Lancer/Confirmer) existaient déjà, au-dessus de la base T2 `d014aee`. Ils ne sont pas présentés comme du travail nouvellement réalisé.
@@ -70,3 +72,21 @@ Les événements et compteurs sont versionnés dans [t3_pixel_actions_2026_10_09
 Le cas obligatoire de non-validation au relâchement est couvert sur PC et Pixel, et le défaut visuel observé est corrigé et couvert. Le contrôle des trois boutons est une sonde instrumentée ; il ne prouve pas individuellement tous les boutons de décision du gameplay. Le vrai dock est contrôlé en complément.
 
 La lecture exhaustive des 26 explications, les fenêtres fermées pendant un maintien et le ressenti au doigt restent hors de ce contrôle ciblé. Aucun résultat de CI GitHub n'est revendiqué : aucune consultation de GitHub, aucun workflow ni aucune PR n'ont été créés par outil. La fusion attend la relecture de Claude.
+
+## Complément demandé : annulation lors de la perte de focus
+
+Reprise depuis `2371e06`, copie de travail propre, toujours sur `codex/t3-mobile-tooltips`.
+
+`TouchTooltip.gd` définit maintenant `_notification(what: int)`. Pour `NOTIFICATION_APPLICATION_FOCUS_OUT` et `NOTIFICATION_WM_WINDOW_FOCUS_OUT`, elle appelle `_cancel()` puis `_hide_bubble()`. Une interruption ne laisse donc pas le bouton temporairement désactivé ni son explication visible.
+
+Le scénario `touch_tooltip_scenario` teste séparément les notifications 2017 et 1005, envoyées par `Node.notification` : maintien au-delà de 450 ms sur Confirmer, bouton désactivé et bulle visible, perte de focus, bulle masquée immédiatement, puis bouton réactivé après traitement différé **sans envoyer de relâchement tactile**. Un relâchement tardif n'émet aucun `pressed`, et l'appui court suivant émet exactement un signal. Les six cas d'action précédents passent également.
+
+Vérifications exécutées avec Godot 4.7.2 après cette correction :
+
+- Import : code 0, aucune erreur de script/parse.
+- Démarrage `--quit-after 2` : code 0, journal sans erreur.
+- `touch_tooltip_scenario.tscn` : PASS, six cas d'action et deux cas de perte de focus, journal sans erreur.
+- `smoke_test.tscn` : PASS, code 0 ; les deux avertissements d'ancres déjà observés persistent.
+- `git diff --check` : PASS.
+
+Fichiers du complément : `ui/TouchTooltip.gd`, `tests/touch_tooltip_scenario.gd` et ce rapport. Aucun contrôle Pixel complet, aucune installation Android, aucune action sur les sauvegardes, aucun pull et aucune fusion n'ont été effectués pour ce complément. Publication uniquement par le push de la branche T3. La correction demandée est couverte par les tests PC ; la fusion elle-même reste à effectuer séparément.

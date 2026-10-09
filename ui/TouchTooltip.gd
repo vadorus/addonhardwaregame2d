@@ -144,6 +144,11 @@ func _hide_bubble() -> void:
 	if _bubble != null:
 		_bubble.visible = false
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_cancel()
+		_hide_bubble()
+
 func _input(event: InputEvent) -> void:
 	if _active == null:
 		return

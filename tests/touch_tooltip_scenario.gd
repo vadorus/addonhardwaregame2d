@@ -138,6 +138,49 @@ func _ready() -> void:
 		action.queue_free()
 		await get_tree().process_frame
 
+	# Un passage en arriere-plan peut supprimer le relachement tactile.
+	# Les deux notifications doivent donc restaurer le bouton sans cet evenement.
+	var focus_action := Button.new()
+	focus_action.text = "Confirmer"
+	focus_action.tooltip_text = "Aide T3 : confirmation apres retour au jeu."
+	focus_action.position = Vector2(490, 215)
+	focus_action.size = Vector2(250, 85)
+	focus_action.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+	focus_action.set_meta("press_count", 0)
+	focus_action.pressed.connect(func(): focus_action.set_meta("press_count", int(focus_action.get_meta("press_count")) + 1))
+	root.add_child(focus_action)
+	tooltip.register(focus_action)
+	await get_tree().process_frame
+	var focus_point := focus_action.position + Vector2(65, 38)
+	for notification_type in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		var context := "Perte de focus %d" % notification_type
+		var count_before := int(focus_action.get_meta("press_count"))
+		push_action_click(viewport, focus_point, true, true)
+		await get_tree().create_timer(0.54).timeout
+		check(focus_action.disabled, context + " : bouton non desactive pendant le maintien")
+		check(tooltip.is_bubble_visible(), context + " : infobulle absente pendant le maintien")
+		tooltip.notification(notification_type)
+		check(not tooltip.is_bubble_visible(), context + " : infobulle encore visible")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		check(not focus_action.disabled, context + " : bouton reste desactive sans relachement")
+		check(int(focus_action.get_meta("press_count")) == count_before,
+			context + " : pressed emis pendant l'annulation")
+		# Un relachement tardif ne valide pas l'ancien maintien.
+		push_action_click(viewport, focus_point, false, true)
+		await get_tree().process_frame
+		check(int(focus_action.get_meta("press_count")) == count_before,
+			context + " : pressed emis au relachement tardif")
+		push_action_click(viewport, focus_point, true, true)
+		await get_tree().process_frame
+		push_action_click(viewport, focus_point, false, true)
+		await get_tree().process_frame
+		check(int(focus_action.get_meta("press_count")) == count_before + 1,
+			context + " : appui court suivant inutilisable")
+		print("[T3] %s: bubble_hidden, button_enabled_without_release, next_short=1" % context)
+	focus_action.queue_free()
+	await get_tree().process_frame
+
 	viewport.queue_free()
 	if failures.is_empty():
 		print("[CI] T3 TouchTooltipScenario PASS: 450ms hold, short press, correct text, cancel, no click on hold")
