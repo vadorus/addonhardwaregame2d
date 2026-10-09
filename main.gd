@@ -3460,7 +3460,9 @@ func _on_node_added(node: Node) -> void:
 	if _is_mobile() and node is Control and is_ancestor_of(node):
 		if node is BaseButton or node is HSlider or node is VSlider or node is SpinBox or node is LineEdit:
 			# Un rafraîchissement ultérieur peut réduire la taille ou changer "Valider".
-			(node as Control).minimum_size_changed.connect(_apply_mobile_touch_target.bind(node), CONNECT_DEFERRED)
+			var target_changed := _apply_mobile_touch_target.bind(node)
+			if not (node as Control).minimum_size_changed.is_connected(target_changed):
+				(node as Control).minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
 			_apply_mobile_touch_target.call_deferred(node)
 	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
 	if node is BaseButton and not node.has_meta("silent"):
