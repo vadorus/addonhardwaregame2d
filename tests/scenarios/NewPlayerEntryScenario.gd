@@ -188,10 +188,10 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: guided workshop stayed open after project launch"
-	if TimeManager.time_scale <= 0.0:
+	if TimeManager.time_scale != 0.0:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: simulation did not start when the first CPU entered development"
+		return "C3 entry: first CPU launch bypassed the initial Concept directive"
 	if feedback_panel.visible:
 		game.queue_free()
 		_restore(snapshot)

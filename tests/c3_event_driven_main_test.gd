@@ -6,6 +6,32 @@ func check(value: bool, reason: String) -> void:
 	if not value:
 		failures.append(reason)
 
+func check_workshop_resumes(game: Control) -> void:
+	for action in ["_software_to_hardware", "_launch_cpu_from_stepper", "_launch_first_cpu_from_workshop"]:
+		for blocked in [false, true]:
+			SimulationManager.reset_all("C3 resume test", "CPU", "ACCESSIBLE")
+			TimeManager.time_scale = 0.0
+			var spec := {"name":"Resume CPU", "budget":45000}
+			if action == "_software_to_hardware":
+				# Un vrai projet CPU ouvre le labo, sans autre arrêt masquant la reprise.
+				game.call("_launch_first_cpu_from_workshop", spec)
+				check(not ResearchManager.projects.is_empty(), "Resume fixture did not create a CPU project")
+				ResearchManager.projects[0]["cockpit_directive_pending"] = {}
+				ResearchManager.projects[0]["cockpit_interactive"] = false
+				game.set("_software_resume_scale", 3.0)
+			TimeManager.time_scale = 0.0
+			if blocked:
+				SoftwareManager.projects = [{"id":"resume-blocker", "status":"DECISION"}]
+			if action == "_software_to_hardware":
+				game.call(action)
+			else:
+				game.call(action, spec)
+				check(not ResearchManager.projects.is_empty(), action + " did not actually start a CPU")
+			# Un CPU nouvellement créé attend déjà sa première orientation de phase.
+			var expected := 3.0 if action == "_software_to_hardware" and not blocked else 0.0
+			check(TimeManager.time_scale == expected,
+				"%s resume should be immediate (blocker=%s, speed=%s)" % [action, blocked, expected])
+
 func _ready() -> void:
 	SaveManager.use_test_folder()
 	SaveManager.writes_enabled = false
@@ -83,6 +109,7 @@ func _ready() -> void:
 	game.size.x = 1280.0
 	game.call("_update_responsive_layout")
 	check(label.text == "Jour 1 • Mois 1 • 1985", "Normal layout did not restore the full date")
+	check_workshop_resumes(game)
 	ResearchManager.projects = previous_research
 	ProductionManager.jobs = previous_jobs
 	ProductManager.products = previous_products

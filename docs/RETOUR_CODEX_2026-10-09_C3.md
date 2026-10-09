@@ -60,3 +60,16 @@ Le gain de temps par image n'a pas encore été chronométré sur le Pixel avec 
   sont enregistrés sur `codex/c3-event-driven`. L'import, le démarrage
   `--quit-after 2`, le smoke test et le test C3 renforcé sont relancés avant
   publication ; leurs journaux `c3-publish-*.log` restent locaux.
+
+## Correction après relecture — reprises des ateliers
+
+- `_software_to_hardware`, `_launch_cpu_from_stepper` et
+  `_launch_first_cpu_from_workshop` passent maintenant par `_request_time_scale`.
+  Une décision déjà en attente ou créée par le lancement bloque immédiatement
+  la reprise, avant le prochain jour de jeu.
+- Le test C3 appelle les trois vrais parcours, avec et sans décision logicielle
+  en attente. Il vérifie que le retour au labo sans blocage conserve la vitesse
+  précédente, et qu'un nouveau CPU attend sa première orientation en pause.
+- Une première attente du test supposait que tout nouveau CPU pouvait avancer
+  immédiatement : elle a été corrigée pour respecter l'orientation initiale,
+  qui est une décision bloquante existante. Aucun contournement du gameplay.

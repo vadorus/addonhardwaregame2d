@@ -1738,7 +1738,7 @@ func _close_software_workshop() -> void:
 func _software_to_hardware() -> void :
 	if software_workshop != null:
 		software_workshop.call("close")
-	TimeManager.time_scale = _software_resume_scale
+	_request_time_scale(_software_resume_scale)
 	var active_cpu_project:= false
 	for project_value in ResearchManager.projects:
 		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
@@ -1805,7 +1805,7 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	# Maquette « L'établi » : le lancement est fêté, puis l'établi se ferme tout seul (ou d'une touche).
 	cpu_stepper.call("play_launch", str(spec.get("name", "Nova CPU")))
 	SoundManager.play("launch")
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement." % str(spec.get("name", "Nova CPU"))
 	_refresh_all()
 	_show_tab(0)
@@ -1889,7 +1889,7 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	var base_name := project_name.rstrip(" 0123456789").strip_edges()
 	var first_line := ArchitectureManager.create_line(base_name if base_name != "" else project_name, str(spec.get("segment", MarketManager.default_segment())), ArchitectureManager.latest_id())
 	ArchitectureManager.register_project(project_name, first_line, ArchitectureManager.latest_id(), [])
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement. Nora ouvre maintenant les outils de direction utiles au suivi du projet." % project_name
 	_refresh_all()
 	_show_tab(0)
