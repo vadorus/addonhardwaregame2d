@@ -35,6 +35,11 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 
 - [QA-00 — Godot PC, économie et presse](reviews/RETOUR_2026-10-10_QA00.md), 10/10/2026, commit `c1d4f6e`. Les tests code 0, warnings et défauts mesurés sont séparés ; pas de Pixel ni testeur novice.
 
+## Campagne économique multi-graines
+
+- [CAREER-01 — 24 trajectoires mesurées](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) au `c1d4f6e` ; [issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) pour investigation, [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) pour narration.
+- [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86) : correction du faux SHA des rapports C3, testée sur PC et en attente de relecture/fusion.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |

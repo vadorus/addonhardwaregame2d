@@ -33,6 +33,13 @@
 
 **Points nécessitant la relecture de Claude :** sortie tactile (RID/ObjectDB leaks), avertissement UID à froid, économie graine 104729 (STANDARD ADAPTEE faillite en 1973, ACCESSIBLE ADAPTEE 225 M€ et rang Empire 3), script `career_probe.gd` qui affiche le faux commit `eff0871`, et presse : 91 corps répétés sur 100 articles homogènes. QG capture PC uniquement ; autres onglets, Pixel et ancienne sauvegarde **non testés**.
 
+## Nouvelle campagne CAREER-01 et correction d'outillage QA-02
+
+- [Rapport 24 carrières / 4 graines](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) : Standard 12/12 faillites, Accessible 9/12 survies, ADAPTÉE 190,7–225,2 M€ fin de carrière. Ce sont des profils automatiques ; **rang Empire et non CPU sectoriel**.
+- [Issue #84 : diagnostiquer l'économie](https://github.com/vadorus/addonhardwaregame2d/issues/84), [issue #85 : narration](https://github.com/vadorus/addonhardwaregame2d/issues/85).
+- [PR #86 QA-02](https://github.com/vadorus/addonhardwaregame2d/pull/86) : provenance SHA des CSV corrigée ; Godot test dédié, smoke et replay de la graine 104729 Standard PASS. Pas fusionné.
+- À faire : traçage mensuel des choix et charges 1971–1973, stratégies prudentes contre le script, indicateur véritable rang CPU, revue visuelle des onglets déverrouillés sur copie de partie.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

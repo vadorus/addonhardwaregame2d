@@ -13,6 +13,10 @@
 
 Cette mise à jour complète mais n'efface pas la photographie statique antérieure.
 
+## CAREER-01 — mesure multi-graines au même HEAD
+
+[Résultats réels de 24 trajectoires](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) : 4 graines, 2 modes, 3 stratégies. STANDARD : **12/12 faillites**. ACCESSIBLE : **9/12 survies** ; ADAPTÉE finit à **190,7–225,2 M€**. Classement mesuré = **Empire**, pas CPU sectoriel. Causes à diagnostiquer avant de changer l'économie. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84).
+
 ## Tableau de statut
 
 | Domaine | Constat au HEAD | Niveau de preuve | Suite |

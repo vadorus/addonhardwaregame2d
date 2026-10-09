@@ -11,6 +11,10 @@
 
 **Arbitrage recommandé après preuve :** avancer `CAREER-01` et `BUD-01` à côté de `PLAY-00`, puis traiter `NAR-00` et `NAR-01` avant toute expansion. **Ne pas modifier les valeurs économiques avant la sonde multi-graines.**
 
+## Complément CAREER-01 : 24 mesures réelles
+
+Le [rapport CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) démontre sous les **stratégies automatiques** 12/12 faillites Standard et une richesse ADAPTÉE Accessible de **190,7 à 225,2 M€**. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) suit la recherche de cause avant changement des coefficients ; [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) suit la narration. **Mesure multi-graines CAREER-01 réalisée**, mais diagnostic économique, parcours humain et mesure rang CPU **restent ouverts**. Le problème d'étiquette SHA est corrigé séparément dans [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86).
+
 ## Règles de priorisation
 
 - **P0 — Bloquant :** corruption/effacement de partie, crash, mauvais comportement d'un bouton payant/critique, progression impossible, calcul économique faux démontré, tests de base cassés.

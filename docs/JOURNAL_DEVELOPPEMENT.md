@@ -39,6 +39,13 @@
 - **Code / sauvegardes :** aucun fichier suivi du jeu modifié, worktree personnel non utilisé, aucune action sur Pixel.
 - **État Git :** rapport ajouté sur PR #83 brouillon, aucune fusion. Prochains travaux `CAREER-01`, `NAR-00`, `PLAY-00` / `VIS-00`.
 
+### CAREER-01 — 10/10/2026 — Mesure de 24 carrières
+
+- **Base :** `v013/demo-octobre` @ `c1d4f6e` ; Godot 4.7.2, worktree isolé, quatre graines, deux modes et trois stratégies.
+- **Résultats :** 24/24 terminés sans erreur Godot ; STANDARD **12/12 faillites**, ACCESSIBLE **9/12 survies** ; ADAPTÉE Accessible 190,7 à 225,2 M€. Pas de leadership **Empire**, ce n'est pas la métrique CPU sectorielle.
+- **Code :** aucun coefficient ni jeu modifié. Rapport [CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md), [issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84), [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) pour narration.
+- **QA-02** : [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86) corrige la provenance SHA des CSV ; test dédié, smoke et sonde C3 PASS sur PC. Branches séparées, aucune fusion.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :
