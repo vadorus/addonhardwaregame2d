@@ -61,6 +61,10 @@ func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
 	SaveManager.use_test_folder()
+	var audio_error: String = preload("res://tests/scenarios/AudioBusScenario.gd").run()
+	if audio_error != "":
+		_fail(audio_error)
+		return
 	var animation_error: String = await preload("res://tests/scenarios/AnimationClockScenario.gd").run(self)
 	if animation_error != "":
 		_fail(animation_error)

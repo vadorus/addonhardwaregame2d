@@ -30,6 +30,10 @@ boot_splash/fullsize=false
 boot_splash/use_filter=true
 boot_splash/show_image=true
 
+[audio]
+
+default_bus_layout="res://default_bus_layout.tres"
+
 [autoload]
 
 GameData="*res://scripts/GameData.gd"
