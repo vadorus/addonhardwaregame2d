@@ -128,7 +128,7 @@ La structure sera raffinée progressivement sans réorganisations inutiles qui c
 ## Workflow de développement
 
 - dépôt GitHub = source de vérité ;
-- branche stable actuelle : `master` (normalisation vers `main` prévue plus tard) ;
+- branche de travail de la démo au 10/10/2026 : `v013/demo-octobre` ; `master` est l'ancienne branche par défaut, à ne pas utiliser pour reprendre la démo sans consigne explicite ;
 - branches courtes pour les évolutions importantes ;
 - Pull Requests quand utile ;
 - CI Godot obligatoire avant de considérer une modification comme techniquement validée ;
