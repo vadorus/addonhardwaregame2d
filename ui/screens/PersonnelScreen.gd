@@ -326,8 +326,10 @@ func refresh() -> void:
 		_clear(candidate_box)
 		_build_shortlist()
 	if hire_button != null:
-		hire_button.disabled = PersonnelManager.candidate.is_empty()
-		hire_button.text = "Recruter %s" % str(PersonnelManager.candidate.get("name", "ce candidat")) if not PersonnelManager.candidate.is_empty() else "Recruter ce candidat"
+		var selected: Dictionary = PersonnelManager.candidate
+		var finance_preview: Dictionary = PersonnelManager.hiring_financial_preview(selected)
+		hire_button.disabled = selected.is_empty() or not bool(finance_preview.get("can_pay_signing", false))
+		hire_button.text = "Recruter %s" % str(selected.get("name", "ce candidat")) if not selected.is_empty() else "Recruter ce candidat"
 	if PersonnelManager.candidate.is_empty():
 		candidate_label.text = "Aucun candidat sélectionné."
 		if candidate_box != null:
@@ -343,6 +345,17 @@ func refresh() -> void:
 			UI.set_meter(meter, float(shown.get(str(meter_data[1]), 0)))
 			candidate_box.add_child(meter)
 		candidate_box.add_child(UI.label("Salaire %s €/mois • prime d'embauche %s €" % [UI.money(int(shown.get("salary", 0))), UI.money(int(shown.get("salary", 0)) * 2)], 14))
+		var financing: Dictionary = PersonnelManager.hiring_financial_preview(shown)
+		var signing := int(financing.get("signing_cost", 0))
+		var payroll := int(financing.get("monthly_cost", 0))
+		var cash_remaining := int(financing.get("cash_after", Economy.money))
+		var runway := float(financing.get("runway_months", 0.0))
+		candidate_box.add_child(UI.label("Engagement réel : -%s € immédiatement, puis -%s €/mois." % [UI.money(signing), UI.money(payroll)], 13))
+		candidate_box.add_child(UI.muted_label("Après recrutement : %s € en caisse • réserve prudente ~%.1f mois de charges (hors ventes futures)." % [UI.money(cash_remaining), runway], 12))
+		if not bool(financing.get("can_pay_signing", false)):
+			candidate_box.add_child(UI.label("⛔ Recrutement impossible : il manque %s € pour la prime." % UI.money(int(financing.get("shortfall", 0))), 13))
+		elif str(financing.get("level", "")) in ["DANGEREUX", "TENDU"]:
+			candidate_box.add_child(UI.label("⚠ Risque financier : %s" % str(financing.get("recommendation", "")), 13))
 		UI.prepare_touch_scroll_children(candidate_box)
 	var candidate: Dictionary = PersonnelManager.candidate
 	var profile: Dictionary = candidate.get("profile", {})
