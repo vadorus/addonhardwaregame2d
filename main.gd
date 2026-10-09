@@ -214,6 +214,7 @@ func _ready():
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
+	AnimationClock.watch_menu(menu_layer)
 	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()

@@ -57,6 +57,7 @@ TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
 SoundManager="*res://scripts/SoundManager.gd"
 PerfProbe="*res://scripts/PerfProbe.gd"
+AnimationClock="*res://ui/AnimationClock.gd"
 
 [display]
 
