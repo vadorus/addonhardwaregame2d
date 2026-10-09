@@ -40,6 +40,13 @@
 - [PR #86 QA-02](https://github.com/vadorus/addonhardwaregame2d/pull/86) : provenance SHA des CSV corrigée ; Godot test dédié, smoke et replay de la graine 104729 Standard PASS. Pas fusionné.
 - À faire : traçage mensuel des choix et charges 1971–1973, stratégies prudentes contre le script, indicateur véritable rang CPU, revue visuelle des onglets déverrouillés sur copie de partie.
 
+## BUD-01 — Recrutement financier (10/10)
+
+- [PR #87 — aperçu financier avant recrutement](https://github.com/vadorus/addonhardwaregame2d/pull/87), **brouillon**, non fusionné, dérivé du HEAD `c1d4f6e`. [Rapport détaillé du lot](https://github.com/vadorus/addonhardwaregame2d/blob/fix/recrutement-prevision-20261010/docs/reviews/RETOUR_2026-10-10_BUD01.md).
+- **Preuve :** 104729/Standard/Adaptée, 28 829 € en août 1972 ; recrutement septembre 11 214 € +5 607 €/mois, cash 2 270 € en décembre et −696 € en clôture janvier 1973. Confirmé pour cette automatisation, pas pour tout joueur.
+- **Correctif :** affichage prix d'embauche, salaire, trésorerie résiduelle, réserve prudente ; prévention clic si paiement impossible ; pas de modification de gameplay ni sauvegarde. Tests Godot financier, UI, smoke, projet finance et budget CPU passés sur PC ; importer à froid génère encore un avertissement UID historique, second import sans erreur.
+- **Claude :** contrôler la prudence de l'estimation, les alertes et la lisibilité Pixel ; vérifier que `CAREER-01` distingue IA automatique et vrai joueur, puis décider des modifications d'équilibrage **seulement après investigation**.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

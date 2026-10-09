@@ -17,6 +17,10 @@ Cette mise à jour complète mais n'efface pas la photographie statique antérie
 
 [Résultats réels de 24 trajectoires](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) : 4 graines, 2 modes, 3 stratégies. STANDARD : **12/12 faillites**. ACCESSIBLE : **9/12 survies** ; ADAPTÉE finit à **190,7–225,2 M€**. Classement mesuré = **Empire**, pas CPU sectoriel. Causes à diagnostiquer avant de changer l'économie. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84).
 
+## BUD-01 — branche séparée, NON intégrée à la démo
+
+[PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) : devis de recrutement calculant prime, salaire et réserve prudente sans mutation ; interface affichant les risques. **Tests Godot PC réussis**, dont affichage UI ; **non fusionné** à `v013/demo-octobre`, **non testé sur Pixel**. Valeurs économiques de simulation inchangées. [Diagnostic chiffré dans issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84).
+
 ## Tableau de statut
 
 | Domaine | Constat au HEAD | Niveau de preuve | Suite |

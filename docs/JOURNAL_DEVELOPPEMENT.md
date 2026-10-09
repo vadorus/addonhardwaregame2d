@@ -46,6 +46,14 @@
 - **Code :** aucun coefficient ni jeu modifié. Rapport [CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md), [issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84), [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) pour narration.
 - **QA-02** : [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86) corrige la provenance SHA des CSV ; test dédié, smoke et sonde C3 PASS sur PC. Branches séparées, aucune fusion.
 
+### BUD-01 — 10/10/2026 — Diagnostic financier et alerte de recrutement
+
+- **Point vérifié sur le code de base `c1d4f6e` :** graine 104729, Standard, stratégie Adaptée. Après une trésorerie à 28 829 € en août 1972, une recrue coûte **11 214 € de prime**, puis **5 607 € de salaires supplémentaires chaque mois** ; solde 13 959 € en septembre, 2 270 € en décembre, **−696 € en clôture janvier 1973**. La sonde affiche « faillite 02/1973 » après incrément du mois.
+- **Interprétation limitée :** l'engagement de recrutement non soutenable explique la chute immédiate dans **ce parcours automatisé**, pas toutes les faillites Standard d'un joueur humain. Issue [#84](https://github.com/vadorus/addonhardwaregame2d/issues/84) enrichie avec le tableau mensuel.
+- **Correctif proposé sur branche distincte :** [PR #87 — BUD-01](https://github.com/vadorus/addonhardwaregame2d/pull/87), **brouillon non fusionné** : devis pur dans `PersonnelManager.gd`, affichage du coût réel et du risque dans `PersonnelScreen.gd`, bouton désactivé si prime impossible, choix risqué toujours autorisé quand financé.
+- **Tests Godot PC :** re-import propre après avertissement UID initial ; nouveau scénario financier PASS, nouveau scénario UI PASS, smoke PASS, budget 2e CPU et projet finance PASS. **Pas de validation au doigt Pixel**, aucune sauvegarde personnelle touchée. Logs sur PC et [rapport de PR](https://github.com/vadorus/addonhardwaregame2d/blob/fix/recrutement-prevision-20261010/docs/reviews/RETOUR_2026-10-10_BUD01.md).
+- **À faire** : revue Claude du sens des indicateurs, parcours humain prudent et équilibre Accessible, capture/tactile Pixel sur copie et tests de carrière après toute future modification économique.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :
@@ -57,5 +65,7 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 | AUD-001 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; [PR #83](https://github.com/vadorus/addonhardwaregame2d/pull/83) | Audit + plan priorisé | Non exécuté (audit documentaire) | Non exécuté | À relire ; pas fusionné |
 
 | QA-00 | 10/10/2026 | `docs/journal-passation-2026-10-10` ; [PR #83](https://github.com/vadorus/addonhardwaregame2d/pull/83) | [Rapport tests réels](reviews/RETOUR_2026-10-10_QA00.md) | 12 commandes Godot code 0, limites détaillées | Non testé | PR brouillon ; pas fusionné |
+
+| BUD-01 | 10/10/2026 | [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) | Aperçu réel du coût et du risque de recrutement | 2 tests ciblés + smoke + budget + finance PASS | **Non testé** | Brouillon, sans fusion ni changement des coûts |
 
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).

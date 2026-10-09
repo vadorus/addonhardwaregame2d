@@ -15,6 +15,10 @@
 
 Le [rapport CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) démontre sous les **stratégies automatiques** 12/12 faillites Standard et une richesse ADAPTÉE Accessible de **190,7 à 225,2 M€**. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) suit la recherche de cause avant changement des coefficients ; [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) suit la narration. **Mesure multi-graines CAREER-01 réalisée**, mais diagnostic économique, parcours humain et mesure rang CPU **restent ouverts**. Le problème d'étiquette SHA est corrigé séparément dans [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86).
 
+## Avancée BUD-01 — première amélioration ciblée prête à relire
+
+[PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) **non fusionnée** : détail avant embauche (prime, salaire, solde, réserve prudente), alertes et deux tests Godot. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) contient désormais la cause immédiate chiffrée pour **104729 / STANDARD / ADAPTÉE** : embauche 11 214 € puis +5 607 €/mois quand la trésorerie ne l'absorbe pas. **Ce lot n'équilibre pas l'économie** ; la comparaison entre IA et joueur prudent reste ouverte. VIS-00 / NAR-00 inchangés.
+
 ## Règles de priorisation
 
 - **P0 — Bloquant :** corruption/effacement de partie, crash, mauvais comportement d'un bouton payant/critique, progression impossible, calcul économique faux démontré, tests de base cassés.

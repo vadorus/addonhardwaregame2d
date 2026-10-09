@@ -40,6 +40,10 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 - [CAREER-01 — 24 trajectoires mesurées](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) au `c1d4f6e` ; [issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) pour investigation, [issue #85](https://github.com/vadorus/addonhardwaregame2d/issues/85) pour narration.
 - [PR #86](https://github.com/vadorus/addonhardwaregame2d/pull/86) : correction du faux SHA des rapports C3, testée sur PC et en attente de relecture/fusion.
 
+## Premier correctif de l'interface financière proposé
+
+- [PR #87 — BUD-01 : prévoir et expliquer le coût d'une embauche](https://github.com/vadorus/addonhardwaregame2d/pull/87) : tests PC PASS, **non fusionné / Pixel non testé**. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) documente le cash-flow 1972–1973.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |
