@@ -206,8 +206,13 @@ var ceo_layer: ColorRect
 var ceo_panel: Control
 var _ceo_resume_scale := 0.0
 
+var _touch_tooltip: CanvasLayer
+
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
+	if _is_mobile():
+		_touch_tooltip = (preload("res://ui/TouchTooltip.gd") as Script).new() as CanvasLayer
+		add_child(_touch_tooltip)
 	_apply_saved_ui_scale()
 	FRAME_RATE.apply_saved(frame_settings_path, _is_mobile())
 	# Thème du moment : réglage du joueur (menu « Décorations du moment »), lu avant de construire les écrans.
@@ -3469,6 +3474,11 @@ func _on_node_added(node: Node) -> void:
 					if not control.minimum_size_changed.is_connected(target_changed):
 						control.minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
 					_apply_mobile_touch_target.call_deferred(node)
+	# T3 : une seule écoute tactile par contrôle, y compris les infobulles définies plus tard.
+	if _is_mobile() and _touch_tooltip != null and node is Control and is_ancestor_of(node):
+		var candidate := node as Control
+		if candidate is BaseButton or candidate is Range or not candidate.tooltip_text.is_empty():
+			_touch_tooltip.call("register", candidate)
 	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
 	if node is BaseButton and not node.has_meta("silent"):
 		var button := node as BaseButton
