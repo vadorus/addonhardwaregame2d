@@ -148,6 +148,9 @@ var cpu_stepper: Control
 
 # V0.8.1 — plateforme PC / Android : sauvegarde, menu, échelle d'interface, zones sûres.
 const SETTINGS_PATH := "user://settings.cfg"
+const FRAME_RATE := preload("res://scripts/FrameRateSettings.gd")
+var frame_settings_path := SETTINGS_PATH
+var menu_frame_rate_button: Button
 const UI_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2, 1.35, 1.5]
 const MIN_LOGICAL_SIZE := Vector2(960.0, 540.0)
 var game_root: VBoxContainer
@@ -206,6 +209,7 @@ var _ceo_resume_scale := 0.0
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
 	_apply_saved_ui_scale()
+	FRAME_RATE.apply_saved(frame_settings_path, _is_mobile())
 	# Thème du moment : réglage du joueur (menu « Décorations du moment »), lu avant de construire les écrans.
 	var live_config := ConfigFile.new()
 	if live_config.load(SETTINGS_PATH) == OK:
@@ -3260,6 +3264,9 @@ func _build_menu_layer() -> void:
 	menu_fullscreen_button.visible = not _is_mobile()
 	menu_fullscreen_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.add_child(menu_fullscreen_button)
+	menu_frame_rate_button = _menu_button("Fluidité : %d images/s" % Engine.max_fps, _menu_toggle_frame_rate)
+	menu_frame_rate_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(menu_frame_rate_button)
 	var privacy_button := _menu_button("Confidentialité", open_privacy)
 	privacy_button.name = "PrivacyButton"
 	privacy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -3307,6 +3314,8 @@ func system_menu_visible() -> bool:
 	return menu_layer != null and menu_layer.visible
 
 func _refresh_menu_labels() -> void:
+	if menu_frame_rate_button != null:
+		menu_frame_rate_button.text = "Fluidité : %d images/s" % Engine.max_fps
 	if menu_volume_label != null:
 		menu_volume_label.text = "Muet" if SoundManager.muted else "%d %%" % int(round(SoundManager.sfx_volume * 100.0))
 	if menu_music_label != null:
@@ -4041,6 +4050,12 @@ func _menu_toggle_motion() -> void:
 	config.load(SETTINGS_PATH)
 	config.set_value("ui", "reduced_motion", JUICE.reduced_motion)
 	config.save(SETTINGS_PATH)
+
+func _menu_toggle_frame_rate() -> void:
+	var fps := 60 if Engine.max_fps == 30 else 30
+	if FRAME_RATE.save_and_apply(fps, frame_settings_path) != OK:
+		status_label.text = "Le réglage de fluidité n'a pas pu être enregistré."
+	_refresh_menu_labels()
 
 func _on_software_launched(product: Dictionary) -> void:
 	call_deferred("_autosave", "sortie logiciel")
