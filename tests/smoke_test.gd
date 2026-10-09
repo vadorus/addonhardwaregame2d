@@ -61,6 +61,10 @@ func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
 	SaveManager.use_test_folder()
+	var animation_error: String = await preload("res://tests/scenarios/AnimationClockScenario.gd").run(self)
+	if animation_error != "":
+		_fail(animation_error)
+		return
 	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
 	if market_guard_error != "":
 		_fail(market_guard_error)

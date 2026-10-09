@@ -119,6 +119,7 @@ static func outdoors(y: float) -> bool:
 	return y < 0.17 or y > 0.84
 
 func _ready() -> void:
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_shelf_button = Button.new()
 	_shelf_button.flat = true
@@ -453,7 +454,7 @@ func _spawn_particles() -> void:
 		_particles.append({"x":rng.randf(), "y":rng.randf(), "speed":rng.randf_range(0.025, 0.06),
 			"sway":rng.randf_range(0.004, 0.018), "phase":rng.randf() * TAU, "size":rng.randf_range(1.4, 3.2)})
 
-func _process(delta: float) -> void:
+func _on_animation_tick(delta: float) -> void:
 	if not is_visible_in_tree() or not CompanyManager.created:
 		return
 	_time += delta
