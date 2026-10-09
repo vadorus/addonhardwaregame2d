@@ -2269,6 +2269,7 @@ func _update_responsive_layout():
 		caption.visible = not short_screen
 	for speed_button in speed_buttons:
 		speed_button.custom_minimum_size = Vector2(40, 36) if short_screen else Vector2(44, 46)
+		UI.touch_target(speed_button)
 	if status_label != null:
 		status_label.custom_minimum_size.y = 18.0 if short_screen else 24.0
 	if bottom_dock != null:
@@ -3081,7 +3082,7 @@ func _select_meta(option: OptionButton, wanted: String):
 # ---------------------------------------------------------------------------
 
 func _is_mobile() -> bool:
-	return OS.has_feature("mobile")
+	return OS.has_feature("mobile") or bool(get_meta("_t2_test_mobile", false))
 
 func _apply_saved_ui_scale() -> void:
 	if not (get_viewport() is Window):
@@ -3454,11 +3455,30 @@ func _confirm_quit_on_back() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_node_added(node: Node) -> void:
+	# T2 : nouveaux contrôles inclus, y compris ceux reconstruits pendant le jeu.
+	# L'exécution différée laisse les composants définir leur taille initiale.
+	if _is_mobile() and node is Control and is_ancestor_of(node):
+		if node is BaseButton or node is HSlider or node is VSlider or node is SpinBox or node is LineEdit:
+			if not node.has_meta("_t2_target_registered"):
+				node.set_meta("_t2_target_registered", true)
+				var control := node as Control
+				var min_height: float = UI.TOUCH_PRIMARY if UI.touch_kind(control) == "primary" else UI.TOUCH_SECONDARY
+				if control.custom_minimum_size.x < UI.TOUCH_SECONDARY or control.custom_minimum_size.y < min_height:
+					# Réécouter seulement les éléments dont la taille doit être protégée.
+					var target_changed := _apply_mobile_touch_target.bind(node)
+					if not control.minimum_size_changed.is_connected(target_changed):
+						control.minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
+					_apply_mobile_touch_target.call_deferred(node)
 	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
 	if node is BaseButton and not node.has_meta("silent"):
 		var button := node as BaseButton
 		if not button.pressed.is_connected(_play_click):
 			button.pressed.connect(_play_click)
+
+func _apply_mobile_touch_target(node: Node) -> void:
+	if not is_instance_valid(node) or not node is Control or not is_ancestor_of(node):
+		return
+	UI.touch_target(node as Control, UI.touch_kind(node as Control), _is_mobile())
 
 func _play_click() -> void:
 	SoundManager.play("click")
