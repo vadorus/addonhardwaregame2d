@@ -16,6 +16,42 @@ const APP_AMBER_DARK := Color("fff7e9")
 const APP_GREEN := Color("087c3b")
 const APP_RED := Color("b72732")
 
+## T2 : tailles logiques retenues après mesure Pixel 10 (1,15 d'échelle UI).
+## 6 mm ~= 58 px ; 8 mm ~= 77 px. PC inchangé, sauf dans les tests forcés.
+const TOUCH_SECONDARY := 58.0
+const TOUCH_PRIMARY := 77.0
+const TOUCH_GAP := 8
+
+static func touch_target(control: Control, kind: String = "secondary", force_mobile: bool = false) -> void:
+	if control == null or (not force_mobile and not OS.has_feature("mobile")):
+		return
+	var height := TOUCH_PRIMARY if kind == "primary" else TOUCH_SECONDARY
+	var minimum := Vector2(maxf(control.custom_minimum_size.x, TOUCH_SECONDARY), maxf(control.custom_minimum_size.y, height))
+	if minimum != control.custom_minimum_size:
+		control.custom_minimum_size = minimum
+	if control.get_parent() is Container:
+		touch_spacing(control.get_parent() as Container, force_mobile)
+
+static func touch_spacing(container: Container, force_mobile: bool = false) -> void:
+	if container == null or (not force_mobile and not OS.has_feature("mobile")):
+		return
+	if container is BoxContainer:
+		container.add_theme_constant_override("separation", maxi(container.get_theme_constant("separation"), TOUCH_GAP))
+	elif container is FlowContainer:
+		for key in ["h_separation", "v_separation"]:
+			container.add_theme_constant_override(key, maxi(container.get_theme_constant(key), TOUCH_GAP))
+	elif container is GridContainer:
+		for key in ["h_separation", "v_separation"]:
+			container.add_theme_constant_override(key, maxi(container.get_theme_constant(key), TOUCH_GAP))
+
+static func touch_kind(control: Control) -> String:
+	if control is BaseButton:
+		var title: String = (control as BaseButton).text.strip_edges().to_lower()
+		for action in ["lancer", "valider", "confirmer"]:
+			if title.begins_with(action):
+				return "primary"
+	return "secondary"
+
 static func label(text: String, size: int = 14) -> Label:
 	var node := Label.new()
 	node.text = text
