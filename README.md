@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.8.1 « garage first » sous Godot 4.7.2, versions PC (Windows) et Android.**
+**Projet actif — Tech Empire, version Godot du projet `0.12.2` au 10/10/2026 (voir `project.godot`). Développement principal sur `v013/demo-octobre` ; pour le statut réellement validé, lire [l'état actuel](docs/ETAT_ACTUEL.md).**
 
 > **Obtenir la version PC et la version Android :** voir [`docs/BUILD_PC_ANDROID.md`](docs/BUILD_PC_ANDROID.md), ou lancer `powershell -ExecutionPolicy Bypass -File tools\build_all.ps1` (tests + `build/windows/TechEmpire.exe` + APK Android ; option `-Install` pour l'envoyer sur le téléphone).
 >
@@ -95,6 +95,8 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 
 ## Documentation
 
+**Point d'entrée pour Claude, Codex et ChatGPT : [index documentaire](docs/INDEX.md).** Les décisions et l'historique de chaque correction sont dans [le registre](docs/DECISIONS.md) et [le journal](docs/JOURNAL_DEVELOPPEMENT.md). Les documents V0.x plus anciens ci-dessous sont des références historiques, pas une preuve de l'état présent.
+
 - [`docs/VISION.md`](docs/VISION.md) — vision globale ;
 - [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — piliers et systèmes ;
 - [`docs/SIMULATION_PHILOSOPHY.md`](docs/SIMULATION_PHILOSOPHY.md) — liberté du CEO, conséquences et profondeur configurable ;
@@ -143,4 +145,5 @@ La structure sera raffinée progressivement sans réorganisations inutiles qui c
 ## Licence
 
 Aucune licence publique définie pour le moment. Le dépôt reste privé pendant le développement.
+
 
