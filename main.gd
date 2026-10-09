@@ -293,6 +293,8 @@ func _on_day_changed(_day: int, _month: int, _year: int) -> void:
 
 func _connect_signals():
 	TimeManager.day_changed.connect(_on_day_changed)
+	# Le premier reset de l'horloge précède la création de l'entreprise.
+	CompanyManager.company_changed.connect(_refresh_clock_date)
 	ResearchManager.projects_changed.connect(_pause_for_blocker_if_running)
 	ResearchManager.research_changed.connect(_pause_for_blocker_if_running)
 	SoftwareManager.software_changed.connect(_pause_for_blocker_if_running)

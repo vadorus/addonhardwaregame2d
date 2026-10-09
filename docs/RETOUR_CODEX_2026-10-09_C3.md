@@ -29,3 +29,34 @@
 Le gain de temps par image n'a pas encore été chronométré sur le Pixel avec P0. Les tests prouvent le comportement et la non-régression ciblée sur PC ; ils ne justifient pas d'affirmer un gain de FPS matériel.
 
 **Consigne :** relire le commit C3 avant toute fusion dans la démo ; C2 et R1 ne sont pas entamés.
+
+## Relecture complémentaire du 09/10 — modifications locales après 17f3b89
+
+- Prérequis C4 vérifié : `v013/demo-octobre` et `codex/c4-sales-row-reuse` distantes
+  pointent déjà toutes deux sur `3a41022`. Ce commit remplace la sauvegarde locale
+  par trois CPU factices dans le test. Aucune nouvelle fusion C4 nécessaire.
+- Un clone local propre de `3a41022`, créé avec `git clone --no-local`, sans copie
+  des fichiers ignorés ni du cache Godot, passe l'import puis
+  `res://tests/sales_portfolio_row_reuse_test.tscn` (codes 0, aucune erreur).
+  `build/p0_reference_candidate.json` est absent avant et après ces commandes.
+- Défaut trouvé dans C3 : `SimulationManager.reset_all()` émet le changement de
+  date avant de créer l'entreprise. À la première nouvelle partie en pause,
+  le bandeau gardait son texte initial incomplet. Test ajouté : échec reproduit
+  (code 1), puis succès après connexion de `company_changed` à `_refresh_clock_date`.
+- Le test C3 utilise maintenant le dossier de sauvegarde de test, écrit toujours
+  zéro sauvegarde et couvre aussi les signaux recherche, fabrication et produit
+  prêt, l'absence de pause sans blocage, la date chargée en pause et les deux
+  présentations de date. Aucun parcours supplémentaire par image.
+- Les chiffres principaux du bilan Pixel C4 ont été recalculés depuis les CSV :
+  12 mois par écran ; pics moyens QG 115,599 ms, Entreprise 136,975 ms,
+  Produits 112,233 ms ; maxima respectifs 156,040 / 327,431 / 138,436 ms.
+  La série QG x1 conserve 3 images > 50 ms dont 2 > 100 ms : la validation
+  globale des performances reste donc ouverte. Ce sont des traces historiques,
+  pas de nouvelles mesures sur le téléphone.
+- Les résultats détaillés de cette relecture sont dans `.agent-output/report.md`
+  et les journaux locaux `review-c3-*.log`. C3 reste sur sa branche séparée pour
+  relecture avant fusion dans la démo.
+- Publication demandée par Alexandre : le complément C3 et le `.uid` de son test
+  sont enregistrés sur `codex/c3-event-driven`. L'import, le démarrage
+  `--quit-after 2`, le smoke test et le test C3 renforcé sont relancés avant
+  publication ; leurs journaux `c3-publish-*.log` restent locaux.
