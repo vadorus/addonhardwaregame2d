@@ -13,10 +13,11 @@
 - **Fichiers ajoutés :** `docs/INDEX.md`, `docs/ETAT_ACTUEL.md`, `docs/DECISIONS.md`, `docs/JOURNAL_DEVELOPPEMENT.md`, `docs/HANDOFF_CLAUDE_2026-10-14.md`, `docs/DOC_MAINTENANCE.md`, `docs/reviews/INDEX.md`, `docs/MODELE_RAPPORT_LOT.md`.
 - **Fichier adapté :** `README.md` (orientation vers le référentiel et correction des références version / branche de travail).
 - **Modification de gameplay / données / sauvegardes :** aucune.
-- **Vérifications :** inventaire GitHub et cohérence documentaire relus sur la base ; contrôle du diff / branche à joindre à la PR. **Aucun test Godot exécuté** pour ce lot uniquement documentaire.
+- **Vérifications :** comparaison Git : **9 fichiers documentaires seulement**, aucun script du jeu ; vérification automatisée de **64 liens internes dans les 9 fichiers : 0 lien manquant** ; **aucun test Godot exécuté** pour ce lot uniquement documentaire.
 - **Risques connus :** rapports anciens non supprimés et potentiellement contradictoires ; l'état du jeu reste une photographie datée.
 - **Retour arrière :** fermer la PR / supprimer la branche, sans toucher au jeu.
-- **Statut :** proposé sur branche de documentation ; **fusion non effectuée**, revue Claude possible à son retour.
+- **PR :** [#83 — référentiel documentaire, brouillon](https://github.com/vadorus/addonhardwaregame2d/pull/83). Commit principal `f075c76`, correction README `43a4fcd`.
+- **Statut :** poussé sur branche de documentation et PR brouillon ouverte ; **fusion non effectuée**, revue Claude possible à son retour.
 
 ## Prochaines entrées
 

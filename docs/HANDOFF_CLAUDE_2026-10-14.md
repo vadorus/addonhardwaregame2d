@@ -2,6 +2,8 @@
 
 **Préparé le 10/10/2026.** Date de retour indicative communiquée par le propriétaire. Ce document sert à reprendre sans répéter des audits entiers.
 
+**Première PR à relire :** [#83 — DOC-001, référentiel documentaire (brouillon)](https://github.com/vadorus/addonhardwaregame2d/pull/83). Base `c1d4f6e`, aucun fichier de gameplay modifié, 64 liens internes vérifiés sans manque. **Pas fusionnée.**
+
 ## Lecture rapide
 
 1. Lire [INDEX.md](INDEX.md), [ETAT_ACTUEL.md](ETAT_ACTUEL.md), [DECISIONS.md](DECISIONS.md), puis [JOURNAL_DEVELOPPEMENT.md](JOURNAL_DEVELOPPEMENT.md).
