@@ -262,22 +262,44 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_back_request()
 
 func _process(_delta):
-	if CompanyManager.created and TimeManager.time_scale > 0.0:
-		var blocker := _blocking_company_decision()
-		if not blocker.is_empty():
-			TimeManager.time_scale = 0.0
-			status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+	# C3 : la date et les décisions sont vérifiées par événements, pas par image.
 	for button in speed_buttons:
 		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
-	if CompanyManager.created:
-		if header_compact:
-			date_label.text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		else:
-			date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		if reputation_label != null:
-			reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+	if CompanyManager.created and reputation_label != null:
+		reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+
+func _refresh_clock_date() -> void:
+	if not CompanyManager.created or date_label == null:
+		return
+	var next_text := ""
+	if header_compact:
+		next_text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	else:
+		next_text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	if date_label.text != next_text:
+		date_label.text = next_text
+
+func _pause_for_blocker_if_running() -> void:
+	if not CompanyManager.created or TimeManager.time_scale <= 0.0:
+		return
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+
+func _on_day_changed(_day: int, _month: int, _year: int) -> void:
+	_refresh_clock_date()
+	_pause_for_blocker_if_running()
 
 func _connect_signals():
+	TimeManager.day_changed.connect(_on_day_changed)
+	# Le premier reset de l'horloge précède la création de l'entreprise.
+	CompanyManager.company_changed.connect(_refresh_clock_date)
+	ResearchManager.projects_changed.connect(_pause_for_blocker_if_running)
+	ResearchManager.research_changed.connect(_pause_for_blocker_if_running)
+	SoftwareManager.software_changed.connect(_pause_for_blocker_if_running)
+	ProductionManager.jobs_changed.connect(_pause_for_blocker_if_running)
+	ProductManager.products_changed.connect(_pause_for_blocker_if_running)
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
 	Objectives.objective_completed.connect(_on_objective_completed)
@@ -1716,7 +1738,7 @@ func _close_software_workshop() -> void:
 func _software_to_hardware() -> void :
 	if software_workshop != null:
 		software_workshop.call("close")
-	TimeManager.time_scale = _software_resume_scale
+	_request_time_scale(_software_resume_scale)
 	var active_cpu_project:= false
 	for project_value in ResearchManager.projects:
 		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
@@ -1783,7 +1805,7 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	# Maquette « L'établi » : le lancement est fêté, puis l'établi se ferme tout seul (ou d'une touche).
 	cpu_stepper.call("play_launch", str(spec.get("name", "Nova CPU")))
 	SoundManager.play("launch")
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement." % str(spec.get("name", "Nova CPU"))
 	_refresh_all()
 	_show_tab(0)
@@ -1867,7 +1889,7 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	var base_name := project_name.rstrip(" 0123456789").strip_edges()
 	var first_line := ArchitectureManager.create_line(base_name if base_name != "" else project_name, str(spec.get("segment", MarketManager.default_segment())), ArchitectureManager.latest_id())
 	ArchitectureManager.register_project(project_name, first_line, ArchitectureManager.latest_id(), [])
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement. Nora ouvre maintenant les outils de direction utiles au suivi du projet." % project_name
 	_refresh_all()
 	_show_tab(0)
@@ -2227,6 +2249,7 @@ func _update_nav_state():
 
 func _update_responsive_layout():
 	header_compact = size.x < 1220.0
+	_refresh_clock_date()
 	if header_brand_box != null:
 		header_brand_box.custom_minimum_size.x = 150.0 if header_compact else 235.0
 		for word in header_wordmark:
