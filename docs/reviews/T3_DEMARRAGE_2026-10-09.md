@@ -12,6 +12,7 @@ Sur mobile, maintenir 450 ms un contrôle ayant `tooltip_text` pour afficher son
 - Lors d'un appui long sur un bouton actif, désactive temporairement le bouton pour éviter qu'il ne valide une action au relâchement, puis le réactive.
 - `main.gd` : instancie le système seulement en mode mobile (ou simulation mobile du test) et enregistre une fois les boutons, curseurs et autres contrôles dont l'explication existe déjà.
 - `tests/touch_tooltip_scenario.tscn` : tests déterministes headless d'appui court, appui long, bon texte, blocage de la validation, relâchement et glissement ; aucune sauvegarde du joueur.
+- **Test obligatoire d'action** : `Valider`, `Lancer` et `Confirmer` sont testés par de vrais événements GUI dans un SubViewport, avec un compteur connecté au signal `pressed`. Chaque appui court génère exactement un `pressed`, chaque appui long de 450 ms montre l'explication mais **n'émet aucun** `pressed` au relâchement. Vérification que le bouton n'est pas laissé désactivé.
 
 ## Vérifications
 
