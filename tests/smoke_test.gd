@@ -65,6 +65,10 @@ func _ready() -> void:
 	if animation_error != "":
 		_fail(animation_error)
 		return
+	var frame_rate_error: String = await preload("res://tests/scenarios/FrameRateSettingsScenario.gd").run(self)
+	if frame_rate_error != "":
+		_fail(frame_rate_error)
+		return
 	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
 	if market_guard_error != "":
 		_fail(market_guard_error)
