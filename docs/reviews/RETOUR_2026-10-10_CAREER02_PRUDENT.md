@@ -22,4 +22,23 @@ Les résultats de C3 ne doivent pas être écrasés ni présentés comme identiq
 3. Si prometteur, étendre aux quatre graines et aux deux difficultés sans modifier les trajectoires de référence.
 4. Aucun équilibrage global, pas de publication/fusion dans le code de jeu avant validation du joueur et seconde revue.
 
-**Résultats non exécutés au moment de la création : à compléter après test.**
+## Campagne exécutée sur PC
+
+**Godot 4.7.2**, branche d'expérience au commit initial `ba5d638`, worktree détaché `C:/Users/Admin/Documents/TechEmpire-CAREER02-20261010`, variables personnelles de Godot isolées, aucun Pixel.
+
+Premier import : sortie 0 avec avertissement UID historique à froid. `smoke_test.tscn` : **PASS**, code 0 sans erreur. Sonde prudente 104729 Standard : code 0, aucun message d'erreur ; la prudence transforme les dates de fin de partie **ADAPTÉE 02/1973 → 10/1997** et **EN RETARD 02/1973 → 05/2013**. FIGÉE reste en faillite 06/2014 (la garde n'y a presque pas d'influence).
+
+Le résultat a été répliqué **sur les quatre graines officielles en STANDARD**, soit 12 stratégies et **0 erreur moteur** :
+
+| Graine | FIGÉE | ADAPTÉE — avant → prudent | EN RETARD — avant → prudent |
+| --- | --- | --- | --- |
+| 104729 | 06/2014 → 06/2014 | **02/1973 → 10/1997** | **02/1973 → 05/2013** |
+| 208877 | 05/2011 → 03/2014 | **02/1973 → 10/1997** | **02/1973 → 06/2007** |
+| 313133 | 07/2013 → 03/2012 | 05/1997 → 10/2002 | 02/2010 → 05/2013 |
+| 417401 | 08/2013 → 08/2013 | **02/1973 → 09/1997** | **02/1973 → 07/2014** |
+
+**Verdict :** 6 faillites initialement en février 1973 sont désormais évitées. **12/12 carrières Standard finissent pourtant toujours par faire faillite** avant la fin de la sonde ; la prudence au recrutement ne suffit donc pas à corriger l'ensemble de l'équilibre, et une trajectoire FIGÉE est même légèrement moins longue. Cela confirme qu'il faut auditer l'après-1990, la demande, les retours commerciaux, les coûts de maintenance et le plafonnement technologique, sans assouplir arbitrairement la difficulté.
+
+Le nouvel essai `tests/career_prudent_hiring_test.tscn` doit confirmer que la garde accepte une forte réserve, refuse une faible réserve et n'altère jamais la trésorerie ni les effectifs. **Son résultat sera ajouté après exécution.**
+
+**Fichiers locaux de preuve :** `C:/Users/Admin/Documents/TE_CAREER02_logs_20261010/` et CSV de la copie de travail. Ne pas confondre les CSV de cet automate expérimental avec le référentiel gelé C3 ; ils sont conservés dans un autre worktree.
