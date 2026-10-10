@@ -70,6 +70,14 @@
 - **Test spécifique au commit `2ffa96d` :** garde de recrutement PASS et non-mutation, smoke/boot PASS ; premier import UID warning puis reimport propre. **Pas de Pixel** ; preuve complète dans `docs/reviews/RETOUR_2026-10-10_CAREER02_PRUDENT.md` (PR #89).
 - **Prochainement :** analyser coût/profit du CPU après 1990, concurrence, durée commerciale et leadership CPU sectoriel distinct du rang Empire.
 
+### SCENARIO-01 — 10/10/2026 — Clarification fondamentale sur les défis et la durée de vie
+
+- **Origine :** clarification explicite du propriétaire : un « défi » est le **bâton dans les roues mis par le jeu et les scénarios de carrière**, pas une réalisation passive à débloquer.
+- **Analyse vérifiée :** `SimulationManager.gd` finit seulement à la faillite ; `ObjectivesManager.gd` propose déjà trois pistes de buts ; `CareerPrestige.gd` inclut 10 trophées et score Empire composite ; `MarketManager.gd` possède des menaces espacées (actuellement au moins 48 mois et après 1975) ; `ExecutiveManager.gd` gère des problèmes RH. La base existe mais reste fragmentée et souvent binaire.
+- **Livrable :** [SCENARIO-01](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md) : architecture proposée d'arcs, multiples palmarès indépendants, déclencheurs liés à l'état du monde, règles de justice, plan WORLD-00/RANK-01/WORLD-01 et tests.
+- **Statut :** **conception seulement**, aucune scène ni règle de simulation modifiée ; pas de test Godot requis à ce stade. Intégration et coefficients **non autorisés sans revue de conception**.
+- **À relire par Claude :** ne pas confondre objectifs/trophées avec scénarios d'adversité, éviter de dupliquer le système de menaces, préserver classement Empire existant en attendant décision et distinguer le n°1 CPU sectoriel.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :

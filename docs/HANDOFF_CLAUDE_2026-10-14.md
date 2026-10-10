@@ -53,6 +53,10 @@
 - [PR #89 — CAREER-02 automate prudent](https://github.com/vadorus/addonhardwaregame2d/pull/89) : **expérience dans la sonde seulement**, six faillites précoces évitées, mais les douze scénarios Standard finissent toujours en faillite ; garde testée sans mutation et smoke PASS. Ne pas fusionner dans le gameplay comme « correctif économique » ; diagnostiquer les années 1990–2030.
 - Le code de démo de référence `v013/demo-octobre` @ `c1d4f6e` n'a **pas** intégré ces deux branches au moment des rapports. Éviter toute confusion entre réussite du test de diversité et validation du jeu complet.
 
+## Nouvelle clarification de design — SCENARIO-01
+
+Le créateur a rectifié une interprétation : **les « défis » sont les obstacles et histoires que la simulation oppose au joueur**, pas des trophées. Il veut que plusieurs formes d'excellence permettent d'être premier : performance, avis, qualité, ventes, fiabilité, etc., sans condition de fortune maximale. Lire [SCENARIO-01](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md). Il s'agit d'une **proposition de design, aucun code implémenté**. Claude devra éviter de fusionner automatiquement objectifs, trophées, crises et classements en un seul nombre.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

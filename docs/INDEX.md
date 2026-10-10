@@ -49,6 +49,10 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 - [PR #88 — presse, 100/100 textes distincts](https://github.com/vadorus/addonhardwaregame2d/pull/88), code du journal seulement ; test PC et sauvegarde PASS, reste revue narrative humaine.
 - [PR #89 — sonde de carrière prudente](https://github.com/vadorus/addonhardwaregame2d/pull/89), expérience sans changer l'économie : 6 sorties précoces évitées, **12/12 faillites finales** ; vérifier la longévité commerciale et la mesure sectorielle CPU.
 
+## Game design — défis et classements
+
+- [SCENARIO-01 — défis vivants et plusieurs formes de réussite](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md) : **le défi est l'obstacle provoqué par le monde**, distinct d'un trophée. Base actuelle et propositions clairement séparées.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |
