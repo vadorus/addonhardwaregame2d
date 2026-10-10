@@ -78,6 +78,14 @@
 - **Statut :** **conception seulement**, aucune scène ni règle de simulation modifiée ; pas de test Godot requis à ce stade. Intégration et coefficients **non autorisés sans revue de conception**.
 - **À relire par Claude :** ne pas confondre objectifs/trophées avec scénarios d'adversité, éviter de dupliquer le système de menaces, préserver classement Empire existant en attendant décision et distinguer le n°1 CPU sectoriel.
 
+### PROGRESSION-01 — 10/10/2026 — Limites réelles et politique d'expansion
+
+- **Décision de design clarifiée directement par le créateur :** CPU seul a une progression finie ; Software reste incomplet ; l'idée d'un moteur de générations technologiques existe **sans architecture prête** et n'est donc pas à implémenter immédiatement. **Plan B** : introduire d'autres branches d'activité **plus tard**.
+- **Travail réalisé :** [document PROGRESSION-01](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md) et mises à jour du registre des décisions, plan priorisé, clarification de SCENARIO-01, index et passation.
+- **Distinction fondamentale :** limite de contenu vs fin de partie programmée ; générations de produit CPU présentes vs générations technologiques extensibles non définies ; défis vivants vs nouveaux pans de gameplay.
+- **Code et validation :** documentation exclusivement ; **aucun code de jeu modifié, aucun test Godot ou Pixel nouvellement exécuté**.
+- **À contrôler par Claude :** ne pas lancer GEN-01 ou nouvelle branche, ne pas appeler le Software « achevé » ; d'abord PROG-00/CORE-01/SOFT-01 puis étude technique ARCH-00 explicitement approuvée.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :

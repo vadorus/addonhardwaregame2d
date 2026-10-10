@@ -25,6 +25,10 @@ Le [rapport CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) démontre s
 - **CAREER-02 / [PR #89](https://github.com/vadorus/addonhardwaregame2d/pull/89)** : expérience sur automate prudent confirmée sur **4 graines Standard**, six faillites précoces évitées, mais toutes les carrières finissent encore en faillite. **Pas de changement de coefficients ni de moteur ;** la priorité est maintenant une analyse de trésorerie et rentabilité après 1990, plus une vraie métrique n°1 CPU sectoriel.
 - **BUD-01 / [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87)** apporte déjà un avertissement financier au recrutement du joueur sur une branche distincte, testé PC mais pas Pixel. Ne pas ajouter un second gardien caché empêchant le joueur de recruter.
 
+## Garde-fou de portée : plafond réel du contenu (10/10)
+
+La [clarification PROGRESSION-01](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md) fixe trois contraintes : **(1)** progression CPU actuellement bornée en contenu, **(2)** Software très incomplet par rapport à la vision, **(3)** système de nouvelles générations technologiques structurelles **non architecturé et donc non à développer maintenant**. Le créateur envisage **d'ajouter des branches plus tard comme plan B de renouvellement**, pas immédiatement. Les scénarios et palmarès améliorent la profondeur **sans supprimer le plafond**. Ajouter une phase de mesure du plafond réel et approfondir Software avant expansion ; ARCH-00 est **étude d'architecture uniquement** et GEN-01 reste différé.
+
 ## Règles de priorisation
 
 - **P0 — Bloquant :** corruption/effacement de partie, crash, mauvais comportement d'un bouton payant/critique, progression impossible, calcul économique faux démontré, tests de base cassés.

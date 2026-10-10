@@ -53,6 +53,10 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 
 - [SCENARIO-01 — défis vivants et plusieurs formes de réussite](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md) : **le défi est l'obstacle provoqué par le monde**, distinct d'un trophée. Base actuelle et propositions clairement séparées.
 
+## Limites actuelles de progression
+
+- [PROGRESSION-01 — Plafond CPU, Software à approfondir, générations technologiques différées et branches futures](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md). Clarification du propriétaire, conception seulement.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |

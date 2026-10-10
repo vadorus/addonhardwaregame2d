@@ -57,6 +57,10 @@
 
 Le créateur a rectifié une interprétation : **les « défis » sont les obstacles et histoires que la simulation oppose au joueur**, pas des trophées. Il veut que plusieurs formes d'excellence permettent d'être premier : performance, avis, qualité, ventes, fiabilité, etc., sans condition de fortune maximale. Lire [SCENARIO-01](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md). Il s'agit d'une **proposition de design, aucun code implémenté**. Claude devra éviter de fusionner automatiquement objectifs, trophées, crises et classements en un seul nombre.
 
+## Clarification PROGRESSION-01 — plafond du jeu et ordre de croissance
+
+[Document de conception complet](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md). Le créateur précise que **le contenu jouable est bel et bien limité** : Hardware surtout CPU avec progression finie ; Software encore très loin du résultat souhaité. Le système envisagé de **nouvelles générations technologiques** n'a **pas** d'architecture validée, donc ne doit **pas** être lancé à la hâte. Son **plan B est l'ajout de branches futures**, lorsque chacune disposera d'une vraie boucle. À ne pas confondre avec les générations de produits CPU déjà programmées. Les nouveaux scénarios peuvent enrichir la carrière mais **ne rendent pas le jeu infini**. Claude doit conserver cette limite et étudier ARCH-00 **sans refactor d'anticipation**.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

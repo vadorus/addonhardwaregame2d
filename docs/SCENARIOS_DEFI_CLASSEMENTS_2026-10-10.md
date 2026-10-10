@@ -17,7 +17,7 @@ Quatre couches distinctes :
 | **Classement** | Mesures comparables du secteur | N°1 efficacité / € / ventes / fiabilité | Mesure plusieurs formes de réussite, pas un seul « plus riche » |
 | **Réussite / trophée** | Faits constatés | Défendre le leadership CPU pendant deux ans | Garde une trace, ne remplace pas le défi |
 
-Un jeu sans fin obligatoire peut avoir une **longue carrière** si les ambitions et défis se renouvellent. La limite 2030 dans `tests/tools/career_probe.gd` est **une borne de test**, pas une fin commerciale.
+Un jeu sans fin obligatoire peut avoir une **longue carrière** si les ambitions et défis se renouvellent, **mais seulement dans la limite de contenu réellement disponible**. Le CPU a aujourd'hui un plafond de possibilités, et la branche Software reste en construction ; les scénarios ne suffisent pas à créer de nouvelles technologies ou activités. Voir [PROGRESSION-01](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md). La limite 2030 des sondes est une borne de test, pas une fin commerciale.
 
 ## 2. État réel de la démo — ne pas redévelopper ce qui existe
 

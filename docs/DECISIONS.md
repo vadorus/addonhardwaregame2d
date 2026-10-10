@@ -16,6 +16,10 @@
 | D-010 | Nature des défis | **Clarification confirmée par le propriétaire, 10/10** | Les défis sont **les obstacles et scénarios que le jeu oppose au joueur** : rivaux, fournisseurs, marché, équipe, crises, transformations. Ils ne sont **pas** de simples trophées ou checklists. Voir [SCENARIO-01](SCENARIOS_DEFI_CLASSEMENTS_2026-10-10.md). |
 | D-011 | Plusieurs leaderships possibles | **Orientation confirmée, modalités à définir** | Le joueur doit pouvoir être premier dans **différentes catégories** (qualité, performance, avis, part de marché, etc.), sans devoir être l'entreprise la plus riche. Coefficients du score global et catégories exactes restent des propositions. |
 
+| D-012 | Durée de vie effective | **Constat confirmé par le propriétaire, 10/10** | Aucune fin obligatoire n'implique pas un contenu infini : **CPU a un plafond de progression** et Software n'a pas encore la profondeur cible. Les défis peuvent renouveler des situations, **pas remplacer de nouvelles mécaniques**. Voir [PROGRESSION-01](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md). |
+| D-013 | Générations technologiques futures | **Intention confirmée ; architecture non définie, réalisation différée** | Distinguer les générations de produits CPU déjà possibles d'un véritable moteur modulaire de générations technologiques. **Ne pas lancer la refonte avant architecture et tests validés.** |
+| D-014 | Ajout ultérieur de branches | **Plan B confirmé, périmètre et calendrier non décidés** | De nouvelles branches pourront étendre la durée de vie **plus tard**, lorsque leur boucle propre est viable. Aucun nouveau secteur n'est autorisé à ouvrir immédiatement. |
+
 ## Propositions encore ouvertes
 
 - **P-001 — Génération narrative procédurale :** choix d'angle, voix propres aux personnages, évitement des répétitions, sauvegarde du texte publié. Mesurer d'abord la répétition et tester la fidélité aux événements.
