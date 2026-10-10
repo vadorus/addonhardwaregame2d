@@ -44,6 +44,11 @@ Les décisions de conception se lisent d'abord dans [DESIGN_BIBLE.md](DESIGN_BIB
 
 - [PR #87 — BUD-01 : prévoir et expliquer le coût d'une embauche](https://github.com/vadorus/addonhardwaregame2d/pull/87) : tests PC PASS, **non fusionné / Pixel non testé**. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) documente le cash-flow 1972–1973.
 
+## Nouveaux lots du 10 octobre
+
+- [PR #88 — presse, 100/100 textes distincts](https://github.com/vadorus/addonhardwaregame2d/pull/88), code du journal seulement ; test PC et sauvegarde PASS, reste revue narrative humaine.
+- [PR #89 — sonde de carrière prudente](https://github.com/vadorus/addonhardwaregame2d/pull/89), expérience sans changer l'économie : 6 sorties précoces évitées, **12/12 faillites finales** ; vérifier la longévité commerciale et la mesure sectorielle CPU.
+
 ## Carte des sujets
 
 | Sujet | Source principale | Preuves / compléments |

@@ -54,6 +54,22 @@
 - **Tests Godot PC :** re-import propre après avertissement UID initial ; nouveau scénario financier PASS, nouveau scénario UI PASS, smoke PASS, budget 2e CPU et projet finance PASS. **Pas de validation au doigt Pixel**, aucune sauvegarde personnelle touchée. Logs sur PC et [rapport de PR](https://github.com/vadorus/addonhardwaregame2d/blob/fix/recrutement-prevision-20261010/docs/reviews/RETOUR_2026-10-10_BUD01.md).
 - **À faire** : revue Claude du sens des indicateurs, parcours humain prudent et équilibre Accessible, capture/tactile Pixel sur copie et tests de carrière après toute future modification économique.
 
+### NAR-01 — 10/10/2026 — Presse plus variée, mesurée sous Godot
+
+- **Branche :** `feat/press-narration-vary-20261010`, [PR #88](https://github.com/vadorus/addonhardwaregame2d/pull/88) **brouillon** ; base code `c1d4f6e`.
+- **Fichiers :** `scripts/MediaManager.gd`, test de corpus `tests/press_narrative_variation_test.*`, `docs/reviews/RETOUR_2026-10-10_NAR01.md` dans la branche concernée.
+- **Avant/après réellement mesuré :** 100 articles homogènes → **9 corps distincts** ancien système, **100 corps distincts** après correction. Le test final a été répété au commit `3d3b5b0` après polissage français : **PASS** ; smoke, boot et sauvegarde PASS ; import froid avertissement UID puis reimport propre.
+- **Portée :** rotation factuelle basée sur les métriques, formulations multiples, pas de RNG économique. Anciens articles inchangés au chargement ; qualité littéraire et contextes variés à relire. Aucun Pixel.
+
+### CAREER-02 — 10/10/2026 — Comparaison contrôlée d'un automate plus prudent
+
+- **Branche :** `audit/career-prudent-20261010`, [PR #89](https://github.com/vadorus/addonhardwaregame2d/pull/89) **brouillon**, base `c1d4f6e`.
+- **But :** tester la cause des six faillites 02/1973 sans changer les coefficients de jeu ou la sonde C3 officielle.
+- **Méthode :** sonde dérivée qui conserve la règle de décision et exige six mois de réserve estimée avant recrutement.
+- **Mesure réelle :** 4 graines × 3 stratégies Standard = **12 résultats** avec exit 0 / zéro erreur ; les **6 faillites précoces** sont évitées, mais **les 12 carrières meurent plus tard**. Donc piste de causalité partielle, **pas de correction d'équilibrage**.
+- **Test spécifique au commit `2ffa96d` :** garde de recrutement PASS et non-mutation, smoke/boot PASS ; premier import UID warning puis reimport propre. **Pas de Pixel** ; preuve complète dans `docs/reviews/RETOUR_2026-10-10_CAREER02_PRUDENT.md` (PR #89).
+- **Prochainement :** analyser coût/profit du CPU après 1990, concurrence, durée commerciale et leadership CPU sectoriel distinct du rang Empire.
+
 ## Prochaines entrées
 
 Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». Pour chaque modification, dupliquer [MODELE_RAPPORT_LOT.md](MODELE_RAPPORT_LOT.md) dans un `docs/reviews/RETOUR_<DATE>_<LOT>.md` et ajouter ici :

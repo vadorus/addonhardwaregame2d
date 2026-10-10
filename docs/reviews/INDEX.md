@@ -4,6 +4,8 @@
 
 | Document | Date | Statut d'usage en octobre | Limites |
 | --- | --- | --- | --- |
+| [NAR-01 — résultats dans PR #88](https://github.com/vadorus/addonhardwaregame2d/blob/feat/press-narration-vary-20261010/docs/reviews/RETOUR_2026-10-10_NAR01.md) | 10/10 | **Testé PC sur branche expérimentale** | 100/100 corps distincts, pas de relecture humaine Pixel |
+| [CAREER-02 — résultats dans PR #89](https://github.com/vadorus/addonhardwaregame2d/blob/audit/career-prudent-20261010/docs/reviews/RETOUR_2026-10-10_CAREER02_PRUDENT.md) | 10/10 | **Sonde dérivée testée PC** | Six faillites précoces évitées, 12/12 carrières Standard toujours en faillite, aucune économie modifiée |
 | [CAREER-01 — 24 carrières](RETOUR_2026-10-10_CAREER01_4SEEDS.md) | 10/10 | **Mesure au commit c1d4f6e** | 12/12 faillites Standard et richesse élevée Accessible ; rang Empire, pas CPU sectoriel |
 | [QA-00 : PC, économie et narration](RETOUR_2026-10-10_QA00.md) | 10/10 | **Preuve actuelle au SHA c1d4f6e** | 12 commandes code 0 ; avertissement UID initial, fuites au test T2 ; 1 graine pour carrière, pas de Pixel |
 | [P0 Pixel référence 12 mois](P0_PIXEL_REFERENCE12_COMPLET_2026-10-08.md) | 08/10 | **Historique / baseline** | APK antérieur aux optimisations, pas mesure de la démo HEAD |

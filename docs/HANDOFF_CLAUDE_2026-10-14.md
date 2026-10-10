@@ -47,6 +47,12 @@
 - **Correctif :** affichage prix d'embauche, salaire, trésorerie résiduelle, réserve prudente ; prévention clic si paiement impossible ; pas de modification de gameplay ni sauvegarde. Tests Godot financier, UI, smoke, projet finance et budget CPU passés sur PC ; importer à froid génère encore un avertissement UID historique, second import sans erreur.
 - **Claude :** contrôler la prudence de l'estimation, les alertes et la lisibilité Pixel ; vérifier que `CAREER-01` distingue IA automatique et vrai joueur, puis décider des modifications d'équilibrage **seulement après investigation**.
 
+## Nouvelles PR à relire au retour
+
+- [PR #88 — NAR-01 presse](https://github.com/vadorus/addonhardwaregame2d/pull/88) : 100 corps distincts/100, tests Godot PC PASS, mais diversité de langue et de contexte à valider humainement. Vérifier métriques, rival, anciennes sauvegardes et qualité des formulations ; pas de fusion ni Pixel.
+- [PR #89 — CAREER-02 automate prudent](https://github.com/vadorus/addonhardwaregame2d/pull/89) : **expérience dans la sonde seulement**, six faillites précoces évitées, mais les douze scénarios Standard finissent toujours en faillite ; garde testée sans mutation et smoke PASS. Ne pas fusionner dans le gameplay comme « correctif économique » ; diagnostiquer les années 1990–2030.
+- Le code de démo de référence `v013/demo-octobre` @ `c1d4f6e` n'a **pas** intégré ces deux branches au moment des rapports. Éviter toute confusion entre réussite du test de diversité et validation du jeu complet.
+
 ## Ordre conseillé de revue
 
 1. **Sécurité de branche / Git :** historique lisible, fichiers réellement modifiés, absence de changements hors périmètre, aucune clé / build / sauvegarde committée.

@@ -21,6 +21,12 @@ Cette mise à jour complète mais n'efface pas la photographie statique antérie
 
 [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) : devis de recrutement calculant prime, salaire et réserve prudente sans mutation ; interface affichant les risques. **Tests Godot PC réussis**, dont affichage UI ; **non fusionné** à `v013/demo-octobre`, **non testé sur Pixel**. Valeurs économiques de simulation inchangées. [Diagnostic chiffré dans issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84).
 
+## NAR-01 et CAREER-02 — suites expérimentales sur deux branches (10/10)
+
+- **Presse — [PR #88](https://github.com/vadorus/addonhardwaregame2d/pull/88) :** dans une branche dédiée, test Godot 4.7.2 **PASS 100/100 corps distincts**, comparé aux **9/100** du code de base dans le même contexte normalisé. Smoke, démarrage, sauvegarde/horloge PASS ; import froid UID historique puis reimport propre. Qualité française et lecture Pixel toujours à revoir. **Non fusionné à la démo.**
+- **Carrière — [PR #89](https://github.com/vadorus/addonhardwaregame2d/pull/89) :** sonde dérivée et **aucune économie modifiée** ; 4 graines × 3 stratégies Standard = 12 scénarios, six faillites de février 1973 évitées par prudence à l'embauche, mais **12/12 faillites à long terme**. Test de garde financière sans mutation, smoke et démarrage PASS. **Non fusionné.**
+- **Référence de la démo toujours au commit `c1d4f6e` lors de ces mesures.** Ne pas confondre les résultats expérimentaux de branches avec la démo installée ou testée sur le Pixel.
+
 ## Tableau de statut
 
 | Domaine | Constat au HEAD | Niveau de preuve | Suite |

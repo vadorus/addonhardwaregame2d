@@ -19,6 +19,12 @@ Le [rapport CAREER-01](reviews/RETOUR_2026-10-10_CAREER01_4SEEDS.md) démontre s
 
 [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) **non fusionnée** : détail avant embauche (prime, salaire, solde, réserve prudente), alertes et deux tests Godot. [Issue #84](https://github.com/vadorus/addonhardwaregame2d/issues/84) contient désormais la cause immédiate chiffrée pour **104729 / STANDARD / ADAPTÉE** : embauche 11 214 € puis +5 607 €/mois quand la trésorerie ne l'absorbe pas. **Ce lot n'équilibre pas l'économie** ; la comparaison entre IA et joueur prudent reste ouverte. VIS-00 / NAR-00 inchangés.
 
+## Mise à jour au 10/10 — résultats concrets de NAR-01 et CAREER-02
+
+- **NAR-01 / [PR #88](https://github.com/vadorus/addonhardwaregame2d/pull/88)** : première correction de variation rédactionnelle testée PC, **100/100 articles différents** dans le corpus homogène au lieu de 9/100. Prochaine étape : relecture de la langue et des situations contradictoires, puis essai en jeu et Pixel. **Pas encore fusionnée.**
+- **CAREER-02 / [PR #89](https://github.com/vadorus/addonhardwaregame2d/pull/89)** : expérience sur automate prudent confirmée sur **4 graines Standard**, six faillites précoces évitées, mais toutes les carrières finissent encore en faillite. **Pas de changement de coefficients ni de moteur ;** la priorité est maintenant une analyse de trésorerie et rentabilité après 1990, plus une vraie métrique n°1 CPU sectoriel.
+- **BUD-01 / [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87)** apporte déjà un avertissement financier au recrutement du joueur sur une branche distincte, testé PC mais pas Pixel. Ne pas ajouter un second gardien caché empêchant le joueur de recruter.
+
 ## Règles de priorisation
 
 - **P0 — Bloquant :** corruption/effacement de partie, crash, mauvais comportement d'un bouton payant/critique, progression impossible, calcul économique faux démontré, tests de base cassés.
