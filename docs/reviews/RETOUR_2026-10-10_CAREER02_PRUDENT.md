@@ -39,6 +39,8 @@ Le résultat a été répliqué **sur les quatre graines officielles en STANDARD
 
 **Verdict :** 6 faillites initialement en février 1973 sont désormais évitées. **12/12 carrières Standard finissent pourtant toujours par faire faillite** avant la fin de la sonde ; la prudence au recrutement ne suffit donc pas à corriger l'ensemble de l'équilibre, et une trajectoire FIGÉE est même légèrement moins longue. Cela confirme qu'il faut auditer l'après-1990, la demande, les retours commerciaux, les coûts de maintenance et le plafonnement technologique, sans assouplir arbitrairement la difficulté.
 
-Le nouvel essai `tests/career_prudent_hiring_test.tscn` doit confirmer que la garde accepte une forte réserve, refuse une faible réserve et n'altère jamais la trésorerie ni les effectifs. **Son résultat sera ajouté après exécution.**
+**Vérification réellement effectuée** sur un worktree détaché au SHA `2ffa96d` : `tests/career_prudent_hiring_test.tscn` **PASS**, accepte une trésorerie de 160 000 €, refuse un recrutement lorsque la caisse ne compte que 20 000 €, sans aucun changement de trésorerie ni effectif. Godot 4.7.2 : exit 0, 0 erreur moteur. `smoke_test.tscn` PASS, `--quit-after 2` exit 0 ; premier import froid a émis l'avertissement UID historique, deuxième import 0 erreur. Logs `C:/Users/Admin/Documents/TE_CAREER02_regress_logs_20261010/`. L'identifiant UID généré du test a été ajouté à la branche pour stabiliser son chargement.
+
+**Limites :** le test de garde n'a été exécuté que sur PC. Il ne démontre pas qu'une vraie embauche (candidate avec salaire variable) peut sauver le parcours humain, ni que les coûts du jeu doivent changer. Aucun test Pixel, aucune fusion.
 
 **Fichiers locaux de preuve :** `C:/Users/Admin/Documents/TE_CAREER02_logs_20261010/` et CSV de la copie de travail. Ne pas confondre les CSV de cet automate expérimental avec le référentiel gelé C3 ; ils sont conservés dans un autre worktree.
