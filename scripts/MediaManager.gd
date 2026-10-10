@@ -405,54 +405,54 @@ func _choose_review_style(base: int, outlet_id: String, product_id: String) -> i
 	return style
 
 const REVIEW_METRIC_NAMES := {
-	"performance":"la performance", "efficiency":"l'efficacite energetique",
-	"reliability":"la fiabilite", "usability":"la facilite d'integration",
-	"innovation":"l'innovation", "ecosystem":"l'ecosysteme",
-	"sustainability":"la sobriete"
+	"performance":"la performance", "efficiency":"l'efficacité énergétique",
+	"reliability":"la fiabilité", "usability":"la facilité d'intégration",
+	"innovation":"l'innovation", "ecosystem":"l'écosystème",
+	"sustainability":"la sobriété"
 }
 ## Chaque proposition se rapporte aux metriques réellement calculees et n'invente
 ## ni un banc de test effectue ni des clients unanimes.
 const REVIEW_CONTEXT_FRAMES := [
 	"Le bilan de {p} se lit dans ses chiffres",
-	"Les caracteristiques de {p} dessinent un profil net",
-	"Le positionnement technique de {p} merite une lecture attentive",
+	"Les caractéristiques de {p} dessinent un profil net",
+	"Le positionnement technique de {p} mérite une lecture attentive",
 	"Une valeur ressort dans le dossier de {p}",
 	"Sur {p}, les chiffres priment sur les slogans",
-	"Chaque compromis compte dans cette generation de {p}",
-	"Le dossier de {p} reserve ses atouts et ses limites",
-	"Au-dela du nom de {p}, la fiche raconte une strategie"
+	"Chaque compromis compte dans cette génération de {p}",
+	"Le dossier de {p} réserve ses atouts et ses limites",
+	"Au-delà du nom de {p}, La fiche raconte une stratégie"
 ]
 const REVIEW_STRENGTH_FRAMES := [
-	"{metric} domine son bilan avec {value}/100",
-	"sa meilleure valeur est {metric}, a {value}/100",
-	"l'indicateur le plus haut est {metric} ({value}/100)",
-	"sur {metric}, le tableau atteint {value}/100, son maximum",
-	"la fiche met {metric} en tete avec {value}/100",
-	"on releve {value}/100 sur {metric}, son premier atout",
-	"la mesure la plus favorable concerne {metric} ({value}/100)",
-	"avec {value}/100, {metric} reste son score dominant"
+	"{metric} domine son bilan Avec {value}/100",
+	"Sa meilleure valeur est {metric}, à {value}/100",
+	"L'indicateur le plus haut est {metric} ({value}/100)",
+	"Sur {metric}, le tableau atteint {value}/100, son maximum",
+	"La fiche met {metric} en tete Avec {value}/100",
+	"On relève {value}/100 Sur {metric}, son premier atout",
+	"La mesure la plus favorable concerne {metric} ({value}/100)",
+	"Avec {value}/100, {metric} reste son score dominant"
 ]
 const REVIEW_RESERVE_FRAMES := [
 	"La note la plus faible concerne {metric} ({value}/100)",
-	"En contrepoint, {metric} ne monte qu'a {value}/100",
-	"Le point le moins fort de la fiche est {metric}, a {value}/100",
-	"Reste {metric}, mesuree a {value}/100, en bas des indicateurs",
+	"En contrepoint, {metric} ne monte qu'à {value}/100",
+	"Le point le moins fort de La fiche est {metric}, à {value}/100",
+	"Reste {metric}, mesurée à {value}/100, en bas des indicateurs",
 	"Il faut aussi regarder {metric} : {value}/100, son minimum",
-	"Le compromis apparait sur {metric}, a {value}/100",
-	"En retrait par rapport aux autres indicateurs : {metric}, {value}/100",
-	"La contrepartie tient a {metric}, avec {value}/100"
+	"Le compromis apparaît Sur {metric}, à {value}/100",
+	"En retrait par rapport aux autrès indicateurs : {metric}, {value}/100",
+	"La contrepartie tient a {metric}, Avec {value}/100"
 ]
 const REVIEW_VERDICTS := {
 	"enthousiaste":["Le bilan convainc","La combinaison technique impressionne","Un haut niveau d'ensemble","Les resultats parlent d'eux-memes",
-		"Une proposition marquante","Cette generation vise haut","Les atouts sont bien presents","Une fiche qui se distingue"],
-	"positif":["Le bilan est favorable","L'ensemble tient la route","Un compromis credible","Les qualites ressortent",
-		"Une proposition coherente","La note confirme un bon niveau","Les choix techniques se defendent","Un positionnement solide"],
-	"mitigé":["Le bilan reste partage","Une proposition avec des compromis","Rien n'est totalement tranche","Une fiche a lire avec nuance",
-		"Les forces ne cachent pas les limites","Des choix discutables","Il faudra choisir ses priorites","Un avis prudent s'impose"],
-	"réservé":["Des reserves subsistent","La note appelle a la prudence","Un bilan sous surveillance","Les faiblesses pesent",
-		"Il manque encore quelque chose","Le compromis est difficile","Les choix ne convainquent pas entierement","Une evolution serait bienvenue"],
-	"critique":["Le bilan ne convainc pas","Les insuffisances dominent","Une copie difficile","La note est severe",
-		"Il faut revoir les priorites","Une proposition peu defendable","Les compromis coutent cher","Cette generation reste en retrait"]
+		"Une proposition marquante","Cette génération vise haut","Les atouts sont bien présents","Une fiche qui se distingue"],
+	"positif":["Le bilan est favorable","L'ensemble tient la route","Un compromis credible","Les qualités ressortent",
+		"Une proposition cohérente","La note confirme un bon niveau","Les choix techniques se defendent","Un positionnement solide"],
+	"mitigé":["Le bilan reste partagé","Une proposition avec des compromis","Rien n'est totalement tranche","Une fiche à lire avec nuance",
+		"Les forces ne cachent pas les limites","Des choix discutables","Il faudra choisir ses priorités","Un avis prudent s'impose"],
+	"réservé":["Des réserves subsistent","La note appelle a la prudence","Un bilan sous surveillance","Les faiblesses pesent",
+		"Il manque encore quelque chose","Le compromis est difficile","Les choix ne convainquent pas entierement","Une évolution serait bienvenue"],
+	"critique":["Le bilan ne convainc pas","Les insuffisances dominent","Une copie difficile","La note est sévère",
+		"Il faut revoir les priorités","Une proposition peu défendable","Les compromis coûtent cher","Cette génération reste en retrait"]
 }
 
 const JOURNALISTS := {
