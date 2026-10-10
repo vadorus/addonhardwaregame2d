@@ -410,8 +410,7 @@ const REVIEW_METRIC_NAMES := {
 	"innovation":"l'innovation", "ecosystem":"l'écosystème",
 	"sustainability":"la sobriété"
 }
-## Chaque proposition se rapporte aux metriques réellement calculees et n'invente
-## ni un banc de test effectue ni des clients unanimes.
+## Toutes les propositions utilisent les véritables métriques de simulation.
 const REVIEW_CONTEXT_FRAMES := [
 	"Le bilan de {p} se lit dans ses chiffres",
 	"Les caractéristiques de {p} dessinent un profil net",
@@ -419,38 +418,38 @@ const REVIEW_CONTEXT_FRAMES := [
 	"Une valeur ressort dans le dossier de {p}",
 	"Sur {p}, les chiffres priment sur les slogans",
 	"Chaque compromis compte dans cette génération de {p}",
-	"Le dossier de {p} réserve ses atouts et ses limites",
-	"Au-delà du nom de {p}, La fiche raconte une stratégie"
+	"Le dossier de {p} révèle ses atouts et ses limites",
+	"Au-delà du nom de {p}, sa fiche raconte une stratégie"
 ]
 const REVIEW_STRENGTH_FRAMES := [
-	"{metric} domine son bilan Avec {value}/100",
+	"Son indicateur dominant est {metric}, avec {value}/100",
 	"Sa meilleure valeur est {metric}, à {value}/100",
 	"L'indicateur le plus haut est {metric} ({value}/100)",
 	"Sur {metric}, le tableau atteint {value}/100, son maximum",
-	"La fiche met {metric} en tete Avec {value}/100",
-	"On relève {value}/100 Sur {metric}, son premier atout",
+	"La fiche met {metric} en tête avec {value}/100",
+	"On relève {value}/100 sur {metric}, son premier atout",
 	"La mesure la plus favorable concerne {metric} ({value}/100)",
 	"Avec {value}/100, {metric} reste son score dominant"
 ]
 const REVIEW_RESERVE_FRAMES := [
 	"La note la plus faible concerne {metric} ({value}/100)",
 	"En contrepoint, {metric} ne monte qu'à {value}/100",
-	"Le point le moins fort de La fiche est {metric}, à {value}/100",
+	"Le point le moins fort de la fiche est {metric}, à {value}/100",
 	"Reste {metric}, mesurée à {value}/100, en bas des indicateurs",
 	"Il faut aussi regarder {metric} : {value}/100, son minimum",
-	"Le compromis apparaît Sur {metric}, à {value}/100",
-	"En retrait par rapport aux autrès indicateurs : {metric}, {value}/100",
-	"La contrepartie tient a {metric}, Avec {value}/100"
+	"Le compromis apparaît sur {metric}, à {value}/100",
+	"En retrait par rapport aux autres indicateurs : {metric}, {value}/100",
+	"La contrepartie tient à {metric}, avec {value}/100"
 ]
 const REVIEW_VERDICTS := {
-	"enthousiaste":["Le bilan convainc","La combinaison technique impressionne","Un haut niveau d'ensemble","Les resultats parlent d'eux-memes",
+	"enthousiaste":["Le bilan convainc","La combinaison technique impressionne","Un haut niveau d'ensemble","Les résultats parlent d'eux-mêmes",
 		"Une proposition marquante","Cette génération vise haut","Les atouts sont bien présents","Une fiche qui se distingue"],
-	"positif":["Le bilan est favorable","L'ensemble tient la route","Un compromis credible","Les qualités ressortent",
-		"Une proposition cohérente","La note confirme un bon niveau","Les choix techniques se defendent","Un positionnement solide"],
-	"mitigé":["Le bilan reste partagé","Une proposition avec des compromis","Rien n'est totalement tranche","Une fiche à lire avec nuance",
+	"positif":["Le bilan est favorable","L'ensemble tient la route","Un compromis crédible","Les qualités ressortent",
+		"Une proposition cohérente","La note confirme un bon niveau","Les choix techniques se défendent","Un positionnement solide"],
+	"mitigé":["Le bilan reste partagé","Une proposition avec des compromis","Rien n'est totalement tranché","Une fiche à lire avec nuance",
 		"Les forces ne cachent pas les limites","Des choix discutables","Il faudra choisir ses priorités","Un avis prudent s'impose"],
-	"réservé":["Des réserves subsistent","La note appelle a la prudence","Un bilan sous surveillance","Les faiblesses pesent",
-		"Il manque encore quelque chose","Le compromis est difficile","Les choix ne convainquent pas entierement","Une évolution serait bienvenue"],
+	"réservé":["Des réserves subsistent","La note appelle à la prudence","Un bilan sous surveillance","Les faiblesses pèsent",
+		"Il manque encore quelque chose","Le compromis est difficile","Les choix ne convainquent pas entièrement","Une évolution serait bienvenue"],
 	"critique":["Le bilan ne convainc pas","Les insuffisances dominent","Une copie difficile","La note est sévère",
 		"Il faut revoir les priorités","Une proposition peu défendable","Les compromis coûtent cher","Cette génération reste en retrait"]
 }
@@ -468,13 +467,13 @@ const HEADLINES := {
 	"critique":["{p} : la douche froide", "{p} déçoit", "{p}, difficile à recommander", "Faux départ pour {c} avec {p}"],
 }
 const OPENERS := {
-	"BENCHMARK":["Sur notre banc de test", "Après une batterie de mesures", "Chronomètre en main"],
-	"BENCHMARK_SITE":["Sur notre banc de test", "Après 40 heures de benchmarks", "Chiffres à l'appui"],
-	"SPECIALIST_PRESS":["Après trois semaines en atelier", "Monté dans nos machines de test", "En usage professionnel"],
-	"GENERAL_PRESS":["Pour le grand public", "Côté utilisateurs", "À l'usage de tous les jours"],
-	"COMMUNITY":["Sur les forums, les premiers acheteurs sont unanimes", "Chez les passionnés", "D'après nos lecteurs"],
-	"VIDEO_CREATOR":["Face caméra", "Dans notre essai vidéo", "Démonté et remonté à l'écran"],
-	"STREAMER":["En direct devant le chat", "Pendant six heures de stream", "Poussé dans ses retranchements en live"],
+	"BENCHMARK":["Sur notre grille de mesure", "Dans notre comparaison", "Côté performances"],
+	"BENCHMARK_SITE":["À travers les résultats publiés", "Dans nos tableaux comparatifs", "Chiffres à l'appui"],
+	"SPECIALIST_PRESS":["Dans le dossier technique", "Pour les usages professionnels", "Sur le papier"],
+	"GENERAL_PRESS":["Pour le grand public", "Côté utilisateurs", "À l'usage quotidien"],
+	"COMMUNITY":["Du point de vue des passionnés", "Dans les discussions techniques", "Pour une communauté exigeante"],
+	"VIDEO_CREATOR":["Face caméra", "Dans notre décryptage", "À l'analyse"],
+	"STREAMER":["Côté diffusion", "Dans cette sélection en direct", "Pour les amateurs de performances"]
 }
 const PRAISE := {
 	"performance":"il avale les calculs sans broncher", "efficiency":"il chauffe à peine et consomme très peu",
