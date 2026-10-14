@@ -201,7 +201,12 @@ func _on_scene_hero() -> void:
 
 func set_viewport_width(width: float) -> void:
 	if mode_grid != null:
-		mode_grid.columns = 4 if width >= 700.0 else 2
+		# Toutes les étapes sur une ligne dès 700 px (téléphone en paysage) : 4, ou 5 avec les logiciels.
+		var shown := 0
+		for button in mode_buttons.values():
+			if (button as Button).visible:
+				shown += 1
+		mode_grid.columns = maxi(shown, 1) if width >= 700.0 else 2
 	if industrialization_panel != null and industrialization_panel.has_method("set_viewport_width"):
 		industrialization_panel.call("set_viewport_width", width)
 	if lifecycle_panel != null and lifecycle_panel.has_method("set_viewport_width"):

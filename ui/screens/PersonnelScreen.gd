@@ -9,6 +9,7 @@ var staff_label: Label
 var team_explainer_label: Label
 var candidate_label: Label
 var recruit_department: OptionButton
+var _department_buttons: Array = []
 
 func _ready() -> void:
 	name = "Équipe"
@@ -79,11 +80,23 @@ func _build() -> void:
 		recruit_department.add_item(department)
 		recruit_department.set_item_metadata(recruit_department.item_count - 1, department)
 	recruit_row.add_child(recruit_department)
-	var search_button := Button.new()
-	search_button.text = "Nora cherche 3 profils"
-	search_button.custom_minimum_size.y = 44
-	search_button.pressed.connect(_generate_candidate)
-	recruit_row.add_child(search_button)
+	# Revue des onglets (14/10) : un bouton par métier ; un seul appui et Nora présente trois profils
+	# (avant : une liste déroulante puis « Nora cherche 3 profils »). La liste reste, cachée, pour les tests.
+	recruit_department.visible = false
+	for i in range(recruit_department.item_count):
+		var department := str(recruit_department.get_item_metadata(i))
+		var pick := Button.new()
+		pick.text = department
+		pick.toggle_mode = true
+		pick.custom_minimum_size = Vector2(130, 46)
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.pressed.connect(func():
+			recruit_department.select(i)
+			for other in _department_buttons:
+				(other as Button).set_pressed_no_signal(other == pick)
+			_generate_candidate())
+		recruit_row.add_child(pick)
+		_department_buttons.append(pick)
 
 	candidate_card = UI.card(UI.APP_PANEL, 12, 12)
 	candidate_box = VBoxContainer.new()
@@ -333,7 +346,7 @@ func refresh() -> void:
 	if PersonnelManager.candidate.is_empty():
 		candidate_label.text = "Aucun candidat sélectionné."
 		if candidate_box != null:
-			candidate_box.add_child(UI.muted_label("Choisissez un profil ci-dessus." if not PersonnelManager.shortlist.is_empty() else "Choisissez un métier puis « Nora cherche 3 profils ».", 13))
+			candidate_box.add_child(UI.muted_label("Choisissez un profil ci-dessus." if not PersonnelManager.shortlist.is_empty() else "Touchez un métier : Nora vous présente trois profils.", 13))
 		return
 	var shown: Dictionary = PersonnelManager.candidate
 	if candidate_box != null:

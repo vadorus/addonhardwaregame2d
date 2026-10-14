@@ -106,4 +106,6 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 
 | SOFT-2 (Logiciel 2.0) | 14/10/2026 | `feat/logiciel-2` (Claude) | Studio type × public × plateforme, fonctions d'époque, effort en 3 phases, jour J presse, versions 2 et 3, synergie CPU — [rapport](reviews/RETOUR_2026-10-14_SOFT2.md) | Smoke + 34 scènes headless + 2 visuelles (xvfb) ; 2 scènes déjà cassées avant le lot ; sonde 24 carrières inchangée | **Non testé** | Fusionné dans `v013/demo-octobre` |
 
+| ONGLETS-1 | 14/10/2026 | `feat/revue-onglets` (Claude) | Revue de tous les onglets sur des parties de 1974 et 1990 : presse logiciels, palmarès, appels d'offres, recherche, QG, Produits « Logiciels », recrutement, listes et compteurs au doigt — [rapport](reviews/RETOUR_2026-10-14_ONGLETS.md) | 38/38 scènes (4 sous xvfb) | **Non testé** | Fusionné dans `v013/demo-octobre` |
+
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).
