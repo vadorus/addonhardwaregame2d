@@ -2897,7 +2897,8 @@ func _start_project():
 		status_label.text = "%s entre en développement — %s • usage %s%s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text, supplier_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
-		if TimeManager.time_scale <= 0.0:
+		# 14/10 : ne pas relancer le temps si un autre projet (logiciel…) attend un choix obligatoire.
+		if TimeManager.time_scale <= 0.0 and _blocking_company_decision().is_empty():
 			TimeManager.time_scale = 1.0
 	else:
 		status_label.text = ResearchManager.last_start_error
