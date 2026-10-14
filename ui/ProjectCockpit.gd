@@ -432,18 +432,19 @@ func _build_software_card(project: Dictionary) -> void:
 	var done := float(project.get("work_done", project.get("months_done", 0)))
 	var total := maxi(int(project.get("months_total", 1)), 1)
 	var status := str(project.get("status", "DEVELOPMENT"))
-	var software_phase := SoftwareManager.software_cockpit_phase(project) if str(project.get("kind", "")) == "UTILITY_SLICE" else ""
+	var studio := str(project.get("kind", "")) == "STUDIO"
+	var software_phase := SoftwareManager.software_cockpit_phase(project) if str(project.get("kind", "")) in ["UTILITY_SLICE", "STUDIO"] else ""
 	var progress_text := "État : %s • travail %.1f/%d • %d mois écoulés" % [_software_status(status), done, total, int(project.get("elapsed_months", project.get("months_done", 0)))]
 	if status == "DEVELOPMENT" and software_phase != "":
-		progress_text += " • %s" % _software_phase_label(software_phase)
+		progress_text += " • %s" % (_studio_phase_label(software_phase) if studio else _software_phase_label(software_phase))
 	_progress(box, float(row.progress), progress_text)
 	if software_phase != "":
 		var phases := HBoxContainer.new()
 		phases.add_theme_constant_override("separation", 8)
 		box.add_child(phases)
 		for phase in ["PLANNING", "BUILD", "STABILIZE"]:
-			var chosen := SoftwareManager._software_has_directive_for_phase(project, phase)
-			var step := UI.label(("✓ " if chosen else "") + _software_phase_label(phase), 12)
+			var chosen := SoftwareManager._software_has_directive_for_phase(project, phase) if not studio else ["PLANNING", "BUILD", "STABILIZE"].find(phase) < SoftwareManager.studio_phase_index(project)
+			var step := UI.label(("✓ " if chosen else "") + (_studio_phase_label(phase) if studio else _software_phase_label(phase)), 12)
 			step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			step.add_theme_color_override("font_color", Color("2f9e6a") if phase == software_phase else UI.APP_MUTED)
 			phases.add_child(step)
@@ -470,6 +471,16 @@ func _build_software_card(project: Dictionary) -> void:
 		if status != "DEVELOPMENT":
 			return
 
+	if studio:
+		# Logiciel 2.0 : l'effort se règle par phase, dans l'atelier Logiciel (les phases à venir seulement).
+		box.add_child(UI.muted_label("L'effort des phases à venir se règle dans l'atelier Logiciel.", 11))
+		var open_studio := Button.new()
+		open_studio.text = "Ouvrir l'atelier Logiciel"
+		open_studio.custom_minimum_size.y = 48
+		LOOK.button_style(open_studio)
+		open_studio.pressed.connect(func(): software_requested.emit())
+		box.add_child(open_studio)
+		return
 	if str(project.get("kind", "")) != "UTILITY_SLICE":
 		box.add_child(UI.muted_label("Cette version utilise son plan de développement initial. Suivez les coûts et sa sortie depuis l’atelier.", 11))
 		return
@@ -555,6 +566,9 @@ func _cpu_phase_tip(phase_index: int) -> String:
 		4: return "Bêta : fiabilité et efficacité dominent. Les changements d'orientation tardifs coûtent en potentiel."
 		5: return "Validation : la fiabilité a le plus fort levier. La performance brute est désormais beaucoup plus difficile à rattraper."
 	return ""
+
+func _studio_phase_label(phase: String) -> String:
+	return str({"PLANNING":"Fondations", "BUILD":"Fonctions", "STABILIZE":"Finition"}.get(phase, phase))
 
 func _software_phase_label(phase: String) -> String:
 	match phase:

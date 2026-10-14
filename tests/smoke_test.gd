@@ -1839,6 +1839,11 @@ func _ready() -> void:
 		_fail(lot_zero_error)
 		return
 	print("[CI] Lot 0 Software : prix, serveurs, contrats, firmware plafonné OK")
+	var studio_error: String = (load("res://tests/scenarios/SoftwareStudioScenario.gd") as Script).call("run", self)
+	if studio_error != "":
+		_fail(studio_error)
+		return
+	print("[CI] Logiciel 2.0 : combinaisons, fonctions d'époque, phases, carnet de Nora OK")
 	var confirm_error: String = (load("res://tests/scenarios/ConfirmGuardScenario.gd") as Script).call("run", self)
 	if confirm_error != "":
 		_fail(confirm_error)

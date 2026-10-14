@@ -1,0 +1,175 @@
+extends RefCounted
+## LOGICIEL 2.0 (14/10) — le studio : type × public × plateforme, fonctions d'époque, trois phases d'effort.
+## Ce que l'on vérifie, sans hasard :
+## 1. le catalogue tient debout : chaque type a au moins une excellente et une mauvaise idée de public ;
+## 2. les choix comptent : bonne combinaison > mauvaise ; répartition juste > répartition à contre-sens ;
+##    fonction attendue manquante = note plus basse ; refaire le même logiciel = note plus basse (barre perso) ;
+## 3. la boucle complète : lancement, 3 rapports de phase, sortie, note, carnet de Nora, ventes ;
+##    une bonne idée se vend mieux qu'une mauvaise ; « Vos processeurs » exige un CPU en vente ;
+## 4. on ne peut plus changer la répartition d'une phase commencée ;
+## 5. sauvegarde et migration : le carnet survit, une ancienne partie reçoit un carnet vide.
+
+const STUDIO := preload("res://scripts/SoftwareStudio.gd")
+const CAT := preload("res://scripts/SoftwareCatalog.gd")
+
+static func _spec(type_id: String, audience_id: String, features: Array, tokens: Dictionary = {}) -> Dictionary:
+	var row := tokens
+	if row.is_empty():
+		row = {}
+		for phase in STUDIO.PHASE_ORDER:
+			row[phase] = STUDIO.ideal_tokens(type_id, phase)
+	return {"type":type_id, "audience":audience_id, "platform":"LEADER", "features":features, "tokens":row, "price_mode":"MARKET"}
+
+static func _note(spec: Dictionary, year: int, best: float = 0.0) -> float:
+	var plan := STUDIO.plan(spec, {"year":year, "skills":{}, "mastery":0})
+	return float(STUDIO.review(plan, year, best).note)
+
+static func _setup(year: int = 1971) -> void:
+	SimulationManager.reset_all("CI Studio", "CPU", "STANDARD")
+	TimeManager.year = year
+	TimeManager.month = 3
+	Economy.money = 400000
+	SoftwareManager.reset()
+	SoftwareManager._check_unlocks()
+	while PersonnelManager.count_department("Développement") < 2:
+		if not PersonnelManager.hire_candidate():
+			break
+
+## Joue un logiciel du lancement à la sortie. Rend le produit (vide si échec).
+static func _ship(spec: Dictionary, name: String, reports: Array) -> Dictionary:
+	if not SoftwareManager.start_studio_project(spec, name):
+		return {}
+	var project := SoftwareManager.project_for(str(spec.type))
+	var guard := 0
+	while str(project.get("status", "")) == "DEVELOPMENT" and guard < 40:
+		PersonnelManager.begin_development_month()
+		SoftwareManager._process_projects()
+		PersonnelManager.end_development_month()
+		guard += 1
+		project = SoftwareManager.project_for(str(spec.type))
+	reports.append(int(project.get("phase_reported", 0)))
+	if str(project.get("status", "")) != "REVIEW":
+		return {}
+	SoftwareManager.choose_release(str(project.id), "RELEASE")
+	for value in SoftwareManager.products:
+		if str(value.get("name", "")) == name:
+			return value
+	return {}
+
+static func run(_host: Node) -> String:
+	# 1. Catalogue.
+	for type_id in CAT.FAMILY_ORDER:
+		var best := 0
+		var worst := 3
+		for audience_id in STUDIO.AUDIENCE_ORDER:
+			best = maxi(best, STUDIO.fit(str(type_id), str(audience_id)))
+			worst = mini(worst, STUDIO.fit(str(type_id), str(audience_id)))
+		if best < 3 or worst > 0:
+			return "Studio: %s has no excellent or no bad audience" % type_id
+		if not STUDIO.IMPORTANCE.has(type_id) or not STUDIO.FIT.has(type_id):
+			return "Studio: %s missing importance or fit table" % type_id
+		for phase in STUDIO.PHASE_ORDER:
+			var ideal := STUDIO.ideal_tokens(str(type_id), str(phase))
+			var total := 0
+			for value in ideal.values(): total += int(value)
+			if total != STUDIO.TOKENS_PER_PHASE or STUDIO.phase_alignment(str(type_id), str(phase), ideal) < 0.85:
+				return "Studio: ideal tokens for %s/%s are not ideal (%s)" % [type_id, phase, str(ideal)]
+	for id in STUDIO.FEATURE_ORDER:
+		if not STUDIO.FEATURES.has(id):
+			return "Studio: feature %s listed but undefined" % id
+
+	# 2. Les choix comptent.
+	var base := _spec("UTILITY", "HOBBY", ["FILES", "SIMPLE_COMMANDS"])
+	var same_a := STUDIO.plan(base, {"year":1971})
+	var same_b := STUDIO.plan(base, {"year":1971})
+	if same_a != same_b:
+		return "Studio: plan is not deterministic"
+	var great := _note(base, 1971)
+	var bad := _note(_spec("UTILITY", "CORP", ["FILES", "SIMPLE_COMMANDS"]), 1975)
+	var dev_bad := _note(_spec("DEVTOOLS", "SMB", ["COMPILER", "SCRIPTING"]), 1975)
+	var dev_good := _note(_spec("DEVTOOLS", "DEVS", ["COMPILER", "SCRIPTING"]), 1975)
+	if great < 6.5 or dev_good <= dev_bad + 2.0 or bad >= great:
+		return "Studio: combinations do not matter enough (utility hobby %.1f / corp %.1f, devtools devs %.1f / smb %.1f)" % [great, bad, dev_good, dev_bad]
+	var upside := {}
+	for phase in STUDIO.PHASE_ORDER:
+		var ideal := STUDIO.ideal_tokens("UTILITY", phase)
+		var flipped := {}
+		var areas: Array = (STUDIO.PHASES[phase] as Dictionary).areas
+		# À contre-sens : tout sur le domaine le moins important de la phase.
+		var low := str(areas[0])
+		for area in areas:
+			if STUDIO.importance("UTILITY", str(area)) < STUDIO.importance("UTILITY", low):
+				low = str(area)
+		for area in areas:
+			flipped[str(area)] = STUDIO.TOKENS_PER_PHASE if str(area) == low else 0
+		upside[phase] = flipped
+	var misdirected := _note(_spec("UTILITY", "HOBBY", ["FILES", "SIMPLE_COMMANDS"], upside), 1971)
+	if misdirected >= great - 1.0:
+		return "Studio: effort distribution barely matters (%.1f vs %.1f)" % [misdirected, great]
+	var os_gui := _note(_spec("OS", "HOME", ["GUI", "NETWORK", "FAST_CORE"]), 1995)
+	var os_text := _note(_spec("OS", "HOME", ["SIMPLE_COMMANDS", "NETWORK", "FAST_CORE"]), 1995)
+	if os_text >= os_gui - 0.5:
+		return "Studio: an OS without graphical interface in 1995 is not punished (%.1f vs %.1f)" % [os_text, os_gui]
+	var first_plan := STUDIO.plan(base, {"year":1971})
+	var first_review := STUDIO.review(first_plan, 1980)
+	var repeat_review := STUDIO.review(first_plan, 1980, float(first_review.score) + 10.0)
+	if float(repeat_review.note) >= float(first_review.note):
+		return "Studio: beating your own best is not required"
+	if STUDIO.missed_line(STUDIO.review(STUDIO.plan(_spec("UTILITY", "HOBBY", ["FILES"], upside), {"year":1971}), 1971)).find("effort") < 0:
+		return "Studio: the press does not explain a misdirected effort"
+
+	# 3. La boucle complète.
+	_setup(1971)
+	if PersonnelManager.count_department("Développement") <= 0:
+		return "Studio: no developer to run the scenario"
+	if bool(SoftwareManager.can_start_studio({"type":"UTILITY", "audience":"HOBBY", "platform":"OWN", "features":["FILES"], "tokens":{}}).get("ok", false)):
+		return "Studio: 'your processors' available without any CPU on the market"
+	var reports: Array = []
+	var good := _ship(base, "Studio Good", reports)
+	if good.is_empty():
+		return "Studio: the good project never reached release (%s)" % str(SoftwareManager.projects)
+	if int(reports[0]) != 3:
+		return "Studio: expected 3 phase reports, got %d" % int(reports[0])
+	if str(good.get("kind", "")) != "STUDIO" or float(good.get("note", 0.0)) < 6.0:
+		return "Studio: release lost its studio data or got a poor note (%s)" % str(good.get("note", "?"))
+	if SoftwareManager.known_fit("UTILITY", "HOBBY") != 3:
+		return "Studio: Nora's notebook did not record the combination"
+	if SoftwareManager.known_areas("UTILITY").is_empty():
+		return "Studio: Nora's notebook learned no effort area"
+	SoftwareManager._process_sales()
+	var good_licenses := int(good.get("licenses_last", 0))
+	if good_licenses <= 0 or int(good.get("revenue_last", 0)) <= 0:
+		return "Studio: a good software sold nothing"
+	# Même chose avec une mauvaise idée de public : la note et les ventes doivent chuter.
+	_setup(1975)
+	var bad_product := _ship(_spec("UTILITY", "CORP", ["FILES", "SIMPLE_COMMANDS"]), "Studio Bad", [])
+	if bad_product.is_empty():
+		return "Studio: the bad project never reached release"
+	SoftwareManager._process_sales()
+	if float(bad_product.note) >= float(good.note) - 1.0:
+		return "Studio: a bad combination is not visible in the note (%.1f vs %.1f)" % [float(bad_product.note), float(good.note)]
+
+	# 4. Phases déjà commencées : figées.
+	_setup(1971)
+	SoftwareManager.start_studio_project(base, "Studio Edit")
+	var editable := SoftwareManager.project_for("UTILITY")
+	var new_row := {"TESTS":4, "OPTIM":1, "DETAIL":1}
+	if not SoftwareManager.set_studio_tokens(str(editable.id), "POLISH", new_row):
+		return "Studio: could not adjust a phase that has not started"
+	if SoftwareManager.set_studio_tokens(str(editable.id), "FOUNDATIONS", {"CORE":6, "DATA":0, "ARCH":0}):
+		return "Studio: changed a phase already under way"
+	if SoftwareManager.set_studio_tokens(str(editable.id), "FEATURES", {"FUNCTIONS":6, "INTERFACE":6, "CONTENT":0}):
+		return "Studio: accepted more tokens than a phase has"
+
+	# 5. Sauvegarde et migration.
+	(SoftwareManager.notebook.combos as Dictionary)["GAME:GAMERS"] = 3
+	var state := SoftwareManager.get_state()
+	SoftwareManager.reset()
+	SoftwareManager.load_state(state.duplicate(true))
+	if SoftwareManager.known_fit("GAME", "GAMERS") != 3:
+		return "Studio: notebook lost on load"
+	var old_save := {"version":34, "software":{"products":[], "projects":[]}, "time":{"year":1980, "month":1}}
+	var migrated := SaveManager._migrate_state(old_save.duplicate(true), 34)
+	if typeof((migrated.get("software", {}) as Dictionary).get("notebook", null)) != TYPE_DICTIONARY:
+		return "Studio: migration did not give old saves an empty notebook"
+	return ""

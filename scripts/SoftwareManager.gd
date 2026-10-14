@@ -9,6 +9,11 @@ signal software_launched(product)
 const CAT := preload("res://scripts/SoftwareCatalog.gd")
 const ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
 const PLAY := preload("res://scripts/SoftwarePlayCatalog.gd")
+const STUDIO := preload("res://scripts/SoftwareStudio.gd")
+const PALMARES := preload("res://scripts/CpuPalmares.gd")
+## Logiciel 2.0 : un logiciel touche une part du marché de son type selon son public et sa plateforme.
+## Ce facteur ramène la part d'un public (0,2 à 0,6) au niveau des anciens produits « tout public ».
+const STUDIO_REACH_SCALE := 2.6
 const PROJECT_COCKPIT := preload("res://scripts/ProjectCockpitModel.gd")
 const PROJECT_DIRECTIVES := preload("res://scripts/ProjectDirectiveCatalog.gd")
 const SOFTWARE_COCKPIT_AXES := ["features", "usability", "stability", "performance"]
@@ -26,6 +31,8 @@ var reveals: Array = []
 var activities: Array = []
 var completed_activities := 0
 var skills: Dictionary = {}
+## Le carnet de Nora (Logiciel 2.0) : combinaisons essayées, domaines appris, meilleur score par type.
+var notebook: Dictionary = {}
 var _next_id := 1
 
 func reset() -> void:
@@ -38,6 +45,7 @@ func reset() -> void:
 	activities = []
 	completed_activities = 0
 	skills = PLAY.empty_skills()
+	notebook = empty_notebook()
 	_next_id = 1
 	software_changed.emit()
 
@@ -270,6 +278,278 @@ func start_utility_project(feature_ids: Array, target_id: String = "HOME", price
 	software_changed.emit()
 	return true
 
+# --- Logiciel 2.0 : le studio --------------------------------------------------------------
+
+static func empty_notebook() -> Dictionary:
+	return {"combos":{}, "areas":{}, "best":{}, "history":[]}
+
+func _notebook() -> Dictionary:
+	for key in ["combos", "areas", "best"]:
+		if typeof(notebook.get(key, null)) != TYPE_DICTIONARY:
+			notebook[key] = {}
+	if typeof(notebook.get("history", null)) != TYPE_ARRAY:
+		notebook["history"] = []
+	return notebook
+
+## La combinaison type × public déjà essayée : -1 si jamais, sinon 0 à 3.
+func known_fit(type_id: String, audience_id: String) -> int:
+	return int((_notebook().combos as Dictionary).get("%s:%s" % [type_id, audience_id], -1))
+
+## Les domaines d'effort déjà compris pour ce type : {area: importance}.
+## Lecture seule : regarder le carnet ne doit jamais modifier la partie.
+func known_areas(type_id: String) -> Dictionary:
+	var value = (_notebook().areas as Dictionary).get(type_id, null)
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+func _writable_areas(type_id: String) -> Dictionary:
+	var areas: Dictionary = _notebook().areas
+	if typeof(areas.get(type_id, null)) != TYPE_DICTIONARY:
+		areas[type_id] = {}
+	return areas[type_id]
+
+func best_score(type_id: String) -> float:
+	return float((_notebook().best as Dictionary).get(type_id, 0.0))
+
+## Avez-vous au moins un CPU en vente (plateforme « Vos processeurs ») ?
+func has_own_cpu() -> bool:
+	for value in ProductManager.products:
+		var product: Dictionary = value
+		if str(product.get("sector", "CPU")) == "CPU" and str(product.get("status", "")) == "LAUNCHED":
+			return true
+	return false
+
+## Part des machines équipées de vos CPU, rapportée au CPU le plus répandu (0,2 à 1).
+func own_cpu_reach() -> float:
+	if not has_own_cpu():
+		return 0.0
+	var ranked := PALMARES.scores("SALES")
+	if ranked.is_empty():
+		return 0.2
+	var leader := maxf(float((ranked[0] as Dictionary).get("score", 0.0)), 1.0)
+	for value in ranked:
+		var row: Dictionary = value
+		if bool(row.get("player", false)):
+			return clampf(float(row.get("score", 0.0)) / leader, 0.2, 1.0)
+	return 0.2
+
+func studio_context(type_id: String) -> Dictionary:
+	return {"year":TimeManager.year, "month":TimeManager.month, "skills":skills, "mastery":mastery(type_id),
+		"own_reach":own_cpu_reach()}
+
+func open_types() -> Array:
+	return CAT.FAMILY_ORDER.filter(func(id): return is_open(str(id)))
+
+## Un plan complet et lisible : coûts, durée avec l'équipe actuelle, notes prévues.
+func studio_preview(spec: Dictionary) -> Dictionary:
+	var type_id := str(spec.get("type", "UTILITY"))
+	var plan := STUDIO.plan(spec, studio_context(type_id))
+	var forecast := work_preview({"id":"SW-PREVIEW", "kind":"STUDIO", "months_total":int(plan.months)})
+	plan["calendar_months"] = int(forecast.get("remaining", 0))
+	plan["monthly_cash_cost"] = Economy.quoted_expense(int(plan.monthly_cost), "Développement software")
+	plan["total_cash_cost"] = int(plan.monthly_cash_cost) * maxi(int(plan.calendar_months), 0)
+	plan["assigned"] = float(forecast.get("assigned", 0.0))
+	plan["check"] = can_start_studio(spec)
+	return plan
+
+func can_start_studio(spec: Dictionary) -> Dictionary:
+	var type_id := str(spec.get("type", ""))
+	if PersonnelManager.count_department("Développement") <= 0:
+		return {"ok":false, "reason":"Affectez au moins une personne au Développement avant de démarrer."}
+	if not CAT.FAMILIES.has(type_id) or not is_open(type_id):
+		return {"ok":false, "reason":"Ce type de logiciel n'existe pas encore à cette époque."}
+	if not project_for(type_id).is_empty():
+		return {"ok":false, "reason":"Un logiciel de ce type est déjà en développement."}
+	var audience_id := str(spec.get("audience", ""))
+	if not STUDIO.open_audiences(TimeManager.year).has(audience_id):
+		return {"ok":false, "reason":"Choisissez un public."}
+	var platform_id := str(spec.get("platform", ""))
+	if not STUDIO.open_platforms(TimeManager.year, has_own_cpu()).has(platform_id):
+		return {"ok":false, "reason":"Plateforme indisponible : sortez d'abord un CPU pour développer sur vos processeurs." if platform_id == "OWN" else "Choisissez une plateforme."}
+	var chosen: Array = (spec.get("features", []) as Array).filter(func(id): return STUDIO.open_features(TimeManager.year).has(str(id)))
+	if chosen.is_empty():
+		return {"ok":false, "reason":"Choisissez au moins une fonction."}
+	if chosen.size() > STUDIO.feature_slots(mastery(type_id)):
+		return {"ok":false, "reason":"Trop de fonctions pour l'expérience de l'équipe (%d au plus)." % STUDIO.feature_slots(mastery(type_id))}
+	var plan := STUDIO.plan(spec, studio_context(type_id))
+	return _funding_check(int(plan.monthly_cost), 2, "Développement software")
+
+func start_studio_project(spec: Dictionary, product_name: String = "") -> bool:
+	if not bool(can_start_studio(spec).get("ok", false)):
+		return false
+	var type_id := str(spec.get("type", "UTILITY"))
+	var price_mode := str(spec.get("price_mode", "MARKET"))
+	if not CAT.PRICE_MODES.has(price_mode):
+		price_mode = "MARKET"
+	var clean_spec := {"type":type_id, "audience":str(spec.audience), "platform":str(spec.platform),
+		"features":(spec.get("features", []) as Array).duplicate(), "tokens":STUDIO.normalize_tokens(spec.get("tokens", {})),
+		"price_mode":price_mode}
+	var plan := STUDIO.plan(clean_spec, studio_context(type_id))
+	clean_spec["features"] = (plan.features as Array).duplicate()
+	var project := {
+		"id":"SW-%03d" % _next_id,
+		"kind":"STUDIO",
+		"family":type_id,
+		"name":product_name.strip_edges() if product_name.strip_edges() != "" else next_name(type_id),
+		"spec":clean_spec,
+		"target":str(spec.audience),
+		"features":(plan.features as Array).duplicate(),
+		"metrics":(plan.metrics as Dictionary).duplicate(true),
+		"levels":_utility_levels_from_metrics(plan.metrics),
+		"bugs":int(plan.bugs),
+		"price_mode":price_mode,
+		"months_total":int(plan.months),
+		"months_done":0,
+		"work_done":0.0,
+		"elapsed_months":0,
+		"spent":0,
+		"spend_tracking_complete":true,
+		"monthly_cost":int(plan.monthly_cost),
+		"status":"DEVELOPMENT",
+		"phase_reported":0,
+		"phase_notes":[]
+	}
+	_next_id += 1
+	projects.append(project)
+	software_changed.emit()
+	return true
+
+## 0 fondations, 1 fonctions, 2 finition — selon le travail déjà fait.
+func studio_phase_index(project: Dictionary) -> int:
+	var total := maxf(float(project.get("months_total", 1)), 1.0)
+	var done := float(project.get("work_done", project.get("months_done", 0)))
+	return clampi(int(floor(done / total * 3.0 + 0.0001)), 0, 2)
+
+## On peut encore changer la répartition d'une phase qui n'a pas commencé.
+func can_edit_studio_phase(project: Dictionary, phase_id: String) -> bool:
+	return str(project.get("kind", "")) == "STUDIO" and str(project.get("status", "")) == "DEVELOPMENT" \
+		and STUDIO.PHASE_ORDER.find(phase_id) > studio_phase_index(project)
+
+func set_studio_tokens(project_id: String, phase_id: String, row: Dictionary) -> bool:
+	var project := project_by_id(project_id)
+	if project.is_empty() or not can_edit_studio_phase(project, phase_id):
+		return false
+	var spec: Dictionary = (project.get("spec", {}) as Dictionary).duplicate(true)
+	var tokens: Dictionary = STUDIO.normalize_tokens(spec.get("tokens", {}))
+	var candidate := tokens.duplicate(true)
+	candidate[phase_id] = row.duplicate()
+	if STUDIO.normalize_tokens(candidate) != candidate:
+		return false
+	spec["tokens"] = candidate
+	var before := STUDIO.plan(project.spec, studio_context(str(project.family)))
+	var after := STUDIO.plan(spec, studio_context(str(project.family)))
+	project["spec"] = spec
+	var metrics: Dictionary = project.get("metrics", {})
+	for axis in STUDIO.AXES:
+		metrics[axis] = clampf(float(metrics.get(axis, 50.0)) + float(after.metrics[axis]) - float(before.metrics[axis]), 10.0, 98.0)
+	project["metrics"] = metrics
+	project["levels"] = _utility_levels_from_metrics(metrics)
+	project["bugs"] = maxi(0, int(project.get("bugs", 0)) + int(after.bugs) - int(before.bugs))
+	software_changed.emit()
+	return true
+
+## Fin d'une phase : Camille fait le point. Le conseil n'arrive que si l'équipe connaît déjà ce domaine.
+func _studio_phase_report(project: Dictionary, finished_index: int) -> void:
+	var phase_id := str(STUDIO.PHASE_ORDER[finished_index])
+	var type_id := str(project.get("family", "UTILITY"))
+	var row: Dictionary = ((project.get("spec", {}) as Dictionary).get("tokens", {}) as Dictionary).get(phase_id, {})
+	var align := STUDIO.phase_alignment(type_id, phase_id, row)
+	var known := known_areas(type_id)
+	var text := "%s : phase %s terminée." % [str(project.get("name", "Logiciel")), STUDIO.phase_label(phase_id).to_lower()]
+	var known_here := false
+	for area in (STUDIO.PHASES[phase_id] as Dictionary).areas:
+		if known.has(str(area)):
+			known_here = true
+	if known_here:
+		text += " Camille : %s" % ("« pile ce qu'il fallait. »" if align >= 0.85 else "« ça ira. »" if align >= 0.65 else "« on a mis l'effort au mauvais endroit. »")
+	else:
+		text += " Camille : « on saura à la sortie si c'était le bon dosage. »"
+	(project["phase_notes"] as Array).append({"phase":phase_id, "alignment":align, "text":text})
+	work_event.emit({"kind":"SOFTWARE", "id":str(project.id), "name":str(project.get("name", "Logiciel")), "text":"%s terminées" % STUDIO.phase_label(phase_id)})
+	CompanyManager.add_alert(text)
+
+## Sortie : la presse note, Nora remplit son carnet.
+func _studio_launch(project: Dictionary, product: Dictionary) -> void:
+	var spec: Dictionary = project.get("spec", {})
+	var type_id := str(project.get("family", "UTILITY"))
+	var subject := {"type":type_id, "audience":str(spec.get("audience", "HOBBY")), "features":project.get("features", []),
+		"tokens":spec.get("tokens", {}), "metrics":project.get("metrics", {}), "bugs":int(project.get("bugs", 0))}
+	var best_before := best_score(type_id)
+	var review := STUDIO.review(subject, TimeManager.year, best_before)
+	var own_reach := own_cpu_reach()
+	product["kind"] = "STUDIO"
+	product["audience"] = str(spec.get("audience", "HOBBY"))
+	product["target"] = str(spec.get("audience", "HOBBY"))
+	product["platform"] = str(spec.get("platform", "LEADER"))
+	product["tokens"] = (spec.get("tokens", {}) as Dictionary).duplicate(true)
+	product["features"] = (project.get("features", []) as Array).duplicate()
+	product["metrics"] = (project.get("metrics", {}) as Dictionary).duplicate(true)
+	product["levels"] = _utility_levels_from_metrics(project.get("metrics", {}))
+	product["bugs_known"] = int(project.get("bugs", 0))
+	product["bugs_at_launch"] = int(project.get("bugs", 0))
+	product["version_major"] = 1
+	product["version_minor"] = 0
+	product["version_patch"] = 0
+	product["note"] = float(review.note)
+	product["review"] = review
+	product["review_score"] = float(review.score)
+	product["expectation"] = float(review.expectation)
+	product["missed"] = STUDIO.missed_line(review)
+	product["own_reach"] = own_reach
+	product["price"] = studio_price(type_id, str(product.audience), str(product.get("price_mode", "MARKET")))
+	product["quality_launch"] = float(review.score)
+	# Le carnet de Nora : la combinaison, et le domaine le plus mal servi (si on ne le connaissait pas).
+	var book := _notebook()
+	var combo_key := "%s:%s" % [type_id, str(product.audience)]
+	var combo_new := not (book.combos as Dictionary).has(combo_key)
+	(book.combos as Dictionary)[combo_key] = int(review.combo)
+	var learned := {}
+	var known := _writable_areas(type_id)
+	var worst: Dictionary = review.get("worst_area", {})
+	if not worst.is_empty() and not known.has(str(worst.area)):
+		learned = {"area":str(worst.area), "importance":float(worst.importance)}
+	else:
+		for phase in STUDIO.PHASE_ORDER:
+			for area in (STUDIO.PHASES[phase] as Dictionary).areas:
+				if learned.is_empty() and not known.has(str(area)):
+					learned = {"area":str(area), "importance":STUDIO.importance(type_id, str(area))}
+	if not learned.is_empty():
+		known[str(learned.area)] = float(learned.importance)
+	(book.best as Dictionary)[type_id] = maxf(best_before, float(review.score))
+	(book.history as Array).append({"name":str(product.name), "type":type_id, "audience":str(product.audience),
+		"platform":str(product.platform), "note":float(review.note), "year":TimeManager.year, "month":TimeManager.month})
+	while (book.history as Array).size() > 40:
+		(book.history as Array).pop_front()
+	product["lessons"] = {"combo_new":combo_new, "combo":int(review.combo), "area":learned}
+	var gains := PLAY.utility_skill_gains([])
+	for id in product.features:
+		for skill_id in (STUDIO.feature(str(id)).get("axes", {}) as Dictionary).keys():
+			match str(skill_id):
+				"features": gains["development"] = int(gains.get("development", 0)) + 4
+				"usability": gains["interface"] = int(gains.get("interface", 0)) + 4
+				"stability": gains["reliability"] = int(gains.get("reliability", 0)) + 3
+				"performance": gains["systems"] = int(gains.get("systems", 0)) + 3
+	for skill_id in gains.keys():
+		skills[str(skill_id)] = skill_xp(str(skill_id)) + int(gains[skill_id])
+	var note := float(review.note)
+	CompanyManager.change_reputation({"innovation":(note - 5.5) * 0.05, "prestige":(note - 5.5) * 0.04})
+	MediaManager.add_news("Logiciel", "%s : %s/10 — %s" % [str(product.name), _note_text(note), STUDIO.verdict(note)],
+		"%s pour %s. %s" % [CAT.family_label(type_id), STUDIO.audience_label(str(product.audience)).to_lower(), str(product.missed)],
+		{"software_id":str(product.id), "software_note":note})
+
+static func _note_text(note: float) -> String:
+	return ("%.1f" % note).replace(".", ",")
+
+func studio_price(type_id: String, audience_id: String, price_mode: String) -> float:
+	return maxf(1.0, snappedf(CAT.license_price(type_id, price_mode) * float(STUDIO.audience(audience_id).get("price", 1.0)), 1.0))
+
+## La note qu'aurait ce logiciel aujourd'hui : il vieillit face aux nouveautés.
+func studio_live_note(product: Dictionary, now: float) -> float:
+	var aging := float(CAT.family(str(product.get("family", "UTILITY"))).get("aging_per_year", 0.4)) * maxf(0.0, now - float(product.get("launch_f", now))) * CAT.POINTS_PER_LEVEL * 0.6
+	# Un correctif retire des bugs : le logiciel remonte un peu (la note de sortie en comptait 0,5 point chacun).
+	var bug_delta := float(int(product.get("bugs_at_launch", product.get("bugs_known", 0))) - int(product.get("bugs_known", 0))) * 0.5
+	var score := float(product.get("review_score", 50.0)) - aging + bug_delta
+	return clampf(5.5 + (score - float(product.get("expectation", 58.0))) / STUDIO.REVIEW_SPREAD, 1.0, 10.0)
+
 func project_by_id(project_id: String) -> Dictionary:
 	for value in projects:
 		var project: Dictionary = value
@@ -308,6 +588,8 @@ func adjust_project_cockpit_priority(project_id: String, axis_id: String, delta:
 	return true
 
 func software_cockpit_phase(project: Dictionary) -> String:
+	if str(project.get("kind", "")) == "STUDIO":
+		return ["PLANNING", "BUILD", "STABILIZE"][studio_phase_index(project)]
 	var total := maxi(int(project.get("months_total", 1)), 3)
 	var done := clampf(float(project.get("work_done", project.get("months_done", 0))), 0.0, float(total))
 	var phase_index := 0
@@ -567,7 +849,7 @@ func can_start_patch(product_id: String) -> Dictionary:
 	var product := product_by_id(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "ACTIVE":
 		return {"ok":false, "reason":"Produit Software introuvable."}
-	if str(product.get("kind", "")) != "UTILITY_SLICE":
+	if str(product.get("kind", "")) not in ["UTILITY_SLICE", "STUDIO"]:
 		return {"ok":false, "reason":"Les correctifs jouables sont encore réservés aux utilitaires."}
 	if not project_for(str(product.get("family", "UTILITY"))).is_empty():
 		return {"ok":false, "reason":"L'équipe Software travaille déjà sur cette famille."}
@@ -766,6 +1048,11 @@ func _process_projects() -> void:
 		var before_work := float(project.get("work_done", project.get("months_done", 0)))
 		var effort := _advance_work(project, rate)
 		var bugs_before := int(project.get("bugs", 0))
+		if kind == "STUDIO":
+			var finished := mini(studio_phase_index(project), 3) if int(project.get("months_done", 0)) < int(project.get("months_total", 1)) else 3
+			while int(project.get("phase_reported", 0)) < finished:
+				_studio_phase_report(project, int(project.get("phase_reported", 0)))
+				project["phase_reported"] = int(project.get("phase_reported", 0)) + 1
 		if kind == "UTILITY_SLICE":
 			# Use the phase at the start of this work, then expose the next checkpoint.
 			var after_work := float(project.work_done)
@@ -811,7 +1098,7 @@ func _process_projects() -> void:
 				_ensure_software_directive(project)
 			continue
 
-		if kind == "UTILITY_SLICE":
+		if kind in ["UTILITY_SLICE", "STUDIO"]:
 			if bool(project.get("polish_pending", false)):
 				project["bugs"] = maxi(0, int(project.get("bugs", 0)) - 5)
 				var polish_metrics: Dictionary = project.get("metrics", {})
@@ -860,6 +1147,8 @@ func _launch(project: Dictionary) -> void:
 		for skill_value in gains.keys():
 			var skill_id := str(skill_value)
 			skills[skill_id] = skill_xp(skill_id) + int(gains[skill_id])
+	if str(project.get("kind", "")) == "STUDIO":
+		_studio_launch(project, product)
 	product["development_spent"] = int(project.get("spent", 0))
 	product["spend_tracking_complete"] = bool(project.get("spend_tracking_complete", false))
 	product["margin_total"] = 0
@@ -868,7 +1157,10 @@ func _launch(project: Dictionary) -> void:
 	state["launches"] = int(state.get("launches", 0)) + 1
 	if product_mastery < LAUNCH_MASTERY_CAP: state["mastery"] = product_mastery + 1
 	reveals.append(str(product.id))
-	CompanyManager.add_alert("%s v1.0 est sorti : %d bugs connus, qualité %.0f/100. Premier bilan des licences au prochain mois." % [str(product.name), int(product.get("bugs_known", 0)), quality])
+	if str(product.get("kind", "")) == "STUDIO":
+		CompanyManager.add_alert("%s v1.0 est sorti : la presse lui donne %s/10. %s" % [str(product.name), _note_text(float(product.note)), str(product.get("missed", ""))])
+	else:
+		CompanyManager.add_alert("%s v1.0 est sorti : %d bugs connus, qualité %.0f/100. Premier bilan des licences au prochain mois." % [str(product.name), int(product.get("bugs_known", 0)), quality])
 	software_launched.emit(product)
 func _process_sales() -> void:
 	var now := CAT.year_f(TimeManager.year, TimeManager.month)
@@ -886,6 +1178,7 @@ func _process_sales() -> void:
 		if active.is_empty(): continue
 		var market := CAT.market_users(family_id, now) * BalanceManager.market_demand_factor()
 		var weights: Array[float] = []
+		var reaches: Array[float] = []
 		var total_weight := 0.0
 		for value in active:
 			var product: Dictionary = value
@@ -907,19 +1200,30 @@ func _process_sales() -> void:
 				quality = clampf(quality - aging, 3.0, 99.0)
 			var price_penalty := CAT.price_factor(str(product.price_mode)) - 1.0
 			var weight := maxf(0.2, 1.0 + (quality - 50.0) / 25.0 - price_penalty)
+			var reach_factor := 1.0
+			if str(product.get("kind", "")) == "STUDIO":
+				# Logiciel 2.0 : la note de la presse (qui vieillit) fait la demande ; le public et la plateforme la portée.
+				var live_note := studio_live_note(product, now)
+				product["note_live"] = live_note
+				quality = 50.0 + (live_note - 5.5) * 4.5
+				weight = clampf(pow(live_note / 6.0, 1.6) - price_penalty * 0.8, 0.12, 3.5)
+				if str(product.get("platform", "")) == "OWN":
+					product["own_reach"] = own_cpu_reach()
+				reach_factor = STUDIO.reach(family_id, str(product.get("audience", "HOBBY")), str(product.get("platform", "LEADER")), float(product.get("own_reach", 0.2))) * STUDIO_REACH_SCALE
 			if str(product.get("kind", "")) == "UTILITY_SLICE":
 				var bug_penalty := clampf(1.0 - float(product.get("bugs_known", 0)) / 80.0, 0.55, 1.0)
 				weight *= bug_penalty
 			product["quality_live"] = quality
 			product["demand_weight"] = weight
-			weights.append(weight); total_weight += weight
+			product["reach_factor"] = reach_factor
+			weights.append(weight); reaches.append(reach_factor); total_weight += weight
 		var player_share := clampf(0.08 + CompanyManager.get_brand_score() / 500.0, 0.08, 0.30)
 		# One external offer competes for a finite reachable market. At weight 1,
 		# a single product keeps the original share; quality/price/bugs affect demand.
 		var reachable_market := market * minf(player_share * 2.0, 0.60)
 		for i in range(active.size()):
 			var product: Dictionary = active[i]
-			var licenses := int(floor(reachable_market * float(weights[i]) / (1.0 + total_weight)))
+			var licenses := int(floor(reachable_market * float(reaches[i]) * float(weights[i]) / (1.0 + total_weight)))
 			var revenue := int(round(float(licenses) * float(product.price)))
 			product["installed_users"] = int(product.installed_users) + licenses
 			var cohorts: Array = product.support_cohorts
@@ -1001,6 +1305,7 @@ func get_state() -> Dictionary:
 		"activities":activities,
 		"completed_activities":completed_activities,
 		"skills":skills,
+		"notebook":notebook,
 		"next_id":_next_id
 	}
 
@@ -1023,6 +1328,9 @@ func load_state(state: Dictionary) -> void:
 	if typeof(saved_skills) == TYPE_DICTIONARY:
 		for skill_id in PLAY.SKILL_ORDER:
 			skills[str(skill_id)] = int((saved_skills as Dictionary).get(str(skill_id), skills.get(str(skill_id), 0)))
+	var saved_notebook = state.get("notebook", {})
+	notebook = (saved_notebook as Dictionary).duplicate(true) if typeof(saved_notebook) == TYPE_DICTIONARY else empty_notebook()
+	_notebook()
 	_next_id = int(state.get("next_id", projects.size() + products.size() + 1))
 	software_changed.emit()
 
@@ -1033,7 +1341,10 @@ func set_product_price(product_id: String, price_mode: String) -> bool:
 		var product: Dictionary = value
 		if str(product.get("id", "")) == product_id:
 			product["price_mode"] = price_mode
-			product["price"] = CAT.license_price(str(product.family), price_mode)
+			if str(product.get("kind", "")) == "STUDIO":
+				product["price"] = studio_price(str(product.family), str(product.get("audience", "HOBBY")), price_mode)
+			else:
+				product["price"] = CAT.license_price(str(product.family), price_mode)
 			software_changed.emit()
 			return true
 	return false
@@ -1060,6 +1371,8 @@ func product_feedback(product: Dictionary) -> String:
 		return "Premiers résultats disponibles au prochain bilan mensuel."
 	if int(product.get("bugs_known", 0)) >= 10:
 		return "Les défauts freinent la demande. Un correctif améliore la confiance et les ventes."
+	if str(product.get("kind", "")) == "STUDIO" and float(product.get("note_live", product.get("note", 5.0))) < float(product.get("note", 5.0)) - 1.5:
+		return "Le logiciel a vieilli : la presse ne lui donnerait plus que %s/10. Une nouvelle version le relancerait." % _note_text(float(product.get("note_live", 5.0)))
 	if int(product.get("margin_last", 0)) < 0:
 		return "Le support coûte plus que les ventes. Revoyez le prix ou préparez une nouvelle version."
 	if float(product.get("quality_live", 50.0)) < 45.0:
