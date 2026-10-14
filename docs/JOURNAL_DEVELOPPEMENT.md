@@ -102,4 +102,6 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 
 | FIX-01 | 14/10/2026 | `fix/debut-standard-r1-r2` (Claude) | D2 progressif, procédés fabricables seulement, filet temps, tests R1/R2 ; fusion #83 #86 #87 — [rapport](reviews/RETOUR_2026-10-14_FIX01.md) | 38/38 scènes + sonde 24 carrières | **Non testé** | Relu par Claude, fusionné dans `v013/demo-octobre` |
 
+| RANK-01 + WORLD-01 | 14/10/2026 | `feat/palmares-rivalite` (Claude) | Palmarès CPU (4 couronnes) et défi « Un titre à défendre » — [rapport](reviews/RETOUR_2026-10-14_RANK01_WORLD01.md) | 38/38 scènes + sonde 24 carrières | **Non testé** | Fusionné dans `v013/demo-octobre` |
+
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).

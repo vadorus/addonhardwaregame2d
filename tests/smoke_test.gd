@@ -1881,6 +1881,12 @@ func _ready() -> void:
 		_fail(ranges_error)
 		return
 	print("[CI] Gammes : mémoire, alimentations, boîtiers — ouverture, fiche d'impact fidèle, note et ventes annoncées = obtenues, sauvegarde OK")
+	await get_tree().process_frame
+	var palmares_error: String = (load("res://tests/scenarios/PalmaresRivalryScenario.gd") as Script).call("run", self)
+	if palmares_error != "":
+		_fail(palmares_error)
+		return
+	print("[CI] Palmarès CPU et défi « un titre à défendre » : plusieurs premiers, prévision fidèle, 4 issues distinctes, sauvegarde OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)
