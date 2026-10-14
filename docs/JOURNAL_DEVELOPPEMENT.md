@@ -100,4 +100,6 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 
 | BUD-01 | 10/10/2026 | [PR #87](https://github.com/vadorus/addonhardwaregame2d/pull/87) | Aperçu réel du coût et du risque de recrutement | 2 tests ciblés + smoke + budget + finance PASS | **Non testé** | Brouillon, sans fusion ni changement des coûts |
 
+| FIX-01 | 14/10/2026 | `fix/debut-standard-r1-r2` (Claude) | D2 progressif, procédés fabricables seulement, filet temps, tests R1/R2 ; fusion #83 #86 #87 — [rapport](reviews/RETOUR_2026-10-14_FIX01.md) | 38/38 scènes + sonde 24 carrières | **Non testé** | Relu par Claude, fusionné dans `v013/demo-octobre` |
+
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).

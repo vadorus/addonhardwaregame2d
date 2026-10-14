@@ -87,6 +87,23 @@ static func _planner_checks() -> String:
 	var base := CPU_DESIGN.normalize({"node_nm":10000, "frequency_ghz":0.001, "cores":1, "tdp_w":2})
 	var context := {"manufacturing_score":70.0, "miniaturization_score":70.0, "architecture_capability":40.0,
 		"layout_score":20.0, "segment":"EMBEDDED", "focus":"BALANCED", "cpu_capabilities":ResearchManager.get_cpu_capabilities()}
+	# 14/10 : le planificateur ne vise que des procédés qu'un fondeur sait graver ; ici, des fondeurs à la pointe.
+	var saved_scores := {}
+	for foundry_id in FoundryManager.external_foundries.keys():
+		saved_scores[foundry_id] = float(FoundryManager.external_foundries[foundry_id].technology_score)
+		FoundryManager.external_foundries[foundry_id]["technology_score"] = 100.0
+	var result := _planner_checks_with_foundries(base, context)
+	for foundry_id in saved_scores.keys():
+		FoundryManager.external_foundries[foundry_id]["technology_score"] = saved_scores[foundry_id]
+	if result != "":
+		return result
+	# Fondeurs de 1971 : la recherche peut être en avance, le plan reste sur un procédé qu'on sait faire graver.
+	var plan_1971 := PLANNER._design_for("BOLD", base, context, 60.0)
+	if not FoundryManager.can_manufacture(int(plan_1971.node_nm)):
+		return "Planner: a plan must never target a node that no foundry can manufacture (%d nm)" % int(plan_1971.node_nm)
+	return ""
+
+static func _planner_checks_with_foundries(base: Dictionary, context: Dictionary) -> String:
 	var finest := PLANNER._finest_node(70.0, 70.0, 0)
 	var order := CPU_DESIGN.NODE_ORDER
 	var bold := PLANNER._design_for("BOLD", base, context, 60.0)

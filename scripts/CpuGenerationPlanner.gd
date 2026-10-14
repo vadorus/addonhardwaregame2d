@@ -207,7 +207,7 @@ static func _apply_sav_lesson_to_design(design: Dictionary, archetype: String, c
 		design.frequency_ghz = float(design.frequency_ghz) * reliability_frequency_factor
 ## Le procédé le plus fin disponible, moins `back` crans (jamais en dessous du premier).
 static func _finest_node(manufacturing_score: float, miniaturization_score: float, back: int) -> int:
-	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
+	var nodes: Array = FoundryManager.manufacturable_nodes(CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score))
 	var best := 0
 	for node_value in nodes:
 		best = maxi(best, CPU_DESIGN.NODE_ORDER.find(int(node_value)))
@@ -229,7 +229,7 @@ static func _retarget_node(design: Dictionary, base: Dictionary, node_nm: int, a
 	design.tdp_w = maxi(int(design.tdp_w), int(ceil(required * 1.1)))
 
 static func _next_advanced_node(node_nm: int, manufacturing_score: float, miniaturization_score: float) -> int:
-	var nodes := CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score)
+	var nodes: Array = FoundryManager.manufacturable_nodes(CPU_DESIGN.available_nodes_for_capabilities(manufacturing_score, miniaturization_score))
 	var index := nodes.find(node_nm)
 	if index < 0:
 		return node_nm

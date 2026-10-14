@@ -519,7 +519,8 @@ func _default_arch_for_choice() -> String:
 func available_nodes() -> Array:
 	var mastery := float(ResearchManager.technologies.get("manufacturing", 0.0))
 	var miniaturization := ResearchManager.get_cpu_capability("MINIATURIZATION")
-	var nodes := CPU_DESIGN.available_nodes_for_capabilities(mastery, miniaturization)
+	# 14/10 : seulement les procédés qu'un fondeur (ou votre usine) sait graver aujourd'hui.
+	var nodes: Array = FoundryManager.manufacturable_nodes(CPU_DESIGN.available_nodes_for_capabilities(mastery, miniaturization))
 	nodes.sort()
 	nodes.reverse()
 	return nodes

@@ -351,7 +351,7 @@ func refresh() -> void:
 		var cash_remaining := int(financing.get("cash_after", Economy.money))
 		var runway := float(financing.get("runway_months", 0.0))
 		candidate_box.add_child(UI.label("Engagement réel : -%s € immédiatement, puis -%s €/mois." % [UI.money(signing), UI.money(payroll)], 13))
-		candidate_box.add_child(UI.muted_label("Après recrutement : %s € en caisse • réserve prudente ~%.1f mois de charges (hors ventes futures)." % [UI.money(cash_remaining), runway], 12))
+		candidate_box.add_child(UI.muted_label("Après recrutement : %s € en caisse • réserve ≈ %s mois de charges (hors ventes futures)." % [UI.money(cash_remaining), ("%.1f" % runway).replace(".", ",")], 12))
 		if not bool(financing.get("can_pay_signing", false)):
 			candidate_box.add_child(UI.label("⛔ Recrutement impossible : il manque %s € pour la prime." % UI.money(int(financing.get("shortfall", 0))), 13))
 		elif str(financing.get("level", "")) in ["DANGEREUX", "TENDU"]:
