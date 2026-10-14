@@ -366,8 +366,15 @@ func can_start_studio(spec: Dictionary) -> Dictionary:
 	if not STUDIO.open_platforms(TimeManager.year, has_own_cpu()).has(platform_id):
 		return {"ok":false, "reason":"Plateforme indisponible : sortez d'abord un CPU pour développer sur vos processeurs." if platform_id == "OWN" else "Choisissez une plateforme."}
 	var chosen: Array = (spec.get("features", []) as Array).filter(func(id): return STUDIO.open_features(TimeManager.year).has(str(id)))
+	var sequel_of := str(spec.get("sequel_of", ""))
+	if sequel_of != "":
+		var check := can_start_sequel(sequel_of)
+		if not bool(check.get("ok", false)):
+			return check
+		if str(product_by_id(sequel_of).get("family", "")) != type_id:
+			return {"ok":false, "reason":"Une suite garde le type de logiciel de l'original."}
 	if chosen.is_empty():
-		return {"ok":false, "reason":"Choisissez au moins une fonction."}
+		return {"ok":false, "reason":"Une nouvelle version sans nouveauté ? Choisissez au moins une fonction." if sequel_of != "" else "Choisissez au moins une fonction."}
 	if chosen.size() > STUDIO.feature_slots(mastery(type_id)):
 		return {"ok":false, "reason":"Trop de fonctions pour l'expérience de l'équipe (%d au plus)." % STUDIO.feature_slots(mastery(type_id))}
 	var plan := STUDIO.plan(spec, studio_context(type_id))
@@ -383,13 +390,20 @@ func start_studio_project(spec: Dictionary, product_name: String = "") -> bool:
 	var clean_spec := {"type":type_id, "audience":str(spec.audience), "platform":str(spec.platform),
 		"features":(spec.get("features", []) as Array).duplicate(), "tokens":STUDIO.normalize_tokens(spec.get("tokens", {})),
 		"price_mode":price_mode}
+	var sequel_of := str(spec.get("sequel_of", ""))
+	if sequel_of != "":
+		var base_spec := sequel_spec(sequel_of)
+		clean_spec["sequel_of"] = sequel_of
+		clean_spec["inherited"] = (base_spec.get("inherited", []) as Array).duplicate()
+		clean_spec["version"] = int(base_spec.get("version", 2))
 	var plan := STUDIO.plan(clean_spec, studio_context(type_id))
 	clean_spec["features"] = (plan.features as Array).duplicate()
 	var project := {
 		"id":"SW-%03d" % _next_id,
 		"kind":"STUDIO",
 		"family":type_id,
-		"name":product_name.strip_edges() if product_name.strip_edges() != "" else next_name(type_id),
+		"name":product_name.strip_edges() if product_name.strip_edges() != "" else (sequel_name(sequel_of) if sequel_of != "" else next_name(type_id)),
+		"base_name":str(product_by_id(sequel_of).get("base_name", product_by_id(sequel_of).get("name", ""))) if sequel_of != "" else (product_name.strip_edges() if product_name.strip_edges() != "" else next_name(type_id)),
 		"spec":clean_spec,
 		"target":str(spec.audience),
 		"features":(plan.features as Array).duplicate(),
@@ -472,7 +486,8 @@ func _studio_launch(project: Dictionary, product: Dictionary) -> void:
 	var spec: Dictionary = project.get("spec", {})
 	var type_id := str(project.get("family", "UTILITY"))
 	var subject := {"type":type_id, "audience":str(spec.get("audience", "HOBBY")), "features":project.get("features", []),
-		"tokens":spec.get("tokens", {}), "metrics":project.get("metrics", {}), "bugs":int(project.get("bugs", 0))}
+		"inherited":spec.get("inherited", []), "tokens":spec.get("tokens", {}), "metrics":project.get("metrics", {}),
+		"bugs":int(project.get("bugs", 0)), "price_mode":str(spec.get("price_mode", "MARKET"))}
 	var best_before := best_score(type_id)
 	var review := STUDIO.review(subject, TimeManager.year, best_before)
 	var own_reach := own_cpu_reach()
@@ -482,11 +497,14 @@ func _studio_launch(project: Dictionary, product: Dictionary) -> void:
 	product["platform"] = str(spec.get("platform", "LEADER"))
 	product["tokens"] = (spec.get("tokens", {}) as Dictionary).duplicate(true)
 	product["features"] = (project.get("features", []) as Array).duplicate()
+	product["inherited"] = (spec.get("inherited", []) as Array).duplicate()
+	product["base_name"] = str(project.get("base_name", product.name))
+	product["sequel_of"] = str(spec.get("sequel_of", ""))
 	product["metrics"] = (project.get("metrics", {}) as Dictionary).duplicate(true)
 	product["levels"] = _utility_levels_from_metrics(project.get("metrics", {}))
 	product["bugs_known"] = int(project.get("bugs", 0))
 	product["bugs_at_launch"] = int(project.get("bugs", 0))
-	product["version_major"] = 1
+	product["version_major"] = maxi(1, int(spec.get("version", 1)))
 	product["version_minor"] = 0
 	product["version_patch"] = 0
 	product["note"] = float(review.note)
@@ -532,9 +550,134 @@ func _studio_launch(project: Dictionary, product: Dictionary) -> void:
 		skills[str(skill_id)] = skill_xp(str(skill_id)) + int(gains[skill_id])
 	var note := float(review.note)
 	CompanyManager.change_reputation({"innovation":(note - 5.5) * 0.05, "prestige":(note - 5.5) * 0.04})
-	MediaManager.add_news("Logiciel", "%s : %s/10 — %s" % [str(product.name), _note_text(note), STUDIO.verdict(note)],
-		"%s pour %s. %s" % [CAT.family_label(type_id), STUDIO.audience_label(str(product.audience)).to_lower(), str(product.missed)],
-		{"software_id":str(product.id), "software_note":note})
+	_studio_upgrade_wave(product)
+	_studio_press(product, subject, review)
+
+## Le jour J : trois journaux de l'époque testent le logiciel ; l'écran de révélation s'ouvre comme pour un CPU.
+func _studio_press(product: Dictionary, subject: Dictionary, review: Dictionary) -> void:
+	var reviews := STUDIO.press_reviews(subject, review, MediaManager.available_outlets(TimeManager.year), str(product.name))
+	var lesson := studio_lesson(product)
+	for value in reviews:
+		var item: Dictionary = value
+		item["channel_label"] = MediaManager.channel_label(str(item.channel))
+		item["product_id"] = str(product.id)
+		item["product_name"] = str(product.name)
+		item["product_kind"] = "SOFTWARE"
+		item["software_lesson"] = lesson
+		MediaManager.add_news(str(item.channel_label), str(item.headline), str(item.body), {
+			"source_id":str(item.source_id), "source_name":str(item.source_name), "channel":str(item.channel),
+			"product_id":str(product.id), "product_name":str(product.name), "product_kind":"SOFTWARE",
+			"review_score":float(item.score), "sentiment":clampf((float(item.score) - 56.0) / 34.0, -1.0, 1.0)})
+	if not reviews.is_empty():
+		if MediaManager.MOMENTS.is_good_press(reviews):
+			MediaManager.front_pages += 1
+		MediaManager.reviews_published.emit(str(product.name), reviews)
+
+## Ce que Nora note dans son carnet après cette sortie (affiché sous le verdict de la presse).
+func studio_lesson(product: Dictionary) -> String:
+	var lessons: Dictionary = product.get("lessons", {})
+	var parts: Array[String] = []
+	var combo := int(lessons.get("combo", 1))
+	var combo_text := "%s pour %s : %s" % [CAT.family_label(str(product.family)), STUDIO.audience_label(str(product.get("audience", ""))).to_lower(), STUDIO.FIT_LABELS[clampi(combo, 0, 3)].to_lower()]
+	parts.append(("nouvelle découverte, " if bool(lessons.get("combo_new", false)) else "") + combo_text)
+	var area: Dictionary = lessons.get("area", {})
+	if not area.is_empty():
+		parts.append("%s est %s pour ce type" % [STUDIO.area_label(str(area.area)).to_lower(), STUDIO.importance_label(float(area.importance))])
+	if int(product.get("upgrade_units", 0)) > 0:
+		parts.append("%s mises à niveau vendues aux utilisateurs de la version précédente" % _thousands(int(product.upgrade_units)))
+	return "Carnet de Nora : " + " ; ".join(parts) + "."
+
+static func _thousands(value: int) -> String:
+	var text := str(absi(value))
+	var out := ""
+	while text.length() > 3:
+		out = " " + text.substr(text.length() - 3) + out
+		text = text.substr(0, text.length() - 3)
+	return ("-" if value < 0 else "") + text + out
+
+## Versions 2 et 3 : à la sortie, l'ancienne version quitte le catalogue et une partie de ses utilisateurs
+## paie la mise à niveau (une vente immédiate, à moitié prix).
+func _studio_upgrade_wave(product: Dictionary) -> void:
+	var previous := product_by_id(str(product.get("sequel_of", "")))
+	if previous.is_empty():
+		return
+	var note_factor := clampf(float(product.get("note", 5.0)) / 7.0, 0.3, 1.3)
+	var units := int(floor(float(int(previous.get("licenses_total", 0))) * STUDIO.UPGRADE_SHARE * note_factor))
+	var revenue := int(round(float(units) * float(product.get("price", 0.0)) * STUDIO.UPGRADE_PRICE))
+	product["upgrade_units"] = units
+	product["upgrade_revenue"] = revenue
+	product["licenses_total"] = int(product.get("licenses_total", 0)) + units
+	product["installed_users"] = int(product.get("installed_users", 0)) + units
+	if revenue > 0:
+		Economy.add_income(revenue, "Mises à niveau software — %s" % CAT.family_label(str(product.family)))
+		product["margin_total"] = int(product.get("margin_total", 0)) + revenue
+	previous["status"] = "RETIRED"
+	previous["replaced_by"] = str(product.id)
+	previous["licenses_last"] = 0
+	previous["revenue_last"] = 0
+	previous["support_last"] = 0
+	previous["margin_last"] = 0
+
+# --- Synergie CPU (Logiciel 2.0, étape 3) ----------------------------------------------------
+
+## Combien chaque type de logiciel « sur vos processeurs » donne envie d'acheter vos CPU.
+## Un OS maison compte le plus ; serveurs et outils de développement attirent les pros ; les jeux un peu.
+const ECOSYSTEM_WEIGHTS := {"OS":1.0, "SERVER":0.6, "DEVTOOLS":0.5, "GAME":0.4}
+const ECOSYSTEM_DEFAULT_WEIGHT := 0.25
+const ECOSYSTEM_PER_PRODUCT := 0.10
+const ECOSYSTEM_CAP := 0.15
+
+## Les logiciels écrits pour vos CPU et ce que chacun apporte à leurs ventes (note qui vieillit comprise).
+func ecosystem_breakdown() -> Array:
+	var rows: Array = []
+	var now := CAT.year_f(TimeManager.year, TimeManager.month)
+	for value in active_products():
+		var product: Dictionary = value
+		if str(product.get("kind", "")) != "STUDIO" or str(product.get("platform", "")) != "OWN":
+			continue
+		var note := studio_live_note(product, now)
+		var quality := clampf((note - 5.0) / 4.0, 0.0, 1.0)
+		var weight := float(ECOSYSTEM_WEIGHTS.get(str(product.family), ECOSYSTEM_DEFAULT_WEIGHT))
+		rows.append({"id":str(product.id), "name":str(product.name), "family":str(product.family), "note":note,
+			"bonus":ECOSYSTEM_PER_PRODUCT * weight * quality})
+	return rows
+
+## Multiplicateur de demande de vos CPU (1,00 à 1,15) : l'écosystème logiciel qui tourne sur vos puces.
+func cpu_ecosystem_factor() -> float:
+	var total := 0.0
+	for row in ecosystem_breakdown():
+		total += float((row as Dictionary).bonus)
+	return 1.0 + minf(total, ECOSYSTEM_CAP)
+
+## La suite d'un logiciel : même type, mêmes réglages de départ, les fonctions déjà écrites sont reprises.
+func sequel_spec(product_id: String) -> Dictionary:
+	var product := product_by_id(product_id)
+	if product.is_empty() or str(product.get("kind", "")) != "STUDIO":
+		return {}
+	var inherited: Array = []
+	for id in (product.get("features", []) as Array) + (product.get("inherited", []) as Array):
+		if not inherited.has(str(id)) and not STUDIO.feature_standard(str(id), TimeManager.year):
+			inherited.append(str(id))
+	return {"type":str(product.family), "audience":str(product.get("audience", "HOBBY")), "platform":str(product.get("platform", "LEADER")),
+		"features":[], "inherited":inherited, "tokens":(product.get("tokens", {}) as Dictionary).duplicate(true),
+		"price_mode":str(product.get("price_mode", "MARKET")), "sequel_of":product_id, "version":int(product.get("version_major", 1)) + 1}
+
+func sequel_name(product_id: String) -> String:
+	var product := product_by_id(product_id)
+	var base := str(product.get("base_name", product.get("name", "Logiciel")))
+	return "%s %d" % [base, int(product.get("version_major", 1)) + 1]
+
+func can_start_sequel(product_id: String) -> Dictionary:
+	var product := product_by_id(product_id)
+	if product.is_empty() or str(product.get("kind", "")) != "STUDIO":
+		return {"ok":false, "reason":"Seuls les logiciels du studio peuvent avoir une suite."}
+	if str(product.get("status", "")) != "ACTIVE":
+		return {"ok":false, "reason":"Cette version n'est plus en vente."}
+	if not project_for(str(product.family)).is_empty():
+		return {"ok":false, "reason":"Un logiciel de ce type est déjà en développement."}
+	if int(product.get("market_months", 0)) < 6:
+		return {"ok":false, "reason":"Laissez la version actuelle vivre au moins six mois."}
+	return {"ok":true, "reason":""}
 
 static func _note_text(note: float) -> String:
 	return ("%.1f" % note).replace(".", ",")
@@ -1235,6 +1378,8 @@ func _process_sales() -> void:
 			product["revenue_last"] = revenue; product["support_last"] = support; product["margin_last"] = revenue - support
 			product["margin_total"] = int(product.get("margin_total", 0)) + revenue - support
 			product["market_months"] = int(product.get("market_months", 0)) + 1
+			if str(product.get("kind", "")) == "STUDIO" and int(product.market_months) == 1:
+				CompanyManager.add_alert("Premier mois de %s : %s licences, %s € de recettes." % [str(product.name), _thousands(licenses), _thousands(revenue)])
 			product["feedback"] = product_feedback(product)
 			Economy.add_income(revenue, "Licences software — %s" % CAT.family_label(family_id))
 			Economy.add_expense(support_raw, "Support software — %s" % CAT.family_label(family_id))

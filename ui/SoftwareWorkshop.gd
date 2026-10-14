@@ -267,6 +267,7 @@ func _add_compact_status() -> void :
 		else:
 			_content.add_child(_project_card(project))
 
+	_add_ecosystem_card()
 	if not SoftwareManager.products.is_empty():
 		_content.add_child(_section("Votre catalogue"))
 	for product_value in SoftwareManager.products:
@@ -475,6 +476,13 @@ func _product_card(product: Dictionary) -> Control:
 		patch.tooltip_text = str(patch_check.get("reason", ""))
 		patch.pressed.connect(_start_patch.bind(str(product.get("id", ""))))
 		actions.add_child(patch)
+	if str(product.get("kind", "")) == "STUDIO" and is_active:
+		var sequel_check:= SoftwareManager.can_start_sequel(str(product.id))
+		var sequel:= _action("Version %d\nbase de code réutilisée" % (int(product.get("version_major", 1)) + 1), bool(sequel_check.get("ok", false)))
+		sequel.disabled = not bool(sequel_check.get("ok", false))
+		sequel.tooltip_text = str(sequel_check.get("reason", ""))
+		sequel.pressed.connect(_open_sequel.bind(str(product.id)))
+		actions.add_child(sequel)
 	var retire:= _action("Suspendre la vente" if is_active else "Remettre en vente")
 	retire.pressed.connect(_toggle_product.bind(str(product.id), not is_active))
 	actions.add_child(retire)
@@ -515,6 +523,27 @@ func _note_badge(live: float, launch: float) -> Control:
 	small.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(small)
 	return panel
+
+## Synergie CPU : ce que vos logiciels écrits pour vos processeurs apportent aux ventes de vos CPU.
+func _add_ecosystem_card() -> void :
+	if not SoftwareManager.has_own_cpu():
+		return
+	var rows:= SoftwareManager.ecosystem_breakdown()
+	var card:= UI.card(Color("eaf3e6") if not rows.is_empty() else UI.APP_PANEL_ALT, 12, 12)
+	var box:= VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
+	box.add_child(UI.eyebrow("ÉCOSYSTÈME DE VOS PROCESSEURS"))
+	if rows.is_empty():
+		box.add_child(_note("Aucun logiciel n'est écrit pour vos processeurs. Un OS maison bien noté ferait vendre vos CPU (jusqu'à +%d %%) ; vos logiciels y seraient plus rapides et moins chers à faire." % roundi(SoftwareManager.ECOSYSTEM_CAP * 100.0), 12))
+	else:
+		var factor:= SoftwareManager.cpu_ecosystem_factor()
+		box.add_child(UI.label("+%d %% de demande pour vos CPU" % roundi((factor - 1.0) * 100.0), 17))
+		var names: Array[String] = []
+		for row in rows:
+			names.append("%s (%s/10)" % [str(row.name), ("%.1f" % float(row.note)).replace(".", ",")])
+		box.add_child(_note("Grâce à : %s. Un logiciel qui vieillit compte moins : sortez une nouvelle version." % ", ".join(names), 12))
+	_content.add_child(card)
 
 ## Le carnet de Nora en une carte : combinaisons connues et meilleures notes.
 func _add_notebook_summary() -> void :
@@ -682,6 +711,12 @@ func _start_activity(activity_id: String, approach_id: String = "BALANCED") -> v
 		status_changed.emit(str(check.get("reason", "Impossible de démarrer ce contrat.")))
 	_show_activities()
 
+
+## « Version 2 » : le studio s'ouvre sur la suite, avec les fonctions déjà écrites.
+func _open_sequel(product_id: String) -> void :
+	_mode = ViewMode.PRODUCT
+	if _studio != null:
+		_studio.call("open", {"sequel_of":product_id})
 
 ## « Nouveau logiciel » : le studio s'ouvre par-dessus le hub.
 func _show_product() -> void :

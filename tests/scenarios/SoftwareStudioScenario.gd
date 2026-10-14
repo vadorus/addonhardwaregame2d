@@ -52,7 +52,7 @@ static func _ship(spec: Dictionary, name: String, reports: Array) -> Dictionary:
 		return {}
 	SoftwareManager.choose_release(str(project.id), "RELEASE")
 	for value in SoftwareManager.products:
-		if str(value.get("name", "")) == name:
+		if str(value.get("id", "")) == str(project.id):
 			return value
 	return {}
 
@@ -140,6 +140,49 @@ static func run(_host: Node) -> String:
 	var good_licenses := int(good.get("licenses_last", 0))
 	if good_licenses <= 0 or int(good.get("revenue_last", 0)) <= 0:
 		return "Studio: a good software sold nothing"
+	# Le jour J : trois journaux, une moyenne fidèle à la note, la leçon de Nora, rangés dans la presse.
+	var press: Array = []
+	for item in MediaManager.news:
+		if str(item.get("product_kind", "")) == "SOFTWARE" and str(item.get("product_id", "")) == str(good.id):
+			press.append(item)
+	if press.size() < 2:
+		return "Studio: launch day published %d software reviews" % press.size()
+	var press_mean := 0.0
+	for item in press:
+		press_mean += float(item.review_score)
+	press_mean /= float(press.size())
+	if absf(press_mean / 10.0 - float(good.note)) > 0.3:
+		return "Studio: press average %.1f differs from the official note %.1f" % [press_mean / 10.0, float(good.note)]
+	if SoftwareManager.studio_lesson(good).find("Carnet de Nora") < 0:
+		return "Studio: no notebook lesson for the launch screen"
+	# Versions 2 et 3 : base de code réutilisée.
+	if bool(SoftwareManager.can_start_sequel(str(good.id)).get("ok", false)):
+		return "Studio: a sequel can start the very month of the release"
+	for m in range(6):
+		SoftwareManager._process_sales()
+	var sequel := SoftwareManager.sequel_spec(str(good.id))
+	if not bool(SoftwareManager.can_start_sequel(str(good.id)).get("ok", false)) or (sequel.inherited as Array).size() != 2:
+		return "Studio: sequel unavailable or did not inherit the features (%s)" % str(sequel)
+	var fresh_plan := STUDIO.plan(_spec("UTILITY", "HOBBY", ["FILES", "SIMPLE_COMMANDS", "SCRIPTING"]), {"year":TimeManager.year})
+	sequel["features"] = ["SCRIPTING"]
+	var sequel_plan := STUDIO.plan(sequel, {"year":TimeManager.year})
+	if int(sequel_plan.months) >= int(fresh_plan.months) or int(sequel_plan.monthly_cost) >= int(fresh_plan.monthly_cost) or int(sequel_plan.bugs) >= int(fresh_plan.bugs):
+		return "Studio: reusing the code base is not cheaper (%s vs %s)" % [str([sequel_plan.months, sequel_plan.monthly_cost, sequel_plan.bugs]), str([fresh_plan.months, fresh_plan.monthly_cost, fresh_plan.bugs])]
+	var v4 := sequel.duplicate(true)
+	v4["version"] = 4
+	if int(STUDIO.plan(v4, {"year":TimeManager.year}).bugs) <= int(sequel_plan.bugs):
+		return "Studio: an old code base (version 4) does not add bugs"
+	var empty_sequel := sequel.duplicate(true)
+	empty_sequel["features"] = []
+	if bool(SoftwareManager.can_start_studio(empty_sequel).get("ok", false)):
+		return "Studio: a sequel without any new feature was accepted"
+	var second := _ship(sequel, "", [])
+	if second.is_empty() or int(second.get("version_major", 0)) != 2 or str(second.name) != "Studio Good 2":
+		return "Studio: sequel did not ship as version 2 (%s)" % str(second.get("name", "?"))
+	if str(good.get("status", "")) != "RETIRED" or int(second.get("upgrade_units", 0)) <= 0:
+		return "Studio: the previous version stayed on sale or nobody upgraded"
+	if (second.get("inherited", []) as Array).size() != 2:
+		return "Studio: version 2 lost its inherited features"
 	# Même chose avec une mauvaise idée de public : la note et les ventes doivent chuter.
 	_setup(1975)
 	var bad_product := _ship(_spec("UTILITY", "CORP", ["FILES", "SIMPLE_COMMANDS"]), "Studio Bad", [])
@@ -148,6 +191,35 @@ static func run(_host: Node) -> String:
 	SoftwareManager._process_sales()
 	if float(bad_product.note) >= float(good.note) - 1.0:
 		return "Studio: a bad combination is not visible in the note (%.1f vs %.1f)" % [float(bad_product.note), float(good.note)]
+
+	# 3 bis. Synergie CPU : un OS maison sur vos processeurs fait vendre vos CPU (plafonné à +15 %).
+	_setup(1980)
+	var cpu := {"id":"CI-STUDIO-CPU", "name":"CI Puce", "sector":"CPU", "company":CompanyManager.company_name,
+		"status":"LAUNCHED", "price":180, "unit_cost":60, "months_on_market":12, "last_month_sales":4000,
+		"target_segment":MarketManager.default_segment(), "metrics":{"performance":70.0, "efficiency":70.0, "reliability":70.0,
+			"usability":60.0, "innovation":60.0, "ecosystem":60.0, "sustainability":60.0}}
+	ProductManager.products.append(cpu)
+	if not SoftwareManager.has_own_cpu() or SoftwareManager.own_cpu_reach() <= 0.0:
+		return "Studio: a launched CPU does not open the 'your processors' platform"
+	var demand_before := int(MarketManager.estimate_consumer_demand(cpu).get("units", 0))
+	if absf(SoftwareManager.cpu_ecosystem_factor() - 1.0) > 0.0001:
+		return "Studio: ecosystem bonus without any software"
+	var os_spec := _spec("OS", "HOME", ["FAST_CORE", "COLOR_GFX", "MULTIUSER"])
+	os_spec["platform"] = "OWN"
+	var os_plan := STUDIO.plan(os_spec, {"year":1980})
+	var leader_plan := STUDIO.plan(_spec("OS", "HOME", ["FAST_CORE", "COLOR_GFX", "MULTIUSER"]), {"year":1980})
+	if float(os_plan.metrics.performance) <= float(leader_plan.metrics.performance) or int(os_plan.monthly_cost) >= int(leader_plan.monthly_cost):
+		return "Studio: software for your own CPU is neither faster nor cheaper"
+	var house_os := _ship(os_spec, "CI OS", [])
+	if house_os.is_empty() or str(house_os.get("platform", "")) != "OWN":
+		return "Studio: the house OS did not ship on your processors"
+	var factor := SoftwareManager.cpu_ecosystem_factor()
+	if factor <= 1.0 or factor > 1.15 + 0.0001:
+		return "Studio: house OS ecosystem factor out of range (%.3f, note %.1f)" % [factor, float(house_os.note)]
+	var demand_after := int(MarketManager.estimate_consumer_demand(cpu).get("units", 0))
+	if demand_before <= 0 or demand_after <= demand_before:
+		return "Studio: the house OS does not help CPU demand (%d -> %d)" % [demand_before, demand_after]
+	ProductManager.products.erase(cpu)
 
 	# 4. Phases déjà commencées : figées.
 	_setup(1971)

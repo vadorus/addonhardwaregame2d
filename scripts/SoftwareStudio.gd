@@ -137,6 +137,15 @@ const FEATURES := {
 		"axes":{"features":16, "usability":6, "performance":-6}, "types":["BUSINESS", "OS", "WEB", "MULTIMEDIA", "DEVTOOLS", "UTILITY"], "audiences":["CORP", "CREATIVE", "DEVS"], "expected":2024}
 }
 const NEW_FEATURE_YEARS := 4
+## Versions 2 et 3 : la base de code sert encore. Fonctions héritées : 30 % du travail et des bugs ;
+## socle du logiciel 30 % plus rapide et projet 20 % moins cher. Après la version 3, la base s'use.
+const INHERITED_WORK := 0.3
+const REUSE_TIME := 0.7
+const REUSE_COST := 0.8
+const REUSE_MAX_VERSION := 3
+## À la sortie d'une nouvelle version, une partie des utilisateurs de l'ancienne paie la mise à niveau.
+const UPGRADE_SHARE := 0.15
+const UPGRADE_PRICE := 0.5
 ## Huit ans après être devenue « attendue », une fonction est de série partout : elle sort du choix
 ## (sinon un OS de 1995 devrait cocher six fonctions de base avant d'innover).
 const STANDARD_AFTER_YEARS := 8
@@ -423,6 +432,13 @@ static func plan(spec: Dictionary, ctx: Dictionary) -> Dictionary:
 		var id := str(value)
 		if FEATURES.has(id) and not chosen.has(id) and year >= int(feature(id).get("from", 9999)) and not feature_standard(id, year):
 			chosen.append(id)
+	# Version 2, 3… : les fonctions de la version précédente sont déjà écrites (base de code réutilisée).
+	var inherited: Array = []
+	for value in spec.get("inherited", []):
+		var id := str(value)
+		if FEATURES.has(id) and not chosen.has(id) and not inherited.has(id) and not feature_standard(id, year):
+			inherited.append(id)
+	var version := maxi(1, int(spec.get("version", 1)))
 	var metrics := {"features":26.0, "usability":30.0, "stability":40.0, "performance":38.0}
 	# Savoir-faire de l'équipe (mêmes plafonds que l'ancien utilitaire) et maîtrise du type.
 	metrics["features"] += minf(float(skills.get("development", 0)) / 12.0, 7.0)
@@ -432,15 +448,16 @@ static func plan(spec: Dictionary, ctx: Dictionary) -> Dictionary:
 	for axis in AXES:
 		metrics[axis] = float(metrics[axis]) + float(mastery) * 1.5
 	var feature_months := 0.0
-	var feature_bugs := 0
-	for id in chosen:
+	var feature_bugs := 0.0
+	for id in chosen + inherited:
 		var data := feature(str(id))
 		var factor := 1.25 if feature_fits(str(id), type_id) else 0.6
+		var reused := inherited.has(id)
 		for axis in (data.get("axes", {}) as Dictionary).keys():
 			metrics[str(axis)] = float(metrics.get(str(axis), 40.0)) + float((data.axes as Dictionary)[axis]) * factor
-		feature_months += float(data.get("months", 1.0))
-		feature_bugs += int(data.get("bugs", 0))
-	var extra := maxi(0, chosen.size() - 3)
+		feature_months += float(data.get("months", 1.0)) * (INHERITED_WORK if reused else 1.0)
+		feature_bugs += float(data.get("bugs", 0)) * (INHERITED_WORK if reused else 1.0)
+	var extra := maxi(0, chosen.size() + inherited.size() - 3)
 	metrics["stability"] = float(metrics.stability) - float(extra) * 2.0
 	for phase in PHASE_ORDER:
 		var row: Dictionary = tokens[phase]
@@ -456,21 +473,25 @@ static func plan(spec: Dictionary, ctx: Dictionary) -> Dictionary:
 		metrics[axis] = clampf(float(metrics[axis]), 10.0, 98.0)
 	var arch_tokens := int((tokens.FOUNDATIONS as Dictionary).get("ARCH", 0))
 	var test_tokens := int((tokens.POLISH as Dictionary).get("TESTS", 0))
-	var bugs_raw := 3.0 + float(feature_bugs) * clampf(1.0 - 0.07 * float(arch_tokens), 0.5, 1.0) + float(platform_data.get("bugs", 0))
+	var bugs_raw := 3.0 + feature_bugs * clampf(1.0 - 0.07 * float(arch_tokens), 0.5, 1.0) + float(platform_data.get("bugs", 0))
+	# Au-delà de la version 3, la vieille base de code se venge : chaque version ajoute des bugs.
+	bugs_raw += float(maxi(0, version - REUSE_MAX_VERSION)) * 3.0
 	bugs_raw -= float(test_tokens) * 2.5
 	bugs_raw -= minf(float(int(skills.get("development", 0)) + int(skills.get("reliability", 0))) / 18.0, 8.0)
 	var bugs := maxi(0, int(round(bugs_raw)))
 	var family := CAT.family(type_id)
-	var months_raw := float(family.get("base_months", 4)) * 0.7 + feature_months * 0.55 + float(platform_data.get("months", 0))
+	var reuse := version >= 2 and version <= REUSE_MAX_VERSION
+	var months_raw := float(family.get("base_months", 4)) * 0.7 * (REUSE_TIME if reuse else 1.0) + feature_months * 0.55 + float(platform_data.get("months", 0))
 	var months := maxi(3, int(ceil(months_raw - 0.001)))
 	if int(skills.get("development", 0)) >= 100:
 		months = maxi(3, months - 1)
 	var monthly_raw := float(CAT.dev_monthly_cost(type_id, CAT.default_levels(type_id), year)) * DEV_COST_SHARE
-	monthly_raw *= (1.0 + 0.07 * float(chosen.size())) * float(platform_data.get("cost", 1.0))
+	monthly_raw *= (1.0 + 0.07 * float(chosen.size())) * float(platform_data.get("cost", 1.0)) * (REUSE_COST if reuse else 1.0)
 	var monthly_cost := int(round(monthly_raw / 100.0)) * 100
 	var price := snappedf(CAT.license_price(type_id, str(spec.get("price_mode", "MARKET"))) * float(audience(audience_id).get("price", 1.0)), 1.0)
 	return {
-		"type":type_id, "audience":audience_id, "platform":platform_id, "features":chosen, "tokens":tokens,
+		"type":type_id, "audience":audience_id, "platform":platform_id, "features":chosen, "inherited":inherited,
+		"all_features":chosen + inherited, "version":version, "reuse":reuse, "tokens":tokens,
 		"metrics":metrics, "bugs":bugs, "months":months, "monthly_cost":monthly_cost,
 		"total_cost":monthly_cost * months, "price":maxf(price, 1.0),
 		"quality":audience_quality(metrics, audience_id), "alignment":alignment(type_id, tokens),
@@ -500,7 +521,8 @@ static func review(subject: Dictionary, year: int, best_previous: float = 0.0) -
 	var audience_id := str(subject.get("audience", "HOBBY"))
 	var metrics: Dictionary = subject.get("metrics", {})
 	var tokens: Dictionary = normalize_tokens(subject.get("tokens", {}))
-	var features: Array = subject.get("features", [])
+	var features: Array = (subject.get("features", []) as Array) + (subject.get("inherited", []) as Array)
+	var new_features: Array = subject.get("features", [])
 	var base := audience_quality(metrics, audience_id)
 	var combo := fit(type_id, audience_id)
 	var align := alignment(type_id, tokens)
@@ -520,7 +542,7 @@ static func review(subject: Dictionary, year: int, best_previous: float = 0.0) -
 		score += missing_value
 		parts.append({"id":"MISSING", "value":missing_value, "text":"Il manque : %s" % ", ".join(missing.map(func(id): return feature_label(str(id)).to_lower())), "features":missing})
 	var fresh: Array = []
-	for id in features:
+	for id in new_features:
 		if feature_is_new(str(id), year) and feature_fits(str(id), type_id):
 			fresh.append(str(id))
 	var fresh_value := minf(float(fresh.size()) * NEW_FEATURE_BONUS, 6.0)
@@ -586,3 +608,105 @@ static func reach(type_id: String, audience_id: String, platform_id: String, own
 		"MULTI":
 			share *= MULTI_REACH
 	return share
+
+
+# --- La presse du jour J -------------------------------------------------------------------
+
+## Ce que regarde chaque type de journal, pour un logiciel (la moyenne des écarts est ramenée à 0 :
+## la moyenne des journaux reste la note officielle).
+static func outlet_bias(channel: String, subject: Dictionary, review_data: Dictionary) -> float:
+	var metrics: Dictionary = subject.get("metrics", {})
+	var mean := 0.0
+	for axis in AXES:
+		mean += float(metrics.get(axis, 50.0))
+	mean /= float(AXES.size())
+	match channel:
+		"BENCHMARK", "BENCHMARK_SITE":
+			return (float(metrics.get("performance", mean)) - mean) * 0.5
+		"SPECIALIST_PRESS":
+			return (float(metrics.get("stability", mean)) - mean) * 0.4 - float(int(subject.get("bugs", 0))) * 0.4
+		"GENERAL_PRESS":
+			return float((review_data.get("fresh", []) as Array).size()) * 3.0 + (float(metrics.get("usability", mean)) - mean) * 0.2
+		"COMMUNITY", "VIDEO_CREATOR":
+			return {"LOW":6.0, "MARKET":0.0, "PREMIUM":-7.0}.get(str(subject.get("price_mode", "MARKET")), 0.0) + (float(metrics.get("features", mean)) - mean) * 0.2
+		"STREAMER":
+			return (float(metrics.get("performance", mean)) - mean) * 0.3 + (float(metrics.get("usability", mean)) - mean) * 0.3
+	return 0.0
+
+## Trois journaux (un généraliste, un spécialisé, un labo ou une communauté) parmi ceux de l'époque.
+static func pick_outlets(outlets: Array) -> Array:
+	var wanted := ["GENERAL_PRESS", "SPECIALIST_PRESS", "COMMUNITY", "BENCHMARK", "VIDEO_CREATOR", "BENCHMARK_SITE", "STREAMER"]
+	var picked: Array = []
+	for channel in wanted:
+		for value in outlets:
+			var outlet: Dictionary = value
+			if str(outlet.get("channel", "")) == channel and picked.size() < 3 and not picked.any(func(o): return str(o.channel) == channel):
+				picked.append(outlet)
+	return picked
+
+static func press_headline(note: float, name: String, channel: String) -> String:
+	var tier := 3 if note >= 8.0 else (2 if note >= 6.5 else (1 if note >= 5.0 else 0))
+	var lines := {
+		"GENERAL_PRESS":["%s : un raté difficile à défendre", "%s ne tient pas ses promesses", "%s, une bonne surprise", "%s, le logiciel dont tout le monde parle"],
+		"SPECIALIST_PRESS":["%s n'est pas prêt pour un usage sérieux", "%s : des bases, mais trop de réserves", "%s : solide et bien conçu", "%s fixe une nouvelle référence"],
+		"COMMUNITY":["%s ? Gardez votre argent", "%s : on attendait mieux", "%s mérite sa place sur nos disques", "Coup de cœur : %s"],
+		"BENCHMARK":["%s rame dans nos mesures", "%s : des performances moyennes", "%s fait le travail dans nos mesures", "%s pulvérise nos mesures"],
+		"BENCHMARK_SITE":["%s rame dans nos mesures", "%s : des performances moyennes", "%s fait le travail dans nos mesures", "%s pulvérise nos mesures"],
+		"VIDEO_CREATOR":["J'ai testé %s… non merci", "%s : mon avis mitigé", "%s, je recommande", "%s m'a bluffé"],
+		"STREAMER":["%s en direct : la cata", "%s : ça passe, sans plus", "%s tourne nickel en live", "%s, le chouchou du chat"]
+	}
+	var row: Array = lines.get(channel, lines.GENERAL_PRESS)
+	return str(row[tier]) % name
+
+## L'angle propre à chaque journal : ce qu'il mesure lui-même (chiffres réels du logiciel).
+static func press_angle(channel: String, subject: Dictionary) -> String:
+	var metrics: Dictionary = subject.get("metrics", {})
+	match channel:
+		"BENCHMARK", "BENCHMARK_SITE":
+			return "Dans nos mesures, les performances atteignent %.0f/100." % float(metrics.get("performance", 50.0))
+		"SPECIALIST_PRESS":
+			var bugs := int(subject.get("bugs", 0))
+			return "Stabilité %.0f/100 ; %s." % [float(metrics.get("stability", 50.0)), "aucun bug relevé" if bugs == 0 else "%d bug(s) relevé(s)" % bugs]
+		"COMMUNITY", "VIDEO_CREATOR":
+			return {"LOW":"Le prix est une vraie bonne affaire.", "MARKET":"Le prix est dans la moyenne.", "PREMIUM":"Le prix pique un peu."}.get(str(subject.get("price_mode", "MARKET")), "")
+		"STREAMER":
+			return "Ergonomie %.0f/100 et fluidité %.0f/100 en direct." % [float(metrics.get("usability", 50.0)), float(metrics.get("performance", 50.0))]
+	return "Côté prise en main : %.0f/100." % float(metrics.get("usability", 50.0))
+
+## Une phrase d'article tirée du vrai calcul : le gros reproche s'il y en a un, sinon ce qui a le plus plu.
+static func press_body(review_data: Dictionary) -> String:
+	var best := {}
+	var worst := {}
+	for value in review_data.get("parts", []):
+		var part: Dictionary = value
+		if float(part.get("value", 0.0)) > 0.5 and (best.is_empty() or float(part.value) > float(best.value)):
+			best = part
+		if float(part.get("value", 0.0)) < -0.5 and (worst.is_empty() or float(part.value) < float(worst.value)):
+			worst = part
+	if not worst.is_empty() and float(worst.value) <= -2.5:
+		return missed_line(review_data)
+	if not best.is_empty():
+		return _capitalize(str(best.text)) + "."
+	return "Un logiciel honnête, sans défaut ni éclat particulier."
+
+static func _capitalize(text: String) -> String:
+	return text.substr(0, 1).to_upper() + text.substr(1) if text != "" else text
+
+## Les tests du jour J, prêts pour l'écran de révélation : [{source_name, channel_label, score 0-100, headline, body}].
+static func press_reviews(subject: Dictionary, review_data: Dictionary, outlets: Array, name: String) -> Array:
+	var picked := pick_outlets(outlets)
+	var biases: Array = []
+	var mean_bias := 0.0
+	for value in picked:
+		var bias := outlet_bias(str((value as Dictionary).get("channel", "")), subject, review_data)
+		biases.append(bias)
+		mean_bias += bias
+	mean_bias /= maxf(float(picked.size()), 1.0)
+	var result: Array = []
+	for i in range(picked.size()):
+		var outlet: Dictionary = picked[i]
+		var score := clampf(float(review_data.get("note", 5.0)) * 10.0 + float(biases[i]) - mean_bias, 8.0, 100.0)
+		result.append({"source_id":str(outlet.get("id", "")), "source_name":str(outlet.get("name", "Presse")), "channel":str(outlet.get("channel", "")),
+			"score":score, "headline":press_headline(score / 10.0, name, str(outlet.get("channel", ""))),
+			"body":press_angle(str(outlet.get("channel", "")), subject) + " " + press_body(review_data)})
+	return result

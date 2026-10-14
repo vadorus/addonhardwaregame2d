@@ -31,6 +31,10 @@ var tokens: Dictionary = {}
 var price_mode := "MARKET"
 var product_name := ""
 var _name_edited := false
+## Version 2, 3… : le logiciel d'origine, ses fonctions déjà écrites et le numéro de version.
+var sequel_of := ""
+var inherited: Array = []
+var version := 1
 
 var _step_pills: Array[Button] = []
 var _content: VBoxContainer
@@ -250,6 +254,9 @@ func _nav_button(text: String) -> Button:
 # --- État ------------------------------------------------------------------------------------
 
 func open(prefill: Dictionary = {}) -> void:
+	sequel_of = ""
+	inherited = []
+	version = 1
 	var types := available_types()
 	type_id = str(prefill.get("type", types[0] if not types.is_empty() else "UTILITY"))
 	if not types.has(type_id) and not types.is_empty():
@@ -261,6 +268,18 @@ func open(prefill: Dictionary = {}) -> void:
 	tokens = camille_tokens()
 	_name_edited = false
 	product_name = SoftwareManager.next_name(type_id)
+	var sequel := SoftwareManager.sequel_spec(str(prefill.get("sequel_of", "")))
+	if not sequel.is_empty():
+		sequel_of = str(prefill.sequel_of)
+		type_id = str(sequel.type)
+		audience_id = str(sequel.audience)
+		platform_id = str(sequel.platform) if SoftwareManager.has_own_cpu() or str(sequel.platform) != "OWN" else "LEADER"
+		price_mode = str(sequel.price_mode)
+		inherited = (sequel.inherited as Array).duplicate()
+		version = int(sequel.version)
+		tokens = STUDIO.normalize_tokens(sequel.tokens)
+		features = _default_features()
+		product_name = SoftwareManager.sequel_name(sequel_of)
 	var tier := int(ExecutiveManager.workplace_data().get("tier", 0)) if ExecutiveManager.has_method("workplace_data") else 0
 	var art := WORKPLACE.art_path(tier)
 	if ResourceLoader.exists(art):
@@ -281,8 +300,13 @@ func available_types() -> Array:
 	return SoftwareManager.open_types().filter(func(id): return SoftwareManager.project_for(str(id)).is_empty())
 
 func current_spec() -> Dictionary:
-	return {"type":type_id, "audience":audience_id, "platform":platform_id, "features":features.duplicate(),
+	var spec := {"type":type_id, "audience":audience_id, "platform":platform_id, "features":features.duplicate(),
 		"tokens":tokens.duplicate(true), "price_mode":price_mode}
+	if sequel_of != "":
+		spec["sequel_of"] = sequel_of
+		spec["inherited"] = inherited.duplicate()
+		spec["version"] = version
+	return spec
 
 func preview() -> Dictionary:
 	return SoftwareManager.studio_preview(current_spec())
@@ -328,11 +352,12 @@ func _default_audience() -> String:
 ## Deux fonctions pour commencer : celles que la presse attend, puis celles qui comptent pour ce type.
 func _default_features() -> Array:
 	var result: Array = []
+	var wanted := 1 if not inherited.is_empty() else 2
 	for id in STUDIO.expected_features(type_id, TimeManager.year):
-		if result.size() < 2 and STUDIO.open_features(TimeManager.year).has(id):
+		if result.size() < wanted and STUDIO.open_features(TimeManager.year).has(id) and not inherited.has(id):
 			result.append(str(id))
 	for id in STUDIO.open_features(TimeManager.year):
-		if result.size() < 2 and STUDIO.feature_fits(str(id), type_id) and not result.has(str(id)):
+		if result.size() < wanted and STUDIO.feature_fits(str(id), type_id) and not result.has(str(id)) and not inherited.has(id):
 			result.append(str(id))
 	return result
 
@@ -375,6 +400,11 @@ func free_tokens(phase_id: String) -> int:
 	return STUDIO.TOKENS_PER_PHASE - used
 
 func set_type(id: String) -> void:
+	if sequel_of != "" and id != type_id:
+		# Changer de type, c'est repartir de zéro : ce n'est plus une suite.
+		sequel_of = ""
+		inherited = []
+		version = 1
 	type_id = id
 	audience_id = _default_audience()
 	features = _default_features()
@@ -431,7 +461,7 @@ func camille_line() -> String:
 				return "Attention, la dernière fois, ce public n'en voulait pas du tout."
 			return "On l'a déjà tenté : %s." % STUDIO.FIT_LABELS[known].to_lower()
 		1:
-			var missing: Array = STUDIO.expected_features(type_id, TimeManager.year).filter(func(id): return not features.has(id))
+			var missing: Array = STUDIO.expected_features(type_id, TimeManager.year).filter(func(id): return not features.has(id) and not inherited.has(id))
 			if not missing.is_empty():
 				return "La presse attend %s. Sans ça, on va se faire descendre." % STUDIO.feature_label(str(missing[0])).to_lower()
 			var fresh: Array = features.filter(func(id): return STUDIO.feature_is_new(str(id), TimeManager.year))
@@ -480,10 +510,20 @@ func _rebuild_step() -> void:
 	UI.prepare_touch_scroll_children(_content)
 
 func _build_idea_step() -> void:
+	if sequel_of != "":
+		var banner := PanelContainer.new()
+		banner.add_theme_stylebox_override("panel", UI.stylebox(Color("fbe8cc"), 12, 1, AMBER, 10))
+		var words := _note("Version %d de %s : la base de code est réutilisée.%s %d fonction(s) déjà écrite(s) : %s." % [
+			version, str(SoftwareManager.product_by_id(sequel_of).get("name", "")),
+			" Moins de temps, moins cher." if version <= STUDIO.REUSE_MAX_VERSION else " Attention : après la version %d, la vieille base ajoute des bugs." % STUDIO.REUSE_MAX_VERSION,
+			inherited.size(), ", ".join(inherited.map(func(id): return STUDIO.feature_label(str(id)).to_lower()))])
+		words.add_theme_color_override("font_color", Color("6b4a2b"))
+		banner.add_child(words)
+		_content.add_child(banner)
 	_content.add_child(_step_title("Quel logiciel ?"))
 	var types_grid := _grid(3)
 	_content.add_child(types_grid)
-	for id in available_types():
+	for id in (available_types() if sequel_of == "" else [type_id]):
 		var family := CAT.family(str(id))
 		var dots := ""
 		for i in range(CAT.MAX_MASTERY):
@@ -525,8 +565,8 @@ func _build_idea_step() -> void:
 		var data := STUDIO.platform(str(id))
 		var text := "%s\n%s" % [STUDIO.platform_label(str(id)), str(data.get("pitch", ""))]
 		if str(id) == "OWN":
-			text = "%s\n%s" % [STUDIO.platform_label("OWN"), ("Vos CPU équipent %.0f %% du parc du leader." % (SoftwareManager.own_cpu_reach() * 100.0)) if has_cpu else "Sortez d'abord un CPU."]
-		var card := _choice_card(text, str(id) == platform_id, func(): platform_id = str(id); _changed(), 74)
+			text = "%s\n%s" % [STUDIO.platform_label("OWN"), ("Vos CPU équipent %.0f %% du parc du leader. Plus rapide, moins cher, et il fait vendre vos CPU." % (SoftwareManager.own_cpu_reach() * 100.0)) if has_cpu else "Sortez d'abord un CPU."]
+		var card := _choice_card(text, str(id) == platform_id, func(): platform_id = str(id); _changed(), 90 if str(id) == "OWN" and has_cpu else 74)
 		card.disabled = str(id) == "OWN" and not has_cpu
 		platform_grid.add_child(card)
 
@@ -554,14 +594,19 @@ func _build_features_step() -> void:
 	if not expected.is_empty():
 		var parts: Array[String] = []
 		for id in expected:
-			parts.append(("✓ " if features.has(id) else "✗ ") + STUDIO.feature_label(str(id)).to_lower())
+			parts.append(("✓ " if features.has(id) or inherited.has(id) else "✗ ") + STUDIO.feature_label(str(id)).to_lower())
 		var line := _note("En %d, la presse attend : %s." % [TimeManager.year, ", ".join(parts)])
 		line.add_theme_color_override("font_color", Color("6b4a2b"))
 		_content.add_child(line)
+	if not inherited.is_empty():
+		var reused := _note("Déjà écrites (version précédente) : %s." % ", ".join(inherited.map(func(id): return STUDIO.feature_label(str(id)).to_lower())))
+		reused.add_theme_color_override("font_color", GOOD)
+		_content.add_child(reused)
 	var grid := _grid(2)
 	_content.add_child(grid)
 	for id in STUDIO.sorted_features(type_id, TimeManager.year):
-		grid.add_child(_feature_tile(str(id)))
+		if not inherited.has(id):
+			grid.add_child(_feature_tile(str(id)))
 	var standard := STUDIO.standard_features(TimeManager.year)
 	if not standard.is_empty():
 		_content.add_child(_note("De série sur tous les logiciels : %s." % ", ".join(standard.map(func(id): return STUDIO.feature_label(str(id)).to_lower()))))
@@ -719,7 +764,7 @@ func camille_checklist() -> Array:
 		lines.append({"state":0, "text":"?  Idée jamais essayée : la presse dira si ce public en voulait."})
 	else:
 		lines.append({"state":1 if known >= 2 else -1, "text":"%s  %s pour ce public (carnet de Nora)." % [STUDIO.FIT_STARS[known], STUDIO.FIT_LABELS[known]]})
-	var missing: Array = STUDIO.expected_features(type_id, TimeManager.year).filter(func(id): return not features.has(id))
+	var missing: Array = STUDIO.expected_features(type_id, TimeManager.year).filter(func(id): return not features.has(id) and not inherited.has(id))
 	if missing.is_empty():
 		lines.append({"state":1, "text":"✓  Rien de ce que la presse attend ne manque."})
 	else:
@@ -778,7 +823,7 @@ func _refresh_live() -> void:
 	var path := WORKPLACE.character_path(CAMILLE_LOOK, pose)
 	if ResourceLoader.exists(path):
 		_camille.texture = load(path)
-	_screen.call("show_software", _display_name(), type_id, features, TimeManager.year)
+	_screen.call("show_software", _display_name(), type_id, inherited + features, TimeManager.year)
 
 func _say(text: String) -> void:
 	if _bubble_label == null or _bubble_label.text == text:
@@ -800,7 +845,7 @@ func play_launch(name_text: String) -> void:
 	_launch_layer.add_child(shade)
 	var big := ScreenMock.new()
 	big.anchor_left = 0.32; big.anchor_right = 0.68; big.anchor_top = 0.12; big.anchor_bottom = 0.58
-	big.call("show_software", name_text, type_id, features, TimeManager.year)
+	big.call("show_software", name_text, type_id, inherited + features, TimeManager.year)
 	_launch_layer.add_child(big)
 	var title := UI.label("%s est en développement !" % name_text, 28)
 	title.add_theme_color_override("font_color", WOOD)
