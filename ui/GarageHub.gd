@@ -19,7 +19,6 @@ const GARAGE_SOUND := preload("res://ui/GarageSound.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const PRESENTATION := preload("res://scripts/ProjectPresentation.gd")
 const SOFTWARE_ACTIVITY := preload("res://scripts/SoftwareActivityCatalog.gd")
-const WORLD_MARKER := preload("res://ui/components/ProjectWorldMarker.gd")
 const WORKPLACE_ART := WORKPLACE.ART
 const GARAGE_EMPTY_ART_PATH := ROOM_ART_PATH
 const GARAGE_FALLBACK_PATH := "res://assets/ui/garage_hq.svg"
@@ -1085,7 +1084,8 @@ func _refresh_gameplay_overlays() -> void :
 	for value in ProductManager.products:
 		if str(value.get("status", "")) == "READY" and ready_product.is_empty():
 			ready_product = value
-		elif str(value.get("status", "")) == "LAUNCHED" and launched_product.is_empty():
+		elif str(value.get("status", "")) == "LAUNCHED" and (launched_product.is_empty() or float(value.get("last_month_sales", 0)) >= float(launched_product.get("last_month_sales", 0))):
+			# Revue des onglets (14/10) : le QG montrait le plus vieux CPU (« 0.0 ventes ») ; on montre le meilleur vendeur.
 			launched_product = value
 	var active_software_project: Dictionary = SoftwareManager.projects[0] if not SoftwareManager.projects.is_empty() else {}
 	var active_software_activity: Dictionary = SoftwareManager.active_activity()
@@ -1139,7 +1139,7 @@ func _refresh_gameplay_overlays() -> void :
 		_project_kicker.text = "Sur le marché"
 		_refresh_phase_strip(4)
 		_project_title.text = str(launched_product.get("name", "CPU lancé"))
-		_project_stage.text = "Sur le marché • %s ventes ce mois" % str(launched_product.get("last_month_sales", 0))
+		_project_stage.text = "Sur le marché • %s ventes ce mois" % UI.money(int(launched_product.get("last_month_sales", 0)))
 		_project_progress.value = 100.0
 	elif not active_software_project.is_empty():
 		_show_software_project_summary(active_software_project)
@@ -1182,22 +1182,6 @@ func _refresh_gameplay_overlays() -> void :
 			_feedback_label.text = "Le marché ne vous connaît pas encore. Votre premier produit changera ça."
 	_refresh_primary_action()
 	call_deferred("_layout_zones")
-
-func _refresh_world_markers(cpu_project: Dictionary, software_project: Dictionary) -> void:
-	var cpu_row := PRESENTATION.cpu(cpu_project) if not cpu_project.is_empty() else {}
-	var software_row := PRESENTATION.software(software_project) if not software_project.is_empty() else {}
-	for button in _zone_buttons:
-		var zone := str(button.get_meta("zone_name", ""))
-		var row: Dictionary = {}
-		if not cpu_row.is_empty() and zone == ("Établi CPU" if int(cpu_row.phase_index) < 2 else "Banc de test"):
-			row = cpu_row
-		elif zone == "Tableau de planification":
-			row = software_row
-		var marker: Control = button.get_meta("project_marker")
-		marker.call("set_project", row, cpu_project.get("cpu_design", {}) if str(row.get("kind", "")) == "CPU" else {})
-		(button.get_meta("badge_node") as Control).visible = row.is_empty()
-		if not row.is_empty():
-			button.tooltip_text = "%s • %s • %.0f %%" % [str(row.name), str(row.state), float(row.progress)]
 
 func _show_software_project_summary(project: Dictionary) -> void:
 	_project_kicker.text = "Projet Software"

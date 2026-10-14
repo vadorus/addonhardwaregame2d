@@ -165,6 +165,7 @@ static func _update_category(category: String, ranked: Array, s: Dictionary) -> 
 	var was_player := bool(crown.get("holder_player", false))
 	if changed:
 		var previous_company := str(crown.get("holder_company", ""))
+		crown["previous_product"] = str(crown.get("holder_product", ""))
 		crown["holder"] = str(winner.id)
 		crown["holder_company"] = str(winner.company)
 		crown["holder_product"] = str(winner.product)
@@ -187,6 +188,12 @@ static func _update_category(category: String, ranked: Array, s: Dictionary) -> 
 
 static func _announce(category: String, winner: Dictionary, was_player: bool, previous_company: String, crown: Dictionary) -> void:
 	var name := label(category)
+	if bool(winner.player) and was_player:
+		# Revue des onglets (14/10) : la couronne passe d'un de vos CPU à un autre. Ce n'est pas une reconquête :
+		# la presse disait « la couronne revient… devant » votre propre entreprise.
+		var previous_product := str(crown.get("previous_product", ""))
+		CompanyManager.add_alert("%s : %s prend le relais%s." % [name, str(winner.product) if str(winner.product) != "" else "votre entreprise", (" de %s" % previous_product) if previous_product != "" else ""])
+		return
 	if bool(winner.player):
 		var first := str(crown.get("first_crown", "")) == ""
 		if first:

@@ -1825,6 +1825,7 @@ func _show_first_cpu_workshop() -> void:
 		return
 	TimeManager.time_scale = 0.0
 	first_cpu_workshop.call("open")
+	UI.upgrade_inputs(first_cpu_workshop)
 	SoundManager.play("open")
 	JUICE.fade_in(first_cpu_workshop, 0.2)
 	status_label.text = "Nora : choisissez d'abord ce que ce premier processeur doit accomplir."
@@ -2216,6 +2217,8 @@ func _show_tab(index: int):
 	if tabs.current_tab != safe_index and status_label != null and (status_label.text.begins_with("Nora : cette fonction") or status_label.text.begins_with("Nora : pas encore")):
 		status_label.text = ""
 	tabs.current_tab = safe_index
+	# Revue des onglets (14/10) : listes et compteurs adaptés au doigt (y compris ceux créés depuis).
+	UI.upgrade_inputs(tabs.get_child(safe_index))
 	_place_notification_feed()
 	_update_nav_state()
 
@@ -2914,6 +2917,8 @@ func _on_products_action(action: String, payload: Dictionary):
 	match action:
 		"status":
 			status_label.text = str(payload.get("text", ""))
+		"open_software":
+			_on_dashboard_navigation(0, "SOFTWARE")
 		"show_product_reviews":
 			# C2 : revoir les tests d'un produit, avec le résumé et le calcul de chaque note.
 			var reviewed := ProductManager.get_product(str(payload.get("product_id", "")))
@@ -4099,6 +4104,7 @@ func _open_cpu_journey(project_id: String = "") -> void:
 	TimeManager.time_scale = 0.0
 	if notification_feed != null: notification_feed.call("clear")
 	cpu_journey.call("open", project_id)
+	UI.upgrade_inputs(cpu_journey)
 	SoundManager.play("open")
 
 func _open_cpu_journey_context(context: String) -> bool:

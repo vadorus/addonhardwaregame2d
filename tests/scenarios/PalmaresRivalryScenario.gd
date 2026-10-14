@@ -158,5 +158,14 @@ static func run(_host: Node) -> String:
 	_advance(12)
 	if not RIVALRY.active_arc().is_empty():
 		return "Rivalry: a new challenge must wait for the cooldown"
+	# 7. Revue des onglets (14/10) : la couronne passe d'un de vos CPU à un autre sans « reconquête » dans la presse.
+	SimulationManager.reset_all("CI Relais", "CPU", "STANDARD")
+	var crowns := PALMARES.state()
+	(crowns["PERF"] as Dictionary).merge({"holder":"PLAYER:A", "holder_company":CompanyManager.company_name, "holder_product":"Ancien", "holder_player":true}, true)
+	var news_before := MediaManager.news.size()
+	PALMARES._update_category("PERF", [{"id":"PLAYER:B", "player":true, "company":CompanyManager.company_name, "product":"Nouveau", "score":80.0},
+		{"id":"RIVAL", "player":false, "company":"Rival", "product":"R", "score":70.0}], crowns)
+	if MediaManager.news.size() != news_before or str((crowns["PERF"] as Dictionary).holder) != "PLAYER:B":
+		return "Palmarès: a handover between your own CPUs was announced as a reconquest"
 	SimulationManager.reset_all("CI Fin palmarès", "CPU", "STANDARD")
 	return ""

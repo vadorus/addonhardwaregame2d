@@ -10,6 +10,7 @@ var pager: Control
 var _lists: Dictionary = {}
 var _last_key := "-"
 var press_board: Control
+var software_board: Control
 
 func _ready() -> void:
 	name = "Presse & médias"
@@ -26,11 +27,16 @@ func _build() -> void:
 	# Revue des onglets (07/10) : la scène de la salle de presse (PressBoard) remplace le titre abstrait.
 	pager = (load("res://ui/SectionPager.gd") as Script).new() as Control
 	box.add_child(pager)
-	for data in [["TESTS", "Tests de vos CPU"], ["BUSINESS", "Business & contrats"], ["ALL", "Tout"]]:
+	for data in [["TESTS", "Tests de vos CPU"], ["SOFTWARE", "Tests de vos logiciels"], ["BUSINESS", "Business & contrats"], ["ALL", "Tout"]]:
 		var page: VBoxContainer = pager.call("add_page", str(data[0]), str(data[1]))
 		if str(data[0]) == "TESTS":
 			press_board = (load("res://ui/components/PressBoard.gd") as Script).new() as Control
 			page.add_child(press_board)
+			continue
+		if str(data[0]) == "SOFTWARE":
+			software_board = (load("res://ui/components/PressBoard.gd") as Script).new() as Control
+			software_board.set("kind", "SOFTWARE")
+			page.add_child(software_board)
 			continue
 		var list := VBoxContainer.new()
 		list.add_theme_constant_override("separation", 8)
@@ -61,6 +67,10 @@ func refresh() -> void:
 	_last_key = key_now
 	if press_board != null and press_board.is_inside_tree():
 		press_board.call("refresh")
+	if software_board != null and software_board.is_inside_tree():
+		software_board.call("refresh")
+	if pager != null:
+		pager.call("set_page_available", "SOFTWARE", not SoftwareManager.products.is_empty())
 	var lines: Array[String] = []
 	for news_value in items:
 		var news: Dictionary = news_value
