@@ -19,6 +19,7 @@
 | D-012 | Durée de vie effective | **Constat confirmé par le propriétaire, 10/10** | Aucune fin obligatoire n'implique pas un contenu infini : **CPU a un plafond de progression** et Software n'a pas encore la profondeur cible. Les défis peuvent renouveler des situations, **pas remplacer de nouvelles mécaniques**. Voir [PROGRESSION-01](PROGRESSION_LIMITES_ET_BRANCHES_2026-10-10.md). |
 | D-013 | Générations technologiques futures | **Intention confirmée ; architecture non définie, réalisation différée** | Distinguer les générations de produits CPU déjà possibles d'un véritable moteur modulaire de générations technologiques. **Ne pas lancer la refonte avant architecture et tests validés.** |
 | D-014 | Ajout ultérieur de branches | **Plan B confirmé, périmètre et calendrier non décidés** | De nouvelles branches pourront étendre la durée de vie **plus tard**, lorsque leur boucle propre est viable. Aucun nouveau secteur n'est autorisé à ouvrir immédiatement. |
+| D-015 | Logiciel 2.0 | **Demande explicite du propriétaire, 14/10** | « La partie logiciel est trop nulle » : refonte validée en entier, dans l'ordre — studio type × public × plateforme, fonctions d'époque, effort en 3 phases, presse du jour J, versions 2 et 3, synergie avec les CPU (plafonnée à +15 % de demande). Voir [rapport SOFT-2](reviews/RETOUR_2026-10-14_SOFT2.md). |
 
 ## Propositions encore ouvertes
 

@@ -104,4 +104,6 @@ Ne jamais combiner plusieurs sujets non liés sous « diverses corrections ». P
 
 | RANK-01 + WORLD-01 | 14/10/2026 | `feat/palmares-rivalite` (Claude) | Palmarès CPU (4 couronnes) et défi « Un titre à défendre » — [rapport](reviews/RETOUR_2026-10-14_RANK01_WORLD01.md) | 38/38 scènes + sonde 24 carrières | **Non testé** | Fusionné dans `v013/demo-octobre` |
 
+| SOFT-2 (Logiciel 2.0) | 14/10/2026 | `feat/logiciel-2` (Claude) | Studio type × public × plateforme, fonctions d'époque, effort en 3 phases, jour J presse, versions 2 et 3, synergie CPU — [rapport](reviews/RETOUR_2026-10-14_SOFT2.md) | Smoke + 34 scènes headless + 2 visuelles (xvfb) ; 2 scènes déjà cassées avant le lot ; sonde 24 carrières inchangée | **Non testé** | Fusionné dans `v013/demo-octobre` |
+
 **Jamais** écrire « PASS » sans commande, sortie et révision ; écrire « non exécuté » si besoin. Les décisions nouvelles se copient également dans [DECISIONS.md](DECISIONS.md).
