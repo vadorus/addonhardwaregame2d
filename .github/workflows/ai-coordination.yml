@@ -1,9 +1,10 @@
+# Trusted copy: default branch master. Product copy alone does not execute.
 name: Multi-agent coordination gate
 
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, edited, ready_for_review]
-    branches: [v013/demo-octobre]
+    branches: [master, v013/demo-octobre]
 
 # Never checkout, build, execute or interpolate code/text supplied by the PR.
 # checks:write is limited to reporting the result on the current PR HEAD.
