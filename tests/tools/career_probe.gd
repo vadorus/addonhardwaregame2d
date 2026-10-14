@@ -17,8 +17,36 @@ const REFRESH_AFTER_MONTHS := 36
 const RETIRE_AFTER_MONTHS := 60
 
 var _profiles
+var _source_commit := "UNKNOWN"
+
+## Ne jamais ecrire un ancien SHA en dur dans les CSV d'une nouvelle campagne.
+## Priorite : injection explicite (CI/outils), puis Git du checkout utilise,
+## puis UNKNOWN si la provenance ne peut pas etre verifiee.
+func _revision_from_git() -> String:
+	for env_key in ["TECH_EMPIRE_GIT_COMMIT", "GITHUB_SHA"]:
+		var supplied := _normalize_revision(OS.get_environment(env_key))
+		if supplied != "":
+			return supplied
+	var stdout: Array = []
+	var status := OS.execute("git", ["-C", ProjectSettings.globalize_path("res://"), "rev-parse", "--verify", "HEAD"], stdout, false)
+	if status == 0 and not stdout.is_empty():
+		var found := _normalize_revision(str(stdout[0]))
+		if found != "":
+			return found
+	return "UNKNOWN"
+
+func _normalize_revision(raw: String) -> String:
+	var value := raw.strip_edges().to_lower()
+	if value.length() != 40:
+		return ""
+	for i in range(value.length()):
+		var ch := value.substr(i, 1)
+		if not "0123456789abcdef".contains(ch):
+			return ""
+	return value
 
 func _ready() -> void:
+	_source_commit = _revision_from_git()
 	_profiles = PROFILES_PROBE.new()
 	var args := OS.get_cmdline_user_args()
 	var seeds := _parse_seeds(str(args[0])) if args.size() > 0 else DEFAULT_SEEDS.duplicate()
@@ -30,7 +58,7 @@ func _ready() -> void:
 	var root := DirAccess.open("res://")
 	if root != null:
 		root.make_dir_recursive("build")
-	print("[C3] commit=eff0871 mode=%s seeds=%s" % [mode, str(seeds)])
+	print("[C3] commit=%s mode=%s seeds=%s" % [_source_commit, mode, str(seeds)])
 	for seed_value in seeds:
 		var seed := int(seed_value)
 		for strategy in STRATEGIES:
@@ -495,7 +523,7 @@ func _write_annual_row(csv: FileAccess, state: Dictionary, year: int, rank: int)
 	var decisions: Array = state.annual_decisions
 	var tech := _latest_player_tech()
 	var row := [
-		"eff0871", str(state.seed), str(state.mode), str(state.strategy), str(year),
+		_source_commit, str(state.seed), str(state.mode), str(state.strategy), str(year),
 		str(Economy.money), str(state.year_revenue), str(state.year_margin), str(state.cumulative_margin),
 		str(rank), str(state.year_lost), str(decisions.size()), _csv_cell(" | ".join(decisions)),
 		_csv_cell(_rivals_ahead()), str(tech.node_nm), _csv_cell(str(tech.architecture))
