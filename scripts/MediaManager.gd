@@ -106,7 +106,7 @@ func publish_product_review(product: Dictionary, segment_scores: Dictionary, ben
 				"source_id":str(outlet.id), "source_name":str(outlet.name), "channel":str(outlet.channel),
 				"product_id":str(product.get("id", "")), "product_name":str(product.get("name", "Produit")),
 				"generation_id":str(product.get("generation_id", "")),
-				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach),
+				"sentiment":sentiment, "review_score":review_score, "reach":float(outlet.reach), "review_style":int(text.get("review_style", -1)),
 				"comparison_previous_name":str(comparison.get("previous_name", "")),
 				"comparison_previous_delta":float(comparison.get("previous_delta", 0.0)),
 				"comparison_rival_name":str(comparison.get("rival_name", "")),
@@ -324,6 +324,9 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	# 29/09 (retour d'Alexandre : « redondant à mort, pas humain ») : chaque média a une plume,
 	# des titres variés selon le ton, une vraie phrase sur la force et la faiblesse, une citation.
 	var pick := absi(hash(product_name + str(outlet.get("id", "")) + str(product.get("id", ""))))
+	# La rotation s'appuie uniquement sur le journal deja sauvegarde.
+	# Aucun tirage aleatoire et aucune modification de la simulation economique.
+	var review_style := _choose_review_style(pick, str(outlet.get("id", "")), str(product.get("id", "")))
 	var titles: Array = HEADLINES.get(tone, HEADLINES["mitigé"])
 	var headline := str(titles[pick % titles.size()]).replace("{p}", product_name).replace("{c}", CompanyManager.company_name)
 	if channel in ["BENCHMARK", "BENCHMARK_SITE"]:
@@ -331,14 +334,20 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	elif channel in ["VIDEO_CREATOR", "STREAMER"]:
 		headline = "[Vidéo] " + headline
 	var openers: Array = OPENERS.get(channel, OPENERS["SPECIALIST_PRESS"])
-	var praise := str(PRAISE.get(best, "sa copie est solide"))
-	var flaw := str(FLAWS.get(worst, "il reste des points à améliorer"))
+	var metric_best := str(REVIEW_METRIC_NAMES.get(best, best))
+	var metric_worst := str(REVIEW_METRIC_NAMES.get(worst, worst))
+	var strongest := snappedf(float(metrics.get(best, 50.0)), 0.1)
+	var weakest := snappedf(float(metrics.get(worst, 50.0)), 0.1)
+	var strong_templates: Array = REVIEW_STRENGTH_FRAMES
+	var reserve_templates: Array = REVIEW_RESERVE_FRAMES
+	var context_templates: Array = REVIEW_CONTEXT_FRAMES
+	var opening := str(openers[(review_style / 8) % openers.size()]).replace("{p}", product_name)
+	var strong := str(strong_templates[(review_style / 24) % strong_templates.size()]).replace("{metric}", metric_best).replace("{value}", "%.1f" % strongest)
+	var reserve := str(reserve_templates[(review_style / 192) % reserve_templates.size()]).replace("{metric}", metric_worst).replace("{value}", "%.1f" % weakest)
+	var context := str(context_templates[review_style % context_templates.size()]).replace("{p}", product_name)
 	var sentences: Array[String] = []
-	sentences.append("%s, %s." % [str(openers[(pick / 3) % openers.size()]).replace("{p}", product_name), praise])
-	if score >= 68.0:
-		sentences.append("Seul bémol : %s." % flaw)
-	else:
-		sentences.append("Mais %s, et ça se sent." % flaw)
+	sentences.append("%s. %s. %s." % [opening, context, strong])
+	sentences.append("%s." % reserve)
 	if bool(comparison.get("has_previous", false)):
 		var previous_delta := float(comparison.get("previous_delta", 0.0))
 		var previous_name := str(comparison.get("previous_name", "la génération précédente"))
@@ -367,10 +376,83 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 			sentences.append("Il joue dans la même cour que %s (%+.1f point)." % [rival_name, rival_delta])
 	if benchmark_total > 1 and channel in ["BENCHMARK", "BENCHMARK_SITE"]:
 		sentences.append("Il %s." % ("prend la tête de notre classement" if benchmark_rank == 1 else "se classe %de sur %d processeurs testés" % [benchmark_rank, benchmark_total]))
-	var quotes: Array = QUOTES.get(tone, QUOTES["mitigé"])
-	sentences.append("« %s » — %s. Note : %.0f/100." % [str(quotes[(pick / 11) % quotes.size()]).replace("{p}", product_name),
+	var editorial: Array = REVIEW_VERDICTS.get(tone, REVIEW_VERDICTS["mitigé"])
+	var verdict := str(editorial[(review_style / 1536) % editorial.size()])
+	sentences.append("« %s » — %s. Note : %.0f/100." % [verdict,
 		str(JOURNALISTS.get(str(outlet.get("id", "")), source)), score])
-	return {"headline":headline, "body":" ".join(sentences)}
+	return {"headline":headline, "body":" ".join(sentences), "review_style":review_style}
+
+## NAR-01 : depuis les 8 derniers articles du meme journal, eviter les rotations identiques.
+## Les articles existants gardent leur texte (news/get_state/load_state inchanges).
+func _choose_review_style(base: int, outlet_id: String, product_id: String) -> int:
+	var style := posmod(base, 12288)
+	var recent: Array[int] = []
+	for news_value in news:
+		var item: Dictionary = news_value
+		if not item.has("review_score") or str(item.get("source_id", "")) != outlet_id:
+			continue
+		# Un meme produit peut etre relu sans modifier sa plume par son propre article.
+		if str(item.get("product_id", "")) == product_id:
+			continue
+		if item.has("review_style"):
+			recent.append(int(item.get("review_style", -1)))
+		if recent.size() >= 8:
+			break
+	for i in range(9):
+		if not recent.has(style):
+			break
+		style = (style + 1) % 12288
+	return style
+
+const REVIEW_METRIC_NAMES := {
+	"performance":"la performance", "efficiency":"l'efficacité énergétique",
+	"reliability":"la fiabilité", "usability":"la facilité d'intégration",
+	"innovation":"l'innovation", "ecosystem":"l'écosystème",
+	"sustainability":"la sobriété"
+}
+## Toutes les propositions utilisent les véritables métriques de simulation.
+const REVIEW_CONTEXT_FRAMES := [
+	"Le bilan de {p} se lit dans ses chiffres",
+	"Les caractéristiques de {p} dessinent un profil net",
+	"Le positionnement technique de {p} mérite une lecture attentive",
+	"Une valeur ressort dans le dossier de {p}",
+	"Sur {p}, les chiffres priment sur les slogans",
+	"Chaque compromis compte dans cette génération de {p}",
+	"Le dossier de {p} révèle ses atouts et ses limites",
+	"Au-delà du nom de {p}, sa fiche raconte une stratégie"
+]
+const REVIEW_STRENGTH_FRAMES := [
+	"Son indicateur dominant est {metric}, avec {value}/100",
+	"Sa meilleure valeur est {metric}, à {value}/100",
+	"L'indicateur le plus haut est {metric} ({value}/100)",
+	"Sur {metric}, le tableau atteint {value}/100, son maximum",
+	"La fiche met {metric} en tête avec {value}/100",
+	"On relève {value}/100 sur {metric}, son premier atout",
+	"La mesure la plus favorable concerne {metric} ({value}/100)",
+	"Avec {value}/100, {metric} reste son score dominant"
+]
+const REVIEW_RESERVE_FRAMES := [
+	"La note la plus faible concerne {metric} ({value}/100)",
+	"En contrepoint, {metric} ne monte qu'à {value}/100",
+	"Le point le moins fort de la fiche est {metric}, à {value}/100",
+	"Reste {metric}, mesurée à {value}/100, en bas des indicateurs",
+	"Il faut aussi regarder {metric} : {value}/100, son minimum",
+	"Le compromis apparaît sur {metric}, à {value}/100",
+	"En retrait par rapport aux autres indicateurs : {metric}, {value}/100",
+	"La contrepartie tient à {metric}, avec {value}/100"
+]
+const REVIEW_VERDICTS := {
+	"enthousiaste":["Le bilan convainc","La combinaison technique impressionne","Un haut niveau d'ensemble","Les résultats parlent d'eux-mêmes",
+		"Une proposition marquante","Cette génération vise haut","Les atouts sont bien présents","Une fiche qui se distingue"],
+	"positif":["Le bilan est favorable","L'ensemble tient la route","Un compromis crédible","Les qualités ressortent",
+		"Une proposition cohérente","La note confirme un bon niveau","Les choix techniques se défendent","Un positionnement solide"],
+	"mitigé":["Le bilan reste partagé","Une proposition avec des compromis","Rien n'est totalement tranché","Une fiche à lire avec nuance",
+		"Les forces ne cachent pas les limites","Des choix discutables","Il faudra choisir ses priorités","Un avis prudent s'impose"],
+	"réservé":["Des réserves subsistent","La note appelle à la prudence","Un bilan sous surveillance","Les faiblesses pèsent",
+		"Il manque encore quelque chose","Le compromis est difficile","Les choix ne convainquent pas entièrement","Une évolution serait bienvenue"],
+	"critique":["Le bilan ne convainc pas","Les insuffisances dominent","Une copie difficile","La note est sévère",
+		"Il faut revoir les priorités","Une proposition peu défendable","Les compromis coûtent cher","Cette génération reste en retrait"]
+}
 
 const JOURNALISTS := {
 	"CIRCUIT_LAB":"Marc Delorme, Circuit Lab", "SYSTEMS_REVIEW":"Hélène Kovac, Systems & Industry Review",
@@ -385,13 +467,13 @@ const HEADLINES := {
 	"critique":["{p} : la douche froide", "{p} déçoit", "{p}, difficile à recommander", "Faux départ pour {c} avec {p}"],
 }
 const OPENERS := {
-	"BENCHMARK":["Sur notre banc de test", "Après une batterie de mesures", "Chronomètre en main"],
-	"BENCHMARK_SITE":["Sur notre banc de test", "Après 40 heures de benchmarks", "Chiffres à l'appui"],
-	"SPECIALIST_PRESS":["Après trois semaines en atelier", "Monté dans nos machines de test", "En usage professionnel"],
-	"GENERAL_PRESS":["Pour le grand public", "Côté utilisateurs", "À l'usage de tous les jours"],
-	"COMMUNITY":["Sur les forums, les premiers acheteurs sont unanimes", "Chez les passionnés", "D'après nos lecteurs"],
-	"VIDEO_CREATOR":["Face caméra", "Dans notre essai vidéo", "Démonté et remonté à l'écran"],
-	"STREAMER":["En direct devant le chat", "Pendant six heures de stream", "Poussé dans ses retranchements en live"],
+	"BENCHMARK":["Sur notre grille de mesure", "Dans notre comparaison", "Côté performances"],
+	"BENCHMARK_SITE":["À travers les résultats publiés", "Dans nos tableaux comparatifs", "Chiffres à l'appui"],
+	"SPECIALIST_PRESS":["Dans le dossier technique", "Pour les usages professionnels", "Sur le papier"],
+	"GENERAL_PRESS":["Pour le grand public", "Côté utilisateurs", "À l'usage quotidien"],
+	"COMMUNITY":["Du point de vue des passionnés", "Dans les discussions techniques", "Pour une communauté exigeante"],
+	"VIDEO_CREATOR":["Face caméra", "Dans notre décryptage", "À l'analyse"],
+	"STREAMER":["Côté diffusion", "Dans cette sélection en direct", "Pour les amateurs de performances"]
 }
 const PRAISE := {
 	"performance":"il avale les calculs sans broncher", "efficiency":"il chauffe à peine et consomme très peu",
