@@ -1,2 +1,2 @@
 Validation du résultat stable de coordination ; aucun code applicatif.
-Ancienne tête : 825073d66442502b208ae6decf5a59781b1ef6ad
+Ancienne tête : 772fbeadc288f9192b74830b9815d58bfe2094fc
