@@ -42,5 +42,14 @@ func refresh() -> void:
 	if lifecycle_panel != null:
 		lifecycle_panel.call("refresh")
 
+func focus_product_launch() -> void:
+	refresh()
+	if lifecycle_panel != null:
+		call_deferred("_focus_product_launch_deferred")
+
+func _focus_product_launch_deferred() -> void:
+	if lifecycle_panel != null:
+		ensure_control_visible(lifecycle_panel)
+
 func _relay_action(action: String, payload: Dictionary) -> void:
 	action_requested.emit(action, payload)

@@ -20,9 +20,9 @@ var reputation := {
 }
 
 var policies := {
-	"marketing_budget": 1500,
-	"support_budget": 1000,
-	"environment_budget": 500,
+	"marketing_budget": 0,
+	"support_budget": 0,
+	"environment_budget": 0,
 	"support_level": "STANDARD"
 }
 
@@ -39,7 +39,7 @@ var subsidiaries: Array = []
 var brands: Array = []
 var alerts: Array = []
 
-func reset(name: String, sector: String, capital: int = 500_000):
+func reset(name: String, sector: String, capital: int = 100_000):
 	company_name = name.strip_edges() if not name.strip_edges().is_empty() else "Nova Technologies"
 	starting_sector = sector if GameData.is_sector_active(sector) else "CPU"
 	founded_year = TimeManager.year
@@ -48,7 +48,7 @@ func reset(name: String, sector: String, capital: int = 500_000):
 		"innovation":50.0,"reliability":50.0,"value":50.0,"support":50.0,
 		"sustainability":50.0,"prestige":35.0,"professional":45.0
 	}
-	policies = {"marketing_budget":1500,"support_budget":1000,"environment_budget":500,"support_level":"STANDARD"}
+	policies = {"marketing_budget":0,"support_budget":0,"environment_budget":0,"support_level":"STANDARD"}
 	departments = {
 		"R&D":{"leader_id":"","autonomy":"SUPERVISED","cohesion":35.0},
 		"Développement":{"leader_id":"","autonomy":"SUPERVISED","cohesion":32.0},
@@ -63,13 +63,48 @@ func reset(name: String, sector: String, capital: int = 500_000):
 	Economy.reset(capital)
 	company_changed.emit()
 
+func monthly_infrastructure_cost() -> int:
+	# Le lieu de travail porte déjà son propre loyer/entretien dans ExecutiveManager.
+	# Ici on ne facture que l'infrastructure administrative/technique qui apparaît
+	# réellement avec la croissance de l'entreprise.
+	match int(ExecutiveManager.workplace.get("tier", 0)):
+		0: return 0
+		1: return 1200
+		2: return 4200
+		_: return 11000
+
+func has_customer_operations() -> bool:
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED":
+			return true
+	return not AfterSalesManager.get_open_cases().is_empty()
+
+func estimated_policy_monthly_cost() -> int:
+	var total := int(policies.get("marketing_budget", 0)) + int(policies.get("environment_budget", 0))
+	if has_customer_operations():
+		total += int(policies.get("support_budget", 0))
+	return total
+
 func process_month():
-	Economy.add_expense(7500, "Bureaux et infrastructure")
-	Economy.add_expense(int(policies.marketing_budget), "Marketing")
-	Economy.add_expense(int(policies.support_budget), "SAV / support")
-	Economy.add_expense(int(policies.environment_budget), "Environnement")
-	var env_gain: float = clampf(float(policies.environment_budget) / 12000.0, 0.0, 1.5)
-	change_reputation({"sustainability": env_gain * 0.7})
+	var infrastructure := monthly_infrastructure_cost()
+	if infrastructure > 0:
+		Economy.add_expense(infrastructure, "Bureaux et infrastructure")
+
+	var marketing := int(policies.get("marketing_budget", 0))
+	if marketing > 0:
+		Economy.add_expense(marketing, "Marketing")
+
+	# Aucun SAV structurel avant d'avoir de vrais clients ou un dossier terrain.
+	var support := int(policies.get("support_budget", 0))
+	if support > 0 and has_customer_operations():
+		Economy.add_expense(support, "SAV / support")
+
+	var environment := int(policies.get("environment_budget", 0))
+	if environment > 0:
+		Economy.add_expense(environment, "Environnement")
+		var env_gain: float = clampf(float(environment) / 12000.0, 0.0, 1.5)
+		change_reputation({"sustainability": env_gain * 0.7})
 
 func change_reputation(changes: Dictionary):
 	for key in changes:
@@ -163,9 +198,9 @@ func load_state(state: Dictionary):
 	var saved_policies = state.get("policies", {})
 	if typeof(saved_policies) == TYPE_DICTIONARY:
 		var migrated_policies := _validated_policies(
-			int(saved_policies.get("marketing_budget", policies.get("marketing_budget", 6000))),
-			int(saved_policies.get("support_budget", policies.get("support_budget", 5000))),
-			int(saved_policies.get("environment_budget", policies.get("environment_budget", 2500))),
+			int(saved_policies.get("marketing_budget", policies.get("marketing_budget", 0))),
+			int(saved_policies.get("support_budget", policies.get("support_budget", 0))),
+			int(saved_policies.get("environment_budget", policies.get("environment_budget", 0))),
 			str(saved_policies.get("support_level", policies.get("support_level", "STANDARD")))
 		)
 		if not migrated_policies.is_empty():

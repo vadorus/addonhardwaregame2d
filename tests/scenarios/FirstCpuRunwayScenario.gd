@@ -24,6 +24,26 @@ static func run() -> String:
 	}
 
 	SimulationManager.reset_all("CI Runway", "CPU", "STANDARD")
+	if PersonnelManager.staff.size() > 3:
+		_restore(snapshot)
+		return "Garage start created a structured-company headcount instead of a founding team"
+	if int(CompanyManager.policies.get("marketing_budget", -1)) != 0 or int(CompanyManager.policies.get("support_budget", -1)) != 0:
+		_restore(snapshot)
+		return "Garage start still pays marketing or support before having a product"
+	if ExecutiveManager.monthly_benefit_cost() != 0:
+		_restore(snapshot)
+		return "Garage start still applies employee benefits before the player chooses them"
+	if BalanceManager.starting_capital() < 60000 or BalanceManager.starting_capital() > 150000:
+		_restore(snapshot)
+		return "Garage start no longer represents believable personal savings"
+	var garage_burn := BalanceManager.projected_starting_monthly_burn()
+	if garage_burn > 5000:
+		_restore(snapshot)
+		return "Garage structural burn is still implausibly high"
+	var first_cpu_burn := BalanceManager.projected_first_cpu_monthly_burn(45000)
+	if first_cpu_burn > 9000:
+		_restore(snapshot)
+		return "First internal CPU still double-counts payroll through the development budget"
 	var design := CPU_DESIGN.default_design()
 	var sourcing := GameData.sourcing_profile("INTERNAL")
 	var estimate := ResearchManager.estimate_cpu_development(design, "INTERNAL", 45000, sourcing)
@@ -77,9 +97,9 @@ static func run() -> String:
 	if abs(actual_months - estimated_months) > 2:
 		_restore(snapshot)
 		return "Displayed first CPU duration diverges by more than two months from the real simulation"
-	if Economy.money < 100000:
+	if Economy.money < 30000:
 		_restore(snapshot)
-		return "Standard first CPU reaches industrialization with too little reserve for a meaningful production choice"
+		return "Standard first CPU reaches industrialization with too little reserve to finance a small outsourced pilot run"
 
 	var job: Dictionary = ProductionManager.jobs[0]
 	if bool(job.get("route_selected", false)) or bool(job.get("route_committed", false)):

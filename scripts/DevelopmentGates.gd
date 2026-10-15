@@ -6,16 +6,16 @@ const VALIDATION_REVIEW := "VALIDATION_REVIEW"
 static func build_prototype_review(project: Dictionary, report: Dictionary, month: int, year: int) -> Dictionary:
 	var weakness := str(report.get("weakness", "reliability"))
 	var confidence := float(report.get("confidence", 50.0))
-	var monthly_budget := maxi(int(project.get("monthly_budget", 42000)), 1)
-	var correction_cost := maxi(6000, int(round(float(monthly_budget) * 0.30)))
-	var balance_cost := maxi(3000, int(round(float(monthly_budget) * 0.15)))
+	var monthly_cash_cost := maxi(int(project.get("monthly_cash_cost", 1200)), 500)
+	var correction_cost := maxi(1200, int(round(float(monthly_cash_cost) * 1.50)))
+	var balance_cost := maxi(700, int(round(float(monthly_cash_cost) * 0.75)))
 	return {
 		"id":PROTOTYPE_REVIEW,
 		"type":PROTOTYPE_REVIEW,
 		"category":"PROTOTYPE",
 		"kicker":"ARBITRAGE PROTOTYPE",
 		"severity":82.0,
-		"expense_label":"Revue prototype",
+		"expense_label":"Développement — revue prototype",
 		"title":"Revue du prototype — %s" % str(project.get("name", "CPU")),
 		"text":"Le premier prototype fonctionne, mais l'équipe signale %s comme point faible. Confiance actuelle : %.0f%%. Le développement est en pause jusqu'à votre décision." % [GameData.metric_label(weakness), confidence],
 		"recommendation":"Corriger, rééquilibrer ou pousser les performances changera réellement la suite du projet.",
@@ -51,9 +51,9 @@ static func build_prototype_review(project: Dictionary, report: Dictionary, mont
 static func build_validation_review(project: Dictionary, report: Dictionary, metrics: Dictionary, design_estimate: Dictionary, month: int, year: int) -> Dictionary:
 	var weakness := _weakest_metric(metrics)
 	var confidence := float(report.get("confidence", project.get("estimate_confidence", 50.0)))
-	var monthly_budget := maxi(int(project.get("monthly_budget", 42000)), 1)
-	var correction_cost := maxi(7000, int(round(float(monthly_budget) * 0.35)))
-	var hardening_cost := maxi(4000, int(round(float(monthly_budget) * 0.20)))
+	var monthly_cash_cost := maxi(int(project.get("monthly_cash_cost", 1200)), 500)
+	var correction_cost := maxi(1500, int(round(float(monthly_cash_cost) * 1.75)))
+	var hardening_cost := maxi(1000, int(round(float(monthly_cash_cost) * 1.00)))
 	var design: Dictionary = project.get("cpu_design", {})
 	var tdp := int(design.get("tdp_w", 0))
 	var unit_cost := int(round(float(design_estimate.get("unit_cost", 0.0))))
@@ -64,7 +64,7 @@ static func build_validation_review(project: Dictionary, report: Dictionary, met
 		"category":"VALIDATION",
 		"kicker":"REVUE FINALE CPU",
 		"severity":88.0,
-		"expense_label":"Validation finale",
+		"expense_label":"Développement — validation finale",
 		"title":"Validation finale — %s" % str(project.get("name", "CPU")),
 		"text":"Mesures finales : performance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100. TDP cible %d W • coût technique estimé ~%d € • risque de conception %.0f/100. Point le plus faible : %s. Ces mesures seront figées avant le passage en industrialisation." % [
 			float(metrics.get("performance", 0.0)),

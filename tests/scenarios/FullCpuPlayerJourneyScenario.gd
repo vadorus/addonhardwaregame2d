@@ -151,13 +151,24 @@ static func _configure_and_finish_industrialization(job: Dictionary, max_months:
 		return "could not choose balanced binning strategy"
 	if not ProductionManager.set_manufacturing_route(job_id, "EXTERNAL", ""):
 		return "no external foundry route could be explicitly selected"
+	var starting_cash := Economy.money
+	var quote := ProductionManager.manufacturing_route_quote(job_id)
 	for _month in range(max_months):
 		if str(job.get("status", "")) == "COMPLETED":
 			return ""
 		SimulationManager.process_month_end()
 		if SimulationManager.is_game_over or Economy.money <= 0:
-			return "bankruptcy before industrialization completed"
-	return "industrialization did not finish within %d months" % max_months
+			return "bankruptcy before industrialization completed (start cash %d, job month %d, progress %.1f, base monthly %d, setup %d, cash %d)" % [
+				starting_cash,
+				int(job.get("months_spent", 0)),
+				float(job.get("progress", 0.0)),
+				int(job.get("monthly_cost", 0)),
+				int(quote.get("setup_fee", 0)),
+				Economy.money
+			]
+	return "industrialization did not finish within %d months (start cash %d, progress %.1f, base monthly %d)" % [
+		max_months, starting_cash, float(job.get("progress", 0.0)), int(job.get("monthly_cost", 0))
+	]
 
 static func _choose_launch_product() -> Dictionary:
 	for product_value in ProductManager.products:

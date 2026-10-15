@@ -342,9 +342,14 @@ func _refresh_launch_intel() -> void:
 		])
 		var chosen_capacity := int(product_capacity.value)
 		var expected_units := int(forecast.get("expected_units", 0))
+		var launch_capacity_cost := ProductManager.launch_capacity_commitment_cost(candidate, chosen_capacity)
+		var monthly_capacity_cost := ProductManager.monthly_capacity_reservation_cost(candidate, mini(expected_units, chosen_capacity))
 		lines.append("Capacité choisie : %s unités/mois%s" % [
 			UI.money(chosen_capacity),
 			" • ⚠ inférieure à la demande centrale estimée" if expected_units > chosen_capacity else ""
+		])
+		lines.append("Engagement capacité au lancement : ~%s € • réservation mensuelle estimée : ~%s €" % [
+			UI.money(launch_capacity_cost), UI.money(monthly_capacity_cost)
 		])
 		lines.append(str(forecast.get("value_signal", "")))
 		lines.append(str(forecast.get("trust_signal", "")))

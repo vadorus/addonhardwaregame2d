@@ -38,6 +38,24 @@ static func run(host: Node) -> String:
 		return "First CPU workshop does not use two columns on tablet/desktop layouts"
 
 	workshop.call("select_brief", "INDUSTRIAL")
+	if int(workshop.call("advisor_detail_level")) != 0:
+		workshop.queue_free()
+		return "First-generation CPU advice exposes expert precision before the company has product experience"
+	var novice_advice := str(workshop.call("advisor_text"))
+	if not novice_advice.contains("Confiance faible") or not novice_advice.contains("Premier produit"):
+		workshop.queue_free()
+		return "First-generation CPU advice does not communicate uncertainty and lack of field experience"
+
+	var division_snapshot := DivisionManager.get_state()
+	if DivisionManager.divisions.has("CPU"):
+		DivisionManager.divisions["CPU"]["generation_count"] = 1
+	workshop.call("_refresh_preview")
+	if int(workshop.call("advisor_detail_level")) < 1 or not str(workshop.call("advisor_text")).contains("MHz"):
+		DivisionManager.load_state(division_snapshot)
+		workshop.queue_free()
+		return "CPU advice did not become more precise after a completed generation"
+	DivisionManager.load_state(division_snapshot)
+
 	var industrial: Dictionary = workshop.call("current_spec")
 	if str(industrial.get("segment", "")) != "INDUSTRIAL" or str(industrial.get("focus", "")) != "RELIABILITY":
 		workshop.queue_free()

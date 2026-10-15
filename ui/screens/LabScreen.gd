@@ -814,6 +814,18 @@ func _on_project_decision_pressed(option_index: int) -> void:
 		"choice_id":str(option.get("id", ""))
 	})
 
+
+func focus_project_decision() -> void:
+	refresh_research_content()
+	if project_decision_card == null or not project_decision_card.visible:
+		return
+	call_deferred("_focus_project_decision_deferred")
+
+func _focus_project_decision_deferred() -> void:
+	if project_decision_card == null or not project_decision_card.visible:
+		return
+	ensure_control_visible(project_decision_card)
+
 func _emit_action(action: String, payload: Variant = null) -> void:
 	action_requested.emit(action, payload)
 

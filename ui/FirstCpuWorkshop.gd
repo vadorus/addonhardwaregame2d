@@ -6,6 +6,7 @@ signal cancel_requested
 
 const UI := preload("res://ui/UiKit.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CPU_ADVICE := preload("res://scripts/CpuAdvice.gd")
 
 const BRIEFS := [
 	{
@@ -55,9 +56,11 @@ const BRIEFS := [
 ]
 
 var _panel: PanelContainer
+var _guide_card: PanelContainer
 var _choice_view: VBoxContainer
 var _config_view: VBoxContainer
 var _brief_grid: GridContainer
+var _config_columns: GridContainer
 var _selected_brief: Dictionary = {}
 var _selected_key := ""
 
@@ -65,14 +68,17 @@ var _brief_title: Label
 var _name_edit: LineEdit
 var _preset_select: OptionButton
 var _budget: SpinBox
+var _budget_cost_label: Label
 var _cores: HSlider
 var _frequency: HSlider
 var _cache: HSlider
+var _cache_field_root: Control
 var _tdp: HSlider
 var _cores_value: Label
 var _frequency_value: Label
 var _cache_value: Label
 var _tdp_value: Label
+var _advisor_label: Label
 var _preview_label: Label
 var _error_label: Label
 
@@ -114,7 +120,8 @@ func _build() -> void:
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shell.add_child(brand)
 
-	var guide_card := UI.card(UI.APP_CYAN_DARK, 12, 10)
+	_guide_card = UI.card(UI.APP_CYAN_DARK, 12, 10)
+	var guide_card := _guide_card
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 10)
 	guide_card.add_child(guide_row)
@@ -182,29 +189,80 @@ func _build() -> void:
 	_brief_title = UI.label("Premier CPU", 23)
 	_brief_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(_brief_title)
-	var config_intro := UI.muted_label("Gardons seulement les choix qui changent vraiment ce premier projet. Les systèmes avancés resteront disponibles plus tard — ou immédiatement via Réglages avancés.", 12)
+	var config_intro := UI.muted_label("Les réglages restent ouverts : ce qui évolue avec la R&D et l'expérience, c'est surtout ce que l'équipe sait estimer, expliquer et recommander. Les systèmes avancés restent accessibles via Réglages avancés.", 12)
 	config_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	config_intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_config_view.add_child(config_intro)
+
+	_config_columns = GridContainer.new()
+	_config_columns.columns = 2
+	_config_columns.add_theme_constant_override("h_separation", 14)
+	_config_columns.add_theme_constant_override("v_separation", 10)
+	_config_view.add_child(_config_columns)
+
+	var left_column := VBoxContainer.new()
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.add_theme_constant_override("separation", 9)
+	_config_columns.add_child(left_column)
+
+	var right_column := VBoxContainer.new()
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_theme_constant_override("separation", 9)
+	_config_columns.add_child(right_column)
+
+	var action_hint := UI.muted_label("Quand le compromis vous convient, lancez le projet. Vous pourrez encore apprendre et corriger pendant le développement.", 12)
+	action_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right_column.add_child(action_hint)
+
+	var actions := HFlowContainer.new()
+	actions.add_theme_constant_override("h_separation", 8)
+	actions.add_theme_constant_override("v_separation", 8)
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_child(actions)
+
+	var launch := Button.new()
+	launch.text = "Lancer ce CPU"
+	launch.custom_minimum_size = Vector2(190, 44)
+	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
+	actions.add_child(launch)
+
+	var advanced := Button.new()
+	advanced.text = "Réglages avancés"
+	advanced.custom_minimum_size = Vector2(170, 44)
+	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
+	actions.add_child(advanced)
+
+	var back := Button.new()
+	back.text = "Changer d'objectif"
+	back.custom_minimum_size = Vector2(170, 44)
+	back.pressed.connect(_show_choices)
+	actions.add_child(back)
+
+	var garage := Button.new()
+	garage.text = "Retour au garage"
+	garage.custom_minimum_size = Vector2(170, 44)
+	garage.pressed.connect(func(): cancel_requested.emit())
+	actions.add_child(garage)
+
 
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "Nom du premier CPU"
 	_name_edit.text = "Nova 1"
 	_name_edit.custom_minimum_size.y = 44
-	_config_view.add_child(_field("Nom du CPU", _name_edit))
+	left_column.add_child(_field("Nom du CPU", _name_edit))
 
 	_preset_select = OptionButton.new()
 	for data in [["Économe","EFFICIENT"],["Équilibré","BALANCED"],["Performance","PERFORMANCE"]]:
 		_preset_select.add_item(str(data[0]))
 		_preset_select.set_item_metadata(_preset_select.item_count - 1, str(data[1]))
 	_preset_select.item_selected.connect(func(_i): _apply_selected_preset())
-	_config_view.add_child(_field("Orientation de l'architecture", _preset_select))
+	left_column.add_child(_field("Orientation de l'architecture", _preset_select))
 
 	var tech_grid := GridContainer.new()
 	tech_grid.columns = 2
 	tech_grid.add_theme_constant_override("h_separation", 14)
 	tech_grid.add_theme_constant_override("v_separation", 8)
-	_config_view.add_child(tech_grid)
+	left_column.add_child(tech_grid)
 
 	var cores_field := _slider_field("Nombre de cœurs", 1.0, 4.0, 1.0, 1.0)
 	_cores = cores_field.slider
@@ -219,6 +277,7 @@ func _build() -> void:
 	var cache_field := _slider_field("Cache intégré", 0.0, 32.0, 1.0, 0.0)
 	_cache = cache_field.slider
 	_cache_value = cache_field.value_label
+	_cache_field_root = cache_field.root
 	tech_grid.add_child(cache_field.root)
 
 	var tdp_field := _slider_field("Enveloppe thermique", 1.0, 25.0, 1.0, 2.0)
@@ -233,52 +292,37 @@ func _build() -> void:
 	_budget.value = 45000
 	_budget.custom_minimum_size.y = 42
 	_budget.value_changed.connect(func(_v): _refresh_preview())
-	_config_view.add_child(_field("Budget mensuel de développement", _budget))
+	left_column.add_child(_field("Intensité R&D mensuelle (référence)", _budget))
+	_budget_cost_label = UI.muted_label("", 12)
+	_budget_cost_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	left_column.add_child(_budget_cost_label)
 
 	var node_label := UI.muted_label("Procédé disponible : 10 µm. Les procédés plus fins apparaîtront avec votre savoir-faire.", 12)
 	node_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_config_view.add_child(node_label)
+	left_column.add_child(node_label)
+
+	var advisor_panel := UI.card(UI.APP_AMBER_DARK, 12, 10)
+	var advisor_box := VBoxContainer.new()
+	advisor_box.add_theme_constant_override("separation", 4)
+	advisor_panel.add_child(advisor_box)
+	advisor_box.add_child(UI.eyebrow("AVIS DE L'ÉQUIPE"))
+	_advisor_label = UI.muted_label("", 12)
+	_advisor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	advisor_box.add_child(_advisor_label)
+	right_column.add_child(advisor_panel)
 
 	var preview_panel := UI.card(UI.APP_CYAN_DARK, 12, 12)
 	_preview_label = UI.muted_label("", 13)
 	_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_panel.add_child(_preview_label)
-	_config_view.add_child(preview_panel)
+	right_column.add_child(preview_panel)
 
 	_error_label = UI.label("", 12)
 	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_error_label.add_theme_color_override("font_color", UI.APP_RED)
 	_error_label.visible = false
-	_config_view.add_child(_error_label)
+	right_column.add_child(_error_label)
 
-	var actions := HFlowContainer.new()
-	actions.add_theme_constant_override("h_separation", 8)
-	actions.add_theme_constant_override("v_separation", 8)
-	_config_view.add_child(actions)
-
-	var launch := Button.new()
-	launch.text = "Lancer ce CPU"
-	launch.custom_minimum_size = Vector2(190, 48)
-	launch.pressed.connect(func(): launch_requested.emit(current_spec()))
-	actions.add_child(launch)
-
-	var advanced := Button.new()
-	advanced.text = "Réglages avancés"
-	advanced.custom_minimum_size.y = 48
-	advanced.pressed.connect(func(): advanced_requested.emit(current_spec()))
-	actions.add_child(advanced)
-
-	var back := Button.new()
-	back.text = "Changer d'objectif"
-	back.custom_minimum_size.y = 48
-	back.pressed.connect(_show_choices)
-	actions.add_child(back)
-
-	var garage := Button.new()
-	garage.text = "Retour au garage"
-	garage.custom_minimum_size.y = 48
-	garage.pressed.connect(func(): cancel_requested.emit())
-	actions.add_child(garage)
 
 	set_viewport_width(1280.0)
 
@@ -300,6 +344,8 @@ func select_brief(key: String) -> void:
 		_selected_key = key
 		_choice_view.visible = false
 		_config_view.visible = true
+		if _guide_card != null:
+			_guide_card.visible = false
 		_brief_title.text = "%s — %s" % [str(brief.get("title", "Premier CPU")), str(brief.get("subtitle", ""))]
 		_select_meta(_preset_select, str(brief.get("preset", "BALANCED")))
 		_budget.value = int(brief.get("budget", 45000))
@@ -312,6 +358,8 @@ func _show_choices() -> void:
 	_selected_key = ""
 	_choice_view.visible = true
 	_config_view.visible = false
+	if _guide_card != null:
+		_guide_card.visible = true
 	if _error_label != null:
 		_error_label.visible = false
 
@@ -342,11 +390,21 @@ func get_brief_count() -> int:
 func selected_brief_key() -> String:
 	return _selected_key
 
+func advisor_text() -> String:
+	return _advisor_label.text if _advisor_label != null else ""
+
+func advisor_detail_level() -> int:
+	var focus := str(_selected_brief.get("focus", "BALANCED")) if not _selected_brief.is_empty() else "BALANCED"
+	return CPU_ADVICE.detail_level(focus)
+
 func set_viewport_width(width: float) -> void:
 	if _panel != null:
-		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, 760.0)
+		var max_width := 1080.0 if width >= 1000.0 else 760.0
+		_panel.custom_minimum_size.x = clampf(width - 32.0, 300.0, max_width)
 	if _brief_grid != null:
 		_brief_grid.columns = 1 if width < 760.0 else 2
+	if _config_columns != null:
+		_config_columns.columns = 1 if width < 1000.0 else 2
 
 func _apply_selected_preset() -> void:
 	if _preset_select == null or _preset_select.item_count == 0:
@@ -379,21 +437,103 @@ func _refresh_preview() -> void:
 		int(_budget.value),
 		GameData.sourcing_profile("INTERNAL")
 	)
-	_preview_label.text = "Nora et l'équipe anticipent :\n%s • %s • %s • %d W\nPerformance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100\nDéveloppement ~%d mois • programme ~%s € • coût technique ~%s €/unité\nCible : %s • priorité : %s" % [
-		"%d cœur(s)" % int(design.get("cores", 1)),
-		CPU_DESIGN.format_frequency(design),
-		CPU_DESIGN.format_cache(design),
-		int(design.get("tdp_w", 2)),
-		float(evaluation.get("performance", 0.0)),
-		float(evaluation.get("efficiency", 0.0)),
-		float(evaluation.get("reliability", 0.0)),
-		int(estimate.get("months", 0)),
-		UI.money(int(estimate.get("program_cost", 0))),
-		UI.money(int(evaluation.get("unit_cost", 0))),
-		MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
-		str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
-	]
+	if _budget_cost_label != null:
+		var garage_cash_cost := ResearchManager.quoted_development_monthly_cost(
+			"INTERNAL",
+			int(_budget.value),
+			GameData.sourcing_profile("INTERNAL")
+		)
+		_budget_cost_label.text = "Sortie de caisse estimée au garage : ~%s €/mois pour prototypes, composants et essais (hors rémunération de l'équipe et local)." % UI.money(garage_cash_cost)
+
+	var advice := CPU_ADVICE.advice(design, evaluation, str(_selected_brief.get("focus", "BALANCED")))
+	var detail_level := int(advice.get("level", 0))
+	if _cache_field_root != null:
+		_cache_field_root.visible = detail_level >= 1
+	if _advisor_label != null:
+		var focus := str(_selected_brief.get("focus", "BALANCED"))
+		_advisor_label.text = "%s : « %s »\nConfiance %s. %s\n%s\n%s" % [
+			str(advice.get("speaker", "Équipe CPU")),
+			str(advice.get("text", "")),
+			str(advice.get("confidence", "faible")),
+			str(advice.get("detail", "")),
+			CPU_ADVICE.knowledge_summary(focus),
+			str(advice.get("path", ""))
+		]
+
+	var metric_text := ""
+	var timing_text := ""
+	if detail_level <= 0:
+		metric_text = "Performance %s • efficacité %s • fiabilité %s" % [
+			_qualitative_metric(float(evaluation.get("performance", 0.0))),
+			_qualitative_metric(float(evaluation.get("efficiency", 0.0))),
+			_qualitative_metric(float(evaluation.get("reliability", 0.0)))
+		]
+		var months := int(estimate.get("months", 0))
+		var program_cost := int(estimate.get("program_cost", 0))
+		timing_text = "Développement probablement %d–%d mois • budget programme ~%s–%s €" % [
+			maxi(months - 2, 1),
+			months + 3,
+			UI.money(int(round(float(program_cost) * 0.78))),
+			UI.money(int(round(float(program_cost) * 1.28)))
+		]
+	elif detail_level == 1:
+		metric_text = "Performance ~%.0f • efficacité ~%.0f • fiabilité ~%.0f" % [
+			round(float(evaluation.get("performance", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("efficiency", 0.0)) / 5.0) * 5.0,
+			round(float(evaluation.get("reliability", 0.0)) / 5.0) * 5.0
+		]
+		var months := int(estimate.get("months", 0))
+		timing_text = "Développement ~%d–%d mois • programme ~%s €" % [
+			maxi(months - 1, 1),
+			months + 1,
+			UI.money(int(estimate.get("program_cost", 0)))
+		]
+	else:
+		metric_text = "Performance %.0f/100 • efficacité %.0f/100 • fiabilité %.0f/100" % [
+			float(evaluation.get("performance", 0.0)),
+			float(evaluation.get("efficiency", 0.0)),
+			float(evaluation.get("reliability", 0.0))
+		]
+		timing_text = "Développement ~%d mois • programme ~%s € • coût technique ~%s €/unité" % [
+			int(estimate.get("months", 0)),
+			UI.money(int(estimate.get("program_cost", 0))),
+			UI.money(int(evaluation.get("unit_cost", 0)))
+		]
+
+	if detail_level <= 0:
+		_preview_label.text = "Estimation large : %s\nDélai probable %s • cible : %s • priorité : %s" % [
+			metric_text,
+			timing_text.replace("Développement probablement ", ""),
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
+			str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
+		]
+	elif detail_level == 1:
+		_preview_label.text = "Estimation : %s\n%s • cible : %s" % [
+			metric_text,
+			timing_text,
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED")))
+		]
+	else:
+		_preview_label.text = "Estimation actuelle :\n%s • %s • %s • %d W\n%s\n%s\nCible : %s • priorité : %s" % [
+			"%d cœur(s)" % int(design.get("cores", 1)),
+			CPU_DESIGN.format_frequency(design),
+			CPU_DESIGN.format_cache(design),
+			int(design.get("tdp_w", 2)),
+			metric_text,
+			timing_text,
+			MarketManager.segment_label(str(_selected_brief.get("segment", "EMBEDDED"))),
+			str(GameData.FOCUS_OPTIONS.get(str(_selected_brief.get("focus", "BALANCED")), {}).get("label", "Équilibré"))
+		]
 	_update_slider_labels()
+
+func _qualitative_metric(value: float) -> String:
+	if value >= 72.0:
+		return "élevée"
+	if value >= 55.0:
+		return "correcte"
+	if value >= 42.0:
+		return "incertaine"
+	return "faible"
 
 func _update_slider_labels() -> void:
 	if _cores_value != null:
@@ -418,6 +558,9 @@ func _slider_field(title: String, min_value: float, max_value: float, step: floa
 	value_label.add_theme_color_override("font_color", UI.APP_CYAN)
 	row.add_child(value_label)
 	var slider := HSlider.new()
+	# Sur mobile paysage, un glissement vertical commencé sur une jauge doit
+	# pouvoir remonter jusqu'au ScrollContainer au lieu de bloquer la page.
+	slider.mouse_filter = Control.MOUSE_FILTER_PASS
 	slider.min_value = min_value
 	slider.max_value = max_value
 	slider.step = step

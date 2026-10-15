@@ -30,6 +30,8 @@ Documents de référence : `DESIGN_BIBLE.md`, `CPU_VERTICAL_SLICE.md` et `UX_ART
 
 Objectif : prouver une boucle de jeu complète, pas seulement un écran de conception.
 
+> **État V0.6 :** un scénario automatisé traverse désormais la première génération CPU jusqu'à l'industrialisation, la gamme, la commercialisation, les ventes, le terrain/SAV et la génération suivante. Le playtest Android a aussi validé le départ à 100 000 € et un premier mois de garage à 4 452 € de dépenses. Les cases ci-dessous restent la checklist de finition produit : « présent dans le moteur » ne signifie pas encore « suffisamment profond, équilibré et poli ».
+
 - [ ] Création de l'entreprise.
 - [ ] Trésorerie et coûts fixes.
 - [ ] Marché CPU de départ.

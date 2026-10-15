@@ -18,7 +18,7 @@ const EXTERNAL_FOUNDRY_TEMPLATES := {
 		"reliability":88.0,
 		"dependency":42.0,
 		"confidentiality":70.0,
-		"setup_fee":12000,
+		"setup_fee":3500,
 		"research_rate":0.42
 	},
 	"EUROSILICON": {
@@ -32,7 +32,7 @@ const EXTERNAL_FOUNDRY_TEMPLATES := {
 		"reliability":95.0,
 		"dependency":31.0,
 		"confidentiality":86.0,
-		"setup_fee":18000,
+		"setup_fee":5500,
 		"research_rate":0.34
 	},
 	"RAPIDFAB": {
@@ -46,7 +46,7 @@ const EXTERNAL_FOUNDRY_TEMPLATES := {
 		"reliability":81.0,
 		"dependency":56.0,
 		"confidentiality":56.0,
-		"setup_fee":9000,
+		"setup_fee":2500,
 		"research_rate":0.52
 	}
 }
@@ -279,7 +279,11 @@ func route_quote(mode: String, foundry_id: String, node_nm: int) -> Dictionary:
 		"mode":"EXTERNAL",
 		"provider_id":foundry_id,
 		"provider_name":str(p.name),
-		"setup_fee":int(p.setup_fee),
+		"setup_fee":int(round(float(p.setup_fee) * lerpf(
+			1.0,
+			6.0,
+			pow(clampf((float(CPU_DESIGN.node_profile(node_nm).get("difficulty", 0.65)) - 0.65) / 0.73, 0.0, 1.0), 1.25)
+		))),
 		"cost_factor":float(p.cost_factor),
 		"speed_factor":float(p.speed_factor),
 		"quality_delta":(float(p.precision) - 50.0) * 0.09 * float(p.quality_factor),

@@ -4,7 +4,7 @@
 
 ## Statut
 
-**Projet actif — prototype V0.2.8 sous Godot 4.7.2.**
+**Projet actif — prototype V0.6 « room-first » sous Godot 4.7.2.**
 
 La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub lance Godot 4.7.2 en mode headless à chaque push / Pull Request pour vérifier l'import du projet, le chargement de la scène principale et un smoke test de simulation.
 
@@ -14,6 +14,7 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 - cible Windows / PC + Android ;
 - temps avec pause et vitesses x1/x2/x3 ;
 - économie mensuelle et rapports de clôture ;
+- départ 1971 dans un garage avec capital personnel crédible (Standard : 100 000 €), petite équipe fondatrice et charges progressives ;
 - création d'entreprise avec division CPU active ;
 - socle générique de divisions, maturité et progression par génération ;
 - conseil d’architecture CPU : plans prudent, équilibré et audacieux calculés par l’équipe ;
@@ -38,7 +39,7 @@ La vraie source Godot est maintenant versionnée dans ce dépôt. Une CI GitHub 
 
 La vertical slice est volontairement limitée à la branche **CPU**. Les autres secteurs restent paramétrés dans les données afin de préparer les futures extensions, mais ils sont affichés comme « à venir », désactivés dans l’interface et refusés par le moteur de R&D. Ils ne doivent pas être développés avant que la boucle CPU soit profonde, équilibrée et amusante.
 
-L’interface V0.2.8 propose un véritable laboratoire CPU : le joueur définit son brief, demande trois plans générationnels à l’équipe, choisit une recommandation puis peut encore régler les cœurs, la fréquence, le cache, la finesse de gravure et le TDP. Une architecture terminée devient ensuite une famille de trois références aux performances, coûts, rendements, capacités et clientèles distincts. Le QG réutilise le design choisi dans son aperçu graphique.
+L’interface V0.6 démarre désormais dans le garage et révèle les fonctions lorsqu’elles deviennent utiles. Le joueur choisit d’abord l’intention de son premier CPU, peut ensuite personnaliser sa conception, suivre son développement, arbitrer prototype/validation puis passer à l’industrialisation et au marché. Une architecture terminée devient une famille de références aux performances, coûts, rendements, capacités et clientèles distincts. Le QG isométrique sert de point d’entrée spatial vers ces décisions et évolue avec l’entreprise.
 
 ## Vision
 
@@ -98,7 +99,9 @@ La CI ne remplace pas les tests de gameplay visuels sur Windows / Android, mais 
 - [`docs/UX_ART_DIRECTION.md`](docs/UX_ART_DIRECTION.md) — interface chaleureuse et progression des bureaux ;
 - [`docs/AI_IMMERSION.md`](docs/AI_IMMERSION.md) — architecture IA / immersion ;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — ordre de développement ;
-- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — contenu du prototype actuel ;
+- [`docs/V06_PLAYTEST_ECONOMY.md`](docs/V06_PLAYTEST_ECONOMY.md) — économie garage V0.6, chiffres de playtest, garde-fous et état de validation ;
+- [`docs/AUDIT_CLAUDE_V06_2026-09-25_R2.md`](docs/AUDIT_CLAUDE_V06_2026-09-25_R2.md) — seconde passe d’audit Claude et résolution des blocants économie/viabilité ;
+- [`docs/PROTOTYPE_V02.md`](docs/PROTOTYPE_V02.md) — historique du prototype V0.2 ;
 - [`docs/IMPORT_FROM_PC.md`](docs/IMPORT_FROM_PC.md) — historique / procédure d'import du projet local.
 
 ## Organisation actuelle

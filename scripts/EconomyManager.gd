@@ -4,14 +4,14 @@ signal money_changed(amount)
 signal month_closed(report)
 signal transaction_recorded(kind, category, amount)
 
-var money: int = 500_000
+var money: int = 100_000
 var monthly_income: int = 0
 var monthly_expenses: int = 0
 var income_breakdown: Dictionary = {}
 var expense_breakdown: Dictionary = {}
 var history: Array = []
 
-func reset(starting_capital: int = 500_000):
+func reset(starting_capital: int = 100_000):
 	money = starting_capital
 	monthly_income = 0
 	monthly_expenses = 0
@@ -74,7 +74,7 @@ func get_state() -> Dictionary:
 	}
 
 func load_state(state: Dictionary):
-	money = int(state.get("money", 500000))
+	money = int(state.get("money", 100000))
 	monthly_income = int(state.get("monthly_income", 0))
 	monthly_expenses = int(state.get("monthly_expenses", 0))
 	income_breakdown = state.get("income_breakdown", {}).duplicate(true)

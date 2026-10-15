@@ -8,7 +8,7 @@ const PROFILES := {
 	"ACCESSIBLE":{
 		"label":"Accessible",
 		"description":"Simulation complète, avec davantage de marge financière et des entreprises concurrentes moins réactives et plus imparfaites.",
-		"starting_capital":1650000,
+		"starting_capital":150000,
 		"operating_cost":0.88,
 		"salary_cost":0.92,
 		"research_cost":0.88,
@@ -25,7 +25,7 @@ const PROFILES := {
 	"STANDARD":{
 		"label":"Standard",
 		"description":"Équilibre de référence : entreprises autonomes cohérentes, réactives sans être omniscientes.",
-		"starting_capital":1450000,
+		"starting_capital":100000,
 		"operating_cost":1.00,
 		"salary_cost":1.00,
 		"research_cost":1.00,
@@ -42,11 +42,11 @@ const PROFILES := {
 	"REALISTIC":{
 		"label":"Réaliste",
 		"description":"Simulation exigeante : dirigeants concurrents plus réactifs et plus précis, sans bonus techniques ni argent magique.",
-		"starting_capital":1400000,
-		"operating_cost":1.10,
-		"salary_cost":1.08,
-		"research_cost":1.12,
-		"industrial_cost":1.12,
+		"starting_capital":95000,
+		"operating_cost":1.04,
+		"salary_cost":1.03,
+		"research_cost":1.02,
+		"industrial_cost":1.03,
 		"market_demand":0.92,
 		"competitor_pressure":1.00,
 		"ai_decision_quality":0.90,
@@ -78,7 +78,7 @@ func profile_description(profile_key: String = "") -> String:
 	return str(profile_data(profile_key).get("description", ""))
 
 func starting_capital() -> int:
-	return int(profile_data().get("starting_capital", 500000))
+	return int(profile_data().get("starting_capital", 100000))
 
 func expense_amount(base_amount: int, category: String) -> int:
 	if base_amount <= 0:
@@ -133,16 +133,20 @@ func company_ai_profile(profile_key: String = "") -> Dictionary:
 	}
 
 func first_generation_runway_target() -> float:
-	return float(profile_data().get("first_generation_runway_target", 7.5))
+	return float(profile_data().get("first_generation_runway_target", 15.0))
 
 func projected_starting_monthly_burn() -> int:
-	# Au garage, la recherche continue n'est facturée que si le joueur affecte réellement des chercheurs.
-	var company_base := expense_amount(7500 + 1500 + 1000 + 500, "Bureaux et infrastructure")
-	var payroll_base := expense_amount(32800, "Salaires")
-	return company_base + payroll_base
+	# Projection du vrai stade garage, sans inventer de bureaux, marketing ou SAV.
+	var result := PersonnelManager.monthly_payroll_cost()
+	result += expense_amount(CompanyManager.monthly_infrastructure_cost(), "Bureaux et infrastructure")
+	result += expense_amount(ExecutiveManager.monthly_workplace_cost(), "Entretien / locaux")
+	result += expense_amount(ExecutiveManager.monthly_benefit_cost(), "Avantages salariés")
+	result += expense_amount(CompanyManager.estimated_policy_monthly_cost(), "Frais entreprise")
+	return result
 
 func projected_first_cpu_monthly_burn(monthly_budget: int = 45000) -> int:
-	return projected_starting_monthly_burn() + expense_amount(maxi(monthly_budget, 10000), "Développement — premier CPU")
+	var sourcing := GameData.sourcing_profile("INTERNAL")
+	return projected_starting_monthly_burn() + ResearchManager.quoted_development_monthly_cost("INTERNAL", monthly_budget, sourcing)
 
 func starting_runway_months() -> float:
 	return float(starting_capital()) / maxf(float(projected_starting_monthly_burn()), 1.0)

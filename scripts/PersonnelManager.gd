@@ -6,6 +6,7 @@ signal candidate_changed(candidate)
 var staff: Array = []
 var candidate: Dictionary = {}
 var _next_id := 1
+var founding_stage_open := true
 var rng := RandomNumberGenerator.new()
 
 const FIRST_NAMES := ["Lina","Maya","Sofia","Emma","Nora","Lucas","Hugo","Adam","Noah","Eliott","Inès","Yanis"]
@@ -17,23 +18,22 @@ func _ready():
 func reset(starting_sector: String):
 	staff = []
 	_next_id = 1
+	founding_stage_open = true
 	var spec := str(GameData.SECTORS.get(starting_sector, {}).get("specialization", "cpu"))
-	_add_employee("Camille Durand", "CTO / responsable R&D", "R&D", 72, 8.0, spec, 68, 6200)
-	_add_employee("Alex Moreau", "Ingénieur senior", "R&D", 67, 6.0, spec, 38, 4700)
-	_add_employee("Samira Lefèvre", "Responsable développement CPU", "Développement", 64, 4.0, "product", 58, 4400)
-	_add_employee("Noah Leroy", "Ingénieur validation CPU", "Développement", 59, 3.0, "validation", 35, 3700)
-	_add_employee("Thomas Girard", "Responsable production", "Production", 63, 7.0, "manufacturing", 72, 5100)
-	_add_employee("Julie Fontaine", "Responsable marketing", "Marketing", 58, 6.0, "marketing", 70, 4600)
-	_add_employee("Mehdi Colin", "Responsable support", "Support", 57, 5.0, "support", 65, 4100)
+	# Stade garage : le fondateur travaille avec un noyau technique réduit.
+	# Production, marketing et support seront de vraies embauches de croissance.
+	_add_employee("Camille Durand", "Cofondatrice technique / R&D", "R&D", 72, 8.0, spec, 68, 3400, {}, true)
+	_add_employee("Samira Lefèvre", "Cofondatrice développement CPU", "Développement", 64, 4.0, "product", 58, 3200, {}, true)
+	_add_employee("Noah Leroy", "Associé validation CPU", "Développement", 59, 3.0, "validation", 35, 2600, {}, true)
 	CompanyManager.set_department_leader("R&D", str(staff[0].id))
-	CompanyManager.set_department_leader("Développement", str(staff[2].id))
-	CompanyManager.set_department_leader("Production", str(staff[4].id))
-	CompanyManager.set_department_leader("Marketing", str(staff[5].id))
-	CompanyManager.set_department_leader("Support", str(staff[6].id))
+	CompanyManager.set_department_leader("Développement", str(staff[1].id))
+	CompanyManager.set_department_leader("Production", "")
+	CompanyManager.set_department_leader("Marketing", "")
+	CompanyManager.set_department_leader("Support", "")
 	generate_candidate("R&D")
 	staff_changed.emit()
 
-func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}):
+func _add_employee(full_name: String, role: String, department: String, skill: int, experience: float, specialization: String, leadership: int, salary: int, profile: Dictionary = {}, founding_member: bool = false):
 	var resolved_profile := profile.duplicate(true)
 	if resolved_profile.is_empty():
 		resolved_profile = _generate_profile(department, specialization, skill, experience)
@@ -43,7 +43,7 @@ func _add_employee(full_name: String, role: String, department: String, skill: i
 		"skill":skill,"aptitude":clampi(skill + rng.randi_range(-8, 8), 35, 95),
 		"experience_years":experience,"specialization":specialization,
 		"domain_experience":{specialization: experience},"leadership":leadership,
-		"salary":salary,"morale":75.0,"profile":resolved_profile
+		"salary":salary,"morale":75.0,"profile":resolved_profile,"founding_member":founding_member
 	}
 	_next_id += 1
 	staff.append(emp)
@@ -142,10 +142,46 @@ func team_attribute(department: String, attribute: String) -> float:
 		return 35.0
 	return clampf(total / float(count), 0.0, 100.0)
 
-func process_month(active_departments: Array):
-	var payroll := 0
+func _refresh_founding_stage() -> void:
+	if not founding_stage_open:
+		return
+	if int(ExecutiveManager.workplace.get("tier", 0)) > 0:
+		founding_stage_open = false
+		return
+	for product_value in ProductManager.products:
+		var product: Dictionary = product_value
+		if str(product.get("status", "")) == "LAUNCHED":
+			founding_stage_open = false
+			return
+
+func founding_stage_active() -> bool:
+	_refresh_founding_stage()
+	return founding_stage_open
+
+func employee_monthly_pay(emp: Dictionary) -> int:
+	var salary := int(emp.get("salary", 0))
+	if bool(emp.get("founding_member", false)) and founding_stage_active():
+		# Les fondateurs vivent sur une indemnité minimale et reportent une partie
+		# de leur rémunération tant que l'entreprise travaille encore dans le garage.
+		return maxi(400, int(round(float(salary) * 0.25)))
+	return salary
+
+func monthly_payroll_cost() -> int:
+	var base := 0
 	for emp in staff:
-		payroll += int(emp.salary)
+		base += employee_monthly_pay(emp)
+	return BalanceManager.expense_amount(base, "Salaires")
+
+func process_month(active_departments: Array):
+	_refresh_founding_stage()
+	var founder_payroll_base := 0
+	var employee_payroll_base := 0
+	for emp in staff:
+		var pay := employee_monthly_pay(emp)
+		if bool(emp.get("founding_member", false)) and founding_stage_active():
+			founder_payroll_base += pay
+		else:
+			employee_payroll_base += pay
 		var dept := str(emp.department)
 		if active_departments.has(dept):
 			emp.experience_years = float(emp.experience_years) + (1.0 / 12.0)
@@ -154,7 +190,10 @@ func process_month(active_departments: Array):
 			emp.morale = clampf(float(emp.morale) + 0.2, 0.0, 100.0)
 		else:
 			emp.morale = clampf(float(emp.morale) - 0.05, 0.0, 100.0)
-	Economy.add_expense(payroll, "Salaires")
+	if founder_payroll_base > 0:
+		Economy.add_expense(founder_payroll_base, "Salaires — équipe fondatrice")
+	if employee_payroll_base > 0:
+		Economy.add_expense(employee_payroll_base, "Salaires")
 	for dept in CompanyManager.departments:
 		if active_departments.has(dept):
 			CompanyManager.departments[dept].cohesion = clampf(float(CompanyManager.departments[dept].cohesion) + 0.6, 0.0, 100.0)
@@ -296,12 +335,15 @@ func move_employee(employee_id: String, department: String):
 			return
 
 func get_state() -> Dictionary:
-	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
+	return {"staff":staff,"candidate":candidate,"next_id":_next_id,"founding_stage_open":founding_stage_open,"rng_seed":SaveCodec.int64_to_json(rng.seed),"rng_state":SaveCodec.int64_to_json(rng.state)}
 
 func load_state(state: Dictionary):
 	staff = state.get("staff", []).duplicate(true)
+	founding_stage_open = bool(state.get("founding_stage_open", true))
 	var migrated_development_leader := ""
 	for emp in staff:
+		if not emp.has("founding_member"):
+			emp["founding_member"] = str(emp.get("name", "")) in ["Camille Durand", "Samira Lefèvre", "Noah Leroy"]
 		if not emp.has("profile") or typeof(emp.get("profile", {})) != TYPE_DICTIONARY:
 			emp["profile"] = _legacy_profile(emp)
 		if str(emp.get("department", "")) == "R&D" and str(emp.get("specialization", "")) == "product":
@@ -315,4 +357,5 @@ func load_state(state: Dictionary):
 	_next_id = int(state.get("next_id", 1))
 	rng.seed = SaveCodec.int64_from_json(state.get("rng_seed", "1947"), 1947)
 	rng.state = SaveCodec.int64_from_json(state.get("rng_state", SaveCodec.int64_to_json(rng.state)), rng.state)
+	_refresh_founding_stage()
 	staff_changed.emit()

@@ -62,26 +62,6 @@ static func run(host: Node) -> String:
 	var heading: Control = dashboard.get("dashboard_heading")
 	var management_grid: GridContainer = dashboard.get("dashboard_grid")
 	var garage: Control = dashboard.get("dashboard_garage")
-	var nora_guide: Control = dashboard.get("dashboard_nora_guide")
-	if nora_guide == null or not nora_guide.visible:
-		game.queue_free()
-		_restore(snapshot)
-		return "V0.5 entry: Nora guide is not visibly present in the opening garage"
-	var nora_message: Label = nora_guide.get("_message_label")
-	var nora_team: Label = nora_guide.get("_team_label")
-	var nora_action: Button = nora_guide.get("_action_button")
-	if nora_message == null or not nora_message.text.contains("bras droit"):
-		game.queue_free()
-		_restore(snapshot)
-		return "V0.5 entry: Nora is visible but her guide role is not explained"
-	if nora_team == null or not nora_team.text.contains("R&D = recherche") or not nora_team.text.contains("Développement = transforme"):
-		game.queue_free()
-		_restore(snapshot)
-		return "V0.5 entry: Nora guide does not explain R&D versus Development"
-	if nora_action == null or nora_action.text != "Aller à l'établi CPU":
-		game.queue_free()
-		_restore(snapshot)
-		return "V0.5 entry: Nora guide does not expose the first useful action"
 	if heading == null or heading.visible or management_grid == null or management_grid.visible:
 		game.queue_free()
 		_restore(snapshot)
@@ -89,7 +69,15 @@ static func run(host: Node) -> String:
 	if garage == null or int(garage.call("visible_zone_count")) != 1:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: opening garage should expose only the CPU workbench"
+		return "V0.6 room-first entry should expose only the CPU workbench"
+	if bool(garage.call("zone_buttons_have_visible_text")):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.6 room-first entry still overlays text buttons on the room"
+	if not bool(garage.call("open_zone_menu", "Établi CPU")):
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.6 room-first entry did not open a contextual workbench menu"
 	if str(garage.get("_onboarding_stage")) != "FIRST_IDEA":
 		game.queue_free()
 		_restore(snapshot)
@@ -137,14 +125,24 @@ static func run(host: Node) -> String:
 		_restore(snapshot)
 		return "V0.5 entry: simulation did not start when the first CPU entered development"
 
+	if nav_panel.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.6 room-first entry shows management tabs while the player is still in the room"
+	if heading.visible or management_grid.visible:
+		game.queue_free()
+		_restore(snapshot)
+		return "V0.6 room-first entry restored the old dashboard around the room"
+	game.call("_show_tab", 3)
 	if not nav_panel.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: management navigation did not appear after the first project started"
-	if not heading.visible or not management_grid.visible:
+		return "V0.6 detailed screens do not restore navigation back to the room"
+	game.call("_show_tab", 0)
+	if nav_panel.visible:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: full HQ did not appear after the first project started"
+		return "V0.6 navigation did not disappear again after returning to the room"
 	if int(garage.call("visible_zone_count")) < 3:
 		game.queue_free()
 		_restore(snapshot)

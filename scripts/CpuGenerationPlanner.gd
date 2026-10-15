@@ -202,9 +202,11 @@ static func _build_proposal(profile: Dictionary, generation_index: int, design: 
 		float(evaluation.get("complexity", 50.0))
 	) / maxf(float(profile.duration_factor), 0.25)
 	var estimated_months := DEVELOPMENT_ESTIMATOR.estimated_months_from_progress(progress_per_month, int(context.get("phase_count", 6)))
-	var prototype_cost := int(float(evaluation.unit_cost) * (120.0 + float(evaluation.complexity) * 3.0))
-	var monthly_program_cost := BalanceManager.expense_amount(int(float(monthly_budget) * approach_cost), "Développement — plan CPU")
-	var program_cost := int(float(estimated_months * monthly_program_cost)) + prototype_cost
+	var cash_factor := clampf(float(context.get("development_cash_factor", 1.0)), 0.01, 2.0)
+	var sourcing_monthly_factor := maxf(float(context.get("sourcing_monthly_cost_factor", 1.0)), 0.05)
+	var monthly_program_base := maxi(500, int(round(float(monthly_budget) * approach_cost * cash_factor * sourcing_monthly_factor)))
+	var monthly_program_cost := BalanceManager.expense_amount(monthly_program_base, "Développement — plan CPU")
+	var program_cost := int(float(estimated_months * monthly_program_cost))
 
 	var capability_gap := maxf(float(evaluation.complexity) - capability, 0.0)
 	var risk := float(evaluation.risk) + float(profile.risk_delta) + capability_gap * 0.28

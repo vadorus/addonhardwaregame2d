@@ -381,6 +381,29 @@ func price_score(product: Dictionary, segment: String = "") -> float:
 	var ratio: float = float(product.get("price", 1)) / maxf(reference, 1.0)
 	return clampf(118.0 - ratio * 58.0, 5.0, 100.0)
 
+func price_demand_multiplier(product: Dictionary, segment: String = "") -> float:
+	# Le score de prix mesure l'attractivité, mais ne suffit pas à modéliser
+	# l'élasticité réelle. Un produit à 3–5x le prix du marché doit perdre
+	# presque toute sa demande, même s'il est techniquement excellent.
+	var target := normalize_segment(segment if segment != "" else str(product.get("target_segment", default_segment())))
+	var reference := maxf(segment_reference_price(target, str(product.get("sector", "CPU"))), 1.0)
+	var ratio := float(product.get("price", 1)) / reference
+	if ratio <= 0.75:
+		return 1.12
+	if ratio <= 1.0:
+		return lerpf(1.08, 1.0, (ratio - 0.75) / 0.25)
+	if ratio <= 1.25:
+		return lerpf(1.0, 0.72, (ratio - 1.0) / 0.25)
+	if ratio <= 1.50:
+		return lerpf(0.72, 0.38, (ratio - 1.25) / 0.25)
+	if ratio <= 2.0:
+		return lerpf(0.38, 0.10, (ratio - 1.50) / 0.50)
+	if ratio <= 3.0:
+		return lerpf(0.10, 0.015, ratio - 2.0)
+	if ratio <= 5.0:
+		return lerpf(0.015, 0.001, (ratio - 3.0) / 2.0)
+	return 0.0005
+
 func evaluate_product(product: Dictionary, segment: String) -> float:
 	var target := normalize_segment(segment)
 	var weights: Dictionary = GameData.SEGMENTS[target].weights
@@ -514,13 +537,19 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		competitor_count += 1
 	competitor_avg /= maxf(float(competitor_count), 1.0)
 	var awareness := CompanyManager.get_awareness_bonus()
-	var share: float = clampf(0.07 + (score - competitor_avg) * 0.008 + awareness * 0.38, 0.005, 0.46)
-	var units := int(float(market_units) * share)
+	# Une jeune marque ne récupère plus automatiquement 7 % du marché.
+	# L'avantage produit et la notoriété peuvent construire la part de marché,
+	# tandis que le prix applique ensuite une vraie élasticité sur les unités.
+	var raw_share: float = clampf(0.012 + (score - competitor_avg) * 0.0025 + awareness * 0.20, 0.0005, 0.28)
+	var price_multiplier := price_demand_multiplier(product, target)
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier)))
+	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
 	return {
 		"units":units,"score":score,"raw_score":raw_score,"age_penalty":age_penalty,
 		"lifecycle":product_lifecycle_label(product),"competitor_avg":competitor_avg,"share":share,
+		"raw_share":raw_share,"price_demand_multiplier":price_multiplier,
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units

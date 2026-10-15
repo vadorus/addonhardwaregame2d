@@ -402,8 +402,12 @@ func _complete_job(job: Dictionary):
 
 func _base_monthly_cost(node_nm: int, complexity: float) -> int:
 	var node_profile: Dictionary = CPU_DESIGN.node_profile(node_nm)
-	var node_factor := clampf(0.78 + (float(node_profile.get("difficulty", 0.65)) - 0.65) * 0.72, 0.78, 1.35)
-	return maxi(9000, int(round((12000.0 + complexity * 165.0) * node_factor)))
+	var difficulty := float(node_profile.get("difficulty", 0.65))
+	# Une petite série en 1971 ne doit pas coûter comme une industrialisation moderne.
+	# Le coût monte fortement avec la finesse du procédé et la complexité.
+	var tech_progress := clampf((difficulty - 0.65) / 0.73, 0.0, 1.0)
+	var technology_factor := lerpf(1.0, 8.0, pow(tech_progress, 1.35))
+	return maxi(2500, int(round((1800.0 + complexity * 30.0) * technology_factor)))
 
 func _default_process_mastery() -> Dictionary:
 	var result := {}
