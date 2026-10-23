@@ -327,14 +327,25 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	var review_style := _choose_review_style(pick, str(outlet.get("id", "")), str(product.get("id", "")))
 	var titles: Array = HEADLINES.get(tone, HEADLINES["mitigé"])
 	var headline := str(titles[pick % titles.size()]).replace("{p}", product_name).replace("{c}", CompanyManager.company_name)
-	if channel in ["BENCHMARK", "BENCHMARK_SITE"]:
-		headline = "Banc d'essai — " + headline
+	var is_benchmark := channel in ["BENCHMARK", "BENCHMARK_SITE"]
+	if is_benchmark:
+		if benchmark_total > 0:
+			var rank_label := "1er" if benchmark_rank == 1 else "%de" % benchmark_rank
+			headline = "Banc d'essai — %s (%s sur %d)" % [headline, rank_label, benchmark_total]
+		else:
+			headline = "Banc d'essai — " + headline
 	elif channel in ["VIDEO_CREATOR", "STREAMER"]:
 		headline = "[Vidéo] " + headline
 	var openers: Array = OPENERS.get(channel, OPENERS["SPECIALIST_PRESS"])
 	var scenes: Array = REVIEW_SCENES.get(channel, REVIEW_SCENES["SPECIALIST_PRESS"])
 	var intro := str(openers[review_style % openers.size()]).replace("{p}", product_name)
 	var scene := str(scenes[(review_style / 7) % scenes.size()]).replace("{p}", product_name)
+	# Éviter les reprises involontaires entre amorce et situation (parties, direct, chronomètre...).
+	for offset in range(scenes.size()):
+		var candidate := str(scenes[((review_style / 7) + offset) % scenes.size()]).replace("{p}", product_name)
+		if not _press_scene_overlap(intro, candidate):
+			scene = candidate
+			break
 	var praise_options: Array = [str(PRAISE.get(best, "sa copie est solide"))]
 	praise_options.append_array(PRAISE_EXTRA.get(best, []))
 	var flaw_options: Array = [str(FLAWS.get(worst, "il reste des points à améliorer"))]
@@ -347,9 +358,15 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	sentences.append("%s, %s." % [intro, scene])
 	# La meilleure métrique peut elle-même être faible ; éviter alors un éloge trompeur.
 	if float(metrics.get(best, 50.0)) >= 60.0:
-		sentences.append("%s, %s." % [transition, praise])
+		if score < 68.0:
+			sentences.append("Certes, %s." % praise)
+		else:
+			sentences.append("%s, %s." % [transition, praise])
 	else:
-		sentences.append("%s, sa meilleure qualité reste %s, sans pour autant faire des étincelles." % [transition, str(REVIEW_METRIC_NAMES.get(best, best))])
+		if score < 68.0:
+			sentences.append("Certes, sa meilleure qualité reste %s, sans pour autant faire des étincelles." % str(REVIEW_METRIC_NAMES.get(best, best)))
+		else:
+			sentences.append("%s, sa meilleure qualité reste %s, sans pour autant faire des étincelles." % [transition, str(REVIEW_METRIC_NAMES.get(best, best))])
 	# La réserve est relative aux autres qualités : rester mesuré si tout est bon.
 	if float(metrics.get(worst, 50.0)) >= 75.0:
 		flaw = "même ses points les moins forts laissent encore une marge de progrès"
@@ -370,6 +387,11 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 			sentences.append("Face à %s, on dirait surtout un nouveau costume sur la même puce." % previous_name)
 		else:
 			sentences.append("Depuis %s, le progrès avance à petits pas, pas à grandes enjambées." % previous_name)
+		if is_benchmark:
+			# Chiffres utiles au joueur uniquement dans la presse de mesure ; virgule française.
+			sentences.append("Écart avec %s : %s points au benchmark." % [previous_name, ("%+.1f" % previous_delta).replace(".", ",")])
+			if comparison.has("previous_age"):
+				sentences.append("%s a été lancé il y a %d mois." % [previous_name, maxi(int(comparison.get("previous_age", 0)), 0)])
 		if int(comparison.get("previous_age", 99)) < PRESS_TOO_SOON_MONTHS:
 			sentences.append("Cette relève arrive déjà, alors que %s vient à peine de trouver sa place." % previous_name)
 	elif bool(comparison.get("has_rival", false)) and not (comparison.get("rival_metrics", {}) as Dictionary).is_empty():
@@ -386,14 +408,45 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 			sentences.append("%s garde le dernier mot : la marche reste haute." % rival_name)
 		else:
 			sentences.append("Avec %s, le match reste serré, sans vainqueur évident." % rival_name)
-	if benchmark_total > 1 and channel in ["BENCHMARK", "BENCHMARK_SITE"]:
-		sentences.append("Notre classement le place %s." % ("en tête" if benchmark_rank == 1 else "dans le peloton"))
+		if is_benchmark:
+			sentences.append("Écart avec %s : %s points au benchmark." % [rival_name, ("%+.1f" % rival_delta).replace(".", ",")])
+	if benchmark_total > 0:
+		if is_benchmark:
+			var rank_label := "1er" if benchmark_rank == 1 else "%de" % benchmark_rank
+			if benchmark_rank == benchmark_total and benchmark_total > 1:
+				sentences.append("Notre classement : %s sur %d, en queue de classement." % [rank_label, benchmark_total])
+			elif benchmark_rank == 1:
+				sentences.append("Notre classement : %s sur %d, en tête." % [rank_label, benchmark_total])
+			else:
+				sentences.append("Notre classement : %s sur %d, dans le groupe intermédiaire." % [rank_label, benchmark_total])
+		elif benchmark_total > 1:
+			if benchmark_rank == benchmark_total:
+				sentences.append("Face aux autres modèles, il termine en queue de classement.")
+			elif benchmark_rank == 1:
+				sentences.append("Face aux autres modèles, il prend la tête du classement.")
+			else:
+				sentences.append("Face aux autres modèles, il se situe au milieu du classement.")
 	var quotes: Array = QUOTES.get(tone, QUOTES["mitigé"])
 	var quote := str(quotes[(review_style / 101) % quotes.size()]).replace("{p}", product_name)
-	# Une seule valeur chiffrée par article, la note arrondie. Ni décimales, ni chiffres
-	# de comparaison qui feraient croire à des mesures journalistiques supplémentaires.
+	# Note entière partout ; seules les deux plumes de benchmark détaillent les
+	# écarts, l'âge de l'ancien modèle et le rang pour éclairer les décisions du joueur.
 	sentences.append("« %s » — %s. Note : %d/100." % [quote, str(JOURNALISTS.get(str(outlet.get("id", "")), source)), roundi(score)])
 	return {"headline":headline, "body":" ".join(sentences), "review_style":review_style}
+
+## Les ouvertures et scènes restent des morceaux rédigés à la main : on écarte
+## les recoupements de mots saillants (chronomètre, parties, direct, atelier...).
+func _press_scene_overlap(opener: String, scene: String) -> bool:
+	var lead := opener.to_lower()
+	var detail := scene.to_lower()
+	for mark in [",", ".", ";", ":", "!", "?", "(", ")", "«", "»", "—", "'", "’"]:
+		lead = lead.replace(mark, " ")
+		detail = detail.replace(mark, " ")
+	var common := ["dans", "avec", "pour", "cette", "notre", "leur", "sans", "nous", "plus", "après", "quand"]
+	var words := detail.split(" ", false)
+	for token in lead.split(" ", false):
+		if token.length() >= 4 and not common.has(token) and words.has(token):
+			return true
+	return false
 
 ## NAR-01 : depuis les 8 derniers articles du meme journal, eviter les rotations identiques.
 ## Les articles existants gardent leur texte (news/get_state/load_state inchanges).
@@ -433,7 +486,7 @@ const REVIEW_SCENES := {
 		"la moindre attente compte pour {p} dans ce duel de machines",
 		"{p} a droit à son passage sous les projecteurs du labo",
 		"nos graphiques prennent vie autour de {p}",
-		"on imagine {p} au milieu d'une journée de travail chargée",
+		"{p} traverse une journée de travail chargée sans quitter le banc d'essai",
 		"{p} se taille une place dans la bataille des processeurs"
 	],
 	"BENCHMARK_SITE":[
@@ -449,58 +502,58 @@ const REVIEW_SCENES := {
 	],
 	"SPECIALIST_PRESS":[
 		"{p} vise les longues journées des bureaux d'études",
-		"on projette {p} au cœur d'un atelier qui tourne sans pause",
+		"{p} a tourné au cœur de notre atelier sans interruption",
 		"{p} doit convaincre des équipes qui détestent les interruptions",
-		"on regarde ce que {p} apporterait à une salle de production",
-		"{p} rêve de s'imposer sur les postes de travail",
+		"{p} a affronté nos tâches de production les plus tenaces",
+		"{p} s'est frotté à nos postes de travail",
 		"la promesse de {p} se joue dans la continuité du service",
-		"les administrateurs auront l'œil sur {p}",
-		"{p} veut faire ses preuves au milieu des outils métier",
+		"les administrateurs examinent les résultats de {p}",
+		"{p} fait ses preuves au contact des outils métier",
 		"on mesure l'intérêt de {p} pour les parcs informatiques"
 	],
 	"GENERAL_PRESS":[
 		"{p} débarque dans la vie de tous les jours",
-		"on imagine {p} dans l'ordinateur familial",
-		"{p} aimerait se faire une place sur le bureau du salon",
+		"{p} prend place dans notre ordinateur familial d'essai",
+		"{p} fait tourner nos applications sur le bureau du salon",
 		"les usages quotidiens donnent leur vrai sens à {p}",
 		"avec {p}, la promesse doit être simple à comprendre",
-		"{p} doit séduire au-delà des passionnés de composants",
-		"on se demande si {p} change vraiment le quotidien",
-		"{p} cherche son public bien loin des laboratoires",
+		"{p} a aussi été mis à l'épreuve hors des laboratoires",
+		"{p} montre ce qu'il change au quotidien",
+		"{p} passe des laboratoires aux usages de tous les jours",
 		"la question avec {p} reste celle du confort d'utilisation"
 	],
 	"COMMUNITY":[
 		"{p} anime déjà les discussions entre passionnés",
-		"on imagine {p} au centre d'un montage maison",
+		"{p} a rejoint notre montage maison",
 		"{p} soulève les questions qui reviennent sur les forums",
 		"la fiche de {p} nourrit autant d'espoirs que de questions",
-		"{p} sera comparé aux composants que chacun connaît",
-		"sur un PC assemblé à la main, {p} doit faire sa place",
+		"{p} a été confronté aux composants déjà connus",
+		"{p} a pris place dans un PC assemblé à la main",
 		"{p} aiguise la curiosité des bricoleurs",
 		"les lecteurs décortiquent les compromis de {p}",
 		"{p} fait parler ceux qui comptent chaque euro"
 	],
 	"VIDEO_CREATOR":[
 		"la caméra suit {p} jusque dans les entrailles du PC",
-		"on imagine {p} sur la table du prochain montage",
+		"{p} est passé sur la table de montage",
 		"{p} passe à la loupe du vidéaste",
 		"le plan serré sur {p} ne cache pas ses compromis",
 		"le public découvre {p} entre deux séquences de montage",
-		"{p} veut tenir le rythme d'une vidéo de démonstration",
+		"{p} a tenu le rythme de notre démonstration filmée",
 		"on raconte {p} sans noyer l'écran sous les graphiques",
-		"{p} devient le sujet du prochain décryptage",
+		"{p} a passé l'épreuve de notre décryptage filmé",
 		"le face-à-face avec {p} se joue aussi dans le prix"
 	],
 	"STREAMER":[
-		"{p} entre dans une soirée de jeu imaginée avec le chat",
-		"on se demande si {p} suivrait le rythme d'une partie tendue",
+		"{p} tourne pendant une vraie séance de jeu suivie par le chat",
+		"{p} a traversé une partie tendue devant les spectateurs",
 		"{p} se retrouve au cœur du débat en direct",
 		"sur le live, {p} déclenche la question que tout le monde pose",
-		"{p} promet une session fluide, encore faut-il convaincre",
+		"{p} a subi les changements de rythme de notre session",
 		"le chat hésite sur la place à donner à {p}",
 		"{p} s'invite entre jeu, capture et diffusion",
-		"on évoque {p} pendant une pause entre deux parties",
-		"les joueurs se demandent ce que {p} changerait vraiment"
+		"le verdict de {p} tombe lors de la pause de jeu",
+		"les joueurs voient ce que {p} change dans la partie"
 	]
 }
 const REVIEW_TRANSITIONS := [

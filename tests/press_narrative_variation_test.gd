@@ -15,6 +15,8 @@ func _ready() -> void:
 	var second: Dictionary = _run_corpus(false)
 	if second.is_empty():
 		return
+	if not _comparison_cases():
+		return
 	if first.get("bodies", []) != second.get("bodies", []):
 		_fail("La meme graine, les memes faits et le meme historique ne reproduisent pas les memes articles")
 		return
@@ -62,17 +64,27 @@ func _run_corpus(log_articles: bool) -> Dictionary:
 				if headline.is_empty() or body.is_empty():
 					_fail("Titre ou corps vide : " + outlet_id + "/" + tone)
 					return {}
-				if lower.contains("indicateur") or body.contains(".0/100"):
-					_fail("Formule de fiche technique interdite : " + body)
+				if lower.contains("indicateur") or lower.contains("imagin") or body.contains(".0/100"):
+					_fail("Formule sèche ou hypothétique interdite : " + body)
 					return {}
-				if body.count("/100") != 1 or not body.contains("%d/100" % roundi(score)):
-					_fail("Note unique et arrondie attendue : " + body)
+				var benchmark_channel := str(outlet.get("channel", "")) in ["BENCHMARK", "BENCHMARK_SITE"]
+				if not body.contains("Note : %d/100" % roundi(score)):
+					_fail("Note entière manquante : " + body)
 					return {}
+				if not benchmark_channel:
+					if body.count("/100") != 1:
+						_fail("Note unique attendue sur canal non benchmark : " + body)
+						return {}
+					var rest := body.replace(name, "").replace(CompanyManager.company_name, "").replace("Note : %d/100" % roundi(score), "")
+					for digit in "0123456789":
+						if rest.contains(digit):
+							_fail("Chiffre hors note sur canal non benchmark : " + body)
+							return {}
 				if score >= 68.0 and not body.contains("Seul bémol :"):
 					_fail("Reserve positive absente : " + body)
 					return {}
-				if score < 68.0 and not body.contains("Mais ") :
-					_fail("Reserve critique absente : " + body)
+				if score < 68.0 and (not body.contains("Certes, ") or not body.contains("Mais ")):
+					_fail("Concession ou réserve critique absente : " + body)
 					return {}
 				if not body.contains("«") or not body.contains("»") or not body.contains("—"):
 					_fail("Citation journalistique absente : " + body)
@@ -116,6 +128,75 @@ func _run_corpus(log_articles: bool) -> Dictionary:
 		_fail("Le texte historique a ete modifie")
 		return {}
 	return {"min_distinct":min_distinct, "bodies":all_bodies}
+
+
+## Couverture des faits techniques réservés aux médias de benchmark.
+## Les mêmes données doivent rester en mots ailleurs, sans chiffres supplémentaires.
+func _comparison_cases() -> bool:
+	var product: Dictionary = {
+		"id":"COMPARE_01", "name":"PUCE_COMPARAISON",
+		"metrics":{
+			"performance":76.0, "efficiency":61.0, "reliability":58.0,
+			"usability":63.0, "innovation":54.0, "ecosystem":50.0, "sustainability":60.0
+		}
+	}
+	var comparison := {
+		"has_previous":true, "previous_name":"PUCE_ANCÊTRE", "previous_delta":6.4, "previous_age":7,
+		"has_rival":true, "rival_name":"CPU_RIVAL", "rival_delta":-3.2,
+		"rival_metrics":{"performance":79.0}
+	}
+	MediaManager.reset()
+	for outlet_id in ["CIRCUIT_LAB", "BENCHGRID", "TECH_WIRE", "FRAMECAST"]:
+		var outlet: Dictionary = {}
+		for row_value in MediaManager.available_outlets(2020):
+			var row: Dictionary = row_value
+			if str(row.get("id", "")) == outlet_id:
+				outlet = row
+				break
+		if outlet.is_empty():
+			_fail("Media comparatif absent : " + outlet_id)
+			return false
+		var article: Dictionary = MediaManager._review_text(outlet, product, "mitigé", 60.0, 5, 5, comparison)
+		var headline := str(article.get("headline", ""))
+		var body := str(article.get("body", ""))
+		if body.to_lower().contains("imagin") or body.to_lower().contains("indicateur") or body.contains(".0/100"):
+			_fail("Texte hypothétique ou chiffres mal formatés : " + body)
+			return false
+		if not body.contains("en queue de classement") or not body.contains("Certes, "):
+			_fail("Dernier rang ou concession manquant : " + body)
+			return false
+		if not body.contains("Note : 60/100"):
+			_fail("Note finale manquante : " + body)
+			return false
+		var is_benchmark := str(outlet.channel) in ["BENCHMARK", "BENCHMARK_SITE"]
+		if is_benchmark:
+			for expected in ["5e sur 5", "+6,4 points", "-3,2 points", "7 mois"]:
+				if not body.contains(expected) and not (expected == "5e sur 5" and headline.contains(expected)):
+					_fail("Comparaison chiffrée manquante : " + expected + " dans " + body)
+					return false
+			if not headline.contains("5e sur 5") or not body.contains("5e sur 5"):
+				_fail("Rang benchmark absent du titre ou du corps : " + headline + " / " + body)
+				return false
+		else:
+			for forbidden in ["5e sur 5", "+6,4", "-3,2", "7 mois", "dans le peloton"]:
+				if body.contains(forbidden) or headline.contains(forbidden):
+					_fail("Chiffre comparatif interdit dans la presse générale : " + body)
+					return false
+			var clean := body.replace(str(product.name), "").replace(CompanyManager.company_name, "").replace("Note : 60/100", "")
+			for digit in "0123456789":
+				if clean.contains(digit):
+					_fail("Chiffre hors note sur canal général : " + body)
+					return false
+		if outlet_id == "CIRCUIT_LAB":
+			print("[NAR-01] COMP ARTICLE outlet=CIRCUIT_LAB has_previous=true has_rival=true rank=5/5")
+			print("[NAR-01] COMP TITRE: " + headline)
+			print("[NAR-01] COMP CORPS: " + body)
+	MediaManager.reset()
+	# Empêcher la répétition concrète des mots d'amorce / de scène sur un cas connu.
+	if not MediaManager._press_scene_overlap("Entre deux parties en direct", "pendant la pause entre deux parties"):
+		_fail("Le détecteur de répétition entre ouverture et scène ne fonctionne pas")
+		return false
+	return true
 
 func _fail(reason: String) -> void:
 	push_error("[NAR-01] FAIL: " + reason)
