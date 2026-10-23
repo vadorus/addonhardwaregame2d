@@ -419,13 +419,10 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 				sentences.append("Notre classement : %s sur %d, en tête." % [rank_label, benchmark_total])
 			else:
 				sentences.append("Notre classement : %s sur %d, dans le groupe intermédiaire." % [rank_label, benchmark_total])
-		elif benchmark_total > 1:
-			if benchmark_rank == benchmark_total:
-				sentences.append("Face aux autres modèles, il termine en queue de classement.")
-			elif benchmark_rank == 1:
-				sentences.append("Face aux autres modèles, il prend la tête du classement.")
-			else:
-				sentences.append("Face aux autres modèles, il se situe au milieu du classement.")
+		elif benchmark_total > 1 and benchmark_rank == benchmark_total:
+			# L'information utile pour un dernier est conservée en mots.
+			# Ne pas prétendre qu'un article critique est enthousiaste parce que le CPU est n°1 au benchmark.
+			sentences.append("Face aux autres modèles, il termine en queue de classement.")
 	var quotes: Array = QUOTES.get(tone, QUOTES["mitigé"])
 	var quote := str(quotes[(review_style / 101) % quotes.size()]).replace("{p}", product_name)
 	# Note entière partout ; seules les deux plumes de benchmark détaillent les

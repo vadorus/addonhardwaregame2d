@@ -86,6 +86,9 @@ func _run_corpus(log_articles: bool) -> Dictionary:
 				if score < 68.0 and (not body.contains("Certes, ") or not body.contains("Mais ")):
 					_fail("Concession ou réserve critique absente : " + body)
 					return {}
+				if score < 68.0 and not benchmark_channel and body.contains("prend la tête du classement"):
+					_fail("Verdict critique contredit par un éloge de classement : " + body)
+					return {}
 				if not body.contains("«") or not body.contains("»") or not body.contains("—"):
 					_fail("Citation journalistique absente : " + body)
 					return {}
