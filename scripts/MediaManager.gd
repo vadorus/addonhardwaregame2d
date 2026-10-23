@@ -329,7 +329,7 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 	var headline := str(titles[pick % titles.size()]).replace("{p}", product_name).replace("{c}", CompanyManager.company_name)
 	var is_benchmark := channel in ["BENCHMARK", "BENCHMARK_SITE"]
 	if is_benchmark:
-		if benchmark_total > 0:
+		if benchmark_total > 1:
 			var rank_label := "1er" if benchmark_rank == 1 else "%de" % benchmark_rank
 			headline = "Banc d'essai — %s (%s sur %d)" % [headline, rank_label, benchmark_total]
 		else:
@@ -410,7 +410,7 @@ func _review_text(outlet: Dictionary, product: Dictionary, tone: String, score: 
 			sentences.append("Avec %s, le match reste serré, sans vainqueur évident." % rival_name)
 		if is_benchmark:
 			sentences.append("Écart avec %s : %s points au benchmark." % [rival_name, ("%+.1f" % rival_delta).replace(".", ",")])
-	if benchmark_total > 0:
+	if benchmark_total > 1:
 		if is_benchmark:
 			var rank_label := "1er" if benchmark_rank == 1 else "%de" % benchmark_rank
 			if benchmark_rank == benchmark_total and benchmark_total > 1:
@@ -439,9 +439,17 @@ func _press_scene_overlap(opener: String, scene: String) -> bool:
 		lead = lead.replace(mark, " ")
 		detail = detail.replace(mark, " ")
 	var common := ["dans", "avec", "pour", "cette", "notre", "leur", "sans", "nous", "plus", "après", "quand"]
-	var words := detail.split(" ", false)
+	var words: Array[String] = []
+	for word in detail.split(" ", false):
+		if common.has(word):
+			continue
+		# Ramener un pluriel simple à son singulier, sans toucher aux mots courts.
+		words.append(word.trim_suffix("s") if word.length() > 4 and word.ends_with("s") else word)
 	for token in lead.split(" ", false):
-		if token.length() >= 4 and not common.has(token) and words.has(token):
+		if token.length() < 4 or common.has(token):
+			continue
+		var singular := token.trim_suffix("s") if token.length() > 4 and token.ends_with("s") else token
+		if words.has(singular):
 			return true
 	return false
 

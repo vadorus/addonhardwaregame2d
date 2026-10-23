@@ -194,10 +194,39 @@ func _comparison_cases() -> bool:
 			print("[NAR-01] COMP ARTICLE outlet=CIRCUIT_LAB has_previous=true has_rival=true rank=5/5")
 			print("[NAR-01] COMP TITRE: " + headline)
 			print("[NAR-01] COMP CORPS: " + body)
+	# Un benchmark sans concurrent ne peut pas annoncer un classement "1er sur 1".
+	for benchmark_id in ["CIRCUIT_LAB", "BENCHGRID"]:
+		var benchmark_outlet: Dictionary = {}
+		for outlet_value in MediaManager.available_outlets(2020):
+			var candidate: Dictionary = outlet_value
+			if str(candidate.get("id", "")) == benchmark_id:
+				benchmark_outlet = candidate
+				break
+		if benchmark_outlet.is_empty():
+			_fail("Media benchmark solo absent : " + benchmark_id)
+			return false
+		var solo: Dictionary = MediaManager._review_text(benchmark_outlet, product, "positif", 72.0, 1, 1, {})
+		var solo_headline := str(solo.get("headline", ""))
+		var solo_body := str(solo.get("body", ""))
+		if solo_headline.contains(" sur 1") or solo_body.contains(" sur 1") or solo_body.contains("Notre classement :"):
+			_fail("Classement sans concurrent affiché : " + benchmark_id + " : " + solo_headline + " / " + solo_body)
+			return false
+		if not solo_headline.begins_with("Banc d'essai") or not solo_body.contains("Note : 72/100"):
+			_fail("Article benchmark solo incomplet : " + benchmark_id)
+			return false
 	MediaManager.reset()
 	# Empêcher la répétition concrète des mots d'amorce / de scène sur un cas connu.
 	if not MediaManager._press_scene_overlap("Entre deux parties en direct", "pendant la pause entre deux parties"):
 		_fail("Le détecteur de répétition entre ouverture et scène ne fonctionne pas")
+		return false
+	if not MediaManager._press_scene_overlap("Entre deux parties", "pendant la partie"):
+		_fail("La répétition singulier/pluriel parties/partie n'est pas détectée")
+		return false
+	if not MediaManager._press_scene_overlap("Une partie commence", "Deux parties suivent"):
+		_fail("La répétition singulier/pluriel partie/parties n'est pas détectée")
+		return false
+	if MediaManager._press_scene_overlap("Sur le banc", "une souris glisse"):
+		_fail("Le détecteur signale à tort une répétition sans mot commun")
 		return false
 	return true
 
