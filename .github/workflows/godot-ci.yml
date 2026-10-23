@@ -2,7 +2,7 @@ name: Godot CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, v013/demo-octobre]
   pull_request:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,14 +52,20 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          timeout 120s godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
+          user_root="${RUNNER_TEMP}/t2_godot_user"
+          rm -rf -- "$user_root"
+          mkdir -p "$user_root"
+          timeout 120s env XDG_DATA_HOME="$user_root" godot --headless --path . res://tests/smoke_test.tscn 2>&1 | tee /tmp/smoke.log
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/smoke.log; then exit 1; fi
 
       - name: Presse variée NAR-01 (3 médias, 3 tons, corpus déterministe)
         shell: bash
         run: |
           set -o pipefail
-          timeout 120s godot --headless --path . res://tests/press_narrative_variation_test.tscn 2>&1 | tee /tmp/press_narrative_variation.log
+          user_root="${RUNNER_TEMP}/t2_godot_user"
+          rm -rf -- "$user_root"
+          mkdir -p "$user_root"
+          timeout 120s env XDG_DATA_HOME="$user_root" godot --headless --path . res://tests/press_narrative_variation_test.tscn 2>&1 | tee /tmp/press_narrative_variation.log
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script|\[NAR-01\] FAIL' /tmp/press_narrative_variation.log; then exit 1; fi
           grep -q '\[NAR-01\] PASS medias=3 tons=3' /tmp/press_narrative_variation.log
           for n in 1 2 3; do
@@ -77,9 +83,68 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          user_root="${RUNNER_TEMP}/t2_godot_user"
           for scene in garage_layout_test workshop_layout_test balance_ceiling_test; do
-            timeout 120s godot --headless --path . "res://tests/${scene}.tscn" 2>&1 | tee "/tmp/${scene}.log"
+            rm -rf -- "$user_root"
+            mkdir -p "$user_root"
+            timeout 120s env XDG_DATA_HOME="$user_root" godot --headless --path . "res://tests/${scene}.tscn" 2>&1 | tee "/tmp/${scene}.log"
             if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/${scene}.log"; then exit 1; fi
             grep -q '\[CI\].*passed' "/tmp/${scene}.log"
           done
 
+
+      - name: T-2 regression scenes (30 audited PASS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          user_root="${RUNNER_TEMP}/t2_godot_user"
+          scenes=(
+            animation_clock_test
+            audio_bus_test
+            branch_map_signature_test
+            c3_event_driven_main_test
+            career_probe_revision_test
+            complete_experience_test
+            complete_layout_test
+            cpu_interactive_career_test
+            cpu_journey_test
+            cpu_prototype_test
+            frame_rate_settings_test
+            gameplay_r1_test
+            gameplay_r2_test
+            hiring_financial_preview_test
+            hiring_financial_screen_test
+            perf_probe_integration_test
+            perf_probe_panel_test
+            perf_probe_test
+            project_brief_world_test
+            project_cockpit_test
+            project_finance_test
+            sales_portfolio_row_reuse_test
+            save_clock_lifecycle_test
+            screen_refresh_test
+            second_cpu_budget_test
+            software_choice_preview_test
+            software_gameplay_test
+            software_integration_test
+            software_manager_test
+            touch_tooltip_scenario
+          )
+          for scene in "${scenes[@]}"; do
+            # Clear Godot's Linux user:// storage before each independent scene.
+            rm -rf -- "$user_root"
+            mkdir -p "$user_root"
+            log="${RUNNER_TEMP}/t2_${scene}.log"
+            if timeout 120s env XDG_DATA_HOME="$user_root" godot --headless --path . "res://tests/${scene}.tscn" 2>&1 | tee "$log"; then
+              :
+            else
+              code=$?
+              echo "::error title=T-2 ${scene}::La scène a quitté avec le code ${code}"
+              exit 1
+            fi
+            if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' "$log"; then
+              echo "::error title=T-2 ${scene}::Erreurs Godot détectées malgré une sortie 0"
+              exit 1
+            fi
+            echo "[T-2] PASS ${scene}"
+          done
