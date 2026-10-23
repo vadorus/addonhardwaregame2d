@@ -151,7 +151,7 @@ static func run(host: Node) -> String:
 	var pulse_sales: Label = lifecycle_pulse.get("sales_value")
 	var pulse_demand: Label = lifecycle_pulse.get("demand_value")
 	var pulse_signal: Label = lifecycle_pulse.get("signal_label")
-	if pulse_sales == null or pulse_sales.text.find("10") < 0 or pulse_demand == null or pulse_demand.text.find("100%") < 0:
+	if pulse_sales == null or pulse_sales.text.find("10") < 0 or pulse_demand == null or pulse_demand.text.find("100 %") < 0:
 		lifecycle_panel.queue_free()
 		_restore(snapshot)
 		return "Product pulse did not expose actual sales and saturated capacity"

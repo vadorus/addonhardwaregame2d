@@ -77,25 +77,32 @@ func _test_dimensions(dimensions: Vector2i) -> void:
 	game.call("_refresh_all")
 	await _settle()
 	_check_garage_actions(garage, dimensions, "CPU + Software")
-	var new_project: Button = garage.get("_new_project_action")
-	new_project.pressed.emit()
+	# Revue des onglets (14/10) : le bouton « Nouveau projet » de la carte a disparu avec la refonte du QG (08/10) ;
+	# pendant un développement, le choix CPU / Logiciel s'ouvre par la navigation du QG.
+	game.call("_on_dashboard_navigation", 0, "PROJECT_CHOICE")
 	await _settle()
 	var workshop: Control = game.get("software_workshop")
 	_check(str(workshop.call("current_view_name")) == "PROJECT_CHOICE", "new project skips the CPU/Software choice")
-	var processor_buttons := _all_buttons(workshop).filter(func(button): return str(button.text).begins_with("Processeur\n"))
+	var processor_buttons := _all_buttons(workshop).filter(func(button): return str(button.get_meta("title", "")) == "Processeur")
 	_check(processor_buttons.size() == 1, "new project has no processor route")
 	if not processor_buttons.is_empty(): processor_buttons[0].pressed.emit()
 	await _settle()
-	_check(game.get("cpu_stepper").visible, "processor route shows an existing project instead of creating a new CPU")
+	# Un seul CPU en développement à la fois : avec un CPU déjà en cours, « Processeur » mène au Labo (où il vit).
+	var routed_to_lab: bool = (game.get("tabs") as TabContainer).current_tab == 3
+	_check(game.get("cpu_stepper").visible or routed_to_lab, "processor route neither opens the CPU stepper nor the running CPU in the lab")
 	game.call("_close_cpu_stepper")
+	game.call("_show_tab", 0)
 	ResearchManager.resolve_cpu_directive(str(ResearchManager.active_cpu_project().id), "BOLD")
 	SoftwareManager.resolve_software_directive(str(sw.id), "SOLID")
 	SoftwareManager.start_activity("AUTOMATION")
 	game.call("_refresh_all")
 	await _settle()
 	_check_garage_actions(garage, dimensions, "CPU + Software + contract")
-	game.call("_open_project_cockpit")
+	# Depuis la refonte du parcours CPU, « Piloter » sans précision ouvre le parcours du CPU : on ouvre ici le
+	# cockpit sur le logiciel, qui liste les trois projets.
+	game.call("_open_project_cockpit", str(sw.id))
 	await _settle()
+	selectors = cockpit.get("_selector")
 	_check(selectors.get_child_count() == 3, "parallel contract disappears from selector")
 	(selectors.get_child(2) as Button).pressed.emit()
 	await _settle()
@@ -136,10 +143,6 @@ func _check_garage_actions(garage: Control, dimensions: Vector2i, state: String)
 	_check(action.is_visible_in_tree() and action.size.y >= 44.0, "parallel project action is unavailable: " + context)
 	_check(project.get_global_rect().encloses(action.get_global_rect()), "parallel project action leaves its card: " + context)
 	_check(not action.get_global_rect().intersects(feedback.get_global_rect()), "news covers project action: " + context)
-	var new_project: Button = garage.get("_new_project_action")
-	_check(new_project.is_visible_in_tree() and new_project.size.y >= 44.0, "new project unavailable during development: " + context)
-	_check(project.get_global_rect().encloses(new_project.get_global_rect()), "new project button leaves the card: " + context)
-	_check(not new_project.get_global_rect().intersects(feedback.get_global_rect()), "news covers new project: " + context)
 
 func _all_buttons(node: Node) -> Array:
 	var result: Array = []

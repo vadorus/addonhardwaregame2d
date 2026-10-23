@@ -152,8 +152,10 @@ func _test_blockers_and_animation() -> void:
 	main.set("_project_cockpit_resume_scale", 2.0)
 	main.call("_close_project_cockpit")
 	_check(is_zero_approx(TimeManager.time_scale), "closing cockpit bypasses a required choice")
+	# C3 (09/10) : le filet de sécurité n'est plus vérifié à chaque image mais à chaque jour qui passe.
+	# Si un chemin oublié relance le temps, la journée suivante le remet en pause.
 	TimeManager.time_scale = 3.0
-	main.call("_process", 0.0)
+	main.call("_on_day_changed", TimeManager.day, TimeManager.month, TimeManager.year)
 	_check(is_zero_approx(TimeManager.time_scale), "an alternate resume path bypasses the required choice")
 	var crew := CREW.new()
 	add_child(crew)

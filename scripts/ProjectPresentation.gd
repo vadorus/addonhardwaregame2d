@@ -41,6 +41,9 @@ static func software(project: Dictionary) -> Dictionary:
 	var phase := SoftwareManager.software_cockpit_phase(project)
 	var phases := ["PLANNING", "BUILD", "STABILIZE"]
 	var phase_label := software_phase(phase)
+	if str(project.get("kind", "")) == "STUDIO":
+		# Logiciel 2.0 : les trois phases du studio (fondations, fonctions, finition).
+		phase_label = str({"PLANNING":"Fondations", "BUILD":"Fonctions", "STABILIZE":"Finition"}.get(phase, phase_label))
 	if str(project.get("kind", "")) == "PATCH": phase_label = "Correctif"
 	if str(project.get("kind", "")) == "UPDATE": phase_label = "Mise à jour"
 	if status == "BETA": phase_label = "Tests utilisateurs"

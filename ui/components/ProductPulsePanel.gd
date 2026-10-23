@@ -85,7 +85,7 @@ func refresh_product(product: Dictionary) -> void:
 	var sales_delta_text := "premier mois en attente"
 	if expected_sales > 0:
 		var delta_pct := (float(actual_sales) - float(expected_sales)) / maxf(float(expected_sales), 1.0) * 100.0
-		sales_delta_text = "%+.0f%% vs prévision" % delta_pct
+		sales_delta_text = "%s%s vs prévision" % ["+" if delta_pct >= 0.0 else "", UI.pct(delta_pct, 0)]
 	sales_value.text = "%s / mois\n%s" % [UI.money(actual_sales), sales_delta_text]
 
 	var utilization := float(feedback.get("capacity_utilization", 0.0))
@@ -93,15 +93,15 @@ func refresh_product(product: Dictionary) -> void:
 	if feedback.is_empty():
 		demand_value.text = "pas encore mesurée"
 	else:
-		demand_value.text = "%.0f%% utilisée\n%s non servies" % [utilization * 100.0, UI.money(unserved)]
+		demand_value.text = "%s utilisée\n%s non servies" % [UI.pct(utilization * 100.0, 0), UI.money(unserved)]
 
 	var satisfaction := float(product.get("customer_satisfaction", feedback.get("satisfaction", 50.0)))
-	satisfaction_value.text = "%.1f / 100\n%s" % [satisfaction, _satisfaction_signal(satisfaction)]
+	satisfaction_value.text = "%s / 100\n%s" % [UI.fr(satisfaction), _satisfaction_signal(satisfaction)]
 	var returns := int(product.get("last_month_returns", 0))
 	var return_rate := 0.0
 	if actual_sales > 0:
 		return_rate = float(returns) / float(actual_sales) * 100.0
-	returns_value.text = "%s\n%.2f%% des ventes" % [UI.money(returns), return_rate]
+	returns_value.text = "%s\n%s des ventes" % [UI.money(returns), UI.pct(return_rate)]
 
 	var contribution := int(feedback.get("net_contribution", 0))
 	contribution_value.text = "%s%s €\nce mois" % ["+" if contribution >= 0 else "", UI.money(contribution)]
@@ -111,7 +111,7 @@ func refresh_product(product: Dictionary) -> void:
 	)
 
 	var share := float(product.get("last_month_share", 0.0)) * 100.0
-	share_value.text = "%.2f%%\n%s" % [share, MarketManager.product_lifecycle_label(product)]
+	share_value.text = "%s\n%s" % [UI.pct(share, 2), MarketManager.product_lifecycle_label(product)]
 
 	heading_label.text = "%s • %d mois" % [
 		MarketManager.product_lifecycle_label(product).to_upper(),

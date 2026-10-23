@@ -51,8 +51,15 @@ func refresh() -> void:
 			node["lane"] = str(lane.id)
 			if str(node.id) == _selected_id:
 				_selected = node
-			if fallback.is_empty() and str(node.state) == "NEXT":
+			# Revue des onglets (14/10) : on ouvre sur le « prochain » objectif affiché par la tuile, pas sur un
+			# vieux palier resté ouvert (le détail montrait « → 8 µm » en 1990 pendant que la tuile disait 0,18 µm).
+			if fallback.is_empty() and not (lane.get("next", {}) as Dictionary).is_empty() and str(node.id) == str((lane.next as Dictionary).get("id", "")):
 				fallback = node
+	if fallback.is_empty():
+		for lane_value in lanes:
+			for node_value in (lane_value as Dictionary).nodes:
+				if fallback.is_empty() and str((node_value as Dictionary).state) == "NEXT":
+					fallback = node_value
 	if _selected_id == "" or str(_selected.get("id", "")) != _selected_id:
 		_selected = fallback
 		_selected_id = str(fallback.get("id", ""))

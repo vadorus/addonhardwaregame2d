@@ -117,9 +117,20 @@ const MARKET_ENTRY_RATE := {
 	"MOBILE_COMPUTING":0.20, "DATACENTER":0.26
 }
 
+## 14/10 : montée progressive du coût de mise sur le marché. En 1971, une puce part chez un fabricant de
+## calculatrices dans un boîtier simple, sans qualification lourde ; les exigences (tests, garantie, normes)
+## montent avec les années jusqu'au plein tarif en 1981. Sans cette rampe, D2 faisait faire faillite aux
+## carrières Standard dès février 1973 (bissection : commit 83059c5), alors que son but était la mi-partie.
+const MARKET_ENTRY_RAMP_START := 0.4
+const MARKET_ENTRY_RAMP_PER_YEAR := 0.06
+
+static func market_entry_era_factor(year: int = -1) -> float:
+	var y := TimeManager.year if year < 0 else year
+	return clampf(MARKET_ENTRY_RAMP_START + MARKET_ENTRY_RAMP_PER_YEAR * float(y - 1971), MARKET_ENTRY_RAMP_START, 1.0)
+
 static func market_entry_unit_cost(segment: String, tier_price_factor: float = 1.0) -> int:
 	var normalized := MarketManager.normalize_segment(segment)
-	var rate := float(MARKET_ENTRY_RATE.get(normalized, 0.20))
+	var rate := float(MARKET_ENTRY_RATE.get(normalized, 0.20)) * market_entry_era_factor()
 	return maxi(0, int(round(MarketManager.segment_reference_price(normalized) * rate * clampf(tier_price_factor, 0.5, 2.0))))
 
 static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary, capability_snapshot: Dictionary) -> Dictionary:

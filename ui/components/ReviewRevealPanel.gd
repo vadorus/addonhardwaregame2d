@@ -172,6 +172,19 @@ func _toggle_detail() -> void:
 
 ## C2 : « ce qui a plu / ce qui freine / prochain essai », tiré du vrai calcul des notes.
 func _show_why() -> void:
+	# Logiciel 2.0 : un logiciel apporte sa propre leçon (le carnet de Nora), sans le calcul détaillé des CPU.
+	var software_lesson := str((_reviews[0] as Dictionary).get("software_lesson", "")) if not _reviews.is_empty() else ""
+	if software_lesson != "":
+		_detail_button.visible = false
+		_nora.visible = true
+		var mean := 0.0
+		for review_value in _reviews:
+			mean += float((review_value as Dictionary).get("score", 50.0))
+		mean /= maxf(float(_reviews.size()), 1.0)
+		if ResourceLoader.exists(NORA_HMM_ART):
+			_nora.texture = load(NORA_OK_ART if mean >= 65.0 else NORA_HMM_ART)
+		_lesson.text = software_lesson
+		return
 	var summary: Dictionary = EXPLAIN.summarize(_reviews)
 	if not bool(summary.get("available", false)):
 		_detail_button.visible = false
@@ -344,12 +357,14 @@ func _previous_best() -> Dictionary:
 	var current := {}
 	for review_value in _reviews:
 		current[str((review_value as Dictionary).get("product_id", ""))] = true
+	# On compare un logiciel aux logiciels, un CPU aux CPU.
+	var kind := str((_reviews[0] as Dictionary).get("product_kind", "CPU")) if not _reviews.is_empty() else "CPU"
 	var totals := {}
 	var counts := {}
 	var names := {}
 	for item_value in MediaManager.news:
 		var item: Dictionary = item_value
-		if not item.has("review_score"):
+		if not item.has("review_score") or str(item.get("product_kind", "CPU")) != kind:
 			continue
 		var product_id := str(item.get("product_id", ""))
 		if product_id == "" or current.has(product_id):

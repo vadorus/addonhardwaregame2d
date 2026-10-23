@@ -13,6 +13,7 @@ var industrialization_panel: Control
 var lifecycle_panel: Control
 var after_sales_panel: Control
 var components_panel: Control
+var software_panel: VBoxContainer
 ## Revue des onglets (08/10) : une scène avec Noah en tête, et la planche 4 quand un prototype attend l'usine.
 var scene: Control
 var production_board: Control
@@ -43,6 +44,8 @@ func show_section_for_context(context: String) -> void:
 			_select_mode("SELL")
 		"COMPONENTS", "Gammes":
 			_select_mode("RANGES")
+		"SOFTWARE_PRODUCTS", "Logiciels":
+			_select_mode("SOFTWARE")
 
 func current_section() -> String:
 	return current_mode
@@ -57,7 +60,7 @@ func _build() -> void:
 	# Lot A (29/09) : « Concevoir » ne faisait que renvoyer au Labo, et le SAV existait aussi dans
 	# Marché. Le cockpit garde trois étapes ; le SAV n'existe plus qu'ici.
 	mode_grid = GridContainer.new()
-	mode_grid.columns = 4
+	mode_grid.columns = 5
 	mode_grid.add_theme_constant_override("h_separation", 8)
 	mode_grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(mode_grid)
@@ -66,6 +69,8 @@ func _build() -> void:
 	_add_mode_button("SUPPORT", "3  SAV")
 	# V0.10 / Gammes : mémoire, alimentations, boîtiers.
 	_add_mode_button("RANGES", "4  GAMMES")
+	# Revue des onglets (14/10) : vos logiciels avaient leur catalogue caché dans l'atelier.
+	_add_mode_button("SOFTWARE", "5  LOGICIELS")
 
 	production_board = (load("res://ui/components/ProductionBoard.gd") as Script).new() as Control
 	production_board.connect("launch_requested", func(payload: Dictionary): action_requested.emit("apply_industrialization", payload))
@@ -97,6 +102,11 @@ func _build() -> void:
 	box.add_child(components_panel)
 	pages["RANGES"] = components_panel
 
+	software_panel = VBoxContainer.new()
+	software_panel.add_theme_constant_override("separation", 8)
+	box.add_child(software_panel)
+	pages["SOFTWARE"] = software_panel
+
 func _add_mode_button(mode: String, title: String) -> void:
 	var button := Button.new()
 	button.text = title
@@ -118,6 +128,8 @@ func _select_mode(mode: String) -> void:
 		button.disabled = key == current_mode
 	if mode == "RANGES" and components_panel != null:
 		components_panel.call("refresh")
+	if mode == "SOFTWARE":
+		_refresh_software()
 	_refresh_board()
 
 ## Le premier CPU qui attend qu'on choisisse son usine (vide sinon).
@@ -189,7 +201,12 @@ func _on_scene_hero() -> void:
 
 func set_viewport_width(width: float) -> void:
 	if mode_grid != null:
-		mode_grid.columns = 4 if width >= 700.0 else 2
+		# Toutes les étapes sur une ligne dès 700 px (téléphone en paysage) : 4, ou 5 avec les logiciels.
+		var shown := 0
+		for button in mode_buttons.values():
+			if (button as Button).visible:
+				shown += 1
+		mode_grid.columns = maxi(shown, 1) if width >= 700.0 else 2
 	if industrialization_panel != null and industrialization_panel.has_method("set_viewport_width"):
 		industrialization_panel.call("set_viewport_width", width)
 	if lifecycle_panel != null and lifecycle_panel.has_method("set_viewport_width"):
@@ -208,6 +225,10 @@ func refresh() -> void:
 		after_sales_panel.call("refresh")
 	if components_panel != null and components_panel.visible:
 		components_panel.call("refresh")
+	if software_panel != null and software_panel.visible:
+		_refresh_software()
+	if mode_buttons.has("SOFTWARE"):
+		(mode_buttons["SOFTWARE"] as Button).visible = SoftwareManager.any_open()
 	_refresh_board()
 	_refresh_scene()
 	_refresh_mode_badges()
@@ -230,6 +251,9 @@ func _refresh_mode_badges() -> void:
 	mode_buttons["SUPPORT"].text = "3  SAV%s" % ("  • %d" % open_sav if open_sav > 0 else "")
 	var ranges := ComponentManager.active_products().size()
 	mode_buttons["RANGES"].text = "4  GAMMES%s" % ("  • %d" % ranges if ranges > 0 else ("  • nouveau" if ComponentManager.any_open() else ""))
+	if mode_buttons.has("SOFTWARE"):
+		var software := SoftwareManager.active_products().size()
+		mode_buttons["SOFTWARE"].text = "5  LOGICIELS%s" % ("  • %d" % software if software > 0 else "")
 
 func focus_product_launch() -> void:
 	refresh()
@@ -298,3 +322,53 @@ func focus_sales() -> void:
 	refresh()
 	_select_mode("SELL")
 	scroll_vertical = 0
+
+
+const STUDIO := preload("res://scripts/SoftwareStudio.gd")
+const SOFTWARE_CAT := preload("res://scripts/SoftwareCatalog.gd")
+
+## Les logiciels en vente, d'un coup d'œil : note du moment, licences, marge. Le détail reste dans l'atelier.
+func _refresh_software() -> void:
+	if software_panel == null:
+		return
+	for child in software_panel.get_children():
+		software_panel.remove_child(child)
+		child.queue_free()
+	var open := Button.new()
+	open.text = "Ouvrir l'atelier Logiciel"
+	open.custom_minimum_size.y = 46
+	open.pressed.connect(func(): action_requested.emit("open_software", {}))
+	software_panel.add_child(open)
+	var active := SoftwareManager.active_products()
+	if active.is_empty():
+		software_panel.add_child(UI.muted_label("Aucun logiciel en vente. Le studio se trouve dans « Nouveau projet », puis Logiciel.", 13))
+		return
+	var total := 0
+	for value in active:
+		total += int((value as Dictionary).get("margin_last", 0))
+	software_panel.add_child(UI.label("%d logiciel(s) en vente • marge %s €/mois" % [active.size(), UI.money(total)], 15))
+	for value in active:
+		var product: Dictionary = value
+		var card := UI.card(UI.APP_PANEL, 12, 10)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		card.add_child(row)
+		if str(product.get("kind", "")) == "STUDIO":
+			var note := float(product.get("note_live", product.get("note", 5.0)))
+			var badge := UI.label(UI.fr(note), 18)
+			badge.custom_minimum_size = Vector2(58, 44)
+			badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			badge.add_theme_color_override("font_color", Color.WHITE)
+			var tint := Color("2f7a3a") if note >= 7.5 else (Color("d9822b") if note >= 5.5 else Color("b3261e"))
+			badge.add_theme_stylebox_override("normal", UI.stylebox(tint, 22, 0, tint, 0))
+			row.add_child(badge)
+		var words := VBoxContainer.new()
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(words)
+		words.add_child(UI.label("%s • v%d.%d" % [str(product.get("name", "Logiciel")), int(product.get("version_major", 1)), int(product.get("version_minor", 0))], 15))
+		var who := ""
+		if str(product.get("kind", "")) == "STUDIO":
+			who = "%s pour %s • " % [SOFTWARE_CAT.family_label(str(product.family)), STUDIO.audience_label(str(product.get("audience", ""))).to_lower()]
+		words.add_child(UI.muted_label("%s%s licences ce mois • marge %s €/mois" % [who, UI.money(int(product.get("licenses_last", 0))), UI.money(int(product.get("margin_last", 0)))], 12))
+		software_panel.add_child(card)

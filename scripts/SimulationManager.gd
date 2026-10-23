@@ -1,5 +1,7 @@
 extends Node
 const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
+const PALMARES := preload("res://scripts/CpuPalmares.gd")
+const RIVALRY := preload("res://scripts/CpuRivalry.gd")
 
 signal month_processed(report)
 signal game_over(reason, report)
@@ -70,6 +72,9 @@ func process_month_end() -> Dictionary:
 	MarketManager.process_month(ProductManager.products)
 	# V0.10 / Gammes : mémoire, alimentations, boîtiers (projets, rivaux, ventes).
 	ComponentManager.process_month()
+	# RANK-01 / WORLD-01 (14/10) : palmarès du marché CPU, puis défi « un titre à défendre ».
+	PALMARES.process_month()
+	RIVALRY.process_month()
 	PatentManager.process_month()
 	GarageBusiness.process_month()
 	# K4 : Nora annonce la période qui commence (rentrée, fêtes, vacances…).

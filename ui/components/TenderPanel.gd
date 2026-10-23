@@ -87,7 +87,11 @@ func _refresh_tenders() -> void:
 	if tender_product_select.selected < 0 and tender_product_select.item_count > 0:
 		tender_product_select.select(0)
 
-	if tender_select.item_count == 0:
+	# Revue des onglets (14/10) : sans appel d'offres, on ne montre pas un formulaire vide (liste blanche, « 100 », bouton gris).
+	var has_tender := tender_select.item_count > 0
+	for control in [tender_select, tender_product_select, tender_bid_price, tender_submit_button]:
+		(control as Control).visible = has_tender
+	if not has_tender:
 		tender_label.text = "Aucun appel d'offres ouvert pour le moment. Les opportunités apparaissent selon l'époque, le progrès technologique et la réputation professionnelle."
 		tender_submit_button.disabled = true
 		return

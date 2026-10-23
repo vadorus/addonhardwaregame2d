@@ -8,6 +8,7 @@ extends RefCounted
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
+const RIVALRY := preload("res://scripts/CpuRivalry.gd")
 const DISCOVERIES := preload("res://scripts/WorkshopDiscoveries.gd")
 
 ## Toutes les conversations en attente, avec qui parle.
@@ -51,6 +52,9 @@ static func pending() -> Array:
 	var eureka := DISCOVERIES.pending_project()
 	if not eureka.is_empty():
 		result.append({"key":"EUREKA:%s" % str(eureka.get("id", "")), "speaker":_dev_speaker()})
+	# WORLD-01 : un rival prépare une riposte contre votre CPU couronné.
+	if RIVALRY.dialogue_pending():
+		result.append({"key":"RIVALRY:%s" % str(RIVALRY.active_arc().get("id", "")), "speaker":"NORA"})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -188,6 +192,12 @@ static func _money(value: int) -> String:
 ## Contenu de la conversation : qui parle, ce qu'il dit, les réponses possibles.
 static func dialogue(key: String) -> Dictionary:
 	var sid := key.substr(key.find(":") + 1)
+	if key.begins_with("RIVALRY:"):
+		var rivalry := RIVALRY.dialogue()
+		if rivalry.is_empty() or str(rivalry.get("key", "")) != key:
+			return {}
+		rivalry["person"] = _person("NORA")
+		return rivalry
 	if key.begins_with("RND:"):
 		for event_value in ResearchManager.get_pending_research_events():
 			var event: Dictionary = event_value
@@ -397,6 +407,8 @@ static func dialogue(key: String) -> Dictionary:
 ## Applique une réponse. Renvoie {ok, message}.
 static func choose(key: String, choice_id: String) -> Dictionary:
 	var sid := key.substr(key.find(":") + 1)
+	if key.begins_with("RIVALRY:"):
+		return RIVALRY.answer(choice_id)
 	if key == "HIRE:DEV":
 		if choice_id == "LATER":
 			ExecutiveManager.workplace["hiring_reminder_at"] = ExecutiveManager.months_operated + 6

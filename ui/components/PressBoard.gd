@@ -27,6 +27,9 @@ var _piles: VBoxContainer
 var _serif: SystemFont
 var _serif_italic: SystemFont
 var _last_key := "-"
+## Revue des onglets (14/10) : « CPU » ou « SOFTWARE ». Les tests de logiciels ont leur propre page :
+## avant, un utilitaire était comparé à un CPU (« Tool 16 : comme C3 08 E… »).
+var kind := "CPU"
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 12)
@@ -42,7 +45,7 @@ func _ready() -> void:
 	var curve_box := VBoxContainer.new()
 	curve_box.add_theme_constant_override("separation", 6)
 	_curve_card.add_child(curve_box)
-	curve_box.add_child(_heading("Nos notes, CPU après CPU", "La moyenne de la presse à chaque lancement."))
+	curve_box.add_child(_heading("Nos notes, CPU après CPU" if kind == "CPU" else "Nos notes, logiciel après logiciel", "La moyenne de la presse à chaque lancement."))
 	_curve = Curve2DView.new()
 	_curve.custom_minimum_size.y = 120
 	curve_box.add_child(_curve)
@@ -52,12 +55,12 @@ func _ready() -> void:
 	refresh(true)
 
 ## Les CPU testés, du plus récent au plus ancien : {name, month, year, average, reviews[]}.
-static func products_with_reviews(news: Array) -> Array:
+static func products_with_reviews(news: Array, product_kind: String = "CPU") -> Array:
 	var order: Array = []
 	var by_name := {}
 	for item_value in news:
 		var item: Dictionary = item_value
-		if not item.has("review_score"):
+		if not item.has("review_score") or str(item.get("product_kind", "CPU")) != product_kind:
 			continue
 		var name := str(item.get("product_name", item.get("product_id", "CPU")))
 		if not by_name.has(name):
@@ -82,13 +85,13 @@ func refresh(force: bool = false) -> void:
 	if key == _last_key and not force:
 		return
 	_last_key = key
-	var products := products_with_reviews(MediaManager.news)
+	var products := products_with_reviews(MediaManager.news, kind)
 	_refresh_scene(products)
 	_refresh_curve(products)
 	_clear(_piles)
 	if products.is_empty():
 		var empty := _paper_card()
-		var label := _text("Aucun test pour l'instant. Lancez un CPU : la presse le recevra le jour même.", 14, MUTED)
+		var label := _text("Aucun test pour l'instant. Lancez un %s : la presse le recevra le jour même." % ("CPU" if kind == "CPU" else "logiciel"), 14, MUTED)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.add_child(label)
 		_piles.add_child(empty)
@@ -106,7 +109,7 @@ func _build_scene() -> void:
 
 func _refresh_scene(products: Array) -> void:
 	if products.is_empty():
-		scene.set_line("Nora : « Les journalistes attendent notre premier CPU. Le jour du lancement, ils le testeront tous. »")
+		scene.set_line("Nora : « Les journalistes attendent notre premier %s. Le jour du lancement, ils le testeront tous. »" % ("CPU" if kind == "CPU" else "logiciel"))
 		scene.set_hero("—", "pas encore de test")
 		scene.set_speaker(NORA_HMM)
 		return

@@ -1,14 +1,17 @@
 extends Node
-## Atelier logiciel (réécrit le 08/10, lot 0) : l'ancien test visait un comparateur retiré de l'interface.
-## On vérifie ce que voit le joueur aujourd'hui :
-## - l'aperçu affiché suit exactement la prévision du gestionnaire et ne change pas la simulation ;
-## - sans développeur, la durée n'est jamais « ~-1 mois » et le lancement est bloqué ;
-## - avant 1977, le public grand public s'appelle « Passionnés et universités » ;
-## - pour les familles de base, changer un réglage suit `SoftwareManager.preview` ;
-## - le bouton de lancement reste visible sur les formats de téléphone.
+## Atelier logiciel — Logiciel 2.0 (14/10) : le studio remplace l'ancien formulaire à listes déroulantes.
+## On vérifie ce que voit le joueur :
+## - « Nouveau logiciel » ouvre le studio (4 étapes), sans aucune liste déroulante ni case à cocher ;
+## - la barre en direct suit exactement la prévision du gestionnaire, et regarder ne change rien à la partie ;
+## - les jetons d'effort restent à 6 par phase, les fonctions ne dépassent pas la limite de l'équipe ;
+## - sans développeur : jamais « ~-1 mois », et le lancement est refusé avec une raison ;
+## - avant 1978, pas de public « Familles » ; « Vos processeurs » est grisé sans CPU en vente ;
+## - lancer depuis le studio crée bien le projet du studio ;
+## - sur les formats de téléphone en paysage, le bouton de lancement reste visible et assez grand.
 
 const UI := preload("res://ui/UiKit.gd")
 const LIVE := preload("res://scripts/LiveTheme.gd")
+const STUDIO := preload("res://scripts/SoftwareStudio.gd")
 var failures: Array[String] = []
 
 func check(condition: bool, message: String) -> void:
@@ -37,11 +40,15 @@ func workshop(parent: Node) -> Control:
 	var node: Control = (load("res://ui/SoftwareWorkshop.gd") as Script).new()
 	parent.add_child(node)
 	node.call("open")
+	node.call("_show_software_choice")
 	node.call("_show_product")
 	return node
 
-func preview_text(node: Control) -> String:
-	return (node.get("_project_preview") as Label).text
+func _all_nodes(root: Node) -> Array:
+	var result: Array = [root]
+	for child in root.get_children():
+		result.append_array(_all_nodes(child))
+	return result
 
 func test_choices(mode: String) -> void:
 	SimulationManager.reset_all("Preview test", "CPU", mode)
@@ -49,43 +56,60 @@ func test_choices(mode: String) -> void:
 	Economy.money = 1000000
 	var node := workshop(self)
 	await settle()
+	var studio: Control = node.call("studio")
+	check(bool(node.call("studio_visible")), "Nouveau logiciel does not open the studio")
+	check(str(node.call("current_view_name")) == "PRODUCT", "studio view is not reported as PRODUCT")
+	for any in _all_nodes(node):
+		check(not (any is OptionButton) and not (any is CheckBox) and not (any is SpinBox), "the software screens still use a dropdown, checkbox or spinbox (%s)" % any.get_class())
 	var software_before := SoftwareManager.get_state().duplicate(true)
 	var economy_before := Economy.get_state().duplicate(true)
 	var time_before := TimeManager.get_state().duplicate(true)
-	var checks: Dictionary = node.get("_feature_checks")
-	check(not checks.is_empty(), "utility features are missing")
-	var features: Array = node.call("_utility_features")
-	check(features.size() == 2, "the form should start with two features")
-	var plan := SoftwareManager.utility_preview(features, "HOME", "MARKET")
-	check(preview_text(node).contains("~%d mois" % int(plan.calendar_months)), "displayed duration differs from the forecast (%s)" % mode)
-	check(preview_text(node).contains(UI.money(int(plan.total_cost))), "displayed budget differs from the forecast (%s)" % mode)
-	check(preview_text(node).contains("Passionnés et universités"), "1971 should not offer « Particuliers »")
-	(checks.AUTOMATION as CheckBox).button_pressed = true
-	var plan_more := SoftwareManager.utility_preview(node.call("_utility_features"), "HOME", "MARKET")
-	check(preview_text(node).contains(UI.money(int(plan_more.total_cost))), "adding a feature does not refresh the estimate")
-	check(int(plan_more.total_cost) >= int(plan.total_cost), "adding a feature makes the project cheaper")
-	UI.select_meta(node.get("_price_select"), "PREMIUM")
-	node.call("_refresh_product_preview")
-	check(SoftwareManager.get_state() == software_before and Economy.get_state() == economy_before and TimeManager.get_state() == time_before, "browsing choices spends, progresses time or changes the simulation")
-	# Sans développeur : jamais de durée négative, lancement bloqué.
+	var plan: Dictionary = SoftwareManager.studio_preview(studio.call("current_spec"))
+	var live: Label = studio.get("_cost_label")
+	check(live.text.contains(UI.money(int(plan.monthly_cash_cost))), "live bar cost differs from the manager forecast (%s)" % mode)
+	var time_label: Label = studio.get("_time_label")
+	check(time_label.text.contains("~%d mois" % int(plan.calendar_months)), "live bar duration differs from the forecast (%s)" % mode)
+	for step in range(4):
+		studio.call("go_to_step", step)
+		await settle()
+	# Fonctions : la limite de l'équipe est respectée.
+	var slots := STUDIO.feature_slots(SoftwareManager.mastery(str(studio.get("type_id"))))
+	for id in STUDIO.open_features(TimeManager.year):
+		if not (studio.get("features") as Array).has(id):
+			studio.call("toggle_feature", str(id))
+	check((studio.get("features") as Array).size() <= slots, "more features than the team can handle")
+	# Jetons : toujours 6 par phase, même en tapant beaucoup sur +.
+	for i in range(10):
+		studio.call("add_token", "POLISH", "TESTS", 1)
+	var polish: Dictionary = (studio.get("tokens") as Dictionary).POLISH
+	check(int(polish.TESTS) == STUDIO.TOKENS_PER_PHASE and int(studio.call("free_tokens", "POLISH")) == 0, "tokens are not conserved in a phase (%s)" % str(polish))
+	check(SoftwareManager.get_state() == software_before and Economy.get_state() == economy_before and TimeManager.get_state() == time_before, "browsing the studio spends, progresses time or changes the simulation")
+	# Avant 1978 : pas de familles. Sans CPU : pas de « Vos processeurs ».
+	var audiences := STUDIO.open_audiences(TimeManager.year)
+	check(not audiences.has("HOME"), "families are offered before home computers exist")
+	check(not bool(SoftwareManager.can_start_studio({"type":"UTILITY", "audience":"HOBBY", "platform":"OWN", "features":["FILES"]}).get("ok", false)), "own CPUs offered without a CPU on sale")
+	# Lancer pour de vrai.
+	studio.set("features", ["FILES", "SIMPLE_COMMANDS"])
+	studio.set("tokens", studio.call("camille_tokens"))
+	studio.call("go_to_step", 3)
+	(studio.get("_next_button") as Button).pressed.emit()
+	await settle()
+	check(str(SoftwareManager.project_for("UTILITY").get("kind", "")) == "STUDIO", "launching from the studio did not create a studio project (%s)" % mode)
+	node.queue_free()
+	await settle()
+	# Sans développeur : jamais de durée négative, lancement refusé avec une raison.
+	SimulationManager.reset_all("Preview no dev", "CPU", mode)
+	Economy.money = 1000000
 	for employee in PersonnelManager.staff:
 		if str(employee.department) == "Développement": employee.department = "R&D"
-	node.call("_refresh_product_preview")
-	check(not preview_text(node).contains("-1"), "a missing team shows a negative duration")
-	check((node.get("_project_start") as Button).disabled, "a project can start without developers")
-	# Familles de base.
-	SimulationManager.reset_all("Family preview", "CPU", mode)
-	Economy.money = 1000000
-	TimeManager.year = 1977
-	SoftwareManager._check_unlocks()
-	SoftwareManager.family_state("DEVTOOLS")["mastery"] = 1
-	node.call("_refresh_family_options")
-	UI.select_meta(node.get("_family_select"), "DEVTOOLS")
-	node.call("_on_family_changed")
-	var controls: Dictionary = node.get("_setting_controls")
-	(controls.productivity as SpinBox).value = 4
-	var basic := SoftwareManager.preview("DEVTOOLS", {"productivity":4,"compatibility":3,"stability":3,"extensibility":3}, "MARKET")
-	check(preview_text(node).contains(UI.money(int(basic.total_cost))), "basic family estimate differs from the manager preview")
+	node = workshop(self)
+	await settle()
+	studio = node.call("studio")
+	check(not (studio.get("_time_label") as Label).text.contains("-1"), "a missing team shows a negative duration")
+	studio.call("go_to_step", 3)
+	(studio.get("_next_button") as Button).pressed.emit()
+	await settle()
+	check((studio.get("_error_label") as Label).visible and SoftwareManager.projects.is_empty(), "a project can start without developers")
 	node.queue_free()
 	await settle()
 
@@ -98,14 +122,14 @@ func test_layout(dimensions: Vector2i) -> void:
 	add_child(viewport)
 	var node := workshop(viewport)
 	await settle()
-	var content: Control = node.get("_content")
-	check(content.size.x <= dimensions.x, "product form exceeds viewport width at " + str(dimensions))
-	var start: Button = node.get("_project_start")
-	check(start.size.y >= 44.0, "launch button is too small to touch at " + str(dimensions))
-	var scroll := content.get_parent() as ScrollContainer
-	if scroll != null:
-		scroll.ensure_control_visible(start)
+	var studio: Control = node.call("studio")
+	for step in range(4):
+		studio.call("go_to_step", step)
 		await settle()
-		check(scroll.get_global_rect().encloses(start.get_global_rect()), "launch button cannot scroll into view at " + str(dimensions))
+		var content: Control = studio.get("_content")
+		check(content.size.x <= dimensions.x, "studio step %d exceeds viewport width at %s" % [step, str(dimensions)])
+		var next: Button = studio.get("_next_button")
+		check(next.size.y >= 44.0, "next/launch button is too small to touch at " + str(dimensions))
+		check(Rect2(Vector2.ZERO, Vector2(dimensions)).encloses(next.get_global_rect()), "next/launch button outside the screen at %s step %d" % [str(dimensions), step])
 	viewport.queue_free()
 	await settle()

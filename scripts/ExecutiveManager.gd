@@ -62,6 +62,7 @@ var moments_seen: Dictionary = {}
 var moments_migration_pending := false
 ## V0.10 / I3 : mois où chaque décision est apparue (pour savoir depuis quand elle attend).
 var decision_seen_at: Dictionary = {}
+const RIVALRY := preload("res://scripts/CpuRivalry.gd")
 const CEO_DEFAULTS := preload("res://scripts/CeoDefaults.gd")
 var _next_hr_issue_id := 1
 var months_operated := 0
@@ -964,6 +965,18 @@ func get_ceo_decisions() -> Array:
 			"text":"La presse attend votre stratégie. Décision sous %d mois." % int(expo.get("months_left", 0)),
 			"recommendation":"Présentation officielle : crédibilité et visibilité durable. Fuite contrôlée : plus de buzz mais image moins professionnelle. Démenti : protège le calendrier sans grosse dépense.",
 			"target_tab":5,"can_defer":false
+		})
+
+	# WORLD-01 (14/10) : un rival vise votre couronne « Meilleur CPU ». Réglé en parlant à Nora.
+	if RIVALRY.dialogue_pending():
+		var arc: Dictionary = RIVALRY.active_arc()
+		decisions.append({
+			"id":"RIVALRY:%s" % str(arc.get("id", "")),
+			"category":"RIVALITÉ", "severity":66.0,
+			"title":"%s veut votre couronne" % str(arc.get("challenger_company", "Un rival")),
+			"text":"Une riposte contre votre %s est attendue d'ici %d mois." % [str(arc.get("product_name", "CPU")), RIVALRY.LAUNCH_MONTHS],
+			"recommendation":"Nora a préparé quatre réponses chiffrées. Sans consigne sous %d mois, elle laissera venir." % RIVALRY.ANSWER_PATIENCE,
+			"target_tab":5, "can_defer":false
 		})
 
 	if GarageBusiness.loan_offer_pending():

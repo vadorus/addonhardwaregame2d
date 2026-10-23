@@ -1825,6 +1825,7 @@ func _show_first_cpu_workshop() -> void:
 		return
 	TimeManager.time_scale = 0.0
 	first_cpu_workshop.call("open")
+	UI.upgrade_inputs(first_cpu_workshop)
 	SoundManager.play("open")
 	JUICE.fade_in(first_cpu_workshop, 0.2)
 	status_label.text = "Nora : choisissez d'abord ce que ce premier processeur doit accomplir."
@@ -2216,6 +2217,8 @@ func _show_tab(index: int):
 	if tabs.current_tab != safe_index and status_label != null and (status_label.text.begins_with("Nora : cette fonction") or status_label.text.begins_with("Nora : pas encore")):
 		status_label.text = ""
 	tabs.current_tab = safe_index
+	# Revue des onglets (14/10) : listes et compteurs adaptés au doigt (y compris ceux créés depuis).
+	UI.upgrade_inputs(tabs.get_child(safe_index))
 	_place_notification_feed()
 	_update_nav_state()
 
@@ -2897,7 +2900,8 @@ func _start_project():
 		status_label.text = "%s entre en développement — %s • usage %s%s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text, supplier_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
-		if TimeManager.time_scale <= 0.0:
+		# 14/10 : ne pas relancer le temps si un autre projet (logiciel…) attend un choix obligatoire.
+		if TimeManager.time_scale <= 0.0 and _blocking_company_decision().is_empty():
 			TimeManager.time_scale = 1.0
 	else:
 		status_label.text = ResearchManager.last_start_error
@@ -2913,6 +2917,8 @@ func _on_products_action(action: String, payload: Dictionary):
 	match action:
 		"status":
 			status_label.text = str(payload.get("text", ""))
+		"open_software":
+			_on_dashboard_navigation(0, "SOFTWARE")
 		"show_product_reviews":
 			# C2 : revoir les tests d'un produit, avec le résumé et le calcul de chaque note.
 			var reviewed := ProductManager.get_product(str(payload.get("product_id", "")))
@@ -3743,7 +3749,7 @@ func open_ceo_decision(decision_id: String) -> bool:
 	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
 		return false
 	# Les dossiers RH et les visites de clients se règlent en parlant à la personne.
-	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:") or decision_id.begins_with("ADVICE:")) and open_dialogue(decision_id):
+	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:") or decision_id.begins_with("ADVICE:") or decision_id.begins_with("RIVALRY:")) and open_dialogue(decision_id):
 		return true
 	if not ceo_layer.visible:
 		_ceo_resume_scale = TimeManager.time_scale
@@ -4098,6 +4104,7 @@ func _open_cpu_journey(project_id: String = "") -> void:
 	TimeManager.time_scale = 0.0
 	if notification_feed != null: notification_feed.call("clear")
 	cpu_journey.call("open", project_id)
+	UI.upgrade_inputs(cpu_journey)
 	SoundManager.play("open")
 
 func _open_cpu_journey_context(context: String) -> bool:

@@ -144,6 +144,21 @@ func select_shortlist(index: int) -> bool:
 	candidate_changed.emit(candidate)
 	return true
 
+## BUD-01 : apercu de l'engagement sans mutation de la tresorerie ni du candidat.
+## Le garde-fou de paiement final reste dans hire_candidate().
+func hiring_financial_preview(profile: Dictionary) -> Dictionary:
+	if profile.is_empty():
+		return {}
+	var salary := maxi(int(profile.get("salary", 0)), 0)
+	var signing := Economy.quoted_expense(salary * 2, "Recrutement")
+	var monthly := Economy.quoted_expense(salary, "Salaires")
+	var advice: Dictionary = ExecutiveManager.financial_advice(signing, monthly)
+	advice["signing_cost"] = signing
+	advice["monthly_cost"] = monthly
+	advice["can_pay_signing"] = Economy.can_afford(salary * 2, "Recrutement")
+	advice["shortfall"] = maxi(signing - Economy.money, 0)
+	return advice
+
 func hire_candidate() -> bool:
 	if candidate.is_empty():
 		return false
