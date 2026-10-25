@@ -24,6 +24,42 @@ static func run() -> String:
 	ProductManager.products = [product]
 	ProductManager.cpu_generations = []
 
+	# T-3 : même coût unitaire en simulation et en interface, sans masquer les pertes.
+	var loss_probe := product.duplicate(true)
+	loss_probe["market_entry_cost"] = 10
+	loss_probe["price"] = 20
+	var margin := ProductManager.unit_margin(loss_probe)
+	var expected_fabrication := 60.0 * MarketManager.production_cost_threat_factor() * ProductManager.experience_cost_factor() + 10.0
+	var expected_margin := 20.0 * (1.0 - MarketManager.distributor_share()) - expected_fabrication
+	if absf(float(margin.fabrication) - expected_fabrication) > 0.001 or absf(float(margin.margin) - expected_margin) > 0.001 or float(margin.margin) >= 0.0:
+		_restore(snapshot)
+		return "T-3: unit margin does not match the monthly cost formula"
+	var price_tip := ProductManager.recommended_unit_price(loss_probe)
+	var min_tip := MarketManager.segment_reference_price("EMBEDDED") * 0.8
+	var max_tip := MarketManager.segment_reference_price("EMBEDDED") * 1.6
+	if price_tip % 5 != 0 or float(price_tip) < min_tip or float(price_tip) > max_tip:
+		_restore(snapshot)
+		return "T-3: advised price is not rounded to 5 within reference bounds"
+	var alerts_before := CompanyManager.alerts.size()
+	ProductManager._track_negative_unit_margin(loss_probe, float(margin.margin), 1)
+	if CompanyManager.alerts.size() != alerts_before:
+		_restore(snapshot)
+		return "T-3: loss alert fired before two negative months"
+	ProductManager._track_negative_unit_margin(loss_probe, float(margin.margin), 1)
+	if CompanyManager.alerts.size() != alerts_before + 1 or not str(CompanyManager.alerts[0]).contains("Vous perdez"):
+		_restore(snapshot)
+		return "T-3: missing loss alert at second negative month"
+	ProductManager._track_negative_unit_margin(loss_probe, float(margin.margin), 1)
+	if CompanyManager.alerts.size() != alerts_before + 1:
+		_restore(snapshot)
+		return "T-3: repeated loss alerts during same streak"
+	ProductManager._track_negative_unit_margin(loss_probe, 1.0, 1)
+	ProductManager._track_negative_unit_margin(loss_probe, float(margin.margin), 1)
+	ProductManager._track_negative_unit_margin(loss_probe, float(margin.margin), 1)
+	if CompanyManager.alerts.size() != alerts_before + 2:
+		_restore(snapshot)
+		return "T-3: negative-margin alert did not rearm after recovery"
+
 	var normal_demand := MarketManager.estimate_consumer_demand(product)
 	var premium_probe := product.duplicate(true)
 	premium_probe["price"] = reference * 5

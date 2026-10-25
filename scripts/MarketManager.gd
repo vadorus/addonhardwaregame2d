@@ -717,11 +717,22 @@ func segment_market_units(segment: String) -> int:
 	var project_scale := float(segment_project_scale(normalized).get("market_scale", 1.0))
 	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor() * LATE_GAME.segment_demand_factor(normalized))))
 
-func segment_reference_price(segment: String, sector: String = "CPU") -> float:
+## T-3 : les tarifs reflètent le marché de l'époque, pas l'inflation des coûts fixes.
+## 1971–1985 restent identiques ; +1,5 % par année à partir de 1986, plafond ×1,35 (dès 2009).
+func era_price_factor(year: int = -1) -> float:
+	var y := TimeManager.year if year < 0 else year
+	return clampf(1.0 + 0.015 * float(maxi(y - 1985, 0)), 1.0, 1.35)
+
+## Valeur de référence hors époque : à utiliser pour les coûts d'entrée D2 uniquement.
+func segment_reference_price_base(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
 	var sd: Dictionary = GameData.SECTORS.get(sector, GameData.SECTORS.CPU)
 	var need: Dictionary = MARKET_NEEDS.get(normalized, MARKET_NEEDS.EMBEDDED)
 	return float(sd.reference_price) * float(need.price_factor)
+
+## Par défaut, prix du marché de l'année courante. Le paramètre year sert aux tests.
+func segment_reference_price(segment: String, sector: String = "CPU", year: int = -1) -> float:
+	return segment_reference_price_base(segment, sector) * era_price_factor(year)
 
 func market_landscape() -> Array:
 	var rows: Array = []
