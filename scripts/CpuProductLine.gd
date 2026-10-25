@@ -131,7 +131,8 @@ static func market_entry_era_factor(year: int = -1) -> float:
 static func market_entry_unit_cost(segment: String, tier_price_factor: float = 1.0) -> int:
 	var normalized := MarketManager.normalize_segment(segment)
 	var rate := float(MARKET_ENTRY_RATE.get(normalized, 0.20)) * market_entry_era_factor()
-	return maxi(0, int(round(MarketManager.segment_reference_price(normalized) * rate * clampf(tier_price_factor, 0.5, 2.0))))
+	# Seule la rampe D2 (1971–1981) s'applique au coût d'entrée, jamais la hausse du prix de vente T-3.
+	return maxi(0, int(round(MarketManager.segment_reference_price_base(normalized) * rate * clampf(tier_price_factor, 0.5, 2.0))))
 
 static func _build_product(project: Dictionary, tier: Dictionary, tier_index: int, generation_id: String, generation_index: int, architecture: Dictionary, project_metrics: Dictionary, yield_rate: float, bin_share: float, base_unit_cost: int, reference_price: int, total_monthly_capacity: int, industrialization: Dictionary, capability_snapshot: Dictionary) -> Dictionary:
 	var tier_key := str(tier.key)
