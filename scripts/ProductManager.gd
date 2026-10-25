@@ -652,15 +652,16 @@ func unit_margin(product: Dictionary) -> Dictionary:
 	var total_unit_cost := maxi(int(product.get("unit_cost", 0)), 0)
 	var entry_cost := clampi(int(product.get("market_entry_cost", 0)), 0, total_unit_cost)
 	var silicon_cost := total_unit_cost - entry_cost
-	var fabrication_factor := MarketManager.production_cost_threat_factor() * experience_cost_factor()
-	var fabrication := float(silicon_cost) * fabrication_factor + float(entry_cost)
+	var threat_factor := MarketManager.production_cost_threat_factor()
+	var learning_factor := experience_cost_factor()
+	var fabrication := float(silicon_cost) * threat_factor * learning_factor + float(entry_cost)
 	var distributor_rate := MarketManager.distributor_share()
 	var distributor := price * distributor_rate
 	var margin := price - distributor - fabrication
 	return {
 		"price":price, "distributor":distributor, "distributor_rate":distributor_rate,
 		"silicon_cost":silicon_cost, "entry_cost":entry_cost,
-		"fabrication_factor":fabrication_factor, "fabrication":fabrication,
+		"threat_factor":threat_factor, "learning_factor":learning_factor, "fabrication":fabrication,
 		"margin":margin, "margin_pct":(margin / price * 100.0) if price > 0.0 else 0.0
 	}
 
@@ -892,11 +893,11 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
 	# V0.10 / H1 : courbe d'expérience (les premières séries coûtent plus cher à fabriquer)
 	# et part des distributeurs sur les ventes grand public (pas sur les contrats B2B directs).
-	var learning := experience_cost_factor()
 	# T-3 : la simulation et l'interface utilisent le même décompte par puce.
-	# On garde l'arrondi du total mensuel historique, pas une somme de puces arrondies.
+	# On conserve l'ordre des opérations et l'arrondi mensuel de la simulation C3.
 	var margin_data := unit_margin(product)
-	var production_cost := int(round(float(total_units * int(margin_data.silicon_cost)) * float(margin_data.fabrication_factor))) + total_units * int(margin_data.entry_cost)
+	var learning := float(margin_data.learning_factor)
+	var production_cost := int(round(float(total_units * int(margin_data.silicon_cost)) * float(margin_data.threat_factor) * learning)) + total_units * int(margin_data.entry_cost)
 	var distributor_rate := float(margin_data.distributor_rate)
 	var distributor_cost := int(round(float(sold_consumer * int(product.price)) * distributor_rate))
 	_track_negative_unit_margin(product, float(margin_data.margin), sold_consumer)
