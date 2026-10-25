@@ -15,6 +15,7 @@ var product_details_label: Label
 var product_price: SpinBox
 var product_capacity: SpinBox
 var launch_intel_label: Label
+var _margin_line_label: Label
 var post_launch_group: VBoxContainer
 var post_launch_label: Label
 var product_pulse_panel: Control
@@ -191,6 +192,9 @@ func _build() -> void:
 	intel_box.add_theme_constant_override("separation", 6)
 	intel_card.add_child(intel_box)
 	intel_box.add_child(UI.eyebrow("VEILLE AVANT LANCEMENT"))
+	_margin_line_label = UI.label("", 15)
+	_margin_line_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intel_box.add_child(_margin_line_label)
 	launch_intel_label = UI.rich_label()
 	launch_intel_label.custom_minimum_size.y = 118
 	intel_box.add_child(launch_intel_label)
@@ -351,10 +355,10 @@ func launch_card_data() -> Dictionary:
 		candidate["production_capacity"] = capacity
 		var forecast := MarketManager.forecast_cpu_launch(candidate, int(product.get("price", 1)))
 		var expected := mini(int(forecast.get("expected_units", 0)), capacity)
-		var margin := ProductManager.net_margin_per_unit(candidate)
+		var margin := float(ProductManager.unit_margin(candidate).margin)
 		expected_total += expected
-		margin_total += float(margin) * float(maxi(expected, 1))
-		monthly_profit += expected * margin - ProductManager.monthly_capacity_reservation_cost(candidate, expected)
+		margin_total += margin * float(maxi(expected, 1))
+		monthly_profit += int(round(float(expected) * margin)) - ProductManager.monthly_capacity_reservation_cost(candidate, expected)
 		commitment += ProductManager.launch_capacity_commitment_cost(candidate, capacity)
 	return {"models":ready.size(), "name":str((ready[0] as Dictionary).get("name", "Votre CPU")).split(" ")[0],
 		"expected":expected_total, "margin":int(round(margin_total / maxf(float(expected_total), 1.0))),
@@ -614,10 +618,9 @@ func _refresh_model_summary(product: Dictionary) -> void:
 		_model_meters.add_child(row)
 	# Retour Pixel (01/10) : « marge 146 €/puce » oubliait distributeurs et premières séries plus chères ;
 	# le lancement annonçait ~59 € gagnés par puce. Même calcul partout maintenant.
-	var price_value := float(product.get("price", 0))
-	var margin := int(round(price_value * (1.0 - MarketManager.distributor_share() - float(product.get("royalty_rate", 0.0))) - float(product.get("unit_cost", 0)) * ProductManager.experience_cost_factor()))
+	var margin := ProductManager.unit_margin(product)
 	var parts: Array[String] = ["coût %s €" % UI.money(int(product.get("unit_cost", 0))), "prix %s €" % UI.money(int(product.get("price", 0))),
-		"gagné ~%s €/puce (après distributeurs)" % UI.money(margin), "capacité %s/mois" % UI.money(int(product.get("production_capacity", 0)))]
+		"marge boutique ~%.1f €/puce (hors SAV, capacité et redevances)" % float(margin.margin), "capacité %s/mois" % UI.money(int(product.get("production_capacity", 0)))]
 	if status == "LAUNCHED":
 		parts.append("%s vendues au total" % UI.money(int(product.get("units_sold_total", 0))))
 		parts.append("%s (%d mois)" % [MarketManager.product_lifecycle_label(product), int(product.get("months_on_market", 0))])
@@ -808,6 +811,7 @@ func _refresh_attack(product: Dictionary) -> void:
 	_market_button.text = ("Offensive en cours (%d mois) — voir Marché" % int(running.get("months_remaining", 0))) if not running.is_empty() else "Voir les rivaux dans Marché"
 
 func _refresh_launch_intel() -> void:
+	_margin_line_label.visible = false
 	if product_select.item_count == 0:
 		launch_intel_label.text = "Terminez l'industrialisation d'un CPU pour préparer son positionnement."
 		return
@@ -822,16 +826,20 @@ func _refresh_launch_intel() -> void:
 	candidate["price"] = int(product_price.value)
 	candidate["production_capacity"] = int(product_capacity.value)
 	var target := MarketManager.normalize_segment(str(candidate.get("target_segment", MarketManager.default_segment())))
-	var unit_cost := int(candidate.get("unit_cost", 0))
 	var planned_price := int(candidate.get("price", 0))
-	var royalty_per_unit := int(round(float(planned_price) * float(candidate.get("royalty_rate", 0.0))))
-	var gross_margin := planned_price - unit_cost - royalty_per_unit
-	var gross_margin_pct := 0.0 if planned_price <= 0 else float(gross_margin) / float(planned_price) * 100.0
+	var margin := ProductManager.unit_margin(candidate)
+	var advised := ProductManager.recommended_unit_price(candidate)
+	_margin_line_label.text = "Par puce : %.0f € − %.1f € distributeurs − %.1f € fabrication = %.1f € (%.1f%%)" % [
+		float(margin.price), float(margin.distributor), float(margin.fabrication),
+		float(margin.margin), float(margin.margin_pct)
+	]
+	var color := Color("c83939") if float(margin.margin_pct) < 0.0 else (AMBER if float(margin.margin_pct) < 15.0 else Color("168447"))
+	_margin_line_label.add_theme_color_override("font_color", color)
+	_margin_line_label.visible = true
 	var lines: Array[String] = [
 		"Cible : %s • repère marché ~%s €" % [MarketManager.segment_label(target), UI.money(int(round(MarketManager.segment_reference_price(target))))],
-		"Coût unitaire %s € • redevance %s € • prix envisagé %s € • marge brute %s € (%.1f%%)" % [
-			UI.money(unit_cost), UI.money(royalty_per_unit), UI.money(planned_price), UI.money(gross_margin), gross_margin_pct
-		]
+		"Prix conseillé (35 %% de marge) : %s € — indicatif, non appliqué automatiquement" % UI.money(advised),
+		"Hors SAV, réservation de capacité, contrats B2B et redevances."
 	]
 	var forecast := MarketManager.forecast_cpu_launch(candidate, planned_price)
 	if not forecast.is_empty():
@@ -874,10 +882,10 @@ func _refresh_launch_intel() -> void:
 			float(best.get("player_benchmark", 0.0)), float(best.get("competitor_benchmark", 0.0))
 		])
 		lines.append(str(best.get("summary", "")))
-	if gross_margin <= 0:
-		lines.append("⚠ Ce prix ne couvre pas le coût unitaire.")
-	elif gross_margin_pct < 10.0:
-		lines.append("⚠ La marge est très faible : retours SAV, promotions ou défauts peuvent rapidement la faire disparaître.")
+	if float(margin.margin) < 0.0:
+		lines.append("⚠ Chaque puce vendue en boutique fait perdre de l'argent.")
+	elif float(margin.margin_pct) < 15.0:
+		lines.append("⚠ Marge boutique faible : SAV, redevances et imprévus peuvent l'effacer.")
 	launch_intel_label.text = "\n".join(lines)
 
 func _emit_launch() -> void:
