@@ -5,8 +5,8 @@ const VOICES := preload("res://scripts/MarketVoices.gd")
 static func run(_host: Node) -> String:
 	# T-3 : repères déterministes, avec identité stricte avant 1986.
 	var factors := {
-		1971:1.0, 1985:1.0, 1986:1.035, 1995:1.35,
-		2005:1.70, 2010:1.875, 2014:2.0, 2030:2.0
+		1971:1.0, 1985:1.0, 1986:1.015, 1995:1.15,
+		2005:1.30, 2008:1.345, 2009:1.35, 2010:1.35, 2030:1.35
 	}
 	for year_value in factors.keys():
 		var year := int(year_value)

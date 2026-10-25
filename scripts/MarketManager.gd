@@ -718,10 +718,10 @@ func segment_market_units(segment: String) -> int:
 	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor() * LATE_GAME.segment_demand_factor(normalized))))
 
 ## T-3 : les tarifs reflètent le marché de l'époque, pas l'inflation des coûts fixes.
-## 1971–1985 restent identiques ; +3,5 % par année à partir de 1986, plafond ×2.
+## 1971–1985 restent identiques ; +1,5 % par année à partir de 1986, plafond ×1,35 (dès 2009).
 func era_price_factor(year: int = -1) -> float:
 	var y := TimeManager.year if year < 0 else year
-	return clampf(1.0 + 0.035 * float(maxi(y - 1985, 0)), 1.0, 2.0)
+	return clampf(1.0 + 0.015 * float(maxi(y - 1985, 0)), 1.0, 1.35)
 
 ## Valeur de référence hors époque : à utiliser pour les coûts d'entrée D2 uniquement.
 func segment_reference_price_base(segment: String, sector: String = "CPU") -> float:
