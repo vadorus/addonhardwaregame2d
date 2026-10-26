@@ -5,6 +5,13 @@ on:
     branches: [master, main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      signing:
+        description: Android signing mode (stable is manual only)
+        type: choice
+        options: [debug, stable]
+        default: debug
+        required: true
 
 permissions:
   contents: read
@@ -13,6 +20,8 @@ jobs:
   export-android:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      ANDROID_APK_PATH: build/android/TechEmpire-v0.8-debug.apk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,6 +111,7 @@ jobs:
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log; then exit 1; fi
 
       - name: Export Android debug APK
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.signing == 'stable') }}
         shell: bash
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.ci-debug.keystore
@@ -116,21 +126,96 @@ jobs:
           if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/android-export.log; then exit 1; fi
           test -s build/android/TechEmpire-v0.8-debug.apk
 
+      - name: Export Android stable APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.signing == 'stable' }}
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.TECH_EMPIRE_ANDROID_KEYSTORE_B64 }}
+          RELEASE_KEY_ALIAS: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.TECH_EMPIRE_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$RELEASE_KEYSTORE_B64" || -z "$RELEASE_KEY_ALIAS" || -z "$RELEASE_KEY_PASSWORD" ]]; then
+            echo "Stable signing requires all three configured signing secrets."
+            exit 1
+          fi
+          umask 077
+          KEYSTORE="$RUNNER_TEMP/techempire-release.jks"
+          printf '%s' "$RELEASE_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$KEYSTORE"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$RELEASE_KEY_ALIAS"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$RELEASE_KEY_PASSWORD"
+          mkdir -p build/android
+          godot --headless --path . --export-release "Android APK" build/android/TechEmpire-stable.apk 2>&1 | tee /tmp/android-export.log
+          if grep -E 'ERROR:|SCRIPT ERROR|Parse Error|Failed to load script' /tmp/android-export.log; then exit 1; fi
+          test -s build/android/TechEmpire-stable.apk
+          echo "ANDROID_APK_PATH=build/android/TechEmpire-stable.apk" >> "$GITHUB_ENV"
+
       - name: Inspect APK
         shell: bash
         run: |
           set -euo pipefail
           ls -lh build/android
-          file build/android/TechEmpire-v0.8-debug.apk
-          sha256sum build/android/TechEmpire-v0.8-debug.apk | tee build/android/SHA256SUMS.txt
-          unzip -l build/android/TechEmpire-v0.8-debug.apk | grep -E 'AndroidManifest.xml|lib/arm64-v8a/libgodot_android.so'
+          file "$ANDROID_APK_PATH"
+          sha256sum "$ANDROID_APK_PATH" | tee build/android/SHA256SUMS.txt
+          unzip -l "$ANDROID_APK_PATH" | grep -E 'AndroidManifest.xml|lib/arm64-v8a/libgodot_android.so'
+
+      - name: Verify signing certificate and summarize APK
+        shell: bash
+        env:
+          STABLE_SIGNING: ${{ github.event_name == 'workflow_dispatch' && inputs.signing == 'stable' }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/35.0.1"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$ANDROID_APK_PATH" > "$RUNNER_TEMP/android-certificates.txt"
+          "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$ANDROID_APK_PATH" > "$RUNNER_TEMP/android-manifest.txt"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          root = Path(os.environ['RUNNER_TEMP'])
+          certs = (root / 'android-certificates.txt').read_text()
+          manifest = (root / 'android-manifest.txt').read_text()
+          fingerprints = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$', certs, re.M)
+          subjects = re.findall(r'^Signer #\d+ certificate DN: (.+)$', certs, re.M)
+          if len(fingerprints) != 1 or len(subjects) != 1:
+              raise SystemExit('Exactly one APK signer is required.')
+          fingerprint = fingerprints[0].lower()
+          expected = '1ab3db61a2491395fccc6c92e5bd14e0443f18e34b3de7b072b83cc8908acadd'
+          if os.environ['STABLE_SIGNING'] == 'true' and fingerprint != expected:
+              raise SystemExit('Stable signing certificate does not match the pinned SHA256.')
+          def field(pattern):
+              match = re.search(pattern, manifest, re.M)
+              if not match:
+                  raise SystemExit('Required APK manifest metadata is missing.')
+              return match.group(1)
+          package = field(r'^\s*A: package="([^"]+)"')
+          version_name = field(r'^\s*A: [^\n]*:versionName\([^)]*\)="([^"]+)"')
+          version_code = field(r'^\s*A: [^\n]*:versionCode\([^)]*\)=(\d+)\s*$')
+          mode = 'stable (pinned certificate verified)' if os.environ['STABLE_SIGNING'] == 'true' else 'debug'
+          lines = ['## Android APK', f'- Signing: {mode}', f'- Source SHA: {os.environ["GITHUB_SHA"]}',
+                   f'- Package: {package}', f'- Version name: {version_name}', f'- Version code: {version_code}',
+                   f'- Certificate DN: {subjects[0]}', f'- Certificate SHA256: {fingerprint}']
+          summary = '\n'.join(lines) + '\n'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write(summary)
+          print(summary, end='')
+          PY
+
+      - name: Remove temporary release keystore
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.signing == 'stable' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f -- "$RUNNER_TEMP/techempire-release.jks"
+          test ! -e "$RUNNER_TEMP/techempire-release.jks"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: TechEmpire-Android-v0.8-debug
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.signing == 'stable' && 'TechEmpire-Android-stable' || 'TechEmpire-Android-v0.8-debug' }}
           path: |
-            build/android/TechEmpire-v0.8-debug.apk
+            ${{ env.ANDROID_APK_PATH }}
             build/android/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
