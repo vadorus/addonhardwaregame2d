@@ -1,50 +1,64 @@
-# Consignes agents — Tech Empire
+# Tech Empire (Godot) — consignes des agents
 
-Ces règles s'appliquent à tout le dépôt.
+Ce fichier est la **seule source** des consignes. `CLAUDE.md`, `GEMINI.md` et la règle Antigravity ne font que renvoyer ici. Le garder court : une règle à un seul endroit.
 
-## Priorité produit
+## Lire au démarrage (rien d'autre)
+1. Ce fichier.
+2. `docs/ETAT.md` : vision, décisions de jeu et leurs raisons.
+3. L'issue de ta tâche, puis le tableau de bord **Jade #93** et les étiquettes `orch:*` pour savoir ce qui est déjà pris.
 
-- Le périmètre jouable actuel reste la branche **CPU**.
-- Ne pas développer GPU, mobile, spatial, militaire ou d'autres secteurs avant validation de la vertical slice CPU.
-- La simulation Godot doit rester fonctionnelle sans service IA ni connexion Internet.
-- Favoriser une boucle amusante, lisible et testable plutôt qu'une accumulation de paramètres.
+À lire **avant toute écriture** (réservation, modification, PR) :
+- `docs/AI_ENFORCEMENT.md`.
 
-## Architecture et compatibilité
+À lire **seulement quand c'est utile** :
+- `docs/AI_COORDINATION.md` et `docs/AI_TASK_TEMPLATE.md` : en cas de doute sur le protocole ou pour rédiger une passation.
 
-- Moteur cible : Godot 4.7.2, GDScript, sans dépendance .NET.
-- Préserver les anciennes sauvegardes avec une migration explicite lors de toute évolution de schéma.
-- Réutiliser les managers et modèles existants avant d'introduire un nouveau système.
-- Ne pas réorganiser massivement le projet sans demande explicite.
-- Ne jamais versionner de secret, jeton, cache Godot, APK, AAB ou build local.
+## Le projet
+- **Avant de modifier le gameplay**, lire la documentation de jeu concernée dans `docs/` (`DESIGN_BIBLE.md`, `CPU_VERTICAL_SLICE.md`, `UX_ART_DIRECTION.md`…).
+- **Branche produit : `v013/demo-octobre`.** Ne jamais partir de `master` (branche GitHub par défaut).
+- Godot 4.7.2, GDScript, sans .NET. Le jeu doit tourner sans IA ni Internet.
+- Périmètre jouable : la branche **CPU** seulement. Pas de GPU, mobile, spatial ou militaire avant validation de la vertical slice CPU.
+- Une boucle amusante, lisible et testable plutôt qu'une accumulation de paramètres.
+- Préserver les anciennes sauvegardes : toute évolution de schéma passe par une migration explicite.
+- Réutiliser les managers et modèles existants. Pas de réorganisation massive sans demande.
+- Ne jamais versionner secret, jeton, cache Godot, APK, AAB ou build local.
 
-## Validation obligatoire
-
-Après une modification de code, exécuter autant que possible :
-
+## Validation obligatoire après une modification de code
 ```bash
 godot --headless --path . --import
 godot --headless --path . --quit-after 2
 godot --headless --path . res://tests/smoke_test.tscn
 ```
+Toute nouvelle mécanique ajoute ou adapte un test déterministe dans `tests/`. Pour l'interface, essai réel au doigt sur une **copie** de la sauvegarde Pixel.
 
-Toute nouvelle mécanique doit ajouter ou adapter un test déterministe dans `tests/`.
+## Avant d'écrire quoi que ce soit
+1. **Sans tâche attribuée par Alexandre** (ou issue nommant un écrivain unique et ses `Zones`) : **lecture seule**. Aucune modification, commit, push ni fusion.
+2. **GitHub ou le précontrôle indisponible : lecture seule.**
+3. Inventorier **toutes les PR ouvertes, brouillons compris**, les issues réservées et les derniers commits de `v013/demo-octobre`. Une PR existante vaut réservation. Recommencer avant toute reprise et avant fusion.
+4. Relever la branche ouverte et l'**état Git local** (`git status`) avant d'intervenir.
+5. Travailler dans une **copie ou un `git worktree` isolé**, jamais dans le dossier d'un autre agent. Ne jamais écraser des modifications locales ; préserver sauvegardes et secrets.
 
-## Exigences pour le pilote Agents API
+## Règles qui ne bougent jamais
+- **Un seul écrivain par tâche**, un relecteur **différent**. Une PR ou une issue `Réservée` / `En cours` / `En revue` réserve ses `Zones`. Chevauchement : s'arrêter et demander l'arbitrage d'Alexandre.
+- **Aucun commit, push, rebase de branche commune, fusion, release, publication Play Store, APK (signé ou non) ni appel d'API payant sans autorisation explicite d'Alexandre**, propre à l'opération. Ni ce fichier, ni un inventaire, ni un CI vert ne crée une autorisation, un verrou ou une preuve de relecture. **Seul Alexandre écrit `/autoriser`** : aucune IA ne le publie, ne le prépare dans un commentaire ni ne le recopie.
+- Ne jamais modifier la sauvegarde réelle du Pixel ni aucune donnée de production : travailler sur une copie.
+- Si un document cité ici manque dans la branche ouverte : ne pas inventer son contenu, demander la bonne branche.
+- Un CI vert ne prouve pas un build : vérifier compilation réelle, version de l'APK et signature.
+- Passation : tâche, auteur, relecteur, branche et SHA de départ, fichiers modifiés, tests **réellement** exécutés (commande, version, environnement, résultat), tests non faits, risques. Aucun PASS sans preuve. Modèle : `docs/AI_TASK_TEMPLATE.md`.
 
-- Lire la documentation pertinente dans `docs/` avant de modifier le gameplay.
-- Travailler uniquement dans la copie de travail fournie.
-- Ne jamais lancer `git commit`, `git push`, `gh` ou modifier un remote.
-- Ne pas modifier `.github/`, `tools/agents/`, `AGENTS.md`, `.gitignore`, `.gitattributes` ou tout fichier secret.
-- Ne pas utiliser le réseau depuis une commande du projet.
-- Ne pas démarrer de sous-agent sauf si la tâche l'exige explicitement.
-- À la fin, écrire `.agent-output/report.md` avec : résumé, fichiers touchés, tests réellement exécutés, résultats, limites et points à vérifier humainement.
+## Pilote Agents API (prioritaire quand il s'applique)
+- Travailler uniquement dans la copie fournie ; pas de `git commit`, `git push`, `gh` ni de modification de remote.
+- Ne pas modifier `.github/`, `tools/agents/`, `AGENTS.md`, `.gitignore`, `.gitattributes` ni aucun fichier secret.
+- Pas de réseau depuis une commande du projet ; pas de sous-agent sauf demande explicite.
+- À la fin, écrire `.agent-output/report.md` : résumé, fichiers touchés, tests réellement exécutés, résultats, limites, points à vérifier humainement.
 
-Une tâche n'est terminée que si le rapport distingue clairement ce qui a été vérifié de ce qui reste supposé.
+## Qui relit quoi
+Le relecteur est toujours celui nommé dans l'issue, et jamais l'auteur.
 
-## Coordination multi-IA (Claude, Codex, Antigravity)
+**Relecture Claude obligatoire** pour : économie et équilibrage structurant, sauvegardes et migrations, découpage de `main.gd`, signature Android et secrets, workflows, et tous les fichiers de consignes (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/AI_*.md`, `docs/ETAT.md`). **Quand Claude en est l'auteur**, c'est Codex qui relit.
 
-Lire `docs/AI_START_HERE.md` et `docs/AI_COORDINATION.md` avant toute tâche. Vérifier les issues et PR en cours, y compris les brouillons, **avant de réserver un chantier**. Une tâche = un seul agent écrivain + un autre relecteur. Sans autorisation claire, pas de modification, commit, push ou fusion. Si l'accès GitHub ou l'inventaire est indisponible, rester en lecture seule. Les consignes métier et les interdictions du pilote Agents API ci-dessus restent prioritaires.
+**Relecture Gemini possible** (quand Claude n'a plus de quota) uniquement pour la documentation et les tests à faible risque, dans les mêmes limites que l'orchestration de Jade (phase A).
 
-## Précontrôles et portée réelle
-
-Lire `docs/AI_ENFORCEMENT.md` avant écriture. L’inventaire et un contrôle CI réussi ne créent aucune autorisation, aucun verrou et aucune preuve de revue indépendante. Vérifier à nouveau les réservations avant reprise et avant fusion. Antigravity dispose aussi de `.agents/rules/coordination.md` (`trigger: always_on`).
+## Garder l'état à jour
+- **Ce qui est en cours** vit dans le tableau de bord Jade #93 et les étiquettes `orch:*`, pas dans un fichier.
+- **Une décision d'Alexandre** s'ajoute à `docs/ETAT.md` avec sa raison, en une ligne. On ne modifie `docs/ETAT.md` que dans une PR consacrée aux consignes ou à l'état, jamais dans une PR de fonctionnalité, pour ne pas bloquer les autres PR sur ce fichier.
