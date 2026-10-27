@@ -40,11 +40,11 @@ Toute nouvelle mécanique ajoute ou adapte un test déterministe dans `tests/`. 
 
 ## Règles qui ne bougent jamais
 - **Un seul écrivain par tâche**, un relecteur **différent**. Une PR ou une issue `Réservée` / `En cours` / `En revue` réserve ses `Zones`. Chevauchement : s'arrêter et demander l'arbitrage d'Alexandre.
-- **Aucun commit, push, fusion, publication Play Store, build signé ni appel d'API payant sans autorisation explicite d'Alexandre**, propre à l'opération. Ni ce fichier, ni un inventaire, ni un CI vert ne crée une autorisation, un verrou ou une preuve de relecture. **Seul Alexandre écrit `/autoriser`** : aucune IA ne le publie, ne le prépare dans un commentaire ni ne le recopie.
-- Ne jamais modifier la sauvegarde réelle du Pixel : travailler sur une copie.
+- **Aucun commit, push, rebase de branche commune, fusion, release, publication Play Store, APK (signé ou non) ni appel d'API payant sans autorisation explicite d'Alexandre**, propre à l'opération. Ni ce fichier, ni un inventaire, ni un CI vert ne crée une autorisation, un verrou ou une preuve de relecture. **Seul Alexandre écrit `/autoriser`** : aucune IA ne le publie, ne le prépare dans un commentaire ni ne le recopie.
+- Ne jamais modifier la sauvegarde réelle du Pixel ni aucune donnée de production : travailler sur une copie.
 - Si un document cité ici manque dans la branche ouverte : ne pas inventer son contenu, demander la bonne branche.
 - Un CI vert ne prouve pas un build : vérifier compilation réelle, version de l'APK et signature.
-- Passation : tâche, auteur, relecteur, branche et SHA de départ, fichiers modifiés, tests **réellement** exécutés, tests non faits. Aucun PASS sans preuve. Modèle : `docs/AI_TASK_TEMPLATE.md`.
+- Passation : tâche, auteur, relecteur, branche et SHA de départ, fichiers modifiés, tests **réellement** exécutés (commande, version, environnement, résultat), tests non faits, risques. Aucun PASS sans preuve. Modèle : `docs/AI_TASK_TEMPLATE.md`.
 
 ## Pilote Agents API (prioritaire quand il s'applique)
 - Travailler uniquement dans la copie fournie ; pas de `git commit`, `git push`, `gh` ni de modification de remote.
