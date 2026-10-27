@@ -29,11 +29,19 @@ godot --headless --path . res://tests/smoke_test.tscn
 ```
 Toute nouvelle mécanique ajoute ou adapte un test déterministe dans `tests/`. Pour l'interface, essai réel au doigt sur une **copie** de la sauvegarde Pixel.
 
+## Avant d'écrire quoi que ce soit
+1. **Sans tâche attribuée par Alexandre** (ou issue nommant un écrivain unique et ses `Zones`) : **lecture seule**. Aucune modification, commit, push ni fusion.
+2. **GitHub ou le précontrôle indisponible : lecture seule.**
+3. Inventorier **toutes les PR ouvertes, brouillons compris**, les issues réservées et les derniers commits de `v013/demo-octobre`. Une PR existante vaut réservation. Recommencer avant toute reprise et avant fusion.
+4. Travailler dans une **copie ou un `git worktree` isolé**, jamais dans le dossier d'un autre agent. Ne jamais écraser des modifications locales ; préserver sauvegardes et secrets.
+
 ## Règles qui ne bougent jamais
 - **Un seul écrivain par tâche**, un relecteur **différent**. Une PR ou une issue `Réservée` / `En cours` / `En revue` réserve ses `Zones`. Chevauchement : s'arrêter et demander l'arbitrage d'Alexandre.
-- **Aucune fusion, aucune publication Play Store, aucun build signé, aucun appel d'API payant** sans l'accord d'Alexandre. **Seul Alexandre écrit `/autoriser`** : aucune IA ne le publie, ne le prépare dans un commentaire ni ne le recopie.
+- **Aucun commit, push, fusion, publication Play Store, build signé ni appel d'API payant sans autorisation explicite d'Alexandre**, propre à l'opération. Ni ce fichier, ni un inventaire, ni un CI vert ne crée une autorisation, un verrou ou une preuve de relecture. **Seul Alexandre écrit `/autoriser`** : aucune IA ne le publie, ne le prépare dans un commentaire ni ne le recopie.
+- Ne jamais modifier la sauvegarde réelle du Pixel : travailler sur une copie.
+- Si un document cité ici manque dans la branche ouverte : ne pas inventer son contenu, demander la bonne branche.
 - Un CI vert ne prouve pas un build : vérifier compilation réelle, version de l'APK et signature.
-- Passation : tests **réellement** exécutés, tests non faits, fichiers modifiés, SHA. Aucun PASS sans preuve.
+- Passation : tâche, auteur, relecteur, branche et SHA de départ, fichiers modifiés, tests **réellement** exécutés, tests non faits. Aucun PASS sans preuve. Modèle : `docs/AI_TASK_TEMPLATE.md`.
 
 ## Pilote Agents API (prioritaire quand il s'applique)
 - Travailler uniquement dans la copie fournie ; pas de `git commit`, `git push`, `gh` ni de modification de remote.
@@ -42,7 +50,9 @@ Toute nouvelle mécanique ajoute ou adapte un test déterministe dans `tests/`. 
 - À la fin, écrire `.agent-output/report.md` : résumé, fichiers touchés, tests réellement exécutés, résultats, limites, points à vérifier humainement.
 
 ## Qui relit quoi
-**Relecture Claude obligatoire** pour : économie et équilibrage structurant, sauvegardes et migrations, découpage de `main.gd`, signature Android et secrets, workflows, et tous les fichiers de consignes (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/AI_*.md`, `docs/ETAT.md`).
+Le relecteur est toujours celui nommé dans l'issue, et jamais l'auteur.
+
+**Relecture Claude obligatoire** pour : économie et équilibrage structurant, sauvegardes et migrations, découpage de `main.gd`, signature Android et secrets, workflows, et tous les fichiers de consignes (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/AI_*.md`, `docs/ETAT.md`). **Quand Claude en est l'auteur**, c'est Codex qui relit.
 
 **Relecture Gemini possible** (quand Claude n'a plus de quota) uniquement pour la documentation et les tests à faible risque, dans les mêmes limites que l'orchestration de Jade (phase A).
 
