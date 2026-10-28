@@ -3,6 +3,7 @@ extends Node
 const _LIVE_THEME := preload("res://scripts/LiveTheme.gd")
 
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
+const CASH_SAFETY_SCENARIO := preload("res://tests/scenarios/CashSafetyScenario.gd")
 const GARAGE_SCENARIO := preload("res://tests/scenarios/GarageScenario.gd")
 const NEW_PLAYER_ENTRY_SCENARIO := preload("res://tests/scenarios/NewPlayerEntryScenario.gd")
 const FIRST_CPU_WORKSHOP_SCENARIO := preload("res://tests/scenarios/FirstCpuWorkshopScenario.gd")
@@ -61,6 +62,10 @@ func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
 	SaveManager.use_test_folder()
+	var cash_safety_error := CASH_SAFETY_SCENARIO.run(self)
+	if cash_safety_error != "":
+		_fail(cash_safety_error)
+		return
 	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
 	if market_guard_error != "":
 		_fail(market_guard_error)

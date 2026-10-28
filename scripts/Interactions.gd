@@ -288,6 +288,11 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"DECLINE", "label":"Désolé, on est concentrés sur notre CPU.", "hint":"Le client repart ; aucune pénalité"},
 				{"id":"LATER", "label":"Laissez-moi y réfléchir.", "hint":"L'offre tient encore quelques semaines"},
 			]}
+	elif key == "FINANCE:WARNING":
+		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE — MOINS DE DEUX MOIS",
+			"text":"Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible.",
+			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions." % _money(Economy.money),
+			"choices":[{"id":"CONTINUE", "label":"Compris, je revois les dépenses.", "primary":true}]}
 	elif key == "FINANCE:LOAN":
 		if not GarageBusiness.loan_offer_pending():
 			return {}
@@ -396,6 +401,8 @@ static func dialogue(key: String) -> Dictionary:
 
 ## Applique une réponse. Renvoie {ok, message}.
 static func choose(key: String, choice_id: String) -> Dictionary:
+	if key == "FINANCE:WARNING":
+		return {"ok":true, "message":"Attention à la prochaine clôture : la trésorerie reste fragile."}
 	var sid := key.substr(key.find(":") + 1)
 	if key == "HIRE:DEV":
 		if choice_id == "LATER":
