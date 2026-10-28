@@ -24,7 +24,12 @@ static func run(host: Node) -> String:
 
 	screen.call("set_viewport_width", 700.0)
 	# V0.10 / Gammes : quatre étapes (Fabriquer, Vendre, SAV, Gammes), toujours sur une ligne sur Android.
-	if mode_grid.columns != 4 or not mode_buttons.has("RANGES"):
+	# Revue des onglets (14/10) : cinq avec « Logiciels » quand le studio est ouvert.
+	var stages := 0
+	for button in mode_buttons.values():
+		if (button as Button).visible:
+			stages += 1
+	if mode_grid.columns != stages or stages < 4 or not mode_buttons.has("RANGES"):
 		screen.queue_free()
 		return "Product cockpit should keep its four stages on one row on Android"
 	screen.call("focus_product_launch")

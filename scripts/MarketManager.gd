@@ -717,11 +717,22 @@ func segment_market_units(segment: String) -> int:
 	var project_scale := float(segment_project_scale(normalized).get("market_scale", 1.0))
 	return maxi(500, int(round(float(need.base_units) * project_scale * maturity_growth * tech_growth * lifecycle * BalanceManager.market_demand_factor() * market_threat_demand_factor() * LATE_GAME.segment_demand_factor(normalized))))
 
-func segment_reference_price(segment: String, sector: String = "CPU") -> float:
+## T-3 : les tarifs reflètent le marché de l'époque, pas l'inflation des coûts fixes.
+## 1971–1985 restent identiques ; +1,5 % par année à partir de 1986, plafond ×1,35 (dès 2009).
+func era_price_factor(year: int = -1) -> float:
+	var y := TimeManager.year if year < 0 else year
+	return clampf(1.0 + 0.015 * float(maxi(y - 1985, 0)), 1.0, 1.35)
+
+## Valeur de référence hors époque : à utiliser pour les coûts d'entrée D2 uniquement.
+func segment_reference_price_base(segment: String, sector: String = "CPU") -> float:
 	var normalized := normalize_segment(segment)
 	var sd: Dictionary = GameData.SECTORS.get(sector, GameData.SECTORS.CPU)
 	var need: Dictionary = MARKET_NEEDS.get(normalized, MARKET_NEEDS.EMBEDDED)
 	return float(sd.reference_price) * float(need.price_factor)
+
+## Par défaut, prix du marché de l'année courante. Le paramètre year sert aux tests.
+func segment_reference_price(segment: String, sector: String = "CPU", year: int = -1) -> float:
+	return segment_reference_price_base(segment, sector) * era_price_factor(year)
 
 func market_landscape() -> Array:
 	var rows: Array = []
@@ -1061,7 +1072,9 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 	var attack_multiplier := attack_demand_factor(product) * RIVAL_LIFE.acquisition_demand_factor(product) * CompanyManager.SUBSIDIARIES.captive_demand_factor(product)
 	var late_game_multiplier := LATE_GAME.player_demand_factor(product)
 	var technology_multiplier := product_technology_factor(product)
-	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier * late_game_multiplier * technology_multiplier)))
+	# Logiciel 2.0 (14/10) : les logiciels écrits pour vos processeurs (un OS maison surtout) font vendre vos CPU.
+	var ecosystem_multiplier := SoftwareManager.cpu_ecosystem_factor() if str(product.get("company", "")) == CompanyManager.company_name and str(product.get("sector", "CPU")) == "CPU" else 1.0
+	var units := maxi(0, int(round(float(market_units) * raw_share * price_multiplier * media_multiplier * lifecycle_multiplier * rival_multiplier * scale_fit * attack_multiplier * late_game_multiplier * technology_multiplier * ecosystem_multiplier)))
 	var share := float(units) / maxf(float(market_units), 1.0)
 	var expectation: float = 48.0 + _segment_expectation_drift(target) + CompanyManager.get_awareness_bonus()*32.0 + maxf((float(product.get("price", 1))/maxf(segment_reference_price(target),1.0)-1.0)*18.0, 0.0)
 	var gap := score - expectation
@@ -1075,7 +1088,8 @@ func estimate_consumer_demand(product: Dictionary) -> Dictionary:
 		"expectation_gap":gap,"promotion_bonus":float(product.get("promotion_bonus", 0.0)),
 		"software_supported":bool(product.get("control_software", {}).get("released", false)),
 		"segment":target,"market_units":market_units,"company_scale_fit":scale_fit,"attack_multiplier":attack_multiplier,
-		"late_game_multiplier":late_game_multiplier,"technology_multiplier":technology_multiplier
+		"late_game_multiplier":late_game_multiplier,"technology_multiplier":technology_multiplier,
+		"ecosystem_multiplier":ecosystem_multiplier
 	}
 
 ## Lot M (Claude, 29/09) : sonde 40 ans — une entreprise de 8 à 10 personnes atteignait 1 milliard d'euros
@@ -1160,7 +1174,8 @@ func estimate_portfolio_demand(products: Array) -> Dictionary:
 		var breadth_factor := 1.0 + minf(float(maxi(ids.size() - 1, 0)) * 0.14, 0.35)
 		var family_potential := int(round(float(best_units) * breadth_factor))
 		var conversion := clampf(weighted_conversion / maxf(conversion_weight, 0.001), 0.0, 1.12)
-		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion * attack_segment_boost(segment))))
+		var ecosystem := SoftwareManager.cpu_ecosystem_factor() if market_key.get_slice("|", 0) == "CPU" else 1.0
+		var share_cap_units := maxi(1, int(round(float(market_units) * _player_portfolio_share_cap() * conversion * attack_segment_boost(segment) * ecosystem)))
 		var portfolio_units := mini(requested_units, mini(family_potential, share_cap_units))
 		var portfolio_share := float(portfolio_units) / float(market_units)
 

@@ -86,6 +86,7 @@ func add_page(key: String, label: String) -> VBoxContainer:
 	button.pressed.connect(show_page.bind(key))
 	_style_button(button, false)
 	_row.add_child(button)
+	UI.touch_target(button)
 	_buttons[key] = button
 	return new_page
 

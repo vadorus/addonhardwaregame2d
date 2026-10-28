@@ -23,6 +23,7 @@ var _flakes: Array = []
 var _textures := {}
 
 func _ready() -> void:
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	z_index = 60
@@ -50,8 +51,8 @@ func _texture(file_name: String) -> Texture2D:
 		_textures[file_name] = load(path) if ResourceLoader.exists(path) else null
 	return _textures[file_name]
 
-func _process(delta: float) -> void:
-	if not visible:
+func _on_animation_tick(delta: float) -> void:
+	if not is_visible_in_tree():
 		return
 	# Sur l'écran d'accueil (dessiné au niveau 100), les décorations passent devant ; en jeu, elles restent
 	# sous les grandes fenêtres (notes, moments clés, menu).

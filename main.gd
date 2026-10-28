@@ -148,6 +148,9 @@ var cpu_stepper: Control
 
 # V0.8.1 — plateforme PC / Android : sauvegarde, menu, échelle d'interface, zones sûres.
 const SETTINGS_PATH := "user://settings.cfg"
+const FRAME_RATE := preload("res://scripts/FrameRateSettings.gd")
+var frame_settings_path := SETTINGS_PATH
+var menu_frame_rate_button: Button
 const UI_SCALE_STEPS := [0.9, 1.0, 1.1, 1.2, 1.35, 1.5]
 const MIN_LOGICAL_SIZE := Vector2(960.0, 540.0)
 var game_root: VBoxContainer
@@ -203,9 +206,15 @@ var ceo_layer: ColorRect
 var ceo_panel: Control
 var _ceo_resume_scale := 0.0
 
+var _touch_tooltip: CanvasLayer
+
 func _ready():
 	get_tree().node_added.connect(_on_node_added)
+	if _is_mobile():
+		_touch_tooltip = (preload("res://ui/TouchTooltip.gd") as Script).new() as CanvasLayer
+		add_child(_touch_tooltip)
 	_apply_saved_ui_scale()
+	FRAME_RATE.apply_saved(frame_settings_path, _is_mobile())
 	# Thème du moment : réglage du joueur (menu « Décorations du moment »), lu avant de construire les écrans.
 	var live_config := ConfigFile.new()
 	if live_config.load(SETTINGS_PATH) == OK:
@@ -214,6 +223,7 @@ func _ready():
 	theme = _create_app_theme()
 	_build_ui()
 	_build_menu_layer()
+	AnimationClock.watch_menu(menu_layer)
 	_build_slot_layer()
 	_build_notification_feed()
 	_build_review_layer()
@@ -262,22 +272,44 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_back_request()
 
 func _process(_delta):
-	if CompanyManager.created and TimeManager.time_scale > 0.0:
-		var blocker := _blocking_company_decision()
-		if not blocker.is_empty():
-			TimeManager.time_scale = 0.0
-			status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+	# C3 : la date et les décisions sont vérifiées par événements, pas par image.
 	for button in speed_buttons:
 		button.set_pressed_no_signal(is_equal_approx(TimeManager.time_scale, float(button.get_meta("speed"))))
-	if CompanyManager.created:
-		if header_compact:
-			date_label.text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		else:
-			date_label.text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
-		if reputation_label != null:
-			reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+	if CompanyManager.created and reputation_label != null:
+		reputation_label.text = ("Rép. %.0f/100" if header_compact else "Réputation %.0f/100") % CompanyManager.get_brand_score()
+
+func _refresh_clock_date() -> void:
+	if not CompanyManager.created or date_label == null:
+		return
+	var next_text := ""
+	if header_compact:
+		next_text = "J%d • M%d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	else:
+		next_text = "Jour %d • Mois %d • %d" % [TimeManager.day, TimeManager.month, TimeManager.year]
+	if date_label.text != next_text:
+		date_label.text = next_text
+
+func _pause_for_blocker_if_running() -> void:
+	if not CompanyManager.created or TimeManager.time_scale <= 0.0:
+		return
+	var blocker := _blocking_company_decision()
+	if not blocker.is_empty():
+		TimeManager.time_scale = 0.0
+		status_label.text = str(blocker.get("message", "Une décision attend votre choix."))
+
+func _on_day_changed(_day: int, _month: int, _year: int) -> void:
+	_refresh_clock_date()
+	_pause_for_blocker_if_running()
 
 func _connect_signals():
+	TimeManager.day_changed.connect(_on_day_changed)
+	# Le premier reset de l'horloge précède la création de l'entreprise.
+	CompanyManager.company_changed.connect(_refresh_clock_date)
+	ResearchManager.projects_changed.connect(_pause_for_blocker_if_running)
+	ResearchManager.research_changed.connect(_pause_for_blocker_if_running)
+	SoftwareManager.software_changed.connect(_pause_for_blocker_if_running)
+	ProductionManager.jobs_changed.connect(_pause_for_blocker_if_running)
+	ProductManager.products_changed.connect(_pause_for_blocker_if_running)
 	Economy.money_changed.connect(func(_v): _refresh_top())
 	Economy.month_closed.connect(_on_month_closed)
 	Objectives.objective_completed.connect(_on_objective_completed)
@@ -1716,7 +1748,7 @@ func _close_software_workshop() -> void:
 func _software_to_hardware() -> void :
 	if software_workshop != null:
 		software_workshop.call("close")
-	TimeManager.time_scale = _software_resume_scale
+	_request_time_scale(_software_resume_scale)
 	var active_cpu_project:= false
 	for project_value in ResearchManager.projects:
 		if str((project_value as Dictionary).get("status", "")) == "DEVELOPMENT":
@@ -1783,7 +1815,7 @@ func _launch_cpu_from_stepper(spec: Dictionary) -> void:
 	# Maquette « L'établi » : le lancement est fêté, puis l'établi se ferme tout seul (ou d'une touche).
 	cpu_stepper.call("play_launch", str(spec.get("name", "Nova CPU")))
 	SoundManager.play("launch")
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement." % str(spec.get("name", "Nova CPU"))
 	_refresh_all()
 	_show_tab(0)
@@ -1793,6 +1825,7 @@ func _show_first_cpu_workshop() -> void:
 		return
 	TimeManager.time_scale = 0.0
 	first_cpu_workshop.call("open")
+	UI.upgrade_inputs(first_cpu_workshop)
 	SoundManager.play("open")
 	JUICE.fade_in(first_cpu_workshop, 0.2)
 	status_label.text = "Nora : choisissez d'abord ce que ce premier processeur doit accomplir."
@@ -1867,7 +1900,7 @@ func _launch_first_cpu_from_workshop(spec: Dictionary) -> void:
 	var base_name := project_name.rstrip(" 0123456789").strip_edges()
 	var first_line := ArchitectureManager.create_line(base_name if base_name != "" else project_name, str(spec.get("segment", MarketManager.default_segment())), ArchitectureManager.latest_id())
 	ArchitectureManager.register_project(project_name, first_line, ArchitectureManager.latest_id(), [])
-	TimeManager.time_scale = 1.0
+	_request_time_scale(1.0)
 	status_label.text = "%s entre en développement. Nora ouvre maintenant les outils de direction utiles au suivi du projet." % project_name
 	_refresh_all()
 	_show_tab(0)
@@ -2184,6 +2217,8 @@ func _show_tab(index: int):
 	if tabs.current_tab != safe_index and status_label != null and (status_label.text.begins_with("Nora : cette fonction") or status_label.text.begins_with("Nora : pas encore")):
 		status_label.text = ""
 	tabs.current_tab = safe_index
+	# Revue des onglets (14/10) : listes et compteurs adaptés au doigt (y compris ceux créés depuis).
+	UI.upgrade_inputs(tabs.get_child(safe_index))
 	_place_notification_feed()
 	_update_nav_state()
 
@@ -2227,6 +2262,7 @@ func _update_nav_state():
 
 func _update_responsive_layout():
 	header_compact = size.x < 1220.0
+	_refresh_clock_date()
 	if header_brand_box != null:
 		header_brand_box.custom_minimum_size.x = 150.0 if header_compact else 235.0
 		for word in header_wordmark:
@@ -2241,6 +2277,7 @@ func _update_responsive_layout():
 		caption.visible = not short_screen
 	for speed_button in speed_buttons:
 		speed_button.custom_minimum_size = Vector2(40, 36) if short_screen else Vector2(44, 46)
+		UI.touch_target(speed_button)
 	if status_label != null:
 		status_label.custom_minimum_size.y = 18.0 if short_screen else 24.0
 	if bottom_dock != null:
@@ -2863,7 +2900,8 @@ func _start_project():
 		status_label.text = "%s entre en développement — %s • usage %s%s%s%s." % [name, str(evaluation.profile), CPU_DESIGN.application_label(application_key), plan_text, remediation_text, supplier_text]
 		active_cpu_generation_plan = {}
 		active_cpu_remediation = {}
-		if TimeManager.time_scale <= 0.0:
+		# 14/10 : ne pas relancer le temps si un autre projet (logiciel…) attend un choix obligatoire.
+		if TimeManager.time_scale <= 0.0 and _blocking_company_decision().is_empty():
 			TimeManager.time_scale = 1.0
 	else:
 		status_label.text = ResearchManager.last_start_error
@@ -2879,6 +2917,8 @@ func _on_products_action(action: String, payload: Dictionary):
 	match action:
 		"status":
 			status_label.text = str(payload.get("text", ""))
+		"open_software":
+			_on_dashboard_navigation(0, "SOFTWARE")
 		"show_product_reviews":
 			# C2 : revoir les tests d'un produit, avec le résumé et le calcul de chaque note.
 			var reviewed := ProductManager.get_product(str(payload.get("product_id", "")))
@@ -3053,7 +3093,7 @@ func _select_meta(option: OptionButton, wanted: String):
 # ---------------------------------------------------------------------------
 
 func _is_mobile() -> bool:
-	return OS.has_feature("mobile")
+	return OS.has_feature("mobile") or bool(get_meta("_t2_test_mobile", false))
 
 func _apply_saved_ui_scale() -> void:
 	if not (get_viewport() is Window):
@@ -3236,6 +3276,9 @@ func _build_menu_layer() -> void:
 	menu_fullscreen_button.visible = not _is_mobile()
 	menu_fullscreen_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.add_child(menu_fullscreen_button)
+	menu_frame_rate_button = _menu_button("Fluidité : %d images/s" % Engine.max_fps, _menu_toggle_frame_rate)
+	menu_frame_rate_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(menu_frame_rate_button)
 	var privacy_button := _menu_button("Confidentialité", open_privacy)
 	privacy_button.name = "PrivacyButton"
 	privacy_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -3283,6 +3326,8 @@ func system_menu_visible() -> bool:
 	return menu_layer != null and menu_layer.visible
 
 func _refresh_menu_labels() -> void:
+	if menu_frame_rate_button != null:
+		menu_frame_rate_button.text = "Fluidité : %d images/s" % Engine.max_fps
 	if menu_volume_label != null:
 		menu_volume_label.text = "Muet" if SoundManager.muted else "%d %%" % int(round(SoundManager.sfx_volume * 100.0))
 	if menu_music_label != null:
@@ -3421,11 +3466,35 @@ func _confirm_quit_on_back() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_node_added(node: Node) -> void:
+	# T2 : nouveaux contrôles inclus, y compris ceux reconstruits pendant le jeu.
+	# L'exécution différée laisse les composants définir leur taille initiale.
+	if _is_mobile() and node is Control and is_ancestor_of(node):
+		if node is BaseButton or node is HSlider or node is VSlider or node is SpinBox or node is LineEdit:
+			if not node.has_meta("_t2_target_registered"):
+				node.set_meta("_t2_target_registered", true)
+				var control := node as Control
+				var min_height: float = UI.TOUCH_PRIMARY if UI.touch_kind(control) == "primary" else UI.TOUCH_SECONDARY
+				if control.custom_minimum_size.x < UI.TOUCH_SECONDARY or control.custom_minimum_size.y < min_height:
+					# Réécouter seulement les éléments dont la taille doit être protégée.
+					var target_changed := _apply_mobile_touch_target.bind(node)
+					if not control.minimum_size_changed.is_connected(target_changed):
+						control.minimum_size_changed.connect(target_changed, CONNECT_DEFERRED)
+					_apply_mobile_touch_target.call_deferred(node)
+	# T3 : une seule écoute tactile par contrôle, y compris les infobulles définies plus tard.
+	if _is_mobile() and _touch_tooltip != null and node is Control and is_ancestor_of(node):
+		var candidate := node as Control
+		if candidate is BaseButton or candidate is Range or not candidate.tooltip_text.is_empty():
+			_touch_tooltip.call("register", candidate)
 	# Chaque bouton du jeu fait un petit « clic » (sauf ceux qui jouent déjà leur propre son).
 	if node is BaseButton and not node.has_meta("silent"):
 		var button := node as BaseButton
 		if not button.pressed.is_connected(_play_click):
 			button.pressed.connect(_play_click)
+
+func _apply_mobile_touch_target(node: Node) -> void:
+	if not is_instance_valid(node) or not node is Control or not is_ancestor_of(node):
+		return
+	UI.touch_target(node as Control, UI.touch_kind(node as Control), _is_mobile())
 
 func _play_click() -> void:
 	SoundManager.play("click")
@@ -3680,7 +3749,7 @@ func open_ceo_decision(decision_id: String) -> bool:
 	if found.is_empty() or decision_id.begins_with("PROJECT:") or decision_id.begins_with("LAUNCH:"):
 		return false
 	# Les dossiers RH et les visites de clients se règlent en parlant à la personne.
-	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:") or decision_id.begins_with("ADVICE:")) and open_dialogue(decision_id):
+	if (decision_id.begins_with("HR:") or decision_id.begins_with("CLIENT:") or decision_id.begins_with("STUDY:") or decision_id.begins_with("FINANCE:") or decision_id.begins_with("ADVICE:") or decision_id.begins_with("RIVALRY:")) and open_dialogue(decision_id):
 		return true
 	if not ceo_layer.visible:
 		_ceo_resume_scale = TimeManager.time_scale
@@ -4018,6 +4087,12 @@ func _menu_toggle_motion() -> void:
 	config.set_value("ui", "reduced_motion", JUICE.reduced_motion)
 	config.save(SETTINGS_PATH)
 
+func _menu_toggle_frame_rate() -> void:
+	var fps := 60 if Engine.max_fps == 30 else 30
+	if FRAME_RATE.save_and_apply(fps, frame_settings_path) != OK:
+		status_label.text = "Le réglage de fluidité n'a pas pu être enregistré."
+	_refresh_menu_labels()
+
 func _on_software_launched(product: Dictionary) -> void:
 	call_deferred("_autosave", "sortie logiciel")
 	SoundManager.play("success")
@@ -4029,6 +4104,7 @@ func _open_cpu_journey(project_id: String = "") -> void:
 	TimeManager.time_scale = 0.0
 	if notification_feed != null: notification_feed.call("clear")
 	cpu_journey.call("open", project_id)
+	UI.upgrade_inputs(cpu_journey)
 	SoundManager.play("open")
 
 func _open_cpu_journey_context(context: String) -> bool:

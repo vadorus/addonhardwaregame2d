@@ -7,7 +7,8 @@ const STANDARD_LEVEL := 3.0
 const POINTS_PER_LEVEL := 15.0
 const MAX_MASTERY := 5
 const DEV_ERA_GROWTH := 0.065
-const FAMILY_ORDER := ["UTILITY", "DEVTOOLS", "BUSINESS", "OS", "SERVER"]
+## Logiciel 2.0 (14/10) : quatre types de plus, qui s'ouvrent avec l'époque (jeux, création, sécurité, Internet).
+const FAMILY_ORDER := ["UTILITY", "DEVTOOLS", "BUSINESS", "GAME", "OS", "SERVER", "MULTIMEDIA", "SECURITY", "WEB"]
 
 const PRICE_MODES := {
 	"LOW":{"label":"Prix accessible", "factor":0.75},
@@ -40,7 +41,27 @@ const FAMILIES := {
 		"base_dev_month":15500, "reference_price":220.0, "base_users":430, "growth":0.15,
 		"aging_per_year":0.28, "support_rate":0.050,
 		"pitch":"Logiciels critiques pour entreprises : peu de clients, gros contrats, sécurité et disponibilité essentielles.",
-		"settings":["performance", "reliability", "security", "scalability"]}
+		"settings":["performance", "reliability", "security", "scalability"]},
+	"GAME":{"label":"Jeux", "unlock_year":1972, "stem":"Quest", "base_months":4,
+		"base_dev_month":7000, "reference_price":20.0, "base_users":700, "growth":0.21,
+		"aging_per_year":0.50, "support_rate":0.025,
+		"pitch":"Des jeux pour les machines de l'époque : un public large, des modes qui passent vite.",
+		"settings":["features", "usability", "stability", "performance"]},
+	"MULTIMEDIA":{"label":"Création & multimédia", "unlock_year":1984, "stem":"Studio", "base_months":6,
+		"base_dev_month":12000, "reference_price":95.0, "base_users":800, "growth":0.17,
+		"aging_per_year":0.40, "support_rate":0.045,
+		"pitch":"Dessin, musique, vidéo : les créatifs paient bien un outil rapide et agréable.",
+		"settings":["features", "usability", "stability", "performance"]},
+	"SECURITY":{"label":"Sécurité", "unlock_year":1988, "stem":"Shield", "base_months":5,
+		"base_dev_month":11000, "reference_price":45.0, "base_users":1100, "growth":0.18,
+		"aging_per_year":0.48, "support_rate":0.050,
+		"pitch":"Antivirus et protection : un logiciel qu'on renouvelle tant qu'il reste à jour.",
+		"settings":["features", "usability", "stability", "performance"]},
+	"WEB":{"label":"Internet & navigateurs", "unlock_year":1994, "stem":"Web", "base_months":5,
+		"base_dev_month":14000, "reference_price":35.0, "base_users":2400, "growth":0.24,
+		"aging_per_year":0.50, "support_rate":0.030,
+		"pitch":"Navigateurs, messageries, services en ligne : un marché qui explose et change chaque année.",
+		"settings":["features", "usability", "stability", "performance"]}
 }
 const SETTINGS := {
 	"UTILITY":{
@@ -67,7 +88,27 @@ const SETTINGS := {
 		"performance":{"label":"Performances", "cost":0.17, "months":0.8},
 		"reliability":{"label":"Fiabilité", "cost":0.18, "months":0.9},
 		"security":{"label":"Sécurité", "cost":0.18, "months":0.9},
-		"scalability":{"label":"Montée en charge", "cost":0.20, "months":1.0}}
+		"scalability":{"label":"Montée en charge", "cost":0.20, "months":1.0}},
+	"GAME":{
+		"features":{"label":"Contenu", "cost":0.14, "months":0.5},
+		"usability":{"label":"Prise en main", "cost":0.10, "months":0.5},
+		"stability":{"label":"Stabilité", "cost":0.10, "months":0.5},
+		"performance":{"label":"Fluidité", "cost":0.12, "months":0.5}},
+	"MULTIMEDIA":{
+		"features":{"label":"Fonctions", "cost":0.15, "months":0.7},
+		"usability":{"label":"Ergonomie", "cost":0.13, "months":0.6},
+		"stability":{"label":"Stabilité", "cost":0.12, "months":0.6},
+		"performance":{"label":"Performances", "cost":0.15, "months":0.7}},
+	"SECURITY":{
+		"features":{"label":"Protection", "cost":0.15, "months":0.7},
+		"usability":{"label":"Discrétion", "cost":0.10, "months":0.5},
+		"stability":{"label":"Fiabilité", "cost":0.15, "months":0.7},
+		"performance":{"label":"Légèreté", "cost":0.12, "months":0.6}},
+	"WEB":{
+		"features":{"label":"Fonctions", "cost":0.15, "months":0.6},
+		"usability":{"label":"Ergonomie", "cost":0.14, "months":0.6},
+		"stability":{"label":"Stabilité", "cost":0.12, "months":0.6},
+		"performance":{"label":"Vitesse", "cost":0.14, "months":0.6}}
 }
 
 const SEGMENTS := {
@@ -85,7 +126,15 @@ const SEGMENTS := {
 		"PRO":{"label":"Entreprises", "from":1978, "share":0.20, "weights":{"compatibility":0.22,"usability":0.08,"stability":0.35,"ecosystem":0.20,"price":0.15}}},
 	"SERVER":{
 		"ENTERPRISE":{"label":"Entreprises", "from":1977, "share":0.70, "weights":{"performance":0.18,"reliability":0.30,"security":0.28,"scalability":0.20,"price":0.04}},
-		"TECH":{"label":"Sociétés technologiques", "from":1980, "share":0.30, "weights":{"performance":0.25,"reliability":0.22,"security":0.18,"scalability":0.30,"price":0.05}}}
+		"TECH":{"label":"Sociétés technologiques", "from":1980, "share":0.30, "weights":{"performance":0.25,"reliability":0.22,"security":0.18,"scalability":0.30,"price":0.05}}},
+	"GAME":{
+		"HOME":{"label":"Joueurs", "from":1972, "share":1.0, "weights":{"features":0.30,"usability":0.25,"stability":0.10,"performance":0.35,"price":0.10}}},
+	"MULTIMEDIA":{
+		"HOME":{"label":"Créatifs", "from":1984, "share":1.0, "weights":{"features":0.35,"usability":0.30,"stability":0.15,"performance":0.20,"price":0.10}}},
+	"SECURITY":{
+		"HOME":{"label":"Tous publics", "from":1988, "share":1.0, "weights":{"features":0.30,"usability":0.15,"stability":0.35,"performance":0.20,"price":0.10}}},
+	"WEB":{
+		"HOME":{"label":"Internautes", "from":1994, "share":1.0, "weights":{"features":0.30,"usability":0.35,"stability":0.15,"performance":0.20,"price":0.10}}}
 }
 
 static func family(family_id: String) -> Dictionary:

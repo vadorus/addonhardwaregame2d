@@ -39,13 +39,16 @@ func _ready() -> void:
 func check_cash_safety() -> void:
 	if not CompanyManager.created or SimulationManager.is_game_over:
 		return
-	if cash_runway_months() >= 2.0:
+	var reserve := cash_runway_months()
+	if reserve > 3.0:
 		_cash_warning_shown = false
+		return
+	if reserve >= 2.0:
 		return
 	if _cash_warning_shown or Economy.money <= 0:
 		return
 	_cash_warning_shown = true
-	CompanyManager.add_alert("Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Cherchons un financement avant la faillite.")
+	CompanyManager.add_alert("Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre.")
 	TimeManager.time_scale = 0.0
 	var scene := get_tree().current_scene
 	if scene != null and scene.has_method("open_dialogue"):

@@ -6,6 +6,7 @@ const COPPER := Color("d9a45c")
 const GREEN := Color("54d6ae")
 
 func _ready() -> void:
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	custom_minimum_size = Vector2(280, 230)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -13,7 +14,7 @@ func configure(value: Dictionary) -> void:
 	state = value
 	queue_redraw()
 
-func _process(delta: float) -> void:
+func _on_animation_tick(delta: float) -> void:
 	if is_visible_in_tree() and TimeManager.time_scale > 0.0:
 		_clock += delta
 		queue_redraw()

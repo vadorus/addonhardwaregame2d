@@ -1043,6 +1043,8 @@ func start_project(project_name: String, sector: String, segment: String, approa
 		)
 		if not available_nodes.has(int(normalized_design.node_nm)):
 			return _reject_project_start("Le procédé de gravure %d nm n’est pas maîtrisé. Choisissez un procédé disponible ou développez la miniaturisation." % int(normalized_design.node_nm))
+		if not FoundryManager.can_manufacture(int(normalized_design.node_nm)):
+			return _reject_project_start("Aucun fondeur ne sait encore graver en %d nm, et votre usine non plus. Choisissez un procédé plus ancien ou équipez votre propre usine." % int(normalized_design.node_nm))
 		design_estimate = CPU_DESIGN.evaluate(normalized_design, effective_capabilities)
 		if not stored_remediation.is_empty():
 			design_estimate = cpu_remediation_preview(normalized_design, stored_remediation)

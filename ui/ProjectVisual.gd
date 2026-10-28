@@ -5,6 +5,7 @@ var data: Dictionary = {}
 var _clock:= 0.0
 
 func _ready() -> void :
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	custom_minimum_size = Vector2(0, 154)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -12,7 +13,7 @@ func configure(row: Dictionary) -> void :
 	data = row.duplicate(true)
 	queue_redraw()
 
-func _process(delta: float) -> void :
+func _on_animation_tick(delta: float) -> void :
 	if not is_visible_in_tree() or JUICE.reduced_motion or bool(data.get("blocked", false)) or TimeManager.time_scale <= 0.0:
 		return
 	_clock += delta

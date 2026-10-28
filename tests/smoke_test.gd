@@ -66,6 +66,18 @@ func _ready() -> void:
 	if cash_safety_error != "":
 		_fail(cash_safety_error)
 		return
+	var audio_error: String = preload("res://tests/scenarios/AudioBusScenario.gd").run()
+	if audio_error != "":
+		_fail(audio_error)
+		return
+	var animation_error: String = await preload("res://tests/scenarios/AnimationClockScenario.gd").run(self)
+	if animation_error != "":
+		_fail(animation_error)
+		return
+	var frame_rate_error: String = await preload("res://tests/scenarios/FrameRateSettingsScenario.gd").run(self)
+	if frame_rate_error != "":
+		_fail(frame_rate_error)
+		return
 	var market_guard_error := MARKET_ECONOMY_GUARD_SCENARIO.run()
 	if market_guard_error != "":
 		_fail(market_guard_error)
@@ -1832,6 +1844,11 @@ func _ready() -> void:
 		_fail(lot_zero_error)
 		return
 	print("[CI] Lot 0 Software : prix, serveurs, contrats, firmware plafonné OK")
+	var studio_error: String = (load("res://tests/scenarios/SoftwareStudioScenario.gd") as Script).call("run", self)
+	if studio_error != "":
+		_fail(studio_error)
+		return
+	print("[CI] Logiciel 2.0 : combinaisons, fonctions d'époque, phases, carnet de Nora OK")
 	var confirm_error: String = (load("res://tests/scenarios/ConfirmGuardScenario.gd") as Script).call("run", self)
 	if confirm_error != "":
 		_fail(confirm_error)
@@ -1874,6 +1891,12 @@ func _ready() -> void:
 		_fail(ranges_error)
 		return
 	print("[CI] Gammes : mémoire, alimentations, boîtiers — ouverture, fiche d'impact fidèle, note et ventes annoncées = obtenues, sauvegarde OK")
+	await get_tree().process_frame
+	var palmares_error: String = (load("res://tests/scenarios/PalmaresRivalryScenario.gd") as Script).call("run", self)
+	if palmares_error != "":
+		_fail(palmares_error)
+		return
+	print("[CI] Palmarès CPU et défi « un titre à défendre » : plusieurs premiers, prévision fidèle, 4 issues distinctes, sauvegarde OK")
 	# Laisse le moteur liberer les ecrans jetes par le scenario precedent (queue_free).
 	await get_tree().process_frame
 	var launch_range_error := LAUNCH_RANGE_SCENARIO.run(self)

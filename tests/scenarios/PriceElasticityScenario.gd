@@ -3,6 +3,21 @@ extends RefCounted
 const VOICES := preload("res://scripts/MarketVoices.gd")
 
 static func run(_host: Node) -> String:
+	# T-3 : repères déterministes, avec identité stricte avant 1986.
+	var factors := {
+		1971:1.0, 1985:1.0, 1986:1.015, 1995:1.15,
+		2005:1.30, 2008:1.345, 2009:1.35, 2010:1.35, 2030:1.35
+	}
+	for year_value in factors.keys():
+		var year := int(year_value)
+		if not is_equal_approx(MarketManager.era_price_factor(year), float(factors[year])):
+			return "T-3: wrong era price factor at %d" % year
+	var base_price := MarketManager.segment_reference_price_base("EMBEDDED")
+	for year_value in factors.keys():
+		var year := int(year_value)
+		var expected := base_price * float(factors[year])
+		if absf(MarketManager.segment_reference_price("EMBEDDED", "CPU", year) - expected) > 0.00001:
+			return "T-3: price reference diverges from base × era factor in %d" % year
 	SimulationManager.reset_all("CI Élasticité", "CPU", "STANDARD")
 	# Aucune rupture aux repères (y compris 75 % et 5x, auparavant discontinus).
 	var last := INF

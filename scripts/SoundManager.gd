@@ -7,6 +7,9 @@ extends Node
 const MIX_RATE := 22050
 const SETTINGS_PATH := "user://settings.cfg"
 const POOL_SIZE := 6
+const AUDIO_BUSES := ["Musique", "Ambiances", "Effets"]
+var _ducks: Dictionary = {}
+var _duck_serial := 0
 
 var sfx_volume := 0.8
 var muted := false
@@ -47,13 +50,17 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for i in range(POOL_SIZE):
 		var player := AudioStreamPlayer.new()
+		player.bus = "Effets"
 		add_child(player)
 		_players.append(player)
 	_music_player = AudioStreamPlayer.new()
+	_music_player.bus = "Musique"
 	add_child(_music_player)
 	_music_player.finished.connect(_on_music_finished)
 	_build_sounds()
 	_load_settings()
+	for bus in AUDIO_BUSES:
+		_apply_bus_volume(bus)
 
 const SFX_DIR := "res://assets/audio/sfx/"
 ## Sons remplacés par la banque libre (les autres restent synthétisés : mois, trésorerie, note).
@@ -99,12 +106,13 @@ func play(sound_name: String, pitch: float = 1.0) -> void:
 	var player := _free_player()
 	player.stream = _streams[sound_name]
 	player.pitch_scale = pitch
-	player.volume_db = linear_to_db(clampf(sfx_volume, 0.001, 1.0))
+	player.volume_db = 0.0
 	player.play()
 
 func set_volume(value: float, persist: bool = true) -> void:
 	sfx_volume = clampf(value, 0.0, 1.0)
 	muted = sfx_volume <= 0.0
+	_apply_bus_volume("Effets")
 	if persist:
 		var config := ConfigFile.new()
 		config.load(SETTINGS_PATH)
@@ -275,14 +283,51 @@ func stop_music() -> void:
 func set_music_volume(value: float, persist: bool = true) -> void:
 	music_volume = clampf(value, 0.0, 1.0)
 	if _music_player != null:
-		_music_player.volume_db = linear_to_db(maxf(music_volume, 0.001))
 		_music_player.stream_paused = music_volume <= 0.0
-	set_ambience(_ambience_target, 0.0)
+	_apply_bus_volume("Musique")
+	_apply_bus_volume("Ambiances")
 	if persist:
 		var config := ConfigFile.new()
 		config.load(SETTINGS_PATH)
 		config.set_value("audio", "music", music_volume)
 		config.save(SETTINGS_PATH)
+
+## Atténuation en dB (négative), tenue pendant `duree` secondes, puis remontée en 1,5 s.
+## Les appels superposés restent indépendants : le plus fort gagne jusqu'à sa fin.
+## Les préférences restent la base du volume, même si elles changent pendant le duck.
+func duck(bus: String, db: float, duree: float) -> Tween:
+	if bus not in AUDIO_BUSES or not is_finite(db) or not is_finite(duree) or db >= 0.0 or duree < 0.0:
+		return null
+	_duck_serial += 1
+	var token := _duck_serial
+	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_ducks[token] = {"bus": bus, "db": maxf(db, -80.0), "tween": tween}
+	_apply_bus_volume(bus)
+	tween.tween_interval(duree)
+	tween.tween_method(_set_duck_level.bind(token), maxf(db, -80.0), 0.0, 1.5)
+	tween.tween_callback(func():
+		_ducks.erase(token)
+		_apply_bus_volume(bus))
+	return tween
+
+func _set_duck_level(db: float, token: int) -> void:
+	if _ducks.has(token):
+		_ducks[token]["db"] = db
+		_apply_bus_volume(str(_ducks[token]["bus"]))
+
+func _apply_bus_volume(bus: String) -> void:
+	var index := AudioServer.get_bus_index(bus)
+	if index < 0:
+		return
+	var level := sfx_volume if bus == "Effets" else music_volume
+	if bus == "Ambiances":
+		level = clampf(music_volume * AMBIENCE_GAIN, 0.0, 1.0)
+	var attenuation := 0.0
+	for entry in _ducks.values():
+		if entry["bus"] == bus:
+			attenuation = minf(attenuation, float(entry["db"]))
+	AudioServer.set_bus_mute(index, level <= 0.0)
+	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(level, 0.0001)) + attenuation)
 
 func _build_music_task(era: String) -> void:
 	var stream := build_music(era, 8)
@@ -318,7 +363,7 @@ func _start_music(stream: AudioStream) -> void:
 		_music_player.play()
 		_music_player.stream_paused = music_volume <= 0.0)
 	# Fondu d'entrée doux.
-	_music_tween.tween_property(_music_player, "volume_db", linear_to_db(maxf(music_volume, 0.001)), 2.5)
+	_music_tween.tween_property(_music_player, "volume_db", 0.0, 2.5)
 
 ## Construit une boucle de `bars` mesures (4 temps) : nappe + basse + arpège, sans clic au bouclage.
 func build_music(era: String, bars: int) -> AudioStreamWAV:
@@ -402,7 +447,7 @@ func set_ambience(mix: Dictionary, fade: float = 2.5) -> void:
 			player = _make_ambience_player(layer)
 			if player == null:
 				continue
-		_fade_ambience(player, level * clampf(music_volume * AMBIENCE_GAIN, 0.0, 1.0), fade)
+		_fade_ambience(player, level, fade)
 
 func ambience_levels() -> Dictionary:
 	return _ambience_target.duplicate()
@@ -419,6 +464,7 @@ func _make_ambience_player(layer: String) -> AudioStreamPlayer:
 		return null
 	stream.loop = true
 	var player := AudioStreamPlayer.new()
+	player.bus = "Ambiances"
 	player.stream = stream
 	player.volume_db = -80.0
 	player.set_meta("level", 0.0)
@@ -455,6 +501,11 @@ func _set_ambience_level(level: float, player: AudioStreamPlayer) -> void:
 
 ## À la fermeture : on coupe tout proprement (sinon le moteur garde des lectures ouvertes).
 func _exit_tree() -> void:
+	for entry in _ducks.values():
+		var tween: Tween = entry["tween"]
+		if tween.is_valid():
+			tween.kill()
+	_ducks.clear()
 	for player in _ambience_players.values():
 		(player as AudioStreamPlayer).stop()
 		(player as AudioStreamPlayer).stream = null

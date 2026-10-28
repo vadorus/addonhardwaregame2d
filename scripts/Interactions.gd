@@ -8,6 +8,7 @@ extends RefCounted
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
+const RIVALRY := preload("res://scripts/CpuRivalry.gd")
 const DISCOVERIES := preload("res://scripts/WorkshopDiscoveries.gd")
 
 ## Toutes les conversations en attente, avec qui parle.
@@ -51,6 +52,9 @@ static func pending() -> Array:
 	var eureka := DISCOVERIES.pending_project()
 	if not eureka.is_empty():
 		result.append({"key":"EUREKA:%s" % str(eureka.get("id", "")), "speaker":_dev_speaker()})
+	# WORLD-01 : un rival prépare une riposte contre votre CPU couronné.
+	if RIVALRY.dialogue_pending():
+		result.append({"key":"RIVALRY:%s" % str(RIVALRY.active_arc().get("id", "")), "speaker":"NORA"})
 	var interview := press_interview_product()
 	if not interview.is_empty():
 		result.append({"key":"PRESS:%s" % str(interview.get("id", "")), "speaker":"PRESS:%s" % journalist_outlet()})
@@ -188,6 +192,12 @@ static func _money(value: int) -> String:
 ## Contenu de la conversation : qui parle, ce qu'il dit, les réponses possibles.
 static func dialogue(key: String) -> Dictionary:
 	var sid := key.substr(key.find(":") + 1)
+	if key.begins_with("RIVALRY:"):
+		var rivalry := RIVALRY.dialogue()
+		if rivalry.is_empty() or str(rivalry.get("key", "")) != key:
+			return {}
+		rivalry["person"] = _person("NORA")
+		return rivalry
 	if key.begins_with("RND:"):
 		for event_value in ResearchManager.get_pending_research_events():
 			var event: Dictionary = event_value
@@ -291,7 +301,7 @@ static func dialogue(key: String) -> Dictionary:
 	elif key == "FINANCE:WARNING":
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE — MOINS DE DEUX MOIS",
 			"text":"Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible.",
-			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions." % _money(Economy.money),
+			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions. Jeu en pause : après cette alerte, utilisez ▶ pour reprendre." % _money(Economy.money),
 			"choices":[{"id":"CONTINUE", "label":"Compris, je revois les dépenses.", "primary":true}]}
 	elif key == "FINANCE:LOAN":
 		if not GarageBusiness.loan_offer_pending():
@@ -300,7 +310,7 @@ static func dialogue(key: String) -> Dictionary:
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
 			"text":"Patron, au rythme actuel on tient à peine %d mois. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
 				int(floor(GarageBusiness.cash_runway_months())), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
-			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
+			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
 			"choices":[
 				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
 				{"id":"DECLINE", "label":"Non, on se serre la ceinture.", "hint":"Nora n'en reparle pas avant un an"},
@@ -402,8 +412,10 @@ static func dialogue(key: String) -> Dictionary:
 ## Applique une réponse. Renvoie {ok, message}.
 static func choose(key: String, choice_id: String) -> Dictionary:
 	if key == "FINANCE:WARNING":
-		return {"ok":true, "message":"Attention à la prochaine clôture : la trésorerie reste fragile."}
+		return {"ok":true, "message":"La trésorerie reste fragile. Jeu en pause : utilisez ▶ pour reprendre."}
 	var sid := key.substr(key.find(":") + 1)
+	if key.begins_with("RIVALRY:"):
+		return RIVALRY.answer(choice_id)
 	if key == "HIRE:DEV":
 		if choice_id == "LATER":
 			ExecutiveManager.workplace["hiring_reminder_at"] = ExecutiveManager.months_operated + 6
@@ -436,9 +448,9 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 	if key == "FINANCE:LOAN":
 		if choice_id == "ACCEPT":
 			var ok := GarageBusiness.accept_loan()
-			return {"ok":ok, "message":"Prêt signé : la trésorerie respire." if ok else "La banque ne peut plus suivre."}
+			return {"ok":ok, "message":"Prêt signé : la trésorerie respire. Si le jeu est en pause, utilisez ▶ pour reprendre." if ok else "La banque ne peut plus suivre."}
 		GarageBusiness.decline_loan()
-		return {"ok":true, "message":"Pas de prêt : chaque euro compte."}
+		return {"ok":true, "message":"Pas de prêt : chaque euro compte. Si le jeu est en pause, utilisez ▶ pour reprendre."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
 	if key.begins_with("ADVICE:"):

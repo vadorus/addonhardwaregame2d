@@ -26,6 +26,7 @@ var _textures := {}
 const ART := preload("res://ui/WorkplaceArt.gd")
 
 func _ready() -> void:
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_t = randf() * 10.0
@@ -92,7 +93,7 @@ func set_scale_px(value: float) -> void:
 	pivot_offset = Vector2(size.x * 0.5, size.y)
 	queue_redraw()
 
-func _process(delta: float) -> void:
+func _on_animation_tick(delta: float) -> void:
 	if preload("res://ui/Juice.gd").reduced_motion or not is_visible_in_tree():
 		return
 	_t += delta * (2.0 if working else 1.0)

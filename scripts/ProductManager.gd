@@ -644,6 +644,50 @@ func net_margin_per_unit(product: Dictionary) -> int:
 	var cost := float(maxi(int(product.get("unit_cost", 1)), 1)) * experience_cost_factor()
 	return maxi(5, int(round(price * (1.0 - MarketManager.distributor_share()) - cost)))
 
+## T-3 — Marge grand public d'une puce, calculée avec exactement les facteurs
+## de _sell_product_month. Les frais fixes mensuels, SAV, redevances et ventes B2B
+## sont volontairement hors de cette marge de vente boutique.
+func unit_margin(product: Dictionary) -> Dictionary:
+	var price := float(int(product.get("price", 0)))
+	var total_unit_cost := maxi(int(product.get("unit_cost", 0)), 0)
+	var entry_cost := clampi(int(product.get("market_entry_cost", 0)), 0, total_unit_cost)
+	var silicon_cost := total_unit_cost - entry_cost
+	var threat_factor := MarketManager.production_cost_threat_factor()
+	var learning_factor := experience_cost_factor()
+	var fabrication := float(silicon_cost) * threat_factor * learning_factor + float(entry_cost)
+	var distributor_rate := MarketManager.distributor_share()
+	var distributor := price * distributor_rate
+	var margin := price - distributor - fabrication
+	return {
+		"price":price, "distributor":distributor, "distributor_rate":distributor_rate,
+		"silicon_cost":silicon_cost, "entry_cost":entry_cost,
+		"threat_factor":threat_factor, "learning_factor":learning_factor, "fabrication":fabrication,
+		"margin":margin, "margin_pct":(margin / price * 100.0) if price > 0.0 else 0.0
+	}
+
+## Conseil seulement : ne remplace jamais le prix choisi ou sauvegardé du joueur.
+func recommended_unit_price(product: Dictionary, target_margin: float = 0.35) -> int:
+	var breakdown := unit_margin(product)
+	var denominator := 1.0 - float(breakdown.distributor_rate) - target_margin
+	var raw_price := float(breakdown.fabrication) / maxf(denominator, 0.01)
+	var segment := str(product.get("target_segment", MarketManager.default_segment()))
+	var reference := MarketManager.segment_reference_price(segment, str(product.get("sector", "CPU")))
+	var low := int(ceil(reference * 0.8 / 5.0)) * 5
+	var high := maxi(low, int(floor(reference * 1.6 / 5.0)) * 5)
+	return clampi(int(round(raw_price / 5.0)) * 5, low, high)
+
+## Deux mois consécutifs de marge unitaire boutique négative : une alerte,
+## puis réarmement uniquement lorsque la marge redevient non négative.
+func _track_negative_unit_margin(product: Dictionary, margin: float, sold_consumer: int) -> void:
+	if margin < 0.0 and sold_consumer > 0:
+		product["negative_margin_months"] = int(product.get("negative_margin_months", 0)) + 1
+		if int(product["negative_margin_months"]) >= 2 and not bool(product.get("negative_margin_alerted", false)):
+			product["negative_margin_alerted"] = true
+			CompanyManager.add_alert("Vous perdez %d € par puce sur %s" % [int(ceil(-margin)), str(product.get("name", "CPU"))])
+	else:
+		product["negative_margin_months"] = 0
+		product["negative_margin_alerted"] = false
+
 func capacity_change_quote(product_id: String, new_capacity: int) -> Dictionary:
 	var product := get_product(product_id)
 	if product.is_empty() or str(product.get("status", "")) != "LAUNCHED":
@@ -849,14 +893,14 @@ func _sell_product_month(product: Dictionary, prepared_demand: Dictionary = {}):
 	var revenue := sold_consumer * int(product.price) + sold_b2b * b2b_price
 	# V0.10 / H1 : courbe d'expérience (les premières séries coûtent plus cher à fabriquer)
 	# et part des distributeurs sur les ventes grand public (pas sur les contrats B2B directs).
-	var learning := experience_cost_factor()
-	# D2 : la courbe d'expérience et les tensions d'approvisionnement ne touchent que la fabrication de la puce,
-	# pas le coût fixe de mise sur le marché (test final, boîtier, qualification).
-	var entry_cost := clampi(int(product.get("market_entry_cost", 0)), 0, int(product.unit_cost))
-	var silicon_cost := int(product.unit_cost) - entry_cost
-	var production_cost := int(round(float(total_units * silicon_cost) * MarketManager.production_cost_threat_factor() * learning)) + total_units * entry_cost
-	var distributor_rate := MarketManager.distributor_share()
+	# T-3 : la simulation et l'interface utilisent le même décompte par puce.
+	# On conserve l'ordre des opérations et l'arrondi mensuel de la simulation C3.
+	var margin_data := unit_margin(product)
+	var learning := float(margin_data.learning_factor)
+	var production_cost := int(round(float(total_units * int(margin_data.silicon_cost)) * float(margin_data.threat_factor) * learning)) + total_units * int(margin_data.entry_cost)
+	var distributor_rate := float(margin_data.distributor_rate)
 	var distributor_cost := int(round(float(sold_consumer * int(product.price)) * distributor_rate))
+	_track_negative_unit_margin(product, float(margin_data.margin), sold_consumer)
 	product["experience_cost_factor"] = learning
 	product["distributor_share"] = distributor_rate
 	var capacity_reservation_cost := monthly_capacity_reservation_cost(product, total_units)

@@ -7,7 +7,7 @@ const SAVE_PATH := "user://tech_empire_save.json"
 const TEMP_SAVE_PATH := "user://tech_empire_save.json.tmp"
 const BACKUP_SAVE_PATH := "user://tech_empire_save.json.bak"
 const SLOT_COUNT := 3 # emplacements manuels 1..3
-const SAVE_VERSION := 34
+const SAVE_VERSION := 35
 const RNG_STATE_SECTIONS := ["personnel", "suppliers", "research", "foundry", "production", "after_sales", "market"]
 const TEST_ROOT := "user://ci_tests/"
 
@@ -333,6 +333,13 @@ func _migrate_state(state: Dictionary, source_version: int) -> Dictionary:
 		for product in migrated.get("software", {}).get("products", []):
 			product["support_cohorts"] = catalog.support_cohorts(product, int(clock.get("year", 1971)), int(clock.get("month", 1)))
 			product["supported_users"] = catalog.supported_licenses(product.support_cohorts)
+	if source_version < 35:
+		# Logiciel 2.0 (14/10) : le carnet de Nora (combinaisons et domaines appris) commence vide ;
+		# les anciens logiciels restent des produits « classiques » et continuent de se vendre comme avant.
+		var software_state: Dictionary = migrated.get("software", {})
+		if typeof(software_state.get("notebook", null)) != TYPE_DICTIONARY:
+			software_state["notebook"] = {"combos":{}, "areas":{}, "best":{}, "history":[]}
+		migrated["software"] = software_state
 	migrated["version"] = SAVE_VERSION
 	return migrated
 

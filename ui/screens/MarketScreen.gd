@@ -12,6 +12,7 @@ var attack_panel: Control
 ## Revue des onglets (08/10) : la scène de Nora, puis la planche 8 « La voix du monde ».
 var scene: Control
 var market_board: Control
+var palmares_panel: Control
 
 func _ready() -> void:
 	name = "Marché"
@@ -26,6 +27,10 @@ func _ready() -> void:
 	market_board = (load("res://ui/components/MarketBoard.gd") as Script).new() as Control
 	market_board.connect("action_requested", _relay_action)
 	box.add_child(market_board)
+
+	# RANK-01 / WORLD-01 (14/10) : les couronnes du marché CPU et le défi en cours.
+	palmares_panel = (load("res://ui/components/PalmaresPanel.gd") as Script).new() as Control
+	box.add_child(palmares_panel)
 
 	# V0.10 / I5 : l'offensive contre un rival se prépare ici (décision d'Alexandre).
 	attack_panel = (load("res://ui/components/RivalAttackPanel.gd") as Script).new() as Control
@@ -88,6 +93,8 @@ func set_viewport_width(width: float) -> void:
 func refresh() -> void:
 	if market_board != null:
 		market_board.call("refresh")
+	if palmares_panel != null:
+		palmares_panel.call("refresh")
 	if scene != null:
 		var product := VOICES.focus_product()
 		var tier := int(ExecutiveManager.workplace_data().get("tier", 0))

@@ -621,7 +621,10 @@ func refresh() -> void:
 			float(division.get("maturity", 0.0)), int(division.get("generation_count", 0)),
 			str(strategy_labels.get(strategy, strategy.to_lower()))
 		])
-	division_lines.append("\nLa division CPU est la seule branche jouable pour l'instant. Les futures divisions restent verrouillées jusqu'à ce que cette boucle soit complète.")
+	# Revue des onglets (14/10) : le Logiciel est jouable depuis 1971 ; le texte disait le contraire.
+	var software_count := SoftwareManager.active_products().size()
+	division_lines.append("Logiciel — %s" % ("%d logiciel(s) en vente • studio ouvert" % software_count if software_count > 0 else "studio ouvert, aucun logiciel en vente"))
+	division_lines.append("\nCPU et Logiciel sont jouables. Les autres divisions (défense, aérospatial, mobile…) restent à venir.")
 	division_label.text = "\n".join(division_lines)
 	_refresh_division_delegation()
 

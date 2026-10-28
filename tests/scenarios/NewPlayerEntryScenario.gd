@@ -117,7 +117,7 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "Project choice opens directly on Software details instead of branch choice"
-	if software_choice.get("_family_select") != null:
+	if bool(software_choice.call("studio_visible")):
 		game.queue_free()
 		_restore(snapshot)
 		return "Software product settings are visible before the player chooses Software and Create a product"
@@ -126,12 +126,12 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "Software branch does not expose contracts versus product choice"
-	if software_choice.get("_family_select") != null:
+	if bool(software_choice.call("studio_visible")):
 		game.queue_free()
 		_restore(snapshot)
 		return "Product settings leak into the Software choice screen"
 	software_choice.call("_show_product")
-	if str(software_choice.call("current_view_name")) != "PRODUCT" or software_choice.get("_family_select") == null:
+	if str(software_choice.call("current_view_name")) != "PRODUCT" or not bool(software_choice.call("studio_visible")):
 		game.queue_free()
 		_restore(snapshot)
 		return "Product settings are not deferred until Software then Create a product"
@@ -188,10 +188,10 @@ static func run(host: Node) -> String:
 		game.queue_free()
 		_restore(snapshot)
 		return "V0.5 entry: guided workshop stayed open after project launch"
-	if TimeManager.time_scale <= 0.0:
+	if TimeManager.time_scale != 0.0:
 		game.queue_free()
 		_restore(snapshot)
-		return "V0.5 entry: simulation did not start when the first CPU entered development"
+		return "C3 entry: first CPU launch bypassed the initial Concept directive"
 	if feedback_panel.visible:
 		game.queue_free()
 		_restore(snapshot)

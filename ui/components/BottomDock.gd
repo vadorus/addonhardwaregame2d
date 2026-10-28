@@ -7,6 +7,7 @@ signal tab_requested(tab_index: int)
 signal locked_pressed(feature: String)
 
 const BADGE := preload("res://ui/GarageBadge.gd")
+const UI := preload("res://ui/UiKit.gd")
 const WOOD := Color("3b2b1e")
 const WOOD_EDGE := Color("a07a52")
 const AMBER := Color("d9822b")
@@ -121,6 +122,7 @@ func set_compact(compact: bool) -> void:
 	_compact = compact
 	for button in _buttons:
 		button.custom_minimum_size = Vector2(72, 48) if compact else Vector2(100, 58)
+		UI.touch_target(button)
 		(button.get_meta("label_node") as Label).add_theme_font_size_override("font_size", 11 if compact else 13)
 		_place_children(button)
 

@@ -15,7 +15,9 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Tech Empire"
-config/version="0.12.2"
+run/max_fps=60
+run/max_fps.mobile=30
+config/version="0.13.0"
 run/main_scene="uid://e28phl1nvy5i"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="TechEmpire"
@@ -27,6 +29,10 @@ boot_splash/image="res://assets/branding/boot_splash.png"
 boot_splash/fullsize=false
 boot_splash/use_filter=true
 boot_splash/show_image=true
+
+[audio]
+
+default_bus_layout="res://default_bus_layout.tres"
 
 [autoload]
 
@@ -57,6 +63,7 @@ TimeManager="*res://scripts/TimeManager.gd"
 SaveManager="*res://scripts/SaveManager.gd"
 SoundManager="*res://scripts/SoundManager.gd"
 PerfProbe="*res://scripts/PerfProbe.gd"
+AnimationClock="*res://ui/AnimationClock.gd"
 
 [display]
 

@@ -226,6 +226,23 @@ func internal_supports_node(node_nm: int) -> bool:
 	var unlock := float(CPU_DESIGN.node_profile(node_nm).get("unlock", 100.0))
 	return float(fab.process_unlock) + 0.001 >= unlock
 
+## 14/10 : un procédé n'est utilisable que si quelqu'un sait le graver (un fondeur ou votre usine).
+## Sonde de carrière : un CPU conçu en 130 nm en 1992 (recherche en avance) restait bloqué en
+## industrialisation pendant des années, sans aucun fondeur capable de le produire.
+func can_manufacture(node_nm: int) -> bool:
+	return internal_supports_node(node_nm) or not available_external_foundries(node_nm).is_empty()
+
+## Garde, dans une liste de procédés maîtrisés, ceux qu'on peut réellement faire graver.
+## Si aucun ne l'est (cas extrême), on garde le plus ancien pour ne jamais rendre la conception impossible.
+func manufacturable_nodes(nodes: Array) -> Array:
+	var result: Array = nodes.filter(func(n): return can_manufacture(int(n)))
+	if result.is_empty() and not nodes.is_empty():
+		var coarsest := int(nodes[0])
+		for n in nodes:
+			coarsest = maxi(coarsest, int(n))
+		result.append(coarsest)
+	return result
+
 func available_external_foundries(node_nm: int) -> Array:
 	var result: Array = []
 	for foundry_id_value in external_foundries.keys():

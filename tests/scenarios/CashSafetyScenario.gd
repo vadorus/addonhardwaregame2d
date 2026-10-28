@@ -40,6 +40,31 @@ static func _run(host: Node) -> String:
 	GarageBusiness.check_cash_safety()
 	if CompanyManager.alerts.size() != alerts:
 		return "Cash safety: warning repeated in the same cash crisis"
+	# Hystérésis : une amélioration à deux ou trois mois ne réarme pas l'alerte.
+	for reserve_cash in [burn * 2, burn * 3]:
+		Economy.money = reserve_cash
+		GarageBusiness.check_cash_safety()
+		Economy.money = burn * 2 - 1
+		TimeManager.time_scale = 3.0
+		GarageBusiness.check_cash_safety()
+		if CompanyManager.alerts.size() != alerts or TimeManager.time_scale != 3.0:
+			return "Cash safety: reserve of at most three months rearmed Nora's warning"
+	Economy.money = burn * 3 + 1
+	GarageBusiness.check_cash_safety()
+	if GarageBusiness._cash_warning_shown:
+		return "Cash safety: reserve above three months did not rearm the warning"
+	Economy.money = burn * 2 - 1
+	GarageBusiness.check_cash_safety()
+	if CompanyManager.alerts.size() != alerts + 1 or TimeManager.time_scale != 0.0:
+		return "Cash safety: a new crisis after recovery must interrupt again"
+	# Choix explicite : pas de reprise implicite, la pause est expliquée à l'écran.
+	for key in ["FINANCE:WARNING", "FINANCE:LOAN"]:
+		var dialogue := INTERACTIONS.dialogue(key)
+		if not str(dialogue.get("note", "")).contains("pause") or not str(dialogue.get("note", "")).contains("▶"):
+			return "Cash safety: Nora must explain the paused clock and how to resume"
+	var warning_answer := INTERACTIONS.choose("FINANCE:WARNING", "CONTINUE")
+	if not str(warning_answer.get("message", "")).contains("Jeu en pause") or TimeManager.time_scale != 0.0:
+		return "Cash safety: closing Nora's warning must explicitly report that time stays paused"
 	var before := Economy.money
 	var terms := GarageBusiness.loan_terms()
 	if not bool(INTERACTIONS.choose("FINANCE:LOAN", "ACCEPT").get("ok", false)):
@@ -63,6 +88,9 @@ static func _run(host: Node) -> String:
 	SimulationManager.process_month_end()
 	if not SimulationManager.is_game_over:
 		return "Cash safety: refusing financing must still allow bankruptcy"
+	var pixel_error := _first_month_minus_618(host)
+	if pixel_error != "":
+		return pixel_error
 	for difficulty in BalanceManager.PROFILE_ORDER:
 		SimulationManager.reset_all("CI Fabrication Cash", "CPU", difficulty)
 		ProductionManager._on_project_completed({"id":"CI-CASH", "name":"CI Cash CPU", "sector":"CPU",
@@ -88,10 +116,38 @@ static func _run(host: Node) -> String:
 		if error != "":
 			return error
 	SimulationManager.reset_all("CI After Cash Safety", "CPU", "STANDARD")
-	print("[CI] Cash safety: PASS (threshold, early loan, refusal/bankruptcy, legacy state, 3 difficulties, both confirmations)")
+	print("[CI] Cash safety: PASS (2/3-month hysteresis, pause explained, first-month -618, early loan, refusal/bankruptcy, legacy state, 3 difficulties, both confirmations)")
 	return ""
 
-static func _buttons(host: Node, job_id: String) -> String:
+## Reconstitution contrôlée du défaut du 28/10, sans utiliser une sauvegarde Pixel.
+static func _first_month_minus_618(host: Node) -> String:
+	SimulationManager.reset_all("CI Pixel 28-10 minus 618", "CPU", "STANDARD")
+	ProductionManager._on_project_completed({"id":"CI-PIXEL-618", "name":"CI Pixel 618", "sector":"CPU",
+		"cpu_design":CPU_DESIGN.default_design(), "complexity":40.0, "design_estimate":{}})
+	var job: Dictionary = ProductionManager.get_active_jobs()[0]
+	var job_id := str(job.id)
+	var provider := FoundryManager.recommended_external_foundry(int(job.node_nm))
+	var quote := GarageBusiness.fabrication_cash_quote(job_id, provider, "BALANCED", "BALANCED")
+	# En Standard : frais fixes du garage + première mensualité + mise en route.
+	Economy.money = ExecutiveManager.estimated_structural_monthly_cost() + int(quote.setup) + int(quote.monthly) - 618
+	var cash_before := Economy.money
+	if not Economy.history.is_empty() or ExecutiveManager.months_operated != 0 or TimeManager.month != 1:
+		return "Cash safety Pixel: fixture must start in month one without history"
+	quote = GarageBusiness.fabrication_cash_quote(job_id, provider, "BALANCED", "BALANCED")
+	if int(quote.lowest) >= 0 or SimulationManager.is_game_over:
+		return "Cash safety Pixel: negative fabrication projection must precede bankruptcy"
+	var error := _buttons(host, job_id, cash_before)
+	if error != "":
+		return error
+	# Si le joueur persiste sans financement, la vraie clôture doit finir à -618 €.
+	ProductionManager.set_manufacturing_route(job_id, "EXTERNAL", provider)
+	var report := SimulationManager.process_month_end()
+	if int(report.get("money", 0)) != -618 or not SimulationManager.is_game_over:
+		return "Cash safety Pixel: expected first-month bankruptcy at -618, got %s" % str(report)
+	print("[CI] Pixel 28/10 regression: month 1, no history, both confirmations BEFORE bankruptcy, final cash=-618")
+	return ""
+
+static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> String:
 	for path in ["res://ui/components/ProductionBoard.gd", "res://ui/components/IndustrializationPanel.gd"]:
 		var panel: Control = (load(path) as Script).new()
 		host.add_child(panel)
@@ -107,11 +163,11 @@ static func _buttons(host: Node, job_id: String) -> String:
 		else:
 			panel._apply(job_id)
 		var dialog: ConfirmationDialog = panel.get_node_or_null("CashRiskConfirmation")
-		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("100 €") or TimeManager.time_scale != 0.0:
+		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%d €" % expected_cash) or TimeManager.time_scale != 0.0:
 			panel.free()
 			return "Cash safety: missing numeric confirmation / premature launch in %s" % path
 		dialog.canceled.emit()
-		if not received.is_empty() or bool(ProductionManager.get_job(job_id).route_selected) or Economy.money != 100:
+		if not received.is_empty() or bool(ProductionManager.get_job(job_id).route_selected) or Economy.money != expected_cash:
 			panel.free()
 			return "Cash safety: cancelling changed the production job or money"
 		# La même instance de dialogue est remplacée au deuxième clic.

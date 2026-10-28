@@ -39,8 +39,12 @@ func _test_cpu_consequence() -> void:
 	cpu["phase_index"] = 2
 	cpu["cockpit_directive_pending"] = DIRECTIVES.cpu_milestone(2)
 	var money_before := Economy.money
+	# Refonte CPU (07/10) : le coût d'une orientation dépend du projet ; on vérifie que le coût affiché est facturé.
+	var robust := DIRECTIVES.option_for(ResearchManager.cpu_pending_directive(cpu), "ROBUST")
+	var announced := Economy.quoted_expense(int(robust.get("cost_once", 0)), "Décision de développement")
+	_check(announced > 0, "Prototype robust choice should announce a cost")
 	_check(ResearchManager.resolve_cpu_directive(cpu_id, "ROBUST"), "Prototype robust choice failed")
-	_check(Economy.money == money_before - 2500, "CPU decision cost was not charged")
+	_check(Economy.money == money_before - announced, "CPU decision cost was not charged (announced %d, charged %d)" % [announced, money_before - Economy.money])
 	_check(int(cpu.get("decision_delay_months_remaining", 0)) == 1, "CPU delay was not recorded")
 	_check(str(cpu.get("cockpit_last_outcome", "")).contains("+1 mois"), "CPU delay is not explained to the player")
 

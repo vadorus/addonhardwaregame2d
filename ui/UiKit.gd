@@ -16,6 +16,45 @@ const APP_AMBER_DARK := Color("fff7e9")
 const APP_GREEN := Color("087c3b")
 const APP_RED := Color("b72732")
 
+## T2 : tailles logiques retenues après mesure Pixel 10 (1,15 d'échelle UI).
+## 6 mm ~= 58 px ; 8 mm ~= 77 px. PC inchangé, sauf dans les tests forcés.
+const TOUCH_SECONDARY := 58.0
+const TOUCH_PRIMARY := 77.0
+const TOUCH_GAP := 8
+
+static func touch_target(control: Control, kind: String = "secondary", force_mobile: bool = false) -> void:
+	if control == null or (not force_mobile and not OS.has_feature("mobile")):
+		return
+	var height := TOUCH_PRIMARY if kind == "primary" else TOUCH_SECONDARY
+	if control.get_parent() is Container:
+		touch_spacing(control.get_parent() as Container, force_mobile)
+	if control.custom_minimum_size.x >= TOUCH_SECONDARY and control.custom_minimum_size.y >= height:
+		return
+	control.custom_minimum_size = Vector2(maxf(control.custom_minimum_size.x, TOUCH_SECONDARY), maxf(control.custom_minimum_size.y, height))
+
+static func touch_spacing(container: Container, force_mobile: bool = false) -> void:
+	if container == null or (not force_mobile and not OS.has_feature("mobile")):
+		return
+	if container.has_meta("_t2_touch_spacing_done"):
+		return
+	container.set_meta("_t2_touch_spacing_done", true)
+	if container is BoxContainer:
+		container.add_theme_constant_override("separation", maxi(container.get_theme_constant("separation"), TOUCH_GAP))
+	elif container is FlowContainer:
+		for key in ["h_separation", "v_separation"]:
+			container.add_theme_constant_override(key, maxi(container.get_theme_constant(key), TOUCH_GAP))
+	elif container is GridContainer:
+		for key in ["h_separation", "v_separation"]:
+			container.add_theme_constant_override(key, maxi(container.get_theme_constant(key), TOUCH_GAP))
+
+static func touch_kind(control: Control) -> String:
+	if control is BaseButton:
+		var title: String = (control as BaseButton).text.strip_edges().to_lower()
+		for action in ["lancer", "valider", "confirmer"]:
+			if title.begins_with(action):
+				return "primary"
+	return "secondary"
+
 static func label(text: String, size: int = 14) -> Label:
 	var node := Label.new()
 	node.text = text
@@ -130,6 +169,14 @@ static func money(value: int) -> String:
 		count += 1
 	return ("-" if value < 0 else "") + out
 
+## Nombre à la française : virgule décimale (« 7,27 »). Revue des onglets (14/10) : « 60.4 / 100 » sur le Pixel.
+static func fr(value: float, decimals: int = 1) -> String:
+	return (("%." + str(decimals) + "f") % value).replace(".", ",")
+
+## Pourcentage à la française : « 7,3 % ».
+static func pct(value: float, decimals: int = 1) -> String:
+	return fr(value, decimals) + " %"
+
 static func stylebox(bg: Color, radius: int = 10, border: int = 0, border_color: Color = APP_LINE, padding: int = 10) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg
@@ -196,3 +243,81 @@ static func fill_simple(option: OptionButton, items: Dictionary) -> void:
 		var key := str(key_value)
 		option.add_item(str(items[key_value]))
 		option.set_item_metadata(option.item_count - 1, key)
+
+
+## Revue des onglets (14/10) : les listes déroulantes et les compteurs étaient pensés pour la souris
+## (petites flèches, menu minuscule sur le Pixel). Sans réécrire chaque écran : les listes prennent le style
+## de l'atelier (grandes, crème, bord ambre, menu aux grandes lignes) et chaque compteur reçoit de vrais
+## boutons − et + à côté. Sans effet sur les valeurs : les boutons font exactement ce que faisaient les flèches.
+static func upgrade_inputs(root: Node) -> void:
+	for child in root.get_children():
+		if child is OptionButton:
+			if not child.has_meta("touch_ready"):
+				_style_option(child as OptionButton)
+		elif child is SpinBox:
+			if not child.has_meta("touch_ready"):
+				_wrap_spin(child as SpinBox)
+			continue
+		upgrade_inputs(child)
+
+static func _style_option(option: OptionButton) -> void:
+	option.set_meta("touch_ready", true)
+	option.custom_minimum_size.y = maxf(option.custom_minimum_size.y, 46.0)
+	option.add_theme_font_size_override("font_size", 15)
+	option.add_theme_stylebox_override("normal", stylebox(Color("fffaf1"), 10, 1, Color("d8c3a3"), 10))
+	option.add_theme_stylebox_override("hover", stylebox(Color("fbe3c2"), 10, 1, Color("d9822b"), 10))
+	option.add_theme_stylebox_override("pressed", stylebox(Color("f3d1a1"), 10, 2, Color("d9822b"), 10))
+	option.add_theme_stylebox_override("focus", stylebox(Color(0, 0, 0, 0), 10, 2, Color("e39a45"), 10))
+	option.add_theme_stylebox_override("disabled", stylebox(Color("eee4d6"), 10, 1, APP_LINE, 10))
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		option.add_theme_color_override(state, APP_TEXT)
+	var popup := option.get_popup()
+	popup.add_theme_font_size_override("font_size", 18)
+	popup.add_theme_constant_override("v_separation", 18)
+	popup.add_theme_constant_override("item_start_padding", 14)
+	popup.add_theme_constant_override("item_end_padding", 14)
+	popup.add_theme_stylebox_override("panel", stylebox(Color("fffaf1"), 12, 2, Color("d9822b"), 8))
+	popup.add_theme_stylebox_override("hover", stylebox(Color("fbe3c2"), 8, 0, Color("fbe3c2"), 4))
+	popup.add_theme_color_override("font_color", APP_TEXT)
+	popup.add_theme_color_override("font_hover_color", APP_TEXT)
+
+static func _wrap_spin(spin: SpinBox) -> void:
+	var parent := spin.get_parent()
+	if not (parent is Container):
+		return
+	spin.set_meta("touch_ready", true)
+	var index := spin.get_index()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	row.size_flags_horizontal = spin.size_flags_horizontal
+	row.size_flags_vertical = spin.size_flags_vertical
+	row.visible = spin.visible
+	parent.add_child(row)
+	parent.move_child(row, index)
+	parent.remove_child(spin)
+	var step := spin.custom_arrow_step if spin.custom_arrow_step > 0.0 else spin.step
+	var minus := _spin_button("−")
+	minus.pressed.connect(func(): spin.value = spin.value - step)
+	row.add_child(minus)
+	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spin.custom_minimum_size.y = maxf(spin.custom_minimum_size.y, 44.0)
+	spin.get_line_edit().add_theme_font_size_override("font_size", 15)
+	row.add_child(spin)
+	var plus := _spin_button("+")
+	plus.pressed.connect(func(): spin.value = spin.value + step)
+	row.add_child(plus)
+	# La ligne suit la visibilité du compteur (certains écrans cachent un compteur selon le contexte).
+	spin.visibility_changed.connect(func(): row.visible = spin.visible)
+
+static func _spin_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(44, 44)
+	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_stylebox_override("normal", stylebox(Color("f8efe2"), 10, 1, Color("d8c3a3"), 4))
+	button.add_theme_stylebox_override("hover", stylebox(Color("fbe3c2"), 10, 1, Color("d9822b"), 4))
+	button.add_theme_stylebox_override("pressed", stylebox(Color("f3d1a1"), 10, 2, Color("d9822b"), 4))
+	button.add_theme_color_override("font_color", Color("7a3f12"))
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
+	return button

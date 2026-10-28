@@ -19,10 +19,11 @@ func setup(family_id: String, at_year: int, is_locked: bool = false) -> void:
 	queue_redraw()
 
 func _ready() -> void:
+	AnimationClock.watch_animation(self, _on_animation_tick)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
 
-func _process(delta: float) -> void:
+func _on_animation_tick(delta: float) -> void:
 	# Le ventilateur de l'alimentation tourne doucement (petit signe de vie, pas une animation lourde).
 	if family == "PSU" and is_visible_in_tree() and not locked:
 		spin = fmod(spin + delta * 2.2, TAU)
