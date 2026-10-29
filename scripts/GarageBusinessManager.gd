@@ -31,6 +31,7 @@ var _next_loan_id := 1
 var _months_since_study := 0
 var _template_turn := 0
 var _cash_warning_shown := false # Transient : une partie rechargée réaffiche le risque actuel.
+var _negative_cash_warning_shown := false # Transient : réarmé dès le retour à un solde positif.
 
 func _ready() -> void:
 	TimeManager.day_changed.connect(func(_day, _month, _year): check_cash_safety())
@@ -39,20 +40,34 @@ func _ready() -> void:
 func check_cash_safety() -> void:
 	if not CompanyManager.created or SimulationManager.is_game_over:
 		return
+	if Economy.money > 0:
+		_negative_cash_warning_shown = false
 	var reserve := cash_runway_months()
 	if reserve > 3.0:
 		_cash_warning_shown = false
 		return
 	if reserve >= 2.0:
 		return
-	if _cash_warning_shown:
-		return
+	if Economy.money < 0:
+		if _negative_cash_warning_shown:
+			return
+		_negative_cash_warning_shown = true
+	else:
+		if _cash_warning_shown:
+			return
 	_cash_warning_shown = true
 	CompanyManager.add_alert(("Nora : trésorerie négative, faillite à la clôture si rien ne change. Jeu en pause : utilisez ▶ pour reprendre." if Economy.money < 0 else "Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre."))
 	TimeManager.time_scale = 0.0
 	var scene := get_tree().current_scene
 	if scene != null and scene.has_method("open_dialogue"):
-		scene.call_deferred("open_dialogue", "FINANCE:LOAN" if loan_offer_pending() else "FINANCE:WARNING")
+		_open_cash_warning.call_deferred(scene, "FINANCE:LOAN" if loan_offer_pending() else "FINANCE:WARNING")
+
+## La clôture peut déclarer la faillite après le contrôle de trésorerie,
+## avant que la file des appels différés ouvre le dialogue.
+func _open_cash_warning(scene: Node, key: String) -> void:
+	if SimulationManager.is_game_over or not is_instance_valid(scene):
+		return
+	scene.call("open_dialogue", key)
 
 ## Devis sans effet : mêmes catégories de paiement que l'usine, difficulté comprise.
 func fabrication_cash_quote(job_id: String, provider: String, strategy: String, binning: String) -> Dictionary:
@@ -98,6 +113,7 @@ func fabrication_cash_text(quote: Dictionary) -> String:
 
 func reset() -> void:
 	_cash_warning_shown = false
+	_negative_cash_warning_shown = false
 	studies = []
 	loans = []
 	flags = {}
@@ -310,6 +326,7 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary) -> void:
 	_cash_warning_shown = false
+	_negative_cash_warning_shown = false
 	studies = state.get("studies", []).duplicate(true)
 	loans = state.get("loans", []).duplicate(true)
 	flags = state.get("flags", {}).duplicate(true)

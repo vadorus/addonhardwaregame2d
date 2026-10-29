@@ -4,6 +4,14 @@ const CASH_RISK := preload("res://ui/components/CashRiskDialog.gd")
 const INTERACTIONS := preload("res://scripts/Interactions.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
+class DialogueProbe extends Node:
+	var opened: Array[String] = []
+	var bankruptcies := 0
+	func open_dialogue(key: String) -> void:
+		opened.append(key)
+	func on_game_over(_reason: String, _report: Dictionary) -> void:
+		bankruptcies += 1
+
 static func run(host: Node) -> String:
 	var snapshot := {}
 	var managers := [CompanyManager, BalanceManager, DivisionManager, Economy, PersonnelManager,
@@ -14,15 +22,20 @@ static func run(host: Node) -> String:
 		snapshot[manager.name] = manager.get_state().duplicate(true)
 	var was_game_over := SimulationManager.is_game_over
 	var warning_shown := GarageBusiness._cash_warning_shown
+	var negative_warning_shown := GarageBusiness._negative_cash_warning_shown
 	var error := _run(host)
 	# TimeManager en dernier : ses signaux lisent les états restaurés.
 	for manager in managers:
 		manager.load_state(snapshot[manager.name])
 	SimulationManager.is_game_over = was_game_over
 	GarageBusiness._cash_warning_shown = warning_shown
+	GarageBusiness._negative_cash_warning_shown = negative_warning_shown
 	return error
 
 static func _run(host: Node) -> String:
+	var review_error := _review_regressions(host)
+	if review_error != "":
+		return review_error
 	var guidance_error := _t6_guidance()
 	if guidance_error != "":
 		return guidance_error
@@ -129,6 +142,67 @@ static func _run(host: Node) -> String:
 	SimulationManager.reset_all("CI After Cash Safety", "CPU", "STANDARD")
 	print("[CI] Cash safety: PASS (2/3-month hysteresis, pause explained, first-month -618, early loan, refusal/bankruptcy, legacy state, 3 difficulties, both confirmations)")
 	return ""
+
+## Régression de revue : deux seuils distincts et course avec la faillite.
+static func _review_regressions(host: Node) -> String:
+	SimulationManager.reset_all("CI T6 review", "CPU", "STANDARD")
+	var burn := int(ExecutiveManager.financial_advice().monthly_burn)
+	Economy.money = burn * 2 - 1
+	var alerts := CompanyManager.alerts.size()
+	TimeManager.day_changed.emit(14, 1, 1971)
+	if CompanyManager.alerts.size() != alerts + 1 or GarageBusiness._negative_cash_warning_shown:
+		return "T6 review: first low-reserve alert must not consume the negative-cash alert"
+	Economy.add_expense(Economy.money + 618, "CI cash crisis")
+	TimeManager.time_scale = 1.0
+	TimeManager.day_changed.emit(15, 1, 1971)
+	if CompanyManager.alerts.size() != alerts + 2 or not GarageBusiness._negative_cash_warning_shown or TimeManager.time_scale != 0.0:
+		return "T6 review: low reserve then negative cash must produce two alerts"
+	GarageBusiness.check_cash_safety()
+	if CompanyManager.alerts.size() != alerts + 2:
+		return "T6 review: repeated negative cash must not repeat the alert"
+	Economy.money = 0
+	GarageBusiness.check_cash_safety()
+	if not GarageBusiness._negative_cash_warning_shown:
+		return "T6 review: zero cash must not rearm the negative alert"
+	Economy.money = 1
+	GarageBusiness.check_cash_safety()
+	if GarageBusiness._negative_cash_warning_shown or not GarageBusiness._cash_warning_shown:
+		return "T6 review: positive cash must rearm only the negative alert"
+	Economy.money = -1
+	GarageBusiness.check_cash_safety()
+	if CompanyManager.alerts.size() != alerts + 3:
+		return "T6 review: a new overdraft must warn again after positive cash"
+	var state := GarageBusiness.get_state().duplicate(true)
+	GarageBusiness.load_state(state)
+	if GarageBusiness._negative_cash_warning_shown or GarageBusiness.get_state() != state:
+		return "T6 review: negative alert flag must remain transient on load"
+	# Rejouer exactement le point d'entrée différé après la vraie clôture :
+	# ordre déterministe, sans attendre une frame dans ce scénario synchrone.
+	SimulationManager.reset_all("CI T6 bankruptcy race", "CPU", "STANDARD")
+	var probe := DialogueProbe.new()
+	host.add_child(probe)
+	SimulationManager.game_over.connect(probe.on_game_over)
+	# Contrôle positif : le même callback ouvre bien Nora avant la faillite.
+	GarageBusiness._open_cash_warning(probe, "FINANCE:WARNING")
+	var error := ""
+	if probe.opened.size() != 1:
+		error = "T6 review: live cash-warning callback did not open Nora"
+	probe.opened.clear()
+	Economy.money = 1
+	SimulationManager.process_month_end()
+	# Même callback que celui différé par check_cash_safety, après la faillite.
+	GarageBusiness._open_cash_warning(probe, "FINANCE:LOAN")
+	GarageBusiness._open_cash_warning(probe, "FINANCE:WARNING")
+	if not SimulationManager.is_game_over or probe.bankruptcies != 1 or not probe.opened.is_empty():
+		error = "T6 review: bankruptcy alone must remain visible, without deferred Nora"
+	var final_alerts := CompanyManager.alerts.size()
+	GarageBusiness.check_cash_safety()
+	if CompanyManager.alerts.size() != final_alerts:
+		error = "T6 review: ended game must not generate another cash warning"
+	probe.free()
+	if error == "":
+		print("[CI] T6 review: PASS (low reserve then negative: two alerts; rearm above zero; transient flag; bankruptcy callback suppresses Nora)")
+	return error
 
 ## T-6 : découvert quotidien, conseils et aperçus sans mutation.
 static func _t6_guidance() -> String:
