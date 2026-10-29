@@ -45,10 +45,10 @@ func check_cash_safety() -> void:
 		return
 	if reserve >= 2.0:
 		return
-	if _cash_warning_shown or Economy.money <= 0:
+	if _cash_warning_shown:
 		return
 	_cash_warning_shown = true
-	CompanyManager.add_alert("Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre.")
+	CompanyManager.add_alert(("Nora : trésorerie négative, faillite à la clôture si rien ne change. Jeu en pause : utilisez ▶ pour reprendre." if Economy.money < 0 else "Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre."))
 	TimeManager.time_scale = 0.0
 	var scene := get_tree().current_scene
 	if scene != null and scene.has_method("open_dialogue"):
@@ -66,10 +66,35 @@ func fabrication_cash_quote(job_id: String, provider: String, strategy: String, 
 	var months := int(preview.get("preparation_months", 1))
 	var projection := ExecutiveManager.launch_cash_projection(months, monthly, setup)
 	return {"cash":Economy.money, "setup":setup, "monthly":monthly, "months":months,
-		"total":setup + monthly * months, "lowest":int(projection.lowest), "cash_end":int(projection.cash_end)}
+		"job_id":job_id, "total":setup + monthly * months, "lowest":int(projection.lowest), "cash_end":int(projection.cash_end)}
+
+## Recherche sans mutation ni tirage aléatoire : coût total industriel minimal,
+## avec toutes les clôtures projetées non négatives (charges comprises).
+func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
+	var job := ProductionManager.get_job(job_id)
+	if job.is_empty() or bool(job.get("route_committed", false)):
+		return {}
+	var providers := FoundryManager.available_external_foundries(int(job.node_nm))
+	if FoundryManager.internal_supports_node(int(job.node_nm)):
+		providers.append("INTERNAL")
+	var best := {}
+	for provider in providers:
+		for strategy in ProductionManager.get_strategy_keys():
+			for binning in ProductionManager.get_binning_strategy_keys():
+				var option := fabrication_cash_quote(job_id, str(provider), str(strategy), str(binning))
+				if option.is_empty() or int(option.lowest) < 0:
+					continue
+				if best.is_empty() or int(option.total) < int(best.total):
+					best = option
+					best["label"] = "%s / %s / %s" % ["Interne" if provider == "INTERNAL" else FoundryManager.external_foundry_label(str(provider)), ProductionManager.strategy_label(str(strategy)), ProductionManager.binning_strategy_label(str(binning))]
+	return best
 
 func fabrication_cash_text(quote: Dictionary) -> String:
-	return "Trésorerie disponible : %d €.\nFabrication estimée : %d € (%d € de mise en route + %d €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %d € avant les premières ventes.\n\nContinuer malgré le risque de faillite ?" % [int(quote.cash), int(quote.total), int(quote.setup), int(quote.monthly), int(quote.months), int(quote.lowest)]
+	var option := cheapest_affordable_fabrication(str(quote.get("job_id", "")))
+	var alternative := "Aucune option ne garde un solde projeté positif ou nul avec la trésorerie actuelle."
+	if not option.is_empty():
+		alternative = "Option finançable la moins chère (estimation) : %s — %d €, réserve minimale %d €. Revenez au choix de fabrication pour la sélectionner." % [str(option.label), int(option.total), int(option.lowest)]
+	return "Trésorerie disponible : %d €.\nFabrication estimée : %d € (%d € de mise en route + %d €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %d € avant les premières ventes.\n\n%s\n\nContinuer malgré le risque de faillite ?" % [int(quote.cash), int(quote.total), int(quote.setup), int(quote.monthly), int(quote.months), int(quote.lowest), alternative]
 
 func reset() -> void:
 	_cash_warning_shown = false
