@@ -2713,10 +2713,10 @@ func _refresh_top():
 	var from_money := _money_shown if _money_shown_ready else target_money
 	_money_shown = target_money
 	_money_shown_ready = true
-	var runway_months := runway
+	var runway_text := preload("res://ui/components/CashRiskDialog.gd").reserve_text(runway)
 	if _money_tween != null and _money_tween.is_valid():
 		_money_tween.kill()
-	_money_tween = JUICE.count_label(money_label, from_money, target_money, func(value: float) -> String: return "%s € • %.0f mois" % [_money(int(round(value))), runway_months], 0.55)
+	_money_tween = JUICE.count_label(money_label, from_money, target_money, func(value: float) -> String: return "%s € • %s" % [_money(int(round(value))), runway_text], 0.55)
 	var cash_color := Color("5ce0a4")
 	if Economy.money <= 0 or runway < 3.0:
 		cash_color = Color("ff7b7b")
