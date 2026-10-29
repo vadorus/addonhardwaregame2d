@@ -5,6 +5,7 @@ extends RefCounted
 ##
 ## Clés : « HR:<id> », « RND:<id> », « CLIENT:<id> ».
 
+const CASH_RISK := preload("res://ui/components/CashRiskDialog.gd")
 const TEAM_LESSONS := preload("res://scripts/TeamLessons.gd")
 const NEXT_GENERATION := preload("res://scripts/NextGeneration.gd")
 const SEASONAL := preload("res://scripts/SeasonalCalendar.gd")
@@ -308,8 +309,8 @@ static func dialogue(key: String) -> Dictionary:
 			return {}
 		var terms := GarageBusiness.loan_terms()
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
-			"text":"Patron, au rythme actuel on tient à peine %d mois. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
-				int(floor(GarageBusiness.cash_runway_months())), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
+			"text":"Patron, au rythme actuel notre réserve couvre %s. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
+				CASH_RISK.reserve_text(GarageBusiness.cash_runway_months()), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
 			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
 			"choices":[
 				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},

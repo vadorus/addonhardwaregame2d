@@ -37,7 +37,8 @@ var _fab_box: VBoxContainer
 var _done_box: VBoxContainer
 var _foundries_box: VBoxContainer
 var _choices: Dictionary = {}
-var _cash_confirmation: ConfirmationDialog
+const CASH_RISK := preload("res://ui/components/CashRiskDialog.gd")
+var _cash_confirmation: CASH_RISK
 var _adjust_open: Dictionary = {}
 var _go_buttons: Dictionary = {}
 var _team_details: VBoxContainer
@@ -389,12 +390,7 @@ func _apply(job_id: String) -> void:
 	if not quote.is_empty() and int(quote.lowest) < 0:
 		if is_instance_valid(_cash_confirmation):
 			_cash_confirmation.queue_free()
-		_cash_confirmation = ConfirmationDialog.new()
-		_cash_confirmation.name = "CashRiskConfirmation"
-		_cash_confirmation.title = "Production : trésorerie insuffisante"
-		_cash_confirmation.dialog_text = GarageBusiness.fabrication_cash_text(quote)
-		_cash_confirmation.ok_button_text = "Lancer malgré le risque"
-		_cash_confirmation.cancel_button_text = "Revoir mon choix"
+		_cash_confirmation = CASH_RISK.new()
 		add_child(_cash_confirmation)
 		var resume_scale := TimeManager.time_scale
 		TimeManager.time_scale = 0.0
@@ -402,7 +398,7 @@ func _apply(job_id: String) -> void:
 		_cash_confirmation.confirmed.connect(func():
 			TimeManager.time_scale = resume_scale
 			_emit_production(payload), CONNECT_ONE_SHOT)
-		_cash_confirmation.popup_centered(Vector2i(600, 320))
+		_cash_confirmation.show_quote(quote)
 		return
 	_emit_production(payload)
 

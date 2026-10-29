@@ -1,5 +1,6 @@
 extends RefCounted
 ## T-5 : frontières de trésorerie, prêt précoce, refus, devis et deux boutons réels.
+const CASH_RISK := preload("res://ui/components/CashRiskDialog.gd")
 const INTERACTIONS := preload("res://scripts/Interactions.gd")
 const CPU_DESIGN := preload("res://scripts/CpuDesign.gd")
 
@@ -23,6 +24,9 @@ static func run(host: Node) -> String:
 
 static func _run(host: Node) -> String:
 	SimulationManager.reset_all("CI Cash Safety", "CPU", "STANDARD")
+	for example in [[0.0, "0,0 mois"], [1.6, "1,6 mois"], [2.94, "2,9 mois"], [3.0, "3 mois"], [6.6, "7 mois"]]:
+		if CASH_RISK.reserve_text(example[0]) != example[1]:
+			return "Cash safety: inconsistent reserve formatting"
 	var burn := int(ExecutiveManager.financial_advice().monthly_burn)
 	Economy.money = burn * 2
 	GarageBusiness.check_cash_safety()
@@ -36,6 +40,10 @@ static func _run(host: Node) -> String:
 		return "Cash safety: Nora must interrupt at less than two months of cash"
 	if not GarageBusiness.loan_offer_pending() or INTERACTIONS.dialogue("FINANCE:LOAN").is_empty():
 		return "Cash safety: rescue loan must be visible before three months of activity"
+	Economy.money = int(burn * 1.6)
+	var expected_reserve := CASH_RISK.reserve_text(float(ExecutiveManager.financial_advice().runway_months))
+	if not str(INTERACTIONS.dialogue("FINANCE:LOAN").get("text", "")).contains(expected_reserve):
+		return "Cash safety: Nora must show the same reserve as the header"
 	var alerts := CompanyManager.alerts.size()
 	GarageBusiness.check_cash_safety()
 	if CompanyManager.alerts.size() != alerts:
@@ -166,6 +174,12 @@ static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> St
 		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%d €" % expected_cash) or TimeManager.time_scale != 0.0:
 			panel.free()
 			return "Cash safety: missing numeric confirmation / premature launch in %s" % path
+		if dialog.get_script() != CASH_RISK or dialog.get_ok_button().custom_minimum_size.y < 56 or dialog.get_cancel_button().custom_minimum_size.y < 56:
+			panel.free()
+			return "Cash safety: both fabrication paths must use the shared touch dialog"
+		if dialog.get_label().get_theme_color("font_color") != Color("2e2418"):
+			panel.free()
+			return "Cash safety: confirmation text must use contrasting ink"
 		dialog.canceled.emit()
 		if not received.is_empty() or bool(ProductionManager.get_job(job_id).route_selected) or Economy.money != expected_cash:
 			panel.free()
