@@ -1099,6 +1099,15 @@ func get_executive_brief() -> Dictionary:
 				})
 				break
 
+	# Une conception validée ne doit pas rester derrière les conseils génériques.
+	for waiting_job in ProductionManager.get_active_jobs():
+		if bool(waiting_job.get("route_selected", false)):
+			continue
+		priorities.append({"category":"PRODUCTION", "severity":88,
+			"text":"%s : conception validée, fabrication non lancée." % str(waiting_job.get("name", "CPU")),
+			"action":"Fabriquer maintenant : ouvrez Produits › Fabriquer. Chaque mois d'attente coûte environ %d € de charges fixes, avant toute vente." % estimated_structural_monthly_cost()})
+		break
+
 	var active_industrial_jobs := ProductionManager.get_active_jobs()
 	if not active_industrial_jobs.is_empty():
 		var industrial_job: Dictionary = active_industrial_jobs[0]

@@ -31,6 +31,7 @@ var _next_loan_id := 1
 var _months_since_study := 0
 var _template_turn := 0
 var _cash_warning_shown := false # Transient : une partie rechargée réaffiche le risque actuel.
+var _negative_cash_warning_shown := false # Transient : réarmé dès le retour à un solde positif.
 
 func _ready() -> void:
 	TimeManager.day_changed.connect(func(_day, _month, _year): check_cash_safety())
@@ -39,20 +40,34 @@ func _ready() -> void:
 func check_cash_safety() -> void:
 	if not CompanyManager.created or SimulationManager.is_game_over:
 		return
+	if Economy.money > 0:
+		_negative_cash_warning_shown = false
 	var reserve := cash_runway_months()
 	if reserve > 3.0:
 		_cash_warning_shown = false
 		return
 	if reserve >= 2.0:
 		return
-	if _cash_warning_shown or Economy.money <= 0:
-		return
+	if Economy.money < 0:
+		if _negative_cash_warning_shown:
+			return
+		_negative_cash_warning_shown = true
+	else:
+		if _cash_warning_shown:
+			return
 	_cash_warning_shown = true
-	CompanyManager.add_alert("Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre.")
+	CompanyManager.add_alert(("Nora : trésorerie négative, faillite à la clôture si rien ne change. Jeu en pause : utilisez ▶ pour reprendre." if Economy.money < 0 else "Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre."))
 	TimeManager.time_scale = 0.0
 	var scene := get_tree().current_scene
 	if scene != null and scene.has_method("open_dialogue"):
-		scene.call_deferred("open_dialogue", "FINANCE:LOAN" if loan_offer_pending() else "FINANCE:WARNING")
+		_open_cash_warning.call_deferred(scene, "FINANCE:LOAN" if loan_offer_pending() else "FINANCE:WARNING")
+
+## La clôture peut déclarer la faillite après le contrôle de trésorerie,
+## avant que la file des appels différés ouvre le dialogue.
+func _open_cash_warning(scene: Node, key: String) -> void:
+	if SimulationManager.is_game_over or not is_instance_valid(scene):
+		return
+	scene.call("open_dialogue", key)
 
 ## Devis sans effet : mêmes catégories de paiement que l'usine, difficulté comprise.
 func fabrication_cash_quote(job_id: String, provider: String, strategy: String, binning: String) -> Dictionary:
@@ -66,13 +81,39 @@ func fabrication_cash_quote(job_id: String, provider: String, strategy: String, 
 	var months := int(preview.get("preparation_months", 1))
 	var projection := ExecutiveManager.launch_cash_projection(months, monthly, setup)
 	return {"cash":Economy.money, "setup":setup, "monthly":monthly, "months":months,
-		"total":setup + monthly * months, "lowest":int(projection.lowest), "cash_end":int(projection.cash_end)}
+		"job_id":job_id, "total":setup + monthly * months, "lowest":int(projection.lowest), "cash_end":int(projection.cash_end)}
+
+## Recherche sans mutation ni tirage aléatoire : coût total industriel minimal,
+## avec toutes les clôtures projetées non négatives (charges comprises).
+func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
+	var job := ProductionManager.get_job(job_id)
+	if job.is_empty() or bool(job.get("route_committed", false)):
+		return {}
+	var providers := FoundryManager.available_external_foundries(int(job.node_nm))
+	if FoundryManager.internal_supports_node(int(job.node_nm)):
+		providers.append("INTERNAL")
+	var best := {}
+	for provider in providers:
+		for strategy in ProductionManager.get_strategy_keys():
+			for binning in ProductionManager.get_binning_strategy_keys():
+				var option := fabrication_cash_quote(job_id, str(provider), str(strategy), str(binning))
+				if option.is_empty() or int(option.lowest) < 0:
+					continue
+				if best.is_empty() or int(option.total) < int(best.total):
+					best = option
+					best["label"] = "%s / %s / %s" % ["Interne" if provider == "INTERNAL" else FoundryManager.external_foundry_label(str(provider)), ProductionManager.strategy_label(str(strategy)), ProductionManager.binning_strategy_label(str(binning))]
+	return best
 
 func fabrication_cash_text(quote: Dictionary) -> String:
-	return "Trésorerie disponible : %d €.\nFabrication estimée : %d € (%d € de mise en route + %d €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %d € avant les premières ventes.\n\nContinuer malgré le risque de faillite ?" % [int(quote.cash), int(quote.total), int(quote.setup), int(quote.monthly), int(quote.months), int(quote.lowest)]
+	var option := cheapest_affordable_fabrication(str(quote.get("job_id", "")))
+	var alternative := "Aucune option ne garde un solde projeté positif ou nul avec la trésorerie actuelle."
+	if not option.is_empty():
+		alternative = "Option finançable la moins chère (estimation) : %s — %d €, réserve minimale %d €. Revenez au choix de fabrication pour la sélectionner." % [str(option.label), int(option.total), int(option.lowest)]
+	return "Trésorerie disponible : %d €.\nFabrication estimée : %d € (%d € de mise en route + %d €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %d € avant les premières ventes.\n\n%s\n\nContinuer malgré le risque de faillite ?" % [int(quote.cash), int(quote.total), int(quote.setup), int(quote.monthly), int(quote.months), int(quote.lowest), alternative]
 
 func reset() -> void:
 	_cash_warning_shown = false
+	_negative_cash_warning_shown = false
 	studies = []
 	loans = []
 	flags = {}
@@ -285,6 +326,7 @@ func get_state() -> Dictionary:
 
 func load_state(state: Dictionary) -> void:
 	_cash_warning_shown = false
+	_negative_cash_warning_shown = false
 	studies = state.get("studies", []).duplicate(true)
 	loans = state.get("loans", []).duplicate(true)
 	flags = state.get("flags", {}).duplicate(true)

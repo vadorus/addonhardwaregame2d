@@ -188,9 +188,29 @@ static func _money(value: int) -> String:
 	while digits.length() > 3:
 		out = " " + digits.substr(digits.length() - 3) + out
 		digits = digits.substr(0, digits.length() - 3)
-	return digits + out
+	return ("−" if value < 0 else "") + digits + out
 
 ## Contenu de la conversation : qui parle, ce qu'il dit, les réponses possibles.
+static func hiring_cash_text() -> String:
+	# Copie hors arbre : simule les mêmes candidats et leur recrutement, sans
+	# toucher au hasard, aux candidats ni aux comptes de la partie réelle.
+	var preview = PersonnelManager.get_script().new()
+	preview.staff = PersonnelManager.staff.duplicate(true)
+	preview.rng.seed = PersonnelManager.rng.seed
+	preview.rng.state = PersonnelManager.rng.state
+	var monthly := 0
+	var signing := 0
+	var lines: Array[String] = []
+	for count in range(1, 3):
+		var profile: Dictionary = preview.generate_candidate("Développement")
+		monthly += Economy.quoted_expense(int(profile.salary), "Salaires")
+		signing += Economy.quoted_expense(int(profile.salary) * 2, "Recrutement")
+		var advice := ExecutiveManager.financial_advice(signing, monthly)
+		lines.append("%d recrue(s) : +%s €/mois, prime %s € ; réserve après embauche %s € (%s)." % [count, _money(monthly), _money(signing), _money(int(advice.cash_after)), CASH_RISK.reserve_text(float(advice.runway_months))])
+		preview._add_employee(str(profile.name), "", "Développement", int(profile.skill), float(profile.experience_years), str(profile.specialization), int(profile.leadership), int(profile.salary), profile.profile)
+	preview.free()
+	return "Avant les premières ventes, préservez le financement du CPU.\n" + "\n".join(lines)
+
 static func dialogue(key: String) -> Dictionary:
 	var sid := key.substr(key.find(":") + 1)
 	if key.begins_with("RIVALRY:"):
@@ -246,7 +266,7 @@ static func dialogue(key: String) -> Dictionary:
 			return {}
 		return {"key":key, "person":_person("NORA"), "mood":"NEUTRAL", "kicker":"GRANDIR",
 			"text":"Pour %s, il faudrait environ %d développeurs. On n'est que %d : le projet traîne. Avec une recrue de plus, on avancerait %d %% plus vite. On embauche ?" % [str(need.project), int(need.required), int(need.devs), int(need.gain_pct)],
-			"note":"Chaque recrue : salaire d'environ 3 000 à 4 000 €/mois + prime d'embauche (2 mois). Attention à la place dans les locaux.",
+			"note":hiring_cash_text(),
 			"choices":[
 				{"id":"HIRE1", "label":"Recrute un développeur.", "hint":"Le projet accélère dès le mois prochain", "primary":true},
 				{"id":"HIRE2", "label":"Recrute-en deux.", "hint":"Encore plus vite, deux salaires de plus"},
@@ -301,7 +321,7 @@ static func dialogue(key: String) -> Dictionary:
 			]}
 	elif key == "FINANCE:WARNING":
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE — MOINS DE DEUX MOIS",
-			"text":"Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible.",
+			"text":("Patron, la trésorerie est négative. Faillite à la clôture si rien ne change." if Economy.money < 0 else "Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible."),
 			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions. Jeu en pause : après cette alerte, utilisez ▶ pour reprendre." % _money(Economy.money),
 			"choices":[{"id":"CONTINUE", "label":"Compris, je revois les dépenses.", "primary":true}]}
 	elif key == "FINANCE:LOAN":
@@ -309,7 +329,7 @@ static func dialogue(key: String) -> Dictionary:
 			return {}
 		var terms := GarageBusiness.loan_terms()
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
-			"text":"Patron, au rythme actuel notre réserve couvre %s. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
+			"text":("Trésorerie négative : faillite à la clôture si rien ne change. " if Economy.money < 0 else "") + "Patron, au rythme actuel notre réserve couvre %s. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
 				CASH_RISK.reserve_text(GarageBusiness.cash_runway_months()), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
 			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
 			"choices":[
