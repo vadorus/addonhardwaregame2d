@@ -86,6 +86,7 @@ func process_month_end() -> Dictionary:
 	PerfProbe.end_span("simulation")
 	PerfProbe.mark_month(report)
 	month_processed.emit(report)
+	GarageBusiness.check_cash_safety()
 	if Economy.money <= 0:
 		is_game_over = true
 		TimeManager.time_scale = 0.0

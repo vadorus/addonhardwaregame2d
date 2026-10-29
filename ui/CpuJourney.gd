@@ -235,10 +235,18 @@ func _build_benchmarks() -> void:
 	else: _body.add_child(_label("Premier CPU : aucun prédécesseur à comparer.", 13, MUTED))
 	for row in _state.benchmark:
 		var card := HBoxContainer.new()
+		card.add_theme_constant_override("separation", 12)
 		var name_label := _label(str(row.name), 16, ACCENT if bool(row.player) else PAPER)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.add_child(name_label)
-		card.add_child(_label("%.1f" % float(row.score), 18))
+		# _label active le retour à la ligne : pour un score, cela autorisait
+		# une colonne de quelques pixels et empilait les chiffres sur Pixel.
+		var score_label := _label("%.1f" % float(row.score), 18)
+		score_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		score_label.custom_minimum_size.x = 64
+		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		score_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		card.add_child(score_label)
 		_body.add_child(card)
 		var bar := ProgressBar.new()
 		bar.value = float(row.score)

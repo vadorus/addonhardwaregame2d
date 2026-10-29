@@ -298,6 +298,11 @@ static func dialogue(key: String) -> Dictionary:
 				{"id":"DECLINE", "label":"Désolé, on est concentrés sur notre CPU.", "hint":"Le client repart ; aucune pénalité"},
 				{"id":"LATER", "label":"Laissez-moi y réfléchir.", "hint":"L'offre tient encore quelques semaines"},
 			]}
+	elif key == "FINANCE:WARNING":
+		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE — MOINS DE DEUX MOIS",
+			"text":"Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible.",
+			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions. Jeu en pause : après cette alerte, utilisez ▶ pour reprendre." % _money(Economy.money),
+			"choices":[{"id":"CONTINUE", "label":"Compris, je revois les dépenses.", "primary":true}]}
 	elif key == "FINANCE:LOAN":
 		if not GarageBusiness.loan_offer_pending():
 			return {}
@@ -305,7 +310,7 @@ static func dialogue(key: String) -> Dictionary:
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
 			"text":"Patron, au rythme actuel on tient à peine %d mois. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
 				int(floor(GarageBusiness.cash_runway_months())), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
-			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
+			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
 			"choices":[
 				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
 				{"id":"DECLINE", "label":"Non, on se serre la ceinture.", "hint":"Nora n'en reparle pas avant un an"},
@@ -406,6 +411,8 @@ static func dialogue(key: String) -> Dictionary:
 
 ## Applique une réponse. Renvoie {ok, message}.
 static func choose(key: String, choice_id: String) -> Dictionary:
+	if key == "FINANCE:WARNING":
+		return {"ok":true, "message":"La trésorerie reste fragile. Jeu en pause : utilisez ▶ pour reprendre."}
 	var sid := key.substr(key.find(":") + 1)
 	if key.begins_with("RIVALRY:"):
 		return RIVALRY.answer(choice_id)
@@ -441,9 +448,9 @@ static func choose(key: String, choice_id: String) -> Dictionary:
 	if key == "FINANCE:LOAN":
 		if choice_id == "ACCEPT":
 			var ok := GarageBusiness.accept_loan()
-			return {"ok":ok, "message":"Prêt signé : la trésorerie respire." if ok else "La banque ne peut plus suivre."}
+			return {"ok":ok, "message":"Prêt signé : la trésorerie respire. Si le jeu est en pause, utilisez ▶ pour reprendre." if ok else "La banque ne peut plus suivre."}
 		GarageBusiness.decline_loan()
-		return {"ok":true, "message":"Pas de prêt : chaque euro compte."}
+		return {"ok":true, "message":"Pas de prêt : chaque euro compte. Si le jeu est en pause, utilisez ▶ pour reprendre."}
 	if choice_id == "LATER":
 		return {"ok":true, "message":"", "later":true}
 	if key.begins_with("ADVICE:"):

@@ -30,8 +30,49 @@ var _next_study_id := 1
 var _next_loan_id := 1
 var _months_since_study := 0
 var _template_turn := 0
+var _cash_warning_shown := false # Transient : une partie rechargée réaffiche le risque actuel.
+
+func _ready() -> void:
+	TimeManager.day_changed.connect(func(_day, _month, _year): check_cash_safety())
+
+## Nora interrompt le temps avant la prochaine clôture, même au premier mois.
+func check_cash_safety() -> void:
+	if not CompanyManager.created or SimulationManager.is_game_over:
+		return
+	var reserve := cash_runway_months()
+	if reserve > 3.0:
+		_cash_warning_shown = false
+		return
+	if reserve >= 2.0:
+		return
+	if _cash_warning_shown or Economy.money <= 0:
+		return
+	_cash_warning_shown = true
+	CompanyManager.add_alert("Nora : attention, la trésorerie couvre moins de deux mois de dépenses. Jeu en pause : après la décision, utilisez ▶ pour reprendre.")
+	TimeManager.time_scale = 0.0
+	var scene := get_tree().current_scene
+	if scene != null and scene.has_method("open_dialogue"):
+		scene.call_deferred("open_dialogue", "FINANCE:LOAN" if loan_offer_pending() else "FINANCE:WARNING")
+
+## Devis sans effet : mêmes catégories de paiement que l'usine, difficulté comprise.
+func fabrication_cash_quote(job_id: String, provider: String, strategy: String, binning: String) -> Dictionary:
+	var preview := ProductionManager.preview_industrialization(job_id, provider, strategy, binning)
+	if preview.is_empty():
+		return {}
+	var job := ProductionManager.get_job(job_id)
+	var route := FoundryManager.route_quote("INTERNAL" if provider == "INTERNAL" else "EXTERNAL", provider, int(job.get("node_nm", 10000)))
+	var setup := 0 if bool(job.get("route_committed", false)) else Economy.quoted_expense(int(preview.get("setup_fee", 0)), "Mise en production — %s" % str(route.get("provider_name", "fabrication")))
+	var monthly := Economy.quoted_expense(int(preview.get("monthly_cost", 0)), "Industrialisation — %s (%s)" % [str(job.get("name", "CPU")), str(route.get("provider_name", "fabrication"))])
+	var months := int(preview.get("preparation_months", 1))
+	var projection := ExecutiveManager.launch_cash_projection(months, monthly, setup)
+	return {"cash":Economy.money, "setup":setup, "monthly":monthly, "months":months,
+		"total":setup + monthly * months, "lowest":int(projection.lowest), "cash_end":int(projection.cash_end)}
+
+func fabrication_cash_text(quote: Dictionary) -> String:
+	return "Trésorerie disponible : %d €.\nFabrication estimée : %d € (%d € de mise en route + %d €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %d € avant les premières ventes.\n\nContinuer malgré le risque de faillite ?" % [int(quote.cash), int(quote.total), int(quote.setup), int(quote.monthly), int(quote.months), int(quote.lowest)]
 
 func reset() -> void:
+	_cash_warning_shown = false
 	studies = []
 	loans = []
 	flags = {}
@@ -160,7 +201,9 @@ func active_loan() -> Dictionary:
 	return {}
 
 func loan_offer_pending() -> bool:
-	if not CompanyManager.created or ExecutiveManager.months_operated < 3 or not active_loan().is_empty():
+	if not CompanyManager.created or not active_loan().is_empty():
+		return false
+	if ExecutiveManager.months_operated < 3 and cash_runway_months() >= 2.0:
 		return false
 	if ExecutiveManager.months_operated < int(flags.get("loan_next_offer_at", 0)):
 		return false
@@ -241,6 +284,7 @@ func get_state() -> Dictionary:
 		"months_since_study":_months_since_study, "template_turn":_template_turn}
 
 func load_state(state: Dictionary) -> void:
+	_cash_warning_shown = false
 	studies = state.get("studies", []).duplicate(true)
 	loans = state.get("loans", []).duplicate(true)
 	flags = state.get("flags", {}).duplicate(true)
