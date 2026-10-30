@@ -33,6 +33,9 @@ static func run(host: Node) -> String:
 	return error
 
 static func _run(host: Node) -> String:
+	var layout_error := _t7_layout(host)
+	if layout_error != "":
+		return layout_error
 	var review_error := _review_regressions(host)
 	if review_error != "":
 		return review_error
@@ -322,7 +325,7 @@ static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> St
 		else:
 			panel._apply(job_id)
 		var dialog: ConfirmationDialog = panel.get_node_or_null("CashRiskConfirmation")
-		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%d €" % expected_cash) or TimeManager.time_scale != 0.0:
+		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%s €" % INTERACTIONS._money(expected_cash)) or TimeManager.time_scale != 0.0:
 			panel.free()
 			return "Cash safety: missing numeric confirmation / premature launch in %s" % path
 		if dialog.get_script() != CASH_RISK or dialog.get_ok_button().custom_minimum_size.y < 56 or dialog.get_cancel_button().custom_minimum_size.y < 56:
@@ -348,3 +351,43 @@ static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> St
 			return "Cash safety: explicit confirmation did not launch exactly once"
 		panel.free()
 	return ""
+
+## Pixel 10 : ADB wm/dumpsys 30/10/2026, surface paysage 2424 × 1080.
+## Échelle mobile par défaut 1,15 ; aucune sauvegarde personnelle lue.
+static func _t7_layout(host: Node) -> String:
+	SimulationManager.reset_all("CI T7 long quote", "CPU", "STANDARD")
+	Economy.money = 34277
+	ProductionManager._on_project_completed({"id":"CI-T7", "name":"CI T7 CPU", "sector":"CPU",
+		"cpu_design":CPU_DESIGN.default_design(), "complexity":40.0, "design_estimate":{}})
+	var job: Dictionary = ProductionManager.get_active_jobs()[0]
+	var root := host.get_tree().root
+	var old_size := root.size
+	var old_scale := root.content_scale_factor
+	root.size = Vector2i(2424, 1080)
+	root.content_scale_factor = 1.15
+	var dialog := CASH_RISK.new()
+	host.add_child(dialog)
+	var quote := {"job_id":str(job.id), "cash":34277, "total":18972, "setup":5500,
+		"monthly":3368, "months":4, "lowest":-2503}
+	dialog.show_quote(quote)
+	var visible := root.get_visible_rect().size
+	var error := ""
+	if dialog.position.x < 0 or dialog.position.y < 0 or dialog.position.x + dialog.size.x > visible.x or dialog.position.y + dialog.size.y > visible.y:
+		error = "T7: confirmation outside logical viewport"
+	if dialog.get_label().get_line_count() <= dialog.dialog_text.count("\n") + 1:
+		error = "T7: long confirmation did not wrap"
+	if not dialog.dialog_text.contains("Option finançable la moins chère"):
+		error = "T7: missing long affordable alternative fixture"
+	if not dialog.dialog_text.contains("34 277 €") or not dialog.dialog_text.contains("−2 503 €"):
+		error = "T7: money format regression"
+	for key in ["embedded_border", "embedded_unfocused_border"]:
+		var border: StyleBoxFlat = dialog.get_theme_stylebox(key)
+		var ink := dialog.get_theme_color("title_color")
+		var contrast := (border.bg_color.get_luminance() + 0.05) / (ink.get_luminance() + 0.05)
+		if contrast < 4.5 or border.expand_margin_top < 32:
+			error = "T7: unreadable title border"
+	print("[CI] T7: visible=%s position=%s size=%s lines=%d error=%s" % [visible, dialog.position, dialog.size, dialog.get_label().get_line_count(), error])
+	dialog.free()
+	root.size = old_size
+	root.content_scale_factor = old_scale
+	return error
