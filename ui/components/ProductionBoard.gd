@@ -35,6 +35,8 @@ var _provider := ""
 var _binning := "BALANCED"
 var _strategy := "BALANCED"
 var _alternative_note := ""
+var _nora_option_active := false
+var _choice_notice_serial := 0
 var _data: Dictionary = {}
 var _options: Array = []
 var _layout: BoxContainer
@@ -68,6 +70,8 @@ func set_job(id: String) -> void:
 		_binning = "BALANCED"
 		_strategy = "BALANCED"
 		_alternative_note = ""
+		_nora_option_active = false
+		_choice_notice_serial += 1
 	refresh()
 
 func set_viewport_width(width: float) -> void:
@@ -88,14 +92,12 @@ func set_viewport_width(width: float) -> void:
 	_signature = ""
 
 func select_provider(provider: String) -> void:
-	_strategy = "BALANCED"
-	_alternative_note = ""
+	_replace_nora_choice()
 	_provider = provider
 	refresh(true)
 
 func select_binning(binning: String) -> void:
-	_strategy = "BALANCED"
-	_alternative_note = ""
+	_replace_nora_choice()
 	_binning = binning
 	refresh(true)
 
@@ -399,7 +401,7 @@ func _on_launch() -> void:
 		_cash_confirmation.alternative_selected.connect(func(option: Dictionary):
 			TimeManager.time_scale = resume_scale
 			call_deferred("_select_alternative", option), CONNECT_ONE_SHOT)
-		_cash_confirmation.show_quote(quote)
+		_cash_confirmation.show_quote(quote, true)
 		return
 	launch_requested.emit(payload)
 
@@ -474,11 +476,26 @@ class Wafer extends Control:
 
 ## Prépare seulement le devis ; le prochain clic reste le seul lancement possible.
 func _select_alternative(option: Dictionary) -> void:
+	_nora_option_active = true
+	_choice_notice_serial += 1
 	_provider = str(option.provider)
 	_strategy = str(option.strategy)
 	_binning = str(option.binning)
-	_alternative_note = "Option de Nora sélectionnée · %s · %s · à confirmer" % [ProductionManager.strategy_label(_strategy), ProductionManager.binning_strategy_label(_binning)]
+	_alternative_note = "Option de Nora sélectionnée · %s · %s · à confirmer" % [ProductionManager.strategy_label(_strategy), str(PREVIEW.BINNING_LABELS.get(_binning, _binning))]
 	refresh(true)
 	if is_instance_valid(_launch):
 		_launch.grab_focus()
 		_launch.add_theme_stylebox_override("focus", _box(Color("d9822b"), 12, 10))
+
+func _replace_nora_choice() -> void:
+	_strategy = "BALANCED"
+	if not _nora_option_active: return
+	_nora_option_active = false
+	_choice_notice_serial += 1
+	_alternative_note = "Option de Nora remplacée par votre choix"
+	get_tree().create_timer(2.5).timeout.connect(_clear_choice_notice.bind(_choice_notice_serial), CONNECT_ONE_SHOT)
+
+func _clear_choice_notice(serial: int) -> void:
+	if serial != _choice_notice_serial or _nora_option_active: return
+	_alternative_note = ""
+	refresh(true)

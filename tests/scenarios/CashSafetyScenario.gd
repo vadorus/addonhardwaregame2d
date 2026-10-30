@@ -397,6 +397,7 @@ static func _t8_interactions(host: Node) -> String:
 	for reduced in [false, true]:
 		juice.reduced_motion = reduced
 		SimulationManager.reset_all("CI T8 alternative", "CPU", "STANDARD")
+		TimeManager.time_scale = 0.0
 		ProductionManager._on_project_completed({"id":"CI-T8-ALT", "name":"CI T8", "sector":"CPU",
 			"cpu_design":CPU_DESIGN.default_design(), "complexity":40.0, "design_estimate":{}})
 		var job: Dictionary = ProductionManager.get_active_jobs()[0]
@@ -414,6 +415,35 @@ static func _t8_interactions(host: Node) -> String:
 			if -int(q.lowest) > maximum:
 				maximum = -int(q.lowest)
 				expensive = str(provider)
+		var balanced_minimum := 2147483647
+		for provider in FoundryManager.available_external_foundries(int(job.node_nm)):
+			for binning in ProductionManager.get_binning_strategy_keys():
+				var q := GarageBusiness.fabrication_cash_quote(job_id, str(provider), "BALANCED", str(binning))
+				balanced_minimum = mini(balanced_minimum, -int(q.lowest))
+		Economy.money = mini(maximum - 1, maxi(balanced_minimum + 1, 34277))
+		var balanced := GarageBusiness.cheapest_affordable_fabrication(job_id, true)
+		var global_best := GarageBusiness.cheapest_affordable_fabrication(job_id)
+		if balanced.is_empty() or str(balanced.strategy) != "BALANCED" or global_best.is_empty() or str(global_best.strategy) == "BALANCED":
+			juice.reduced_motion = motion
+			return "T8 review: balanced option must be preferred when affordable"
+		var board: Control = preload("res://ui/components/ProductionBoard.gd").new()
+		host.add_child(board)
+		board.set_job(job_id)
+		board.select_provider(expensive)
+		board._on_launch()
+		var chosen: Control = board.get_node_or_null("CashRiskConfirmation")
+		if chosen == null or chosen.alternative != balanced:
+			board.free()
+			juice.reduced_motion = motion
+			return "T8 review: atelier did not pass balanced-first policy to its scene"
+		chosen.select_alternative()
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		if board._strategy != "BALANCED":
+			board.free()
+			juice.reduced_motion = motion
+			return "T8 review: atelier selected a hidden strategy despite a funded balanced option"
+		board.free()
 		Economy.money = minimum + 1
 		var option := GarageBusiness.cheapest_affordable_fabrication(job_id)
 		if option.is_empty() or minimum + 1 >= maximum:
@@ -451,6 +481,25 @@ static func _t8_interactions(host: Node) -> String:
 				panel.free()
 				juice.reduced_motion = motion
 				return "T8: selected alternative preview differs from production source"
+			if panel.has_signal("launch_requested"):
+				var note: String = panel._alternative_note
+				panel.refresh(true)
+				if not panel._nora_option_active or note == "" or panel._alternative_note != note:
+					panel.free()
+					juice.reduced_motion = motion
+					return "T8 review: fallback strategy note vanished during refresh"
+				panel.select_binning(str(option.binning))
+				if panel._nora_option_active or panel._strategy != "BALANCED" or panel._alternative_note != "Option de Nora remplacée par votre choix":
+					panel.free()
+					juice.reduced_motion = motion
+					return "T8 review: manual choice did not explain that it replaced Nora's option"
+				if not reduced:
+					await host.get_tree().create_timer(2.7).timeout
+					if panel._alternative_note != "":
+						panel.free()
+						juice.reduced_motion = motion
+						return "T8 review: manual replacement notice did not disappear"
+
 			panel.free()
 		# Le compteur finit exactement au point bas ; le mode réduit saute directement à la fin.
 		var animated := CASH_RISK.new()
@@ -506,6 +555,8 @@ static func _t8_interactions(host: Node) -> String:
 		dialog.show_quote({"job_id":"", "cash":34277, "total":18972, "setup":5500, "monthly":3368, "months":4, "lowest":-2503})
 		await host.get_tree().process_frame
 		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
 		var screen := root.get_visible_rect().size
 		var rect := dialog._stage.get_global_rect()
 		var card := dialog._card.get_global_rect()
@@ -514,6 +565,14 @@ static func _t8_interactions(host: Node) -> String:
 			invalid = invalid or not dialog.narrow or dialog._nora.get_global_rect().end.y > card.position.y or dialog._scroll.get_v_scroll_bar().max_value <= dialog._scroll.get_v_scroll_bar().page
 		else:
 			invalid = invalid or dialog.narrow or dialog._nora.get_global_rect().end.x > card.position.x
+		var chip_height: float = dialog._low_chip.size.y
+		for chip: Control in dialog._chips.get_children():
+			invalid = invalid or absf(chip.size.y - chip_height) > 1
+		invalid = invalid or dialog._bubble.size.y > dialog._bubble.get_combined_minimum_size().y + 1
+		if not dialog.narrow:
+			var wanted: float = dialog._body.get_combined_minimum_size().y + dialog._buttons.get_combined_minimum_size().y + 36
+			invalid = invalid or card.size.y > wanted + 1 or absf(dialog._portrait.get_global_rect().end.y - card.end.y) > 1
+		invalid = invalid or dialog._gauge.cash_text != INTERACTIONS._money(34277, true) or dialog._header_veil.color.a <= 0 or dialog._counter.position.y + dialog._counter.size.y > 52
 		invalid = invalid or host.get_viewport().gui_get_focus_owner() != dialog._cancel or dialog._alternative_button.visible
 		print("[CI] T8 responsive: screen=%s scene=%s card=%s narrow=%s" % [screen, rect, card, dialog.narrow])
 		dialog.free()
@@ -527,5 +586,6 @@ static func _t8_interactions(host: Node) -> String:
 	root.content_scale_size = old_base
 	root.content_scale_factor = old_scale
 	juice.reduced_motion = motion
+	print("[CI] T8 review: PASS (balanced option preferred over cheaper hidden strategy; fallback note survives refresh; manual replacement explained; content heights, equal chips, gauge and header checked)")
 	print("[CI] T8 actions: PASS (both fabrication paths, exact alternative preview, zero spending/launch, immediate input, double tap, veil/back/cancel, reduced motion)")
 	return ""

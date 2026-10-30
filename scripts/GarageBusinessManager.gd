@@ -85,7 +85,8 @@ func fabrication_cash_quote(job_id: String, provider: String, strategy: String, 
 
 ## Recherche sans mutation ni tirage aléatoire : coût total industriel minimal,
 ## avec toutes les clôtures projetées non négatives (charges comprises).
-func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
+## L’Atelier propose d’abord ses choix visibles (stratégie équilibrée), puis un recours si aucun ne tient.
+func cheapest_affordable_fabrication(job_id: String, balanced_first: bool = false) -> Dictionary:
 	var job := ProductionManager.get_job(job_id)
 	if job.is_empty() or bool(job.get("route_committed", false)):
 		return {}
@@ -93,8 +94,9 @@ func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
 	if FoundryManager.internal_supports_node(int(job.node_nm)):
 		providers.append("INTERNAL")
 	var best := {}
+	var strategies: Array = ["BALANCED"] if balanced_first else ProductionManager.get_strategy_keys()
 	for provider in providers:
-		for strategy in ProductionManager.get_strategy_keys():
+		for strategy in strategies:
 			for binning in ProductionManager.get_binning_strategy_keys():
 				var option := fabrication_cash_quote(job_id, str(provider), str(strategy), str(binning))
 				if option.is_empty() or int(option.lowest) < 0:
@@ -105,11 +107,13 @@ func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
 					best["strategy"] = str(strategy)
 					best["binning"] = str(binning)
 					best["label"] = "%s / %s / %s" % ["Interne" if provider == "INTERNAL" else FoundryManager.external_foundry_label(str(provider)), ProductionManager.strategy_label(str(strategy)), ProductionManager.binning_strategy_label(str(binning))]
+	if best.is_empty() and balanced_first:
+		return cheapest_affordable_fabrication(job_id)
 	return best
 
-func fabrication_cash_text(quote: Dictionary) -> String:
+func fabrication_cash_text(quote: Dictionary, balanced_first: bool = false) -> String:
 	var interactions: Script = load("res://scripts/Interactions.gd")
-	var option := cheapest_affordable_fabrication(str(quote.get("job_id", "")))
+	var option := cheapest_affordable_fabrication(str(quote.get("job_id", "")), balanced_first)
 	var alternative := "Aucune option ne garde un solde projeté positif ou nul avec la trésorerie actuelle."
 	if not option.is_empty():
 		alternative = "Option finançable la moins chère (estimation) : %s — %s €, réserve minimale %s €. Revenez au choix de fabrication pour la sélectionner." % [str(option.label), interactions._money(int(option.total)), interactions._money(int(option.lowest))]

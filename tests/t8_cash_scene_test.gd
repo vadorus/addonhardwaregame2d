@@ -65,7 +65,7 @@ func _ready() -> void:
 		quote = GarageBusiness.fabrication_cash_quote(str(job.id), expensive, "BALANCED", "BALANCED")
 	scene = DIALOG.new()
 	bg.add_child(scene)
-	scene.show_quote(quote)
+	scene.show_quote(quote, true)
 	if mode == "animation":
 		var frames := 0
 		while scene._gauge.value >= float(quote.cash) and frames < 180:
@@ -76,7 +76,14 @@ func _ready() -> void:
 			get_tree().quit(1)
 			return
 	else:
-		await get_tree().create_timer(1.1).timeout
+		var frames := 0
+		while scene._gauge.value != float(quote.lowest) and frames < 300:
+			await get_tree().process_frame
+			frames += 1
+		if frames == 300:
+			push_error("T8 capture: counter did not finish")
+			get_tree().quit(1)
+			return
 	# Le rendu doit aussi terminer si la fenêtre locale est masquée/minimisée.
 	RenderingServer.force_draw(false)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/reviews/t8"))
