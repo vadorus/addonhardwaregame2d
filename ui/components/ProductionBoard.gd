@@ -33,6 +33,10 @@ const CASH_RISK := preload("res://ui/components/CashRiskDialog.gd")
 var _cash_confirmation: CASH_RISK
 var _provider := ""
 var _binning := "BALANCED"
+var _strategy := "BALANCED"
+var _alternative_note := ""
+var _nora_option_active := false
+var _choice_notice_serial := 0
 var _data: Dictionary = {}
 var _options: Array = []
 var _layout: BoxContainer
@@ -64,6 +68,10 @@ func set_job(id: String) -> void:
 		job_id = id
 		_provider = ""
 		_binning = "BALANCED"
+		_strategy = "BALANCED"
+		_alternative_note = ""
+		_nora_option_active = false
+		_choice_notice_serial += 1
 	refresh()
 
 func set_viewport_width(width: float) -> void:
@@ -84,10 +92,12 @@ func set_viewport_width(width: float) -> void:
 	_signature = ""
 
 func select_provider(provider: String) -> void:
+	_replace_nora_choice()
 	_provider = provider
 	refresh(true)
 
 func select_binning(binning: String) -> void:
+	_replace_nora_choice()
 	_binning = binning
 	refresh(true)
 
@@ -107,11 +117,11 @@ func refresh(force: bool = false) -> void:
 		return
 	# Le jeu rafraîchit souvent : on ne reconstruit que si quelque chose de visible a pu changer.
 	var signature := "%s|%s|%s|%d|%d|%s|%d|%d|%s" % [job_id, _provider, _binning, TimeManager.month, TimeManager.year,
-		str(job.get("route_selected", false)), ProductManager.products.size(), MarketManager.competitors.get("CPU", []).size(), str(_narrow)]
+		str(job.get("route_selected", false)), ProductManager.products.size(), MarketManager.competitors.get("CPU", []).size(), str(_narrow) + _strategy + _alternative_note]
 	if signature == _signature and not force:
 		return
 	_signature = signature
-	_options = PREVIEW.foundry_options(job, _binning)
+	_options = PREVIEW.foundry_options(job, _binning, _strategy)
 	if _provider == "" or not _options.any(func(o): return str(o.id) == _provider):
 		_provider = ""
 		for option_value in _options:
@@ -119,11 +129,16 @@ func refresh(force: bool = false) -> void:
 				_provider = str((option_value as Dictionary).id)
 		if _provider == "" and not _options.is_empty():
 			_provider = str((_options[0] as Dictionary).id)
-	_data = PREVIEW.build(job, _provider, _binning) if _provider != "" else {"ok":false, "name":str(job.get("name", "CPU"))}
+	_data = PREVIEW.build(job, _provider, _binning, _strategy) if _provider != "" else {"ok":false, "name":str(job.get("name", "CPU"))}
 	_clear(_left)
 	_clear(_right)
 	_build_market(job)
 	_build_factory()
+	if _alternative_note != "":
+		var note := _text(_alternative_note, 14, Color("9a5a12"))
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_right.add_child(note)
+		_right.move_child(note, 0)
 
 # --- À gauche : le nouveau CPU face au marché ---------------------------------------------------
 
@@ -366,12 +381,12 @@ func _on_launch() -> void:
 		return
 	var payload := {
 		"job_id":job_id,
-		"strategy":"BALANCED",
+		"strategy":_strategy,
 		"binning":_binning,
 		"mode":"INTERNAL" if _provider == "INTERNAL" else "EXTERNAL",
 		"provider":_provider,
 	}
-	var quote := GarageBusiness.fabrication_cash_quote(job_id, _provider, "BALANCED", _binning)
+	var quote := GarageBusiness.fabrication_cash_quote(job_id, _provider, _strategy, _binning)
 	if not quote.is_empty() and int(quote.lowest) < 0:
 		if is_instance_valid(_cash_confirmation):
 			_cash_confirmation.queue_free()
@@ -383,7 +398,10 @@ func _on_launch() -> void:
 		_cash_confirmation.confirmed.connect(func():
 			TimeManager.time_scale = resume_scale
 			launch_requested.emit(payload), CONNECT_ONE_SHOT)
-		_cash_confirmation.show_quote(quote)
+		_cash_confirmation.alternative_selected.connect(func(option: Dictionary):
+			TimeManager.time_scale = resume_scale
+			call_deferred("_select_alternative", option), CONNECT_ONE_SHOT)
+		_cash_confirmation.show_quote(quote, true)
 		return
 	launch_requested.emit(payload)
 
@@ -455,3 +473,29 @@ class Wafer extends Control:
 				var good := (index * 37) % 100 < yield_pct
 				draw_rect(rect, Color("e3b04b") if good else Color("2f3b43"))
 				index += 1
+
+## Prépare seulement le devis ; le prochain clic reste le seul lancement possible.
+func _select_alternative(option: Dictionary) -> void:
+	_nora_option_active = true
+	_choice_notice_serial += 1
+	_provider = str(option.provider)
+	_strategy = str(option.strategy)
+	_binning = str(option.binning)
+	_alternative_note = "Option de Nora sélectionnée · %s · %s · à confirmer" % [ProductionManager.strategy_label(_strategy), str(PREVIEW.BINNING_LABELS.get(_binning, _binning))]
+	refresh(true)
+	if is_instance_valid(_launch):
+		_launch.grab_focus()
+		_launch.add_theme_stylebox_override("focus", _box(Color("d9822b"), 12, 10))
+
+func _replace_nora_choice() -> void:
+	_strategy = "BALANCED"
+	if not _nora_option_active: return
+	_nora_option_active = false
+	_choice_notice_serial += 1
+	_alternative_note = "Option de Nora remplacée par votre choix"
+	get_tree().create_timer(2.5).timeout.connect(_clear_choice_notice.bind(_choice_notice_serial), CONNECT_ONE_SHOT)
+
+func _clear_choice_notice(serial: int) -> void:
+	if serial != _choice_notice_serial or _nora_option_active: return
+	_alternative_note = ""
+	refresh(true)

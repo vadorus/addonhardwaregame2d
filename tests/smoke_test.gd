@@ -62,7 +62,7 @@ func _ready() -> void:
 	print("[CI] Tech Empire smoke test starting")
 	# C1 : les tests écrivent et effacent des sauvegardes. Jamais dans le vrai dossier du joueur.
 	SaveManager.use_test_folder()
-	var cash_safety_error := CASH_SAFETY_SCENARIO.run(self)
+	var cash_safety_error: String = await CASH_SAFETY_SCENARIO.run(self)
 	if cash_safety_error != "":
 		_fail(cash_safety_error)
 		return

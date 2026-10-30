@@ -15,7 +15,7 @@ const BINNING_HINTS := {
 }
 
 ## Les fondeurs possibles pour ce CPU, chacun avec son aperçu et deux mots qui le résument.
-static func foundry_options(job: Dictionary, binning: String = "BALANCED") -> Array:
+static func foundry_options(job: Dictionary, binning: String = "BALANCED", strategy: String = "BALANCED") -> Array:
 	var node_nm := int(job.get("node_nm", 10000))
 	var ids: Array = []
 	if FoundryManager.internal_supports_node(node_nm):
@@ -26,7 +26,7 @@ static func foundry_options(job: Dictionary, binning: String = "BALANCED") -> Ar
 	var options: Array = []
 	for id_value in ids:
 		var provider := str(id_value)
-		var preview := ProductionManager.preview_industrialization(str(job.get("id", "")), provider, "BALANCED", binning)
+		var preview := ProductionManager.preview_industrialization(str(job.get("id", "")), provider, strategy, binning)
 		if preview.is_empty():
 			continue
 		options.append({"id":provider, "name":str(preview.get("foundry_name", provider)), "preview":preview, "recommended":provider == recommended})
@@ -66,9 +66,9 @@ static func _is_best(options: Array, option: Dictionary, key: String, highest: b
 	return true
 
 ## L'aperçu complet pour un fondeur et un tri des puces.
-static func build(job: Dictionary, provider: String, binning: String = "BALANCED") -> Dictionary:
+static func build(job: Dictionary, provider: String, binning: String = "BALANCED", strategy: String = "BALANCED") -> Dictionary:
 	var job_id := str(job.get("id", ""))
-	var preview := ProductionManager.preview_industrialization(job_id, provider, "BALANCED", binning)
+	var preview := ProductionManager.preview_industrialization(job_id, provider, strategy, binning)
 	if preview.is_empty():
 		return {"ok":false, "job_id":job_id, "name":str(job.get("name", "CPU"))}
 	var project: Dictionary = job.get("project", {})
