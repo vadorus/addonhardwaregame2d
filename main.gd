@@ -3402,6 +3402,10 @@ func _menu_quit() -> void:
 # --- Bouton Retour Android / Échap PC --------------------------------------
 
 func _handle_back_request() -> void:
+	var cash_scene := get_tree().get_first_node_in_group("cash_risk_modal")
+	if cash_scene != null:
+		cash_scene.cancel()
+		return
 	if slot_picker_visible():
 		close_slot_picker()
 		return

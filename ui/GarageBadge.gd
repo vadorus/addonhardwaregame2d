@@ -47,6 +47,14 @@ func _draw() -> void:
 	var unit := s / 52.0
 	draw_set_transform(center, 0.0, Vector2.ONE * unit)
 	match kind:
+		"finance":
+			draw_circle(Vector2.ZERO, 12, ink, false, 2.5, true)
+			draw_arc(Vector2.ZERO, 8, -PI * 0.35, PI * 0.35, 16, ink, 2, true)
+			draw_line(Vector2(-2,-7), Vector2(-2,7), ink, 2.5)
+		"risk":
+			draw_polyline(PackedVector2Array([Vector2(0,-13), Vector2(14,12), Vector2(-14,12), Vector2(0,-13)]), ink, 2.5, true)
+			draw_line(Vector2(0,-5), Vector2(0,3), ink, 3)
+			draw_circle(Vector2(0,8), 1.6, ink)
 		"screen":
 			draw_rect(Rect2(-12, -10, 24, 17), ink, false, 2.5)
 			draw_line(Vector2(0, 7), Vector2(0, 13), ink, 2.5)

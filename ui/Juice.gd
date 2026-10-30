@@ -56,3 +56,20 @@ static func count_label(label: Label, from_value: float, to_value: float, format
 	var tween := label.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_method(func(value: float): label.text = formatter.call(value), from_value, to_value, duration)
 	return tween
+
+## Une seule pulsation, jamais de boucle pour une décision financière.
+static func pulse_once(node: Control, duration: float = 0.2) -> void:
+	if node == null or not node.is_inside_tree() or reduced_motion:
+		return
+	node.pivot_offset = node.size * 0.5
+	var tween := node.create_tween()
+	tween.tween_property(node, "scale", Vector2.ONE * 1.04, duration * 0.5)
+	tween.tween_property(node, "scale", Vector2.ONE, duration * 0.5)
+
+static func fade_out(node: CanvasItem, finished: Callable, duration: float = 0.15) -> void:
+	if node == null or not node.is_inside_tree() or reduced_motion:
+		finished.call()
+		return
+	var tween := node.create_tween()
+	tween.tween_property(node, "modulate:a", 0.0, duration)
+	tween.tween_callback(finished)

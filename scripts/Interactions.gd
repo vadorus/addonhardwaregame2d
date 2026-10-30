@@ -113,7 +113,7 @@ static func _career_summary() -> String:
 		"%d ans d'activité depuis %d" % [TimeManager.year - CompanyManager.founded_year, CompanyManager.founded_year],
 		"%d générations de CPU, %d références" % [ProductManager.cpu_generations.size(), launched],
 		"%d personnes dans l'équipe" % PersonnelManager.staff.size(),
-		"trésorerie %s €" % _money(Economy.money),
+		"trésorerie %s €" % _money(Economy.money),
 	]
 	if units > 0:
 		parts.insert(2, "%s puces vendues" % _money(units))
@@ -182,13 +182,13 @@ static func _person(speaker_key: String) -> Dictionary:
 	var employee := PersonnelManager.get_employee(speaker_key)
 	return {"key":speaker_key, "name":str(employee.get("name", "Un salarié")), "role":str(employee.get("role", ""))}
 
-static func _money(value: int) -> String:
+static func _money(value: int, currency: bool = false) -> String:
 	var digits := str(absi(value))
 	var out := ""
 	while digits.length() > 3:
-		out = " " + digits.substr(digits.length() - 3) + out
+		out = "\u00a0" + digits.substr(digits.length() - 3) + out
 		digits = digits.substr(0, digits.length() - 3)
-	return ("−" if value < 0 else "") + digits + out
+	return ("−" if value < 0 else "") + digits + out + ("\u00a0€" if currency else "")
 
 ## Contenu de la conversation : qui parle, ce qu'il dit, les réponses possibles.
 static func hiring_cash_text() -> String:
@@ -206,7 +206,7 @@ static func hiring_cash_text() -> String:
 		monthly += Economy.quoted_expense(int(profile.salary), "Salaires")
 		signing += Economy.quoted_expense(int(profile.salary) * 2, "Recrutement")
 		var advice := ExecutiveManager.financial_advice(signing, monthly)
-		lines.append("%d recrue(s) : +%s €/mois, prime %s € ; réserve après embauche %s € (%s)." % [count, _money(monthly), _money(signing), _money(int(advice.cash_after)), CASH_RISK.reserve_text(float(advice.runway_months))])
+		lines.append("%d recrue(s) : +%s €/mois, prime %s € ; réserve après embauche %s € (%s)." % [count, _money(monthly), _money(signing), _money(int(advice.cash_after)), CASH_RISK.reserve_text(float(advice.runway_months))])
 		preview._add_employee(str(profile.name), "", "Développement", int(profile.skill), float(profile.experience_years), str(profile.specialization), int(profile.leadership), int(profile.salary), profile.profile)
 	preview.free()
 	return "Avant les premières ventes, préservez le financement du CPU.\n" + "\n".join(lines)
@@ -257,7 +257,7 @@ static func dialogue(key: String) -> Dictionary:
 		return {"key":key, "person":_person(speaker), "mood":"WORRIED", "kicker":"L'ÉQUIPE VOUS PARLE", "text":text,
 			"choices":[
 				{"id":"DISCUSS", "label":discuss, "hint":discuss_hint, "primary":true},
-				{"id":"BONUS", "label":"Je débloque une prime (%s €)." % _money(cost), "hint":"Effet plus fort sur le moral", "enabled":Economy.can_afford(cost)},
+				{"id":"BONUS", "label":"Je débloque une prime (%s €)." % _money(cost), "hint":"Effet plus fort sur le moral", "enabled":Economy.can_afford(cost)},
 				{"id":"LATER", "label":"Pas maintenant.", "hint":"Le problème reste ouvert"},
 			]}
 	elif key == "HIRE:DEV":
@@ -280,9 +280,9 @@ static func dialogue(key: String) -> Dictionary:
 			"text":"Patron, c'est bientôt Noël ! L'équipe a bien travaillé cette année. On organise quelque chose ?",
 			"note":"%d personnes. Le moral joue un peu sur la qualité du travail de chacun." % people,
 			"choices":[
-				{"id":"BIG", "label":str(SEASONAL.PARTY.BIG.label), "hint":"%s € • moral +8" % _money(SEASONAL.party_cost("BIG")), "primary":true},
-				{"id":"SMALL", "label":str(SEASONAL.PARTY.SMALL.label), "hint":"%s € • moral +3" % _money(SEASONAL.party_cost("SMALL"))},
-				{"id":"SKIP", "label":str(SEASONAL.PARTY.SKIP.label), "hint":"0 € • moral −2"},
+				{"id":"BIG", "label":str(SEASONAL.PARTY.BIG.label), "hint":"%s € • moral +8" % _money(SEASONAL.party_cost("BIG")), "primary":true},
+				{"id":"SMALL", "label":str(SEASONAL.PARTY.SMALL.label), "hint":"%s € • moral +3" % _money(SEASONAL.party_cost("SMALL"))},
+				{"id":"SKIP", "label":str(SEASONAL.PARTY.SKIP.label), "hint":"0 € • moral −2"},
 			]}
 	elif key == "NEXT:GEN":
 		var next := NEXT_GENERATION.advice()
@@ -311,7 +311,7 @@ static func dialogue(key: String) -> Dictionary:
 		var busy := int(round(float(study.get("load", 0.3)) * 100.0))
 		var own_project := ResearchManager.get_active_development_project_count() > 0
 		return {"key":key, "person":_person("CLIENT:%s" % str(study.get("customer", ""))), "mood":"HAPPY", "kicker":"UN CLIENT PASSE AU GARAGE",
-			"text":"Bonjour ! On m'a dit que vous saviez concevoir des puces. Il nous faudrait %s, livré dans %d mois. On paie %s €, dont %s € d'avance à la signature. Ça vous intéresse ?" % [
+			"text":"Bonjour ! On m'a dit que vous saviez concevoir des puces. Il nous faudrait %s, livré dans %d mois. On paie %s €, dont %s € d'avance à la signature. Ça vous intéresse ?" % [
 				str(study.get("task", "une puce")), int(study.get("months", 2)), _money(int(study.get("pay", 0))), _money(GarageBusiness.study_advance(study))],
 			"note":("Pendant %d mois, environ %d %% de votre équipe Développement y travaillera : votre propre CPU avancera moins vite." % [int(study.get("months", 2)), busy]) if own_project else "Votre équipe n'a pas de projet en cours : ce contrat ne ralentit rien.",
 			"choices":[
@@ -322,18 +322,18 @@ static func dialogue(key: String) -> Dictionary:
 	elif key == "FINANCE:WARNING":
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE — MOINS DE DEUX MOIS",
 			"text":("Patron, la trésorerie est négative. Faillite à la clôture si rien ne change." if Economy.money < 0 else "Patron, la trésorerie couvre moins de deux mois de dépenses. Réduisons ou reportons nos engagements avant la prochaine clôture. La faillite reste possible."),
-			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions. Jeu en pause : après cette alerte, utilisez ▶ pour reprendre." % _money(Economy.money),
+			"note":"Trésorerie disponible : %s €. Un prêt en cours ou un prêt refusé peut limiter nos solutions. Jeu en pause : après cette alerte, utilisez ▶ pour reprendre." % _money(Economy.money),
 			"choices":[{"id":"CONTINUE", "label":"Compris, je revois les dépenses.", "primary":true}]}
 	elif key == "FINANCE:LOAN":
 		if not GarageBusiness.loan_offer_pending():
 			return {}
 		var terms := GarageBusiness.loan_terms()
 		return {"key":key, "person":_person("NORA"), "mood":"WORRIED", "kicker":"TRÉSORERIE",
-			"text":("Trésorerie négative : faillite à la clôture si rien ne change. " if Economy.money < 0 else "") + "Patron, au rythme actuel notre réserve couvre %s. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
+			"text":("Trésorerie négative : faillite à la clôture si rien ne change. " if Economy.money < 0 else "") + "Patron, au rythme actuel notre réserve couvre %s. J'ai vu la banque : elle nous prête %s € tout de suite, remboursés %s € par mois pendant %d mois. Ça nous donnerait de l'air jusqu'au lancement." % [
 				CASH_RISK.reserve_text(GarageBusiness.cash_runway_months()), _money(int(terms.amount)), _money(int(terms.monthly)), int(terms.months)],
-			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
+			"note":"Coût total du prêt : %s € (%s € d'intérêts). Autre piste : accepter un contrat d'études d'un client.\nSi Nora a interrompu le temps pour cette alerte, le jeu reste en pause après votre réponse : utilisez ▶ pour reprendre." % [_money(int(terms.total)), _money(int(terms.total) - int(terms.amount))],
 			"choices":[
-				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
+				{"id":"ACCEPT", "label":"On signe, il faut tenir jusqu'au lancement.", "hint":"Trésorerie +%s € • mensualité de %s €" % [_money(int(terms.amount)), _money(int(terms.monthly))], "primary":true},
 				{"id":"DECLINE", "label":"Non, on se serre la ceinture.", "hint":"Nora n'en reparle pas avant un an"},
 			]}
 	elif key.begins_with("ADVICE:"):
@@ -343,9 +343,9 @@ static func dialogue(key: String) -> Dictionary:
 		return {"key":key, "person":_person(_dev_speaker()), "mood":"NEUTRAL", "kicker":"L'ÉQUIPE A UNE IDÉE",
 			"text":"Patron, sur la gamme %s, %s. On peut sortir un %s : %s. On s'y met ?" % [
 				str(advice.generation_name), str(advice.reason), str(advice.label), str(advice.effect)],
-			"note":"Coût : %s € pour %d modèle(s) en vente." % [_money(int(advice.cost)), int(advice.products)],
+			"note":"Coût : %s € pour %d modèle(s) en vente." % [_money(int(advice.cost)), int(advice.products)],
 			"choices":[
-				{"id":"APPLY", "label":"Vas-y, on corrige.", "hint":"%s • %s €" % [str(advice.effect), _money(int(advice.cost))], "primary":true, "enabled":Economy.can_afford(int(advice.cost))},
+				{"id":"APPLY", "label":"Vas-y, on corrige.", "hint":"%s • %s €" % [str(advice.effect), _money(int(advice.cost))], "primary":true, "enabled":Economy.can_afford(int(advice.cost))},
 				{"id":"NO", "label":"Non, gardons l'argent.", "hint":"L'équipe ne reviendra pas sur ce point pour cette gamme"},
 				{"id":"LATER", "label":"On en reparle plus tard.", "hint":"Le « ! » reste au-dessus de sa tête"},
 			]}
@@ -421,8 +421,8 @@ static func dialogue(key: String) -> Dictionary:
 			var units := int(contract.get("units_per_month", 0))
 			var price := int(contract.get("unit_price", 0))
 			return {"key":key, "person":_person("CLIENT:%s" % str(contract.get("customer", ""))), "mood":"HAPPY", "kicker":"UN CLIENT PASSE AU GARAGE",
-				"text":"Bonjour ! Votre %s nous intéresse. Il nous en faudrait %d par mois pendant %d mois, à %s € pièce. Vous pouvez suivre ?" % [str(contract.get("product_name", "CPU")), units, int(contract.get("remaining_months", 12)), _money(price)],
-				"note":"Votre capacité : %d unités/mois • ce contrat : %s €/mois de ventes\n%s" % [int(product.get("production_capacity", 0)), _money(units * price), MarketManager.contract_penalty_text(contract)],
+				"text":"Bonjour ! Votre %s nous intéresse. Il nous en faudrait %d par mois pendant %d mois, à %s € pièce. Vous pouvez suivre ?" % [str(contract.get("product_name", "CPU")), units, int(contract.get("remaining_months", 12)), _money(price)],
+				"note":"Votre capacité : %d unités/mois • ce contrat : %s €/mois de ventes\n%s" % [int(product.get("production_capacity", 0)), _money(units * price), MarketManager.contract_penalty_text(contract)],
 				"choices":[
 					{"id":"SIGN", "label":"Marché conclu !", "hint":"Clientèle pro +2 • honorez-le jusqu'au bout pour gagner leur confiance", "primary":true},
 					{"id":"DECLINE", "label":"Désolé, pas cette fois.", "hint":"Le client repart ; aucune pénalité"},

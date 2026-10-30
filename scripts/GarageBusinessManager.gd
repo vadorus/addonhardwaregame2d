@@ -101,6 +101,9 @@ func cheapest_affordable_fabrication(job_id: String) -> Dictionary:
 					continue
 				if best.is_empty() or int(option.total) < int(best.total):
 					best = option
+					best["provider"] = str(provider)
+					best["strategy"] = str(strategy)
+					best["binning"] = str(binning)
 					best["label"] = "%s / %s / %s" % ["Interne" if provider == "INTERNAL" else FoundryManager.external_foundry_label(str(provider)), ProductionManager.strategy_label(str(strategy)), ProductionManager.binning_strategy_label(str(binning))]
 	return best
 
@@ -109,8 +112,8 @@ func fabrication_cash_text(quote: Dictionary) -> String:
 	var option := cheapest_affordable_fabrication(str(quote.get("job_id", "")))
 	var alternative := "Aucune option ne garde un solde projeté positif ou nul avec la trésorerie actuelle."
 	if not option.is_empty():
-		alternative = "Option finançable la moins chère (estimation) : %s — %s €, réserve minimale %s €. Revenez au choix de fabrication pour la sélectionner." % [str(option.label), interactions._money(int(option.total)), interactions._money(int(option.lowest))]
-	return "Trésorerie disponible : %s €.\nFabrication estimée : %s € (%s € de mise en route + %s €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %s € avant les premières ventes.\n\n%s\n\nContinuer malgré le risque de faillite ?" % [interactions._money(int(quote.cash)), interactions._money(int(quote.total)), interactions._money(int(quote.setup)), interactions._money(int(quote.monthly)), int(quote.months), interactions._money(int(quote.lowest)), alternative]
+		alternative = "Option finançable la moins chère (estimation) : %s — %s €, réserve minimale %s €. Revenez au choix de fabrication pour la sélectionner." % [str(option.label), interactions._money(int(option.total)), interactions._money(int(option.lowest))]
+	return "Trésorerie disponible : %s €.\nFabrication estimée : %s € (%s € de mise en route + %s €/mois pendant %d mois).\nAvec les autres dépenses et revenus récents, le solde pourrait descendre à %s € avant les premières ventes.\n\n%s" % [interactions._money(int(quote.cash)), interactions._money(int(quote.total)), interactions._money(int(quote.setup)), interactions._money(int(quote.monthly)), int(quote.months), interactions._money(int(quote.lowest)), alternative]
 
 func reset() -> void:
 	_cash_warning_shown = false

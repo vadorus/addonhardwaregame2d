@@ -24,6 +24,8 @@ static func run(host: Node) -> String:
 	var warning_shown := GarageBusiness._cash_warning_shown
 	var negative_warning_shown := GarageBusiness._negative_cash_warning_shown
 	var error := _run(host)
+	if error == "":
+		error = await _t8_interactions(host)
 	# TimeManager en dernier : ses signaux lisent les états restaurés.
 	for manager in managers:
 		manager.load_state(snapshot[manager.name])
@@ -243,7 +245,7 @@ static func _t6_guidance() -> String:
 			var candidate := PersonnelManager.generate_candidate("Développement")
 			signing += Economy.quoted_expense(int(candidate.salary) * 2, "Recrutement")
 			monthly += Economy.quoted_expense(int(candidate.salary), "Salaires")
-			if not hiring_text.contains("+%s €/mois, prime %s € ; réserve après embauche %s €" % [INTERACTIONS._money(monthly), INTERACTIONS._money(signing), INTERACTIONS._money(cash - signing)]):
+			if not hiring_text.contains("+%s €/mois, prime %s € ; réserve après embauche %s €" % [INTERACTIONS._money(monthly), INTERACTIONS._money(signing), INTERACTIONS._money(cash - signing)]):
 				return "T6: hiring preview differs from actual candidate costs"
 			if not PersonnelManager.hire_candidate():
 				return "T6: funded hiring fixture failed"
@@ -324,17 +326,17 @@ static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> St
 			panel._on_launch()
 		else:
 			panel._apply(job_id)
-		var dialog: ConfirmationDialog = panel.get_node_or_null("CashRiskConfirmation")
-		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%s €" % INTERACTIONS._money(expected_cash)) or TimeManager.time_scale != 0.0:
+		var dialog: Control = panel.get_node_or_null("CashRiskConfirmation")
+		if dialog == null or not received.is_empty() or not dialog.dialog_text.contains("%s\u00a0€" % INTERACTIONS._money(expected_cash)) or TimeManager.time_scale != 0.0:
 			panel.free()
 			return "Cash safety: missing numeric confirmation / premature launch in %s" % path
-		if dialog.get_script() != CASH_RISK or dialog.get_ok_button().custom_minimum_size.y < 56 or dialog.get_cancel_button().custom_minimum_size.y < 56:
+		if dialog.get_script() != CASH_RISK or dialog._confirm.custom_minimum_size.y < 56 or dialog._cancel.custom_minimum_size.y < 56:
 			panel.free()
 			return "Cash safety: both fabrication paths must use the shared touch dialog"
-		if dialog.get_label().get_theme_color("font_color") != Color("2e2418"):
+		if dialog._speech.get_theme_color("font_color") != Color("2e2418"):
 			panel.free()
 			return "Cash safety: confirmation text must use contrasting ink"
-		dialog.canceled.emit()
+		dialog.cancel()
 		if not received.is_empty() or bool(ProductionManager.get_job(job_id).route_selected) or Economy.money != expected_cash:
 			panel.free()
 			return "Cash safety: cancelling changed the production job or money"
@@ -345,19 +347,19 @@ static func _buttons(host: Node, job_id: String, expected_cash: int = 100) -> St
 		else:
 			panel._apply(job_id)
 		dialog = panel.get_node("CashRiskConfirmation")
-		dialog.confirmed.emit()
+		dialog.confirm()
 		if received.size() != 1 or str((received[0] as Dictionary).job_id) != job_id or TimeManager.time_scale != 1.0:
 			panel.free()
 			return "Cash safety: explicit confirmation did not launch exactly once"
 		panel.free()
 	return ""
 
-## Pixel 10 : ADB wm/dumpsys 30/10/2026, surface paysage 2424 × 1080.
-## Échelle mobile par défaut 1,15 ; aucune sauvegarde personnelle lue.
+
+## Même surface mesurée que T7, maintenant avec une carte plafonnée et une scène maison.
 static func _t7_layout(host: Node) -> String:
-	SimulationManager.reset_all("CI T7 long quote", "CPU", "STANDARD")
+	SimulationManager.reset_all("CI T8 long quote", "CPU", "STANDARD")
 	Economy.money = 34277
-	ProductionManager._on_project_completed({"id":"CI-T7", "name":"CI T7 CPU", "sector":"CPU",
+	ProductionManager._on_project_completed({"id":"CI-T8", "name":"CI T8 CPU", "sector":"CPU",
 		"cpu_design":CPU_DESIGN.default_design(), "complexity":40.0, "design_estimate":{}})
 	var job: Dictionary = ProductionManager.get_active_jobs()[0]
 	var root := host.get_tree().root
@@ -367,27 +369,163 @@ static func _t7_layout(host: Node) -> String:
 	root.content_scale_factor = 1.15
 	var dialog := CASH_RISK.new()
 	host.add_child(dialog)
-	var quote := {"job_id":str(job.id), "cash":34277, "total":18972, "setup":5500,
-		"monthly":3368, "months":4, "lowest":-2503}
-	dialog.show_quote(quote)
+	dialog.show_quote({"job_id":str(job.id), "cash":34277, "total":18972, "setup":5500,
+		"monthly":3368, "months":4, "lowest":-2503})
 	var visible := root.get_visible_rect().size
+	var rect := dialog._stage.get_global_rect()
 	var error := ""
-	if dialog.position.x < 0 or dialog.position.y < 0 or dialog.position.x + dialog.size.x > visible.x or dialog.position.y + dialog.size.y > visible.y:
-		error = "T7: confirmation outside logical viewport"
-	if dialog.get_label().get_line_count() <= dialog.dialog_text.count("\n") + 1:
-		error = "T7: long confirmation did not wrap"
-	if not dialog.dialog_text.contains("Option finançable la moins chère"):
-		error = "T7: missing long affordable alternative fixture"
-	if not dialog.dialog_text.contains("34 277 €") or not dialog.dialog_text.contains("−2 503 €"):
-		error = "T7: money format regression"
-	for key in ["embedded_border", "embedded_unfocused_border"]:
-		var border: StyleBoxFlat = dialog.get_theme_stylebox(key)
-		var ink := dialog.get_theme_color("title_color")
-		var contrast := (border.bg_color.get_luminance() + 0.05) / (ink.get_luminance() + 0.05)
-		if contrast < 4.5 or border.expand_margin_top < 32:
-			error = "T7: unreadable title border"
-	print("[CI] T7: visible=%s position=%s size=%s lines=%d error=%s" % [visible, dialog.position, dialog.size, dialog.get_label().get_line_count(), error])
+	if rect.position.x < 0 or rect.position.y < 0 or rect.end.x > visible.x or rect.end.y > visible.y or rect.size.y > visible.y * 0.8 + 1:
+		error = "T8: scene outside logical viewport or above height limit"
+	if dialog._confirm.custom_minimum_size.y < 56 or dialog._cancel.custom_minimum_size.y < 56:
+		error = "T8: expected native scene with touch buttons"
+	if not dialog.dialog_text.contains("34\u00a0277\u00a0€") or not dialog.dialog_text.contains("−2\u00a0503\u00a0€"):
+		error = "T8: money must be non-breaking"
+	if INTERACTIONS._money(-2503, true) != "−2\u00a0503\u00a0€" or INTERACTIONS._money(34277) != "34\u00a0277":
+		error = "T8: shared formatter regression"
+	if dialog._alternative_button.visible != not dialog.alternative.is_empty():
+		error = "T8: alternative visibility differs from financial source"
+	print("[CI] T8: visible=%s scene=%s card=%s error=%s" % [visible, rect, dialog._card.size, error])
 	dialog.free()
 	root.size = old_size
 	root.content_scale_factor = old_scale
 	return error
+
+## Le bouton conseil prépare EXACTEMENT les trois paramètres sans engager un euro.
+static func _t8_interactions(host: Node) -> String:
+	var juice := preload("res://ui/Juice.gd")
+	var motion := juice.reduced_motion
+	for reduced in [false, true]:
+		juice.reduced_motion = reduced
+		SimulationManager.reset_all("CI T8 alternative", "CPU", "STANDARD")
+		ProductionManager._on_project_completed({"id":"CI-T8-ALT", "name":"CI T8", "sector":"CPU",
+			"cpu_design":CPU_DESIGN.default_design(), "complexity":40.0, "design_estimate":{}})
+		var job: Dictionary = ProductionManager.get_active_jobs()[0]
+		var job_id := str(job.id)
+		Economy.money = 0
+		var minimum := 2147483647
+		var expensive := ""
+		var maximum := 0
+		for provider in FoundryManager.available_external_foundries(int(job.node_nm)):
+			for strategy in ProductionManager.get_strategy_keys():
+				for binning in ProductionManager.get_binning_strategy_keys():
+					var q := GarageBusiness.fabrication_cash_quote(job_id, str(provider), str(strategy), str(binning))
+					minimum = mini(minimum, -int(q.lowest))
+			var q := GarageBusiness.fabrication_cash_quote(job_id, str(provider), "BALANCED", "BALANCED")
+			if -int(q.lowest) > maximum:
+				maximum = -int(q.lowest)
+				expensive = str(provider)
+		Economy.money = minimum + 1
+		var option := GarageBusiness.cheapest_affordable_fabrication(job_id)
+		if option.is_empty() or minimum + 1 >= maximum:
+			juice.reduced_motion = motion
+			return "T8: invalid affordable alternative fixture"
+		for path in ["res://ui/components/ProductionBoard.gd", "res://ui/components/IndustrializationPanel.gd"]:
+			var panel: Control = (load(path) as Script).new()
+			host.add_child(panel)
+			var received := []
+			if panel.has_signal("launch_requested"):
+				panel.set_job(job_id)
+				panel.select_provider(expensive)
+				panel.launch_requested.connect(func(payload): received.append(payload))
+				panel._on_launch()
+			else:
+				panel._choices[job_id] = {"provider":expensive, "strategy":"BALANCED", "binning":"BALANCED"}
+				panel.action_requested.connect(func(_action, payload): received.append(payload))
+				panel._apply(job_id)
+			var dialog: Control = panel.get_node("CashRiskConfirmation")
+			var before := ProductionManager.get_state().duplicate(true)
+			var cash := Economy.money
+			# Dès l'apparition : pas d'attente d'animation, y compris double toucher.
+			dialog._alternative_button.pressed.emit()
+			dialog._alternative_button.pressed.emit()
+			await host.get_tree().process_frame
+			await host.get_tree().process_frame
+			var selected: Dictionary = panel.data().preview if panel.has_signal("launch_requested") else panel._choices[job_id]
+			var actual := GarageBusiness.fabrication_cash_quote(job_id, str(option.provider), str(option.strategy), str(option.binning))
+			var same: bool = panel._provider == str(option.provider) and panel._strategy == str(option.strategy) and panel._binning == str(option.binning) if panel.has_signal("launch_requested") else selected == {"provider":option.provider, "strategy":option.strategy, "binning":option.binning}
+			if not same or not received.is_empty() or before != ProductionManager.get_state() or cash != Economy.money or int(actual.lowest) < 0:
+				panel.free()
+				juice.reduced_motion = motion
+				return "T8: alternative launched, mutated state or selected incorrect parameters"
+			if panel.has_signal("launch_requested") and int(panel.data().preview.total_cost) != int(ProductionManager.preview_industrialization(job_id, str(option.provider), str(option.strategy), str(option.binning)).total_cost):
+				panel.free()
+				juice.reduced_motion = motion
+				return "T8: selected alternative preview differs from production source"
+			panel.free()
+		# Le compteur finit exactement au point bas ; le mode réduit saute directement à la fin.
+		var animated := CASH_RISK.new()
+		host.add_child(animated)
+		animated.show_quote({"job_id":"", "cash":34277, "total":18972, "setup":5500, "monthly":3368, "months":4, "lowest":-2503})
+		if reduced:
+			await host.get_tree().process_frame
+			await host.get_tree().process_frame
+			await host.get_tree().process_frame
+		else:
+			await host.get_tree().create_timer(1.1).timeout
+		if not is_equal_approx(animated._gauge.value, -2503.0) or animated._counter.text != INTERACTIONS._money(-2503, true) or not animated._pulsed:
+			animated.free()
+			juice.reduced_motion = motion
+			return "T8: counter did not reach the exact low point, or reduced motion still animates"
+		animated.free()
+		# Annulation au voile, Retour et bouton : même signal, jamais confirmé.
+		for method in ["button", "veil", "back"]:
+			var dialog := CASH_RISK.new()
+			host.add_child(dialog)
+			dialog.show_quote(GarageBusiness.fabrication_cash_quote(job_id, expensive, "BALANCED", "BALANCED"))
+			var results := []
+			dialog.canceled.connect(func(): results.append("cancel"))
+			dialog.confirmed.connect(func(): results.append("confirm"))
+			if method == "button": dialog._cancel.pressed.emit()
+			elif method == "veil":
+				var click := InputEventMouseButton.new()
+				click.button_index = MOUSE_BUTTON_LEFT
+				click.pressed = true
+				dialog._veil_input(click)
+			else:
+				var back := InputEventAction.new()
+				back.action = "ui_cancel"
+				back.pressed = true
+				dialog._input(back)
+			dialog.confirm() # Un second événement ne doit jamais inverser la décision.
+			if results != ["cancel"]:
+				dialog.free()
+				juice.reduced_motion = motion
+				return "T8: cancellation not immediate or not idempotent"
+			dialog.free()
+	# Redimensionnement réel : pas seulement le minimum déclaré des conteneurs.
+	var root := host.get_tree().root
+	var old_size := root.size
+	var old_scale := root.content_scale_factor
+	var old_base := root.content_scale_size
+	for dimensions in [Vector2i(2424, 1080), Vector2i(800, 1080)]:
+		root.size = dimensions
+		root.content_scale_size = Vector2i(1280, 720) if dimensions.x > 1000 else Vector2i(540, 720)
+		root.content_scale_factor = 1.15
+		var dialog := CASH_RISK.new()
+		host.add_child(dialog)
+		dialog.show_quote({"job_id":"", "cash":34277, "total":18972, "setup":5500, "monthly":3368, "months":4, "lowest":-2503})
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		var screen := root.get_visible_rect().size
+		var rect := dialog._stage.get_global_rect()
+		var card := dialog._card.get_global_rect()
+		var invalid := rect.size.y > screen.y * 0.8 + 1 or rect.size.x > screen.x * 0.9 + 1 or rect.end.y > screen.y or card.size.x > 760.1 or card.end.y > screen.y
+		if dimensions.x < 1000:
+			invalid = invalid or not dialog.narrow or dialog._nora.get_global_rect().end.y > card.position.y or dialog._scroll.get_v_scroll_bar().max_value <= dialog._scroll.get_v_scroll_bar().page
+		else:
+			invalid = invalid or dialog.narrow or dialog._nora.get_global_rect().end.x > card.position.x
+		invalid = invalid or host.get_viewport().gui_get_focus_owner() != dialog._cancel or dialog._alternative_button.visible
+		print("[CI] T8 responsive: screen=%s scene=%s card=%s narrow=%s" % [screen, rect, card, dialog.narrow])
+		dialog.free()
+		if invalid:
+			root.size = old_size
+			root.content_scale_size = old_base
+			root.content_scale_factor = old_scale
+			juice.reduced_motion = motion
+			return "T8: responsive bounds, scroll, default focus or no-option regression"
+	root.size = old_size
+	root.content_scale_size = old_base
+	root.content_scale_factor = old_scale
+	juice.reduced_motion = motion
+	print("[CI] T8 actions: PASS (both fabrication paths, exact alternative preview, zero spending/launch, immediate input, double tap, veil/back/cancel, reduced motion)")
+	return ""

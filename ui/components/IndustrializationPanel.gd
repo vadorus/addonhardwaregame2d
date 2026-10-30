@@ -398,6 +398,9 @@ func _apply(job_id: String) -> void:
 		_cash_confirmation.confirmed.connect(func():
 			TimeManager.time_scale = resume_scale
 			_emit_production(payload), CONNECT_ONE_SHOT)
+		_cash_confirmation.alternative_selected.connect(func(option: Dictionary):
+			TimeManager.time_scale = resume_scale
+			call_deferred("_select_alternative", job_id, option), CONNECT_ONE_SHOT)
 		_cash_confirmation.show_quote(quote)
 		return
 	_emit_production(payload)
@@ -654,3 +657,12 @@ func _add_details(box: VBoxContainer, lines: Array[String]) -> void:
 func _toggle_details(toggle: Button, details: Control) -> void:
 	details.visible = not details.visible
 	toggle.text = "Masquer les détails  ▴" if details.visible else "Détails  ▾"
+
+func _select_alternative(job_id: String, option: Dictionary) -> void:
+	_choices[job_id] = {"provider":str(option.provider), "strategy":str(option.strategy), "binning":str(option.binning)}
+	_adjust_open[job_id] = true
+	_force_refresh()
+	var button: Button = _go_buttons.get(job_id)
+	if is_instance_valid(button):
+		button.text = "Option de Nora sélectionnée · " + button.text
+		button.grab_focus()
