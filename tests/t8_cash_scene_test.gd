@@ -77,7 +77,8 @@ func _ready() -> void:
 			return
 	else:
 		await get_tree().create_timer(1.1).timeout
-	await RenderingServer.frame_post_draw
+	# Le rendu doit aussi terminer si la fenêtre locale est masquée/minimisée.
+	RenderingServer.force_draw(false)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/reviews/t8"))
 	get_viewport().get_texture().get_image().save_png("res://docs/reviews/t8/%s.png" % mode)
 	print("[CAPTURE T8] ", mode, " scene=", scene._stage.get_global_rect(), " card=", scene._card.get_global_rect(), " value=", scene._gauge.value, " nora=", scene._nora.get_global_rect(), " bubble=", scene._bubble.get_global_rect(), " body min=", scene._body.get_combined_minimum_size())
